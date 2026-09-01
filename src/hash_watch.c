@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <psapi.h>
 
 /* _ReturnAddress() is an MSVC intrinsic; this project builds with MinGW GCC. */
 #ifndef _MSC_VER
@@ -50,23 +51,32 @@ static volatile LONG g_nsites;
 static volatile LONG g_total;
 static volatile LONG g_installed;
 
-/* Is this buffer plausibly a GMD label? Labels are uppercase ASCII with
- * underscores and digits (MENU_TITLE_00, STATS_CVS2_39_NAME). Being strict
- * here is deliberate: it is what separates "hashing a string" from "hashing a
- * struct of floats", which is exactly the distinction static analysis could
- * not make. */
-static BOOL looks_like_label(const char *p, unsigned len)
+/* Is this buffer plausibly TEXT of any kind?
+ *
+ * Deliberately broader than "matches a GMD label". GMD labels are uppercase
+ * (MENU_TITLE_00), but a lookup might equally be handed a resource path, a
+ * mixed-case name, or a UI node id -- and a filter tuned to exactly what I
+ * expect would report "no text" for all of those, producing a confident
+ * negative that is really just a too-narrow filter. Accept any mostly-
+ * printable ASCII run and let the SAMPLE in the log show what it actually was.
+ *
+ * This still cleanly separates text from the float/bitfield structs the
+ * graphics callers hash, which is the distinction that matters. */
+static BOOL looks_like_text(const char *p, unsigned len)
 {
-    if (len < 3 || len > 64)
+    if (len < 3 || len > 128)
         return FALSE;
-    unsigned upper = 0;
+    unsigned alnum = 0;
     for (unsigned i = 0; i < len; i++) {
         unsigned char c = (unsigned char)p[i];
-        if (c >= 'A' && c <= 'Z') { upper++; continue; }
-        if (c == '_' || (c >= '0' && c <= '9')) continue;
-        return FALSE;       /* anything else disqualifies it */
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+            (c >= '0' && c <= '9')) { alnum++; continue; }
+        if (c == '_' || c == '.' || c == '/' || c == '\\' || c == '-')
+            continue;
+        return FALSE;
     }
-    return upper >= 2;
+    /* Mostly alphanumeric, not just a run of separators. */
+    return alnum * 2 >= len;
 }
 
 /* Record one observation. Lock-free: races can only lose a sample, never
@@ -81,7 +91,7 @@ static void record(uintptr_t ret, const void *buf, unsigned len)
             InterlockedIncrement(&g_sites[i].count);
             /* Upgrade the sample if this call carries a label-looking buffer
              * and we have not stored one yet. */
-            if (buf && looks_like_label((const char *)buf, len)) {
+            if (buf && looks_like_text((const char *)buf, len)) {
                 InterlockedIncrement(&g_sites[i].printable);
                 if (InterlockedCompareExchange(&g_sites[i].have_sample, 1, 0)
                         == 0) {
@@ -100,7 +110,7 @@ static void record(uintptr_t ret, const void *buf, unsigned len)
         return;                      /* table full: stop recording, do not wrap */
     g_sites[idx].ret = ret;
     g_sites[idx].count = 1;
-    if (buf && looks_like_label((const char *)buf, len)) {
+    if (buf && looks_like_text((const char *)buf, len)) {
         g_sites[idx].printable = 1;
         unsigned c = len < SAMPLE_LEN - 1 ? len : SAMPLE_LEN - 1;
         memcpy(g_sites[idx].sample, buf, c);
@@ -159,6 +169,24 @@ BOOL hash_watch_install(void)
     }
 
     InterlockedExchange(&g_installed, ok);
+
+    /* POSITIVE CONTROL. Call the hooked primitive ourselves with a real GMD
+     * label. If the detour and the text filter both work, this shows up in the
+     * report as a caller inside our own DLL with sample="MENU_TITLE_00".
+     *
+     * This is what makes a later "0 callers hashed text" trustworthy. Without
+     * it, a broken detour, a wrong signature, or a too-narrow filter would all
+     * produce the same empty result as a genuine absence -- and I would have no
+     * way to tell which I was looking at. */
+    if (ok > 0 && g_orig_a) {
+        unsigned seed = 0xFFFFFFFFu;
+        static const char probe[] = "MENU_TITLE_00";
+        unsigned h = ((crc_a_t)hook_a)(&seed, probe, (unsigned)sizeof(probe) - 1);
+        log_line("hashwatch: positive control -- hashed \"%s\" through the "
+                 "hook, got 0x%08x (expect 0xec548ce8) %s",
+                 probe, h, h == 0xec548ce8u ? "OK" : "MISMATCH");
+    }
+
     return ok > 0;
 }
 
@@ -184,11 +212,35 @@ void hash_watch_report(void)
         return;
     }
 
-    int labelish = 0;
+    /* Our own positive-control call returns into this DLL, so exclude that
+     * range when counting GAME callers -- otherwise the control would inflate
+     * the very number it exists to validate. */
+    HMODULE self = NULL;
+    GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                       GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       (LPCSTR)(void *)hash_watch_report, &self);
+    MODULEINFO mi;
+    uintptr_t self_lo = 0, self_hi = 0;
+    if (self && GetModuleInformation(GetCurrentProcess(), self, &mi,
+                                     sizeof(mi))) {
+        self_lo = (uintptr_t)mi.lpBaseOfDll;
+        self_hi = self_lo + mi.SizeOfImage;
+    }
+
+    int labelish = 0, control = 0;
     for (int i = 0; i < n; i++) {
         if (g_sites[i].printable > 0) {
+            BOOL is_self = self_lo && g_sites[i].ret >= self_lo &&
+                           g_sites[i].ret < self_hi;
+            if (is_self) {
+                control++;
+                log_line("hashwatch:  [control] our own probe call, "
+                         "sample=\"%s\" -- detour+filter WORK",
+                         g_sites[i].sample);
+                continue;
+            }
             labelish++;
-            log_line("hashwatch:  ⭐ caller 0x%llx  calls=%ld  label-like=%ld  "
+            log_line("hashwatch:  ⭐ GAME caller 0x%llx  calls=%ld  text=%ld  "
                      "sample=\"%s\"",
                      (unsigned long long)g_sites[i].ret,
                      g_sites[i].count, g_sites[i].printable,
@@ -200,7 +252,13 @@ void hash_watch_report(void)
             log_line("hashwatch:     caller 0x%llx  calls=%ld  (no text)",
                      (unsigned long long)g_sites[i].ret, g_sites[i].count);
     }
-    log_line("hashwatch: %d/%d callers hashed label-like strings", labelish, n);
+    /* State the control's verdict alongside the count, so the negative is
+     * always read with the evidence that the detector was working. */
+    log_line("hashwatch: %d/%d GAME callers hashed text "
+             "(positive control: %s)",
+             labelish, n - control,
+             control > 0 ? "PASSED -- a text hash WOULD have been caught"
+                         : "MISSING -- treat any zero here as INCONCLUSIVE");
 }
 
 void hash_watch_shutdown(void)
