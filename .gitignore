@@ -2,3 +2,4 @@ build/
 *.o
 *.log
 tools/__pycache__/
+data/text_*.json
