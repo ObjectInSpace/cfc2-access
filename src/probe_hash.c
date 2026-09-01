@@ -81,6 +81,11 @@ static const candidate g_candidates[] = {
     { "big-frame fn",     0x1402608c0 },
     { "crc site 17ca29",  0x14017c9e0 },
     { "crc site 29bfec",  0x14029bf90 },
+    /* Slicing-by-8 CRC over the SECOND table (0x14106c080), signature
+     * crc32(u32 crc, buf, len) with the seed inverted on entry (`not ecx`).
+     * Shape says zlib's crc32() -- used for ARC decompression rather than for
+     * GMD labels -- but that is an inference, so test it the same way. */
+    { "zlib crc32?",      0x1405a4a10 },
 };
 #define NCAND (int)(sizeof(g_candidates) / sizeof(g_candidates[0]))
 

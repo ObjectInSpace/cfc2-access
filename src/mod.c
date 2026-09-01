@@ -19,6 +19,7 @@
 #include "speech.h"
 #include "image.h"
 #include "probe_hash.h"
+#include "hash_watch.h"
 
 #include <stdio.h>
 
@@ -119,6 +120,9 @@ static DWORD WINAPI worker(LPVOID param)
         /* Only meaningful once .text is decrypted -- calling into ciphertext
          * would fault every time and prove nothing. */
         hash_matches = probe_hash_candidates();
+        /* Static tracing cannot see through MTFramework's hasher vtable, so
+         * observe the callers at runtime instead of inferring them. */
+        hash_watch_install();
     } else {
         log_line("dump: SKIPPED -- image never unpacked. Any dump taken now "
                  "would be ciphertext that silently looks like a valid file.");
@@ -162,6 +166,13 @@ static DWORD WINAPI worker(LPVOID param)
         beat++;
         if (beat <= 3 || beat % 30 == 0)
             log_line("heartbeat %d (alive %d s)", beat, beat * 2);
+        /* Report what the hooks have seen, at a few points spread across
+         * startup and early menu use. The user has to actually navigate a
+         * menu for the interesting callers to appear, so sample repeatedly
+         * rather than once. */
+        if (unpacked && (beat == 5 || beat == 15 || beat == 30 ||
+                         beat % 60 == 0))
+            hash_watch_report();
     }
 
     log_line("worker exiting");
@@ -179,6 +190,7 @@ void mod_start(HINSTANCE self)
 void mod_stop(void)
 {
     InterlockedExchange(&g_quit, 1);
+    hash_watch_shutdown();
     /* Do not wait on the thread here: DLL_PROCESS_DETACH also holds the
      * loader lock, and the worker may be inside a call that needs it. */
     if (g_thread) {
