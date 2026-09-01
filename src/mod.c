@@ -18,6 +18,7 @@
 #include "log.h"
 #include "speech.h"
 #include "image.h"
+#include "probe_hash.h"
 
 #include <stdio.h>
 
@@ -111,9 +112,13 @@ static DWORD WINAPI worker(LPVOID param)
 
     BOOL can_protect = probe_can_protect();
 
+    int hash_matches = 0;
     int dumped = 0;
     if (unpacked) {
         dumped = image_dump();
+        /* Only meaningful once .text is decrypted -- calling into ciphertext
+         * would fault every time and prove nothing. */
+        hash_matches = probe_hash_candidates();
     } else {
         log_line("dump: SKIPPED -- image never unpacked. Any dump taken now "
                  "would be ciphertext that silently looks like a valid file.");
@@ -144,9 +149,10 @@ static DWORD WINAPI worker(LPVOID param)
         speech_say(msg, TRUE);
     }
 
-    log_line("phase 1.3 result: speech=%s protect=%s unpacked=%s sections_dumped=%d",
+    log_line("phase 1.3 result: speech=%s protect=%s unpacked=%s "
+             "sections_dumped=%d hash_matches=%d",
              spoke ? "YES" : "NO", can_protect ? "YES" : "NO",
-             unpacked ? "YES" : "NO", dumped);
+             unpacked ? "YES" : "NO", dumped, hash_matches);
 
     /* Heartbeat: if Enigma tears the thread down later in startup, the log
      * stopping is itself the finding. */
