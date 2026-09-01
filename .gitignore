@@ -3,3 +3,6 @@ build/
 *.log
 tools/__pycache__/
 data/text_*.json
+# Dumps of the unpacked game image: large, and game-owned code.
+cfc2_dump/
+*.bin

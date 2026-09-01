@@ -24,7 +24,7 @@ New-Item -ItemType Directory -Force -Path "$root\build" | Out-Null
     -I "$root\libs\minhook\include" `
     -o "$root\build\dinput8.dll" `
     "$root\src\dinput8_proxy.c" "$root\src\mod.c" "$root\src\speech.c" `
-    "$root\src\log.c" `
+    "$root\src\log.c" "$root\src\image.c" `
     $minhookSrc `
     -luser32 -lpsapi -s
 if ($LASTEXITCODE -ne 0) { throw "Build failed" }

@@ -36,8 +36,19 @@ The game is two different things and they need different approaches:
 
 ## Scope (user's call — do not silently re-order)
 
-In-game state (**gauges, round state, character select**) comes FIRST, before
-the easier shell menus. Menus can be memorised; a live health bar cannot.
+**BUILD ORDER: the MTFramework shell FIRST**, then in-game state.
+
+⚠ An earlier note here said "in-game first". That answered *what to
+investigate* first, not *what to build* first, and the user corrected it
+explicitly: "we should build the shell stuff first, I just wanted to get the
+investigation done so our plan covers all the bases." The in-game investigation
+is complete and recorded (audio design, prior-art RAM schemas); nothing is lost
+by building the shell first. Do not re-invoke the old note to reorder.
+
+The in-match audio design is fully settled — **everything in-game is an audio
+cue, speech only on character select**; two per-player beacons with pan = X
+position and pitch = a stance ladder. See memory `cfc2-audio-design-decision`
+before touching that work.
 
 ## Build
 
@@ -52,10 +63,32 @@ the easier shell menus. Menus can be memorised; a live health bar cannot.
 - `src/dinput8_proxy.c` — the exe imports exactly one symbol from dinput8.dll
   (`DirectInput8Create`), and its own directory wins the DLL search order.
   DllMain stays minimal (loader lock): it only spawns the worker thread.
-- `src/mod.c` — worker thread, Stage 0 probes, heartbeat.
+- `src/mod.c` — worker thread, probes, heartbeat.
+- `src/image.c` — section walk, the unpack wait, and the image dumper.
+  **Every read is guarded by `VirtualQuery`**: Enigma decommits its own
+  unpacking scaffolding, so section headers describe memory that is gone.
 - `src/speech.c` — UniversalSpeech, loaded dynamically so a missing DLL
   degrades instead of killing the process.
 - `src/log.c` — timestamped logging.
+
+## Phase 1.3 workflow — finding the shell's text chokepoint
+
+Plan (user's call): **text hook first, then focus**, because the text hook can
+be verified against ground truth and a focus hook cannot.
+
+1. Launch the game once with the mod deployed. `image_wait_for_unpack()` polls
+   for decryption, then `image_dump()` writes `cfc2_dump\` into the game dir
+   (one `.bin` per section plus `manifest.txt`). The mod **speaks** the result,
+   so no need to read the log for the headline.
+2. `python tools/analyze_dump.py` — locates label hashes, the CRC-32 machinery
+   and GMD artifacts in the dump, reporting **live addresses** (valid forever:
+   ASLR off, no relocations).
+3. `python tools/test_analyze_dump.py` — a self-test that plants known
+   artifacts in a synthetic dump and requires the analyzer to find all of them.
+   Run it after changing the analyzer: "found nothing" and "detector is broken"
+   otherwise look identical.
+
+⚠ The dump is large and game-owned; it is gitignored, not committed.
 
 ## ⭐ Injection facts (measured in-game, 2026-09-01)
 
