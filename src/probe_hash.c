@@ -1,9 +1,10 @@
 #include "probe_hash.h"
 #include "log.h"
 
+#include "memsafe.h"
+
 #include <stdio.h>
 #include <string.h>
-#include <setjmp.h>
 
 /* Fault protection under MinGW.
  *
@@ -18,43 +19,11 @@
  * (i.e. inside one of our own probe calls) and only on the fault classes a bad
  * call actually produces; anything else is passed through to the game's own
  * handlers untouched. */
-static jmp_buf        g_guard;
-static volatile LONG  g_guard_armed;
-static void          *g_veh;
-
-static LONG CALLBACK guard_veh(EXCEPTION_POINTERS *ep)
-{
-    if (!InterlockedCompareExchange(&g_guard_armed, 0, 0))
-        return EXCEPTION_CONTINUE_SEARCH;
-
-    DWORD code = ep->ExceptionRecord->ExceptionCode;
-    if (code != EXCEPTION_ACCESS_VIOLATION &&
-        code != EXCEPTION_ILLEGAL_INSTRUCTION &&
-        code != EXCEPTION_PRIV_INSTRUCTION &&
-        code != EXCEPTION_INT_DIVIDE_BY_ZERO &&
-        code != EXCEPTION_STACK_OVERFLOW &&
-        code != EXCEPTION_DATATYPE_MISALIGNMENT)
-        return EXCEPTION_CONTINUE_SEARCH;
-
-    InterlockedExchange(&g_guard_armed, 0);
-    longjmp(g_guard, (int)code);
-    return EXCEPTION_CONTINUE_SEARCH;   /* not reached */
-}
-
-/* Run one call under the guard. Sets *faulted and leaves *out untouched on a
- * fault. Written as a macro because setjmp's buffer must belong to the frame
- * that is still live when longjmp fires. */
+/* The guard now lives in memsafe.c -- gmd_find.c needs the same machinery, and
+ * a third hand-rolled copy would be the one that drifts. GUARDED_CALL is kept
+ * as a thin wrapper so the call-shape below reads unchanged. */
 #define GUARDED_CALL(out, faulted, expr)                                      \
-    do {                                                                      \
-        (faulted) = FALSE;                                                    \
-        if (setjmp(g_guard) == 0) {                                           \
-            InterlockedExchange(&g_guard_armed, 1);                           \
-            (out) = (expr);                                                   \
-            InterlockedExchange(&g_guard_armed, 0);                           \
-        } else {                                                              \
-            (faulted) = TRUE;                                                 \
-        }                                                                     \
-    } while (0)
+    MEM_GUARDED((faulted), (out) = (expr))
 
 /* Candidate CRC-32 sites from tools/trace_crc.py, as FUNCTION ENTRY points
  * (found with tools/disasm.py --entry). These are live addresses and stay
@@ -166,36 +135,15 @@ int probe_hash_candidates(void)
     log_line("hashprobe: expecting ~crc32=0x%08x  ~crc32(x2)=0x%08x  "
              "crc32=0x%08x", K_PLAIN, K_HASH1, K_RAW);
 
-    g_veh = AddVectoredExceptionHandler(1, guard_veh);
-    if (!g_veh) {
-        log_line("hashprobe: ABORTED -- cannot install the fault guard. "
-                 "Calling guessed signatures unguarded would crash the game.");
+    /* mem_guard_install() arms the handler AND self-tests it by deliberately
+     * faulting -- an untested fault handler is indistinguishable from one that
+     * was never needed, right up until it takes the game down. It refuses to
+     * arm if the self-test does not fault, so a FALSE here means real calls
+     * would be unsafe. */
+    if (!mem_guard_install()) {
+        log_line("hashprobe: ABORTED -- no working fault guard. Calling "
+                 "guessed signatures unguarded would crash the game.");
         return 0;
-    }
-
-    /* SELF-TEST the guard before trusting it with real calls. A fault handler
-     * that silently does not work looks identical to one that was never
-     * needed -- right up until it takes the game down. Deliberately fault, and
-     * require the guard to catch it; if it does not, we never get here and the
-     * missing "guard OK" line is itself the diagnosis. */
-    {
-        volatile unsigned got = 0;
-        volatile BOOL faulted = FALSE;
-        /* Held in a volatile pointer so the optimizer cannot see a constant
-         * null-ish address and "helpfully" fold the deref into a trap. */
-        static volatile unsigned *bad;
-        bad = (volatile unsigned *)(uintptr_t)0x10;
-        GUARDED_CALL(got, faulted, *bad);
-        (void)got;   /* only the fault matters here, not the value */
-        if (faulted) {
-            log_line("hashprobe: guard self-test OK (deliberate fault caught)");
-        } else {
-            log_line("hashprobe: ABORTED -- guard self-test did NOT fault; "
-                     "the handler is not working, so real calls are unsafe.");
-            RemoveVectoredExceptionHandler(g_veh);
-            g_veh = NULL;
-            return 0;
-        }
     }
 
     for (volatile int i = 0; i < NCAND; i++) {
@@ -284,8 +232,9 @@ int probe_hash_candidates(void)
                      (unsigned long long)CFC2_CRC32);
     }
 
-    RemoveVectoredExceptionHandler(g_veh);
-    g_veh = NULL;
+    /* Deliberately NOT removing the guard: the heap scan runs later on this
+     * same thread and needs it. mem_guard_install() is idempotent, so leaving
+     * it armed costs nothing and avoids install/remove/install churn. */
 
     /* A POSITIVE COUNT of what was examined, not just of what passed:
      * "0 matched" and "nothing ran" must not look the same in the log. */

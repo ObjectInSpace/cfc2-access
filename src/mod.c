@@ -20,11 +20,13 @@
 #include "image.h"
 #include "probe_hash.h"
 #include "hash_watch.h"
+#include "gmd_find.h"
 
 #include <stdio.h>
 
 static HANDLE g_thread;
 static volatile LONG g_quit;
+static BOOL g_gmd_found;
 
 /* --- Probe: can we change .text page protection? -------------------------
  * This is the capability Enigma specifically takes away, and the one every
@@ -204,6 +206,31 @@ static DWORD WINAPI worker(LPVOID param)
         if (unpacked && (beat == 5 || beat == 15 || beat == 30 ||
                          beat % 60 == 0))
             hash_watch_report();
+
+        /* Look for the live GMD table. Retried rather than done once: the
+         * message file is loaded with the shell's first menu, so an early
+         * scan can legitimately find nothing. Read-only -- VirtualQuery then
+         * read, no writes and no hooks -- so retrying is free of risk to the
+         * game. Stops as soon as it succeeds. */
+        if (unpacked && !g_gmd_found &&
+            (beat == 3 || beat == 8 || beat == 20 || beat % 25 == 0)) {
+            gmd_result r;
+            if (gmd_find(&r)) {
+                /* Only stops retrying on VERIFIED success -- a structural
+                 * match alone is not enough to build on. */
+                g_gmd_found = TRUE;
+                log_line("gmdfind: array_base=%p form=%s label_verified=%s "
+                         "text_verified=%s",
+                         (void *)r.array_base,
+                         r.form == GMD_FORM_FILE_IMAGE ? "FILE_IMAGE"
+                       : r.form == GMD_FORM_LIVE_TABLE ? "LIVE_TABLE"
+                                                       : "UNKNOWN",
+                         r.label_verified ? "YES" : "no",
+                         r.text_verified ? "YES" : "no");
+                if (r.text_verified)
+                    speech_say(L"Message table located and verified.", FALSE);
+            }
+        }
     }
 
     log_line("worker exiting");

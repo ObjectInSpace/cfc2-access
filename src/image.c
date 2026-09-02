@@ -1,5 +1,6 @@
 #include "image.h"
 #include "log.h"
+#include "memsafe.h"
 
 #include <stdio.h>
 
@@ -8,32 +9,12 @@ BYTE *image_base(void)
     return (BYTE *)GetModuleHandleW(NULL);
 }
 
-/* How many bytes starting at p are committed and readable?
- *
- * This guard is not paranoia. Enigma decommits its own unpacking scaffolding
- * once it is done: sections 1, 2, 4 and 5 vanish from the walk entirely between
- * t+0 and t+10. A section header still describes them, so trusting the header
- * and reading straight through faults. Ask the memory manager, not the PE. */
-static SIZE_T readable_run(BYTE *p, SIZE_T want)
-{
-    SIZE_T ok = 0;
-    while (ok < want) {
-        MEMORY_BASIC_INFORMATION mbi;
-        if (!VirtualQuery(p + ok, &mbi, sizeof(mbi)))
-            break;
-        if (mbi.State != MEM_COMMIT)
-            break;
-        /* PAGE_GUARD would raise on touch; NOACCESS faults outright. */
-        if (mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD))
-            break;
-
-        SIZE_T avail = (SIZE_T)((BYTE *)mbi.BaseAddress + mbi.RegionSize - (p + ok));
-        if (avail == 0)
-            break;
-        ok += avail;
-    }
-    return ok < want ? ok : want;
-}
+/* readable_run lives in memsafe.c now -- Enigma decommits its own unpacking
+ * scaffolding (sections 1, 2, 4 and 5 vanish between t+0 and t+10), so a
+ * section header can describe memory that is gone. Ask the memory manager,
+ * not the PE. The heap scanner needs the same guard, so it is shared rather
+ * than duplicated. */
+#define readable_run(p, want) mem_readable_run((p), (want))
 
 /* Count distinct byte values in a sample window -- our entropy proxy. */
 static int distinct_bytes(BYTE *p, SIZE_T len)
