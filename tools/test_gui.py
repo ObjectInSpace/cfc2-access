@@ -86,6 +86,39 @@ def main():
     check("no unclassified state-prefixed names remain",
           not unknown, "unknown: %s" % sorted(unknown))
 
+    # --- Anchors: every layout must be identifiable at runtime -------------
+    # A layout with no anchor is a screen that can never announce itself, and
+    # that must be a visible failure rather than a quiet omission.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from gen_gui_probes import build  # noqa: E402
+    _text, rows, _states, _decoys = build(os.environ.get(
+        "CFC2_GAME_DIR",
+        r"C:\Program Files (x86)\Steam\steamapps\common"
+        r"\CAPCOM FIGHTING COLLECTION 2"))
+
+    unidentifiable = [r[0] for r in rows if not r[1] and not r[4]]
+    check("every layout has an anchor or a discriminator",
+          not unidentifiable, "stuck: %s" % unidentifiable)
+
+    inter_stuck = [r[0] for r in rows if r[2] and not r[1] and not r[4]]
+    check("every INTERACTIVE layout is identifiable",
+          not inter_stuck, "stuck: %s" % inter_stuck)
+
+    # Anchors must be long enough not to collide with arbitrary memory. The
+    # pool is found by scanning printable runs, so short fragments like "D"
+    # are binary noise from the pool edges, not real names.
+    short = [(r[0], r[1]) for r in rows if r[1] and len(r[1]) < 8]
+    check("no anchor is shorter than 8 chars", not short, "%s" % short)
+
+    # Each anchor must genuinely be unique across all layouts.
+    from collections import Counter
+    freq = Counter()
+    for lay in layouts:
+        for n in set(lay.names):
+            freq[n] += 1
+    bad = [(r[0], r[1]) for r in rows if r[1] and freq[r[1]] != 1]
+    check("every primary anchor is unique across layouts", not bad, "%s" % bad)
+
     print("-" * 62)
     if fails:
         print("%d FAILURES:" % len(fails))
