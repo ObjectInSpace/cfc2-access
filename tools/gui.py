@@ -52,6 +52,62 @@ TYPE_GUI = 0x22948394
 # marks a layout as interactive.
 FOCUS_STATES = ("DEFAULT", "SELECT", "DECIDE", "DISABLE", "FOCUS")
 
+# ⚠ A PREFIX TEST ON "SELECT" IS WRONG. Surveying all 25 shipped layouts turns
+# up names that start with SELECT but do NOT mean "this item just became
+# focused":
+#
+#   SELECTED_DEFAULT / SELECTED_SELECT / SELECTED_DECIDE / SELECTED_UNFOCUS /
+#   SELECTED_F0CUS   -- sub-states of an ALREADY-selected item (option_match).
+#                       SELECTED_UNFOCUS in particular fires as an item LOSES
+#                       focus, so a strncmp(name,"SELECT",6) hook would
+#                       announce exactly the wrong thing.
+#   DISABLE_SELECT   -- contains "SELECT" but is a disabled state.
+#
+# ⚠ And note SELECTED_F0CUS is spelled with a DIGIT ZERO, not the letter O --
+# a typo in Capcom's own data. Matching on "FOCUS" silently misses it. This is
+# why the classifier works from an explicit surveyed vocabulary rather than
+# from pattern-matching what the names look like they ought to be.
+_STATE_RE = re.compile(r"^(DEFAULT|SELECT|DECIDE|DISABLE)(\d*)$")
+
+# Names that carry a state prefix but are NOT a plain focus transition.
+# Enumerated from the shipped data, not guessed.
+NON_PLAIN_STATES = {
+    "DECIDE_MINE", "DEFAULT_MINE", "DEFAULT_SCATK", "DISABLE_SELECT",
+    "SELECTED_DECIDE", "SELECTED_DEFAULT", "SELECTED_F0CUS",
+    "SELECTED_SELECT", "SELECTED_UNFOCUS", "SELECT_MINE", "SELECT_SCATK",
+}
+
+
+def classify_state(name):
+    """What does this animation-state name mean for focus?
+
+    Returns one of: 'select', 'decide', 'default', 'disable', or None.
+    Works from the surveyed vocabulary above, so a name that merely looks
+    like a selection state does not get treated as one.
+    """
+    m = _STATE_RE.match(name)
+    if m:
+        return m.group(1).lower()
+
+    # The compound names. Each is classified by what it actually signifies,
+    # which is not always what its prefix suggests.
+    special = {
+        # An item that is the current selection, in various sub-states.
+        "SELECTED_SELECT": "select",
+        "SELECTED_F0CUS": "select",     # sic: digit zero
+        "SELECTED_DEFAULT": None,       # selected but idle -- not a transition
+        "SELECTED_UNFOCUS": None,       # LOSING focus -- must not announce
+        "SELECTED_DECIDE": "decide",
+        "DISABLE_SELECT": "disable",
+        # *_MINE / *_SCATK are lobby/online variants of the plain states.
+        "SELECT_MINE": "select",
+        "DECIDE_MINE": "decide",
+        "DEFAULT_MINE": "default",
+        "SELECT_SCATK": "select",
+        "DEFAULT_SCATK": "default",
+    }
+    return special.get(name)
+
 
 class GuiLayout:
     def __init__(self, name, raw):
