@@ -62,9 +62,38 @@ static volatile LONG g_installed;
  *
  * This still cleanly separates text from the float/bitfield structs the
  * graphics callers hash, which is the distinction that matters. */
+/* Is [p, p+len) safe to read?
+ *
+ * ⚠ THIS IS WHY THE FIRST VERSION CRASHED THE GAME. crc32_B is called during
+ * archive decompression with buffers that are not strings and are not
+ * necessarily followed by readable pages; reading up to 128 bytes from an
+ * arbitrary caller-supplied pointer faulted on a hot path with nothing to
+ * catch it, and the process died within a second of the hooks going in.
+ *
+ * Ask the memory manager before touching caller memory. Never assume a pointer
+ * handed to a hooked function is readable for as far as you want to look --
+ * the caller only promised `len` bytes to the function it meant to call. */
+static BOOL readable(const void *p, unsigned len)
+{
+    if (!p || len == 0)
+        return FALSE;
+    MEMORY_BASIC_INFORMATION mbi;
+    if (!VirtualQuery(p, &mbi, sizeof(mbi)))
+        return FALSE;
+    if (mbi.State != MEM_COMMIT)
+        return FALSE;
+    if (mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD))
+        return FALSE;
+    /* Must not run past the end of this committed region. */
+    uintptr_t end = (uintptr_t)mbi.BaseAddress + mbi.RegionSize;
+    return (uintptr_t)p + len <= end;
+}
+
 static BOOL looks_like_text(const char *p, unsigned len)
 {
     if (len < 3 || len > 128)
+        return FALSE;
+    if (!readable(p, len))
         return FALSE;
     unsigned alnum = 0;
     for (unsigned i = 0; i < len; i++) {
@@ -96,8 +125,10 @@ static void record(uintptr_t ret, const void *buf, unsigned len)
                 if (InterlockedCompareExchange(&g_sites[i].have_sample, 1, 0)
                         == 0) {
                     unsigned c = len < SAMPLE_LEN - 1 ? len : SAMPLE_LEN - 1;
-                    memcpy(g_sites[i].sample, buf, c);
-                    g_sites[i].sample[c] = '\0';
+                    if (readable(buf, c)) {
+                        memcpy(g_sites[i].sample, buf, c);
+                        g_sites[i].sample[c] = '\0';
+                    }
                 }
             }
             return;
@@ -113,9 +144,11 @@ static void record(uintptr_t ret, const void *buf, unsigned len)
     if (buf && looks_like_text((const char *)buf, len)) {
         g_sites[idx].printable = 1;
         unsigned c = len < SAMPLE_LEN - 1 ? len : SAMPLE_LEN - 1;
-        memcpy(g_sites[idx].sample, buf, c);
-        g_sites[idx].sample[c] = '\0';
-        g_sites[idx].have_sample = 1;
+        if (readable(buf, c)) {
+            memcpy(g_sites[idx].sample, buf, c);
+            g_sites[idx].sample[c] = '\0';
+            g_sites[idx].have_sample = 1;
+        }
     }
 }
 
@@ -181,7 +214,11 @@ BOOL hash_watch_install(void)
     if (ok > 0 && g_orig_a) {
         unsigned seed = 0xFFFFFFFFu;
         static const char probe[] = "MENU_TITLE_00";
-        unsigned h = ((crc_a_t)hook_a)(&seed, probe, (unsigned)sizeof(probe) - 1);
+        /* Call the real hooked ADDRESS, not hook_a directly. Calling our own
+         * detour function bypasses the very dispatch we are trying to verify,
+         * so it would "pass" even if the hook were not actually installed. */
+        unsigned h = ((crc_a_t)CFC2_CRC32_A)(&seed, probe,
+                                             (unsigned)sizeof(probe) - 1);
         log_line("hashwatch: positive control -- hashed \"%s\" through the "
                  "hook, got 0x%08x (expect 0xec548ce8) %s",
                  probe, h, h == 0xec548ce8u ? "OK" : "MISMATCH");

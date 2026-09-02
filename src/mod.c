@@ -72,6 +72,22 @@ static BOOL probe_can_protect(void)
     return TRUE;
 }
 
+/* Is <leaf> present next to the game exe? Used to gate experiments that can
+ * destabilize the game behind an explicit opt-in. */
+static BOOL opt_in_file_present(const char *leaf)
+{
+    char path[MAX_PATH];
+    DWORD n = GetModuleFileNameA(NULL, path, MAX_PATH);
+    if (n == 0 || n >= MAX_PATH)
+        return FALSE;
+    char *slash = strrchr(path, '\\');
+    if (!slash)
+        return FALSE;
+    slash[1] = '\0';
+    strncat(path, leaf, MAX_PATH - strlen(path) - 1);
+    return GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
+}
+
 /* Log the section map as it stands right now. Cheap, and it is the context
  * every later finding gets interpreted against. */
 static void report_sections(const char *when)
@@ -121,8 +137,23 @@ static DWORD WINAPI worker(LPVOID param)
          * would fault every time and prove nothing. */
         hash_matches = probe_hash_candidates();
         /* Static tracing cannot see through MTFramework's hasher vtable, so
-         * observe the callers at runtime instead of inferring them. */
-        hash_watch_install();
+         * observe the callers at runtime instead of inferring them.
+         *
+         * OFF BY DEFAULT. The first version of this crashed the game within a
+         * second of installing: the hooks read up to 128 bytes from whatever
+         * pointer the caller passed, and crc32_B is called during archive
+         * decompression with buffers that are not NUL-terminated strings.
+         * Reading past the end faults on a hot path with nothing to catch it.
+         * An experiment must never be the reason the game will not start, so
+         * it now takes an explicit opt-in: create a file named
+         * `cfc2_hashwatch.on` next to the exe. */
+        if (opt_in_file_present("cfc2_hashwatch.on")) {
+            log_line("hashwatch: opt-in file present -- installing hooks");
+            hash_watch_install();
+        } else {
+            log_line("hashwatch: disabled (create cfc2_hashwatch.on next to "
+                     "the exe to enable)");
+        }
     } else {
         log_line("dump: SKIPPED -- image never unpacked. Any dump taken now "
                  "would be ciphertext that silently looks like a valid file.");
