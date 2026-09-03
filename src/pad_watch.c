@@ -6,39 +6,35 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Two snapshots: one taken while a direction is held, one while nothing is.
- * Comparing them is the whole method -- a byte that differs between the two
- * states is reacting to the keyboard, and everything else is subtracted. */
-static BYTE     *g_held;        /* snapshot while a direction was held    */
-static BYTE     *g_free;        /* snapshot while nothing was held        */
-static unsigned  g_held_dirs;   /* which direction the held snapshot used */
-static SIZE_T    g_span;        /* bytes actually captured                */
-static BOOL      g_reported;
+static unsigned g_seq;          /* capture number, 1-based */
 
+/* Resolve the sPad instance pointer. Returns 0 if it is still null (the input
+ * system is constructed some time after startup) or unreadable. */
 static uintptr_t singleton(void)
 {
     HMODULE base = GetModuleHandleW(NULL);
     if (!base)
         return 0;
-    uintptr_t slot = (uintptr_t)base + PAD_SINGLETON_RVA;
+    uintptr_t slot = (uintptr_t)base + PAD_INSTANCE_RVA;
     uintptr_t obj = 0;
     BOOL faulted;
     MEM_GUARDED(faulted, obj = *(uintptr_t *)slot);
     return faulted ? 0 : obj;
 }
 
-/* Capture the object into `dst`. Returns bytes captured, 0 on failure.
+/* Copy the object into `dst`, page at a time under the fault guard.
  *
- * ⚠ Reads in page-sized chunks under one guard each, so a partially committed
- * object yields a partial capture rather than nothing -- the layout is unknown
- * and the tail may simply not be mapped. */
+ * ⚠ Reads in chunks so a partially committed object yields a PARTIAL capture
+ * rather than nothing -- the layout is unknown and the tail may simply not be
+ * mapped. The actual byte count is recorded, so the analysis never assumes it
+ * got everything. */
 static SIZE_T capture(BYTE *dst, uintptr_t obj)
 {
     /* volatile: lives across setjmp, so longjmp could restore a stale value
      * and silently truncate or loop the capture (-Wclobbered). */
     volatile SIZE_T got = 0;
-    while (got < PAD_WATCH_SPAN) {
-        SIZE_T chunk = PAD_WATCH_SPAN - (SIZE_T)got;
+    while (got < PAD_DUMP_SPAN) {
+        SIZE_T chunk = PAD_DUMP_SPAN - (SIZE_T)got;
         if (chunk > 4096)
             chunk = 4096;
         BOOL faulted;
@@ -51,166 +47,116 @@ static SIZE_T capture(BYTE *dst, uintptr_t obj)
     return (SIZE_T)got;
 }
 
-void pad_watch_tick(unsigned dirs)
+/* Build a path next to the game exe. */
+static BOOL game_path(char *out, size_t n, const char *leaf)
 {
-    if (g_reported)
-        return;
+    char path[MAX_PATH];
+    DWORD len = GetModuleFileNameA(NULL, path, MAX_PATH);
+    if (len == 0 || len >= MAX_PATH)
+        return FALSE;
+    char *slash = strrchr(path, '\\');
+    if (!slash)
+        return FALSE;
+    slash[1] = '\0';
+    size_t need = strlen(path) + strlen(leaf) + 1;
+    if (need > n)
+        return FALSE;
+    memcpy(out, path, strlen(path));
+    memcpy(out + strlen(path), leaf, strlen(leaf) + 1);
+    return TRUE;
+}
 
-    /* Need one snapshot of each state; take whichever is still missing. */
-    if (dirs && g_held)
-        return;
-    if (!dirs && g_free)
-        return;
-
-    uintptr_t obj = singleton();
-    if (!obj) {
-        static BOOL said;
-        if (!said) {
-            said = TRUE;
-            log_line("pad: singleton at image+0x%x is still NULL -- the input "
-                     "system has not been constructed yet.", PAD_SINGLETON_RVA);
-        }
-        return;
-    }
-
+void pad_dump_now(unsigned kb_dirs)
+{
+    /* ⚠⚠ MEM_GUARDED is inert unless the handler is installed, and an inert
+     * guard is worse than none: every read merely LOOKS protected. A previous
+     * module used the macro without arming it and died with 0xC0000005.
+     * Install self-tests by faulting deliberately, so a guard that would not
+     * have worked refuses to proceed. */
     if (!mem_guard_install()) {
-        log_line("pad: fault guard did not install -- not watching.");
+        log_line("pad: fault guard did not install -- not dumping.");
+        speech_say(L"Dump aborted, no fault guard.", TRUE);
         return;
     }
 
-    BYTE **slot = dirs ? &g_held : &g_free;
-    if (!*slot) {
-        *slot = (BYTE *)VirtualAlloc(NULL, PAD_WATCH_SPAN,
-                                     MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-        if (!*slot) {
-            log_line("pad: could not allocate a snapshot buffer.");
-            return;
-        }
-    }
-
-    SIZE_T got = capture(*slot, obj);
-    if (!got) {
-        log_line("pad: could not read the singleton object at 0x%llx.",
-                 (unsigned long long)obj);
-        return;
-    }
-    if (!g_span || got < g_span)
-        g_span = got;
-
-    if (dirs) {
-        g_held_dirs = dirs;
-        log_line("pad: captured HELD state (dirs 0x%02x) from 0x%llx, "
-                 "%llu bytes", dirs, (unsigned long long)obj,
-                 (unsigned long long)got);
-    } else {
-        log_line("pad: captured RELEASED state from 0x%llx, %llu bytes",
-                 (unsigned long long)obj, (unsigned long long)got);
-    }
-
-    if (g_held && g_free) {
-        pad_watch_report();
-        g_reported = TRUE;
-    }
-}
-
-void pad_watch_report(void)
-{
-    if (!g_held || !g_free) {
-        log_line("pad: need both a held and a released capture -- hold a "
-                 "direction for a moment, then let go.");
-        speech_say(L"Need both states.", TRUE);
-        return;
-    }
-
-    /* Which direction bits the held snapshot should show. Either the D-pad
-     * bit or the stick bit may carry it, never both, so accept either. */
-    unsigned want = g_held_dirs;
-
-    unsigned diffs = 0, dirlike = 0;
-    log_line("pad: comparing %llu bytes; held dirs = 0x%02x",
-             (unsigned long long)g_span, want);
-
-    for (SIZE_T i = 0; i < g_span; i++) {
-        if (g_held[i] == g_free[i])
-            continue;
-        diffs++;
-        /* ⚠ Print EVERY differing byte, not only the ones matching the
-         * expected shape. When the expected shape does not appear, what DID
-         * change is the only lead left -- and suppressing it turns a useful
-         * negative into a dead end. */
-        if (diffs <= 64)
-            log_line("pad:   diff +0x%-6llx  held 0x%02x  released 0x%02x",
-                     (unsigned long long)i, g_held[i], g_free[i]);
-        /* ⭐ The shape we are looking for: nonzero while held, zero while
-         * released, and the nonzero value is one of the direction bits. That
-         * is a button byte, read off the machine rather than inferred. */
-        BYTE h = g_held[i], f = g_free[i];
-        if (f == 0 && (h & want) == h && h != 0) {
-            dirlike++;
-            if (dirlike <= 40)
-                log_line("pad:   ⭐ +0x%-6llx  held 0x%02x  released 0x%02x",
-                         (unsigned long long)i, h, f);
-        }
-    }
-
-    log_line("pad: %u byte(s) differed; %u look like direction bits.",
-             diffs, dirlike);
-
-    if (!dirlike) {
-        /* ⚠ Say what a null result means. A quiet "0 found" reads the same as
-         * a broken tool, and that ambiguity has cost several runs here. */
-        log_line("pad: ⚠ nothing matched the button-byte shape. Either the "
-                 "records are outside the first 0x%x bytes, the two captures "
-                 "were taken in the same state, or the pad data lives behind "
-                 "another pointer rather than inline.", PAD_WATCH_SPAN);
-        if (diffs > 2000)
-            log_line("pad:   (%u bytes differed, so the captures WERE taken "
-                     "in different states -- the object is just busy.)", diffs);
-        speech_say(L"No button bytes found. Check the log.", TRUE);
-    } else {
-        speech_say(L"Found candidate button bytes.", TRUE);
-    }
-}
-
-/* Read the two confirmed button bytes and name the direction they report.
- *
- * This is the end-to-end check the whole route was for: press a direction,
- * hear it. No searching, no filtering -- a fixed offset from a fixed pointer,
- * both established before this ran. */
-void pad_watch_say(void)
-{
     uintptr_t obj = singleton();
     if (!obj) {
+        log_line("pad: sPad instance at image+0x%x is NULL -- the input "
+                 "system is not constructed yet. Reach a menu and try again.",
+                 PAD_INSTANCE_RVA);
         speech_say(L"Pad object not ready.", TRUE);
         return;
     }
-    BYTE stick = 0, dpad = 0;
-    BOOL f1, f2;
-    MEM_GUARDED(f1, stick = *(BYTE *)(obj + PAD_STICK_OFFSET));
-    MEM_GUARDED(f2, dpad  = *(BYTE *)(obj + PAD_DPAD_OFFSET));
-    if (f1 || f2) {
-        speech_say(L"Pad bytes unreadable.", TRUE);
+
+    BYTE *buf = (BYTE *)VirtualAlloc(NULL, PAD_DUMP_SPAN,
+                                     MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (!buf) {
+        log_line("pad: could not allocate a %d-byte capture buffer.",
+                 PAD_DUMP_SPAN);
+        speech_say(L"Dump failed, out of memory.", TRUE);
         return;
     }
 
-    /* Either byte may carry the direction; OR them and name what is set. */
-    unsigned bits = (unsigned)stick | (unsigned)dpad;
-    const wchar_t *word = NULL;
-    if (bits & PAD_UP)         word = L"up";
-    else if (bits & PAD_DOWN)  word = L"down";
-    else if (bits & PAD_LEFT)  word = L"left";
-    else if (bits & PAD_RIGHT) word = L"right";
+    SIZE_T got = capture(buf, obj);
+    if (!got) {
+        log_line("pad: could not read the object at 0x%llx.",
+                 (unsigned long long)obj);
+        speech_say(L"Dump failed, unreadable.", TRUE);
+        VirtualFree(buf, 0, MEM_RELEASE);
+        return;
+    }
 
-    /* ⚠ Log what the KEYBOARD says alongside what the bytes say, so the two
-     * can be compared without relying on the user to remember. The bytes were
-     * found by a filter that searched for Left bits, which cannot confirm
-     * itself -- only agreement with an independent reading counts. */
-    unsigned kb = 0;
-    if (GetAsyncKeyState(VK_UP)    & 0x8000) kb |= PAD_UP;
-    if (GetAsyncKeyState(VK_DOWN)  & 0x8000) kb |= PAD_DOWN;
-    if (GetAsyncKeyState(VK_LEFT)  & 0x8000) kb |= PAD_LEFT;
-    if (GetAsyncKeyState(VK_RIGHT) & 0x8000) kb |= PAD_RIGHT;
-    log_line("pad: stick=0x%02x dpad=0x%02x -> %ls   (keyboard says 0x%02x)",
-             stick, dpad, word ? word : L"(none)", kb);
-    speech_say(word ? word : L"none", TRUE);
+    unsigned seq = ++g_seq;
+    char leaf[64], path[MAX_PATH];
+    snprintf(leaf, sizeof leaf, "cfc2_pad_%02u.bin", seq);
+    if (!game_path(path, sizeof path, leaf)) {
+        log_line("pad: could not build the dump path.");
+        VirtualFree(buf, 0, MEM_RELEASE);
+        return;
+    }
+
+    FILE *f = fopen(path, "wb");
+    if (!f) {
+        log_line("pad: could not open %s for writing.", path);
+        speech_say(L"Dump failed, cannot write file.", TRUE);
+        VirtualFree(buf, 0, MEM_RELEASE);
+        return;
+    }
+    size_t wrote = fwrite(buf, 1, got, f);
+    fclose(f);
+    VirtualFree(buf, 0, MEM_RELEASE);
+
+    /* ⚠ Record the byte count ACTUALLY WRITTEN, not the count requested. A
+     * short write with a confident log line is exactly the kind of quiet
+     * mismatch that has cost this project several rounds. */
+    if (wrote != got)
+        log_line("pad: ⚠ short write -- captured %llu bytes but wrote %llu.",
+                 (unsigned long long)got, (unsigned long long)wrote);
+
+    /* The index is the analysis input: it says what state each capture was
+     * taken in. Appended, so the five captures of one session accumulate. */
+    char ipath[MAX_PATH];
+    if (game_path(ipath, sizeof ipath, "cfc2_pad_index.txt")) {
+        FILE *ix = fopen(ipath, "a");
+        if (ix) {
+            if (seq == 1)
+                fprintf(ix, "# seq, file, object, bytes, kb_dirs, tick_ms\n");
+            fprintf(ix, "%u, %s, 0x%llx, %llu, 0x%02x, %llu\n",
+                    seq, leaf, (unsigned long long)obj,
+                    (unsigned long long)wrote, kb_dirs,
+                    (unsigned long long)GetTickCount64());
+            fclose(ix);
+        }
+    }
+
+    log_line("pad: capture %u -> %s  object=0x%llx  bytes=%llu  keyboard=0x%02x",
+             seq, leaf, (unsigned long long)obj,
+             (unsigned long long)wrote, kb_dirs);
+
+    /* Speak the sequence number so the user knows the press registered and
+     * which step of the protocol they are on -- they cannot see the log. */
+    wchar_t msg[64];
+    _snwprintf(msg, 63, L"Capture %u", seq);
+    msg[63] = 0;
+    speech_say(msg, TRUE);
 }

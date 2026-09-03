@@ -27,49 +27,26 @@ static HANDLE g_thread;
 static volatile LONG g_quit;
 static BOOL g_gmd_found;
 
-/* --- Route 5: read the engine's own pad state -----------------------------
- * Routes 1-4 are closed with evidence (see CLAUDE.md). This one does not try
- * to infer which item is selected from memory that happens to change; it reads
- * MTFramework's own input record, identified by the algebraic relationship the
- * engine maintains between Old/Trg/Rel/Chg. That relationship is a positive
- * identification test rather than a correlation, which is what every earlier
- * route lacked.
+/* --- Route 5: read the engine's own pad record ---------------------------
+ * Routes 1-4 are closed with evidence (see CLAUDE.md), and route 5's first
+ * four attempts failed too. What finally worked was reading the answer out of
+ * the DISASSEMBLY rather than searching memory for something pad-shaped:
+ * the sPad instance pointer, the field offsets and the array stride all come
+ * from instructions, not from pattern matching.
  *
- * Up/Down drive menu navigation and Left/Right drive settings, and all four are
- * bits in the same word -- so one reader covers both.
+ * The mod's job is now only to capture bytes; all comparison happens offline.
+ * See src/pad_watch.h for why that division matters.
  *
- * ⚠ The scan is KEY-DRIVEN and requires a direction to be HELD while it runs:
- * a candidate is only armed when something is actually pressed, since an
- * all-zero record satisfies the algebra trivially. */
+ * ⚠ Hotkey choice: F7 is ordinary, not a toggle, not an NVDA modifier. The
+ * real hazard from [[hotkey-fallback-codes-eat-arrows]] is narrow -- NumLock
+ * -off numpad VKs literally ARE the arrow VKs -- and F7 has no such aliasing.
+ * An earlier pass excluded all 70 keys in the game's KB_* table and landed on
+ * Scroll Lock, a toggle key that never registered in-game, costing two runs. */
 
-/* The hotkeys: F5/F6/F7. Ordinary keys, deliberately.
- *
- * ⚠ THE EARLIER REASONING WAS OVERCAUTIOUS AND COST TWO RUNS. The game's
- * shipped GMD lists 70 bindable keys (`KB_*` in data/text_english.json),
- * F1-F12 among them, and I excluded every one of them on that basis. But that
- * table is what the game CAN bind, not what it DOES bind: the shell menus are
- * driven by arrows, Enter and Escape. Avoiding the whole table pushed the
- * choice onto exotic keys, and the first pick -- Scroll Lock, a TOGGLE key --
- * never registered in-game at all.
- *
- * The real lesson from [[hotkey-fallback-codes-eat-arrows]] is narrower than
- * "avoid anything bindable": it is that NumLock-off numpad VKs literally ARE
- * the arrow VKs, so they steal navigation. F5-F7 have no such aliasing, are not
- * toggles, and are not NVDA modifiers (NVDA uses Insert/CapsLock).
- *
- * F5 = arm the scan. Hold a direction while pressing it. */
-#define PAD_ARM_HOTKEY       VK_F5
-#define PAD_ARM_HOTKEY_NAME  "F5"   /* restart the search from scratch */
-
-/* F6 = report what survived. Separate from arming so the player can keep
- * navigating and ask for the state whenever they like. */
-#define PAD_REPORT_HOTKEY      VK_F6
-#define PAD_REPORT_HOTKEY_NAME "F6"
-
-/* F7 = speak the direction currently held, read out of the engine's own pad
- * record. This is the end-to-end check: press Down, hear "down". */
-#define PAD_SAY_HOTKEY      VK_F7
-#define PAD_SAY_HOTKEY_NAME "F7"
+/* ONE hotkey: F7 takes a capture. There is nothing else to drive, because
+ * the mod makes no decisions -- see the header of pad_watch.h. */
+#define PAD_DUMP_HOTKEY      VK_F7
+#define PAD_DUMP_HOTKEY_NAME "F7"
 
 /* Was `vk` pressed since the last check? Edge-triggered, so holding the key
  * captures one pass rather than a flood. */
@@ -246,11 +223,18 @@ static DWORD WINAPI worker(LPVOID param)
     if (unpacked && pad_enabled) {
         /* Starts itself and re-seeds until a press makes the record visible.
          * Nothing is asked of the player except to navigate. */
-        log_line("pad: watching the sPad singleton at image+0x%x. "
-                 "HOLD a direction for a second, then RELEASE it and wait a "
-                 "second. It captures one snapshot of each state and reports "
-                 "the bytes that differ. F6 repeats the report.",
-                 PAD_SINGLETON_RVA);
+        log_line("pad: dumping the sPad INSTANCE at image+0x%x on F7. "
+                 "The mod does NO analysis -- it writes cfc2_pad_NN.bin plus a "
+                 "line in cfc2_pad_index.txt recording which arrow keys were "
+                 "down. Comparison happens offline.",
+                 PAD_INSTANCE_RVA);
+        /* ⭐ The protocol is stated in the log because it is what makes the
+         * result interpretable: captures 1 and 2 are the SAME state, so their
+         * difference is the noise floor. Without that control a diff measures
+         * elapsed time, which is exactly how the previous attempt failed. */
+        log_line("pad: press F7 five times -- (1) nothing held, (2) nothing "
+                 "held again, (3) holding DOWN, (4) nothing held, "
+                 "(5) holding LEFT. Captures 1 and 2 are the control.");
     }
 
     while (!InterlockedCompareExchange(&g_quit, 0, 0)) {
@@ -265,25 +249,23 @@ static DWORD WINAPI worker(LPVOID param)
              * question -- is that field the selection? -- is then answered by
              * simply navigating the menus, with no protocol for the user to
              * follow and get wrong. Two reads and a compare. */
-            /* Sample the armed candidates every 100 ms. Cheap: a bounded
-             * number of sites, each a 20-byte guarded read. This is what
-             * accumulates the evidence, so it must run while the player is
-             * simply navigating -- no protocol for them to follow. */
-            if (unpacked && pad_enabled) {
-                /* Follow the ONE established pointer and snapshot the object
-                 * in both states. No searching: the address came from the
-                 * reflection metadata offline and is launch-stable. */
+            /* ⚠ NOTHING happens automatically here any more.
+             *
+             * The previous version captured on its own schedule, which is how
+             * it ended up comparing two states eight seconds apart and
+             * measuring elapsed time instead of the keypress. Captures are now
+             * taken only when the user presses the key, so the user controls
+             * exactly what state each one records. */
+            if (unpacked && pad_enabled && key_pressed(PAD_DUMP_HOTKEY)) {
+                /* Read the arrow keys HERE and pass them in, so pad_watch
+                 * stays free of input policy and testable offline with a
+                 * synthetic player. The mask is recorded, never interpreted. */
                 unsigned dirs = 0;
                 if (GetAsyncKeyState(VK_UP)    & 0x8000) dirs |= PAD_UP;
                 if (GetAsyncKeyState(VK_DOWN)  & 0x8000) dirs |= PAD_DOWN;
                 if (GetAsyncKeyState(VK_LEFT)  & 0x8000) dirs |= PAD_LEFT;
                 if (GetAsyncKeyState(VK_RIGHT) & 0x8000) dirs |= PAD_RIGHT;
-                pad_watch_tick(dirs);
-            }
-            if (unpacked && pad_enabled && key_pressed(PAD_REPORT_HOTKEY)) {
-                log_line("pad: report triggered by %s",
-                         PAD_REPORT_HOTKEY_NAME);
-                pad_watch_report();
+                pad_dump_now(dirs);
             }
         }
         beat++;
