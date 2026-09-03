@@ -71,125 +71,154 @@ before touching that work.
   degrades instead of killing the process.
 - `src/log.c` — timestamped logging.
 
-## ⚠ hashwatch CRASHED the game (2026-09-02) — read before enabling it
+## ⭐ Route 5 (CURRENT): read the engine's own pad state
 
-`hash_watch.c` is **off by default** behind an opt-in file `cfc2_hashwatch.on`
-next to the exe. Delete that file to disable; that is the OFF switch.
+`src/pad_find.c`. **Four routes are closed with evidence — do not restart any
+of them.** Detail in memory `cfc2-heapdiff` and `cfc2-gui-tree-walk`; the code
+for those routes was deleted once closed and lives in git history.
 
-Its first live run killed the process. Cause: the positive control passed
-`&seed` — **a stack local** — to the game's CRC primitive, which writes back
-through that pointer wider than the 4 bytes declared, overwriting the return
-address. The call logged OK and the function's `ret` then faulted.
+### ⭐⭐ What the unpacked image gave up
 
-Diagnosis method worth repeating: the log just stops, which proves nothing.
-The Windows **Application event log (Id 1000)** gave `0xc0000005` and **fault
-offset 0x3dfc in DINPUT8.dll**; `objdump -d` on the deployed DLL mapped that
-offset to the exact instruction. Symbols are stripped — match on RVA.
+MTFramework's reflection metadata is in the dump, in plain text, and it names
+the input model directly (`sec_00fdc000_data.bin`):
 
-**Fixed and CONFIRMED in-game 2026-09-02** — it now installs and runs without
-crashing (oversized `static volatile` scratch, never a stack local; call
-wrapped in the fault guard; hooks self-uninstall if the control faults).
+- `sPad` class descriptor — size **0x3c4**, name hash `0x7db4fe86`
+- `sPad::Pad` — the per-pad record, size **0xb8**
+- `sPad::Map` — button mapping, size 0x50
+- the five button words, in declaration order: **`Old Trg Rel Chg Rep`**
+- `RepeatStartTime` / `RepeatTime` — the menu auto-repeat timing
+- the 16 button bit names on a fixed stride, then the analog axes
 
-⚠ The fix was declared done while still INCOMPLETE. `probe_hash.c` had the same
-bug in **three** places, and the third was found only by disassembling the
-DEPLOYED dll and classifying every call site into `0x1402ef1e0` by how `%rcx`
-is loaded — it had never crashed because `GUARDED_CALL` absorbed the fault. A
-guard that catches a fault makes latent memory corruption look like a working
-experiment. **Audit the shipped binary for ALL sites; re-reading the source of
-the sites you changed is not verification.**
+That last one fixes the bit layout: `Rup Rright Rdown Rleft` (D-pad, bits 0-3)
+then `Lup Lright Ldown Lleft` (stick, bits 4-7). So:
 
-Verify such a fix in the CODEGEN, not the source: the pointer argument must
-load RIP-relative (`lea 0x...(%rip),%rcx`), not `lea -0x14(%rbp),%rcx`.
+- **DOWN = 0x44, UP = 0x11, LEFT = 0x88, RIGHT = 0x22**
+- Menu navigation (up/down) and **settings adjustment (left/right) are the same
+  four bits in the same word** — one reader covers both.
 
-## ⛔⛔ Focus detection: FOUR routes closed. Next is a CODE HOOK. (2026-09-02)
+Class descriptors are a uniform 0x38 bytes: `+0` name, `+40` property table,
+`+48` size (low u32) + name hash (high u32). The singleton descriptors sit
+together around `0x1422c8xxx`.
 
-**Status: reading the shell's text is SOLVED. Finding which item is selected is
-NOT. Four approaches have been closed with evidence — do not restart any of
-them.** Full detail in memory `cfc2-heapdiff` and `cfc2-gui-tree-walk`.
+### ⭐⭐ Why this route is not a fifth variation on the closed ones
 
-### ⭐ What is banked and reusable
-- **Text**: `gmd_find` locates and verifies the live GMD table; text reads
-  correctly, closed-loop.
-- **⭐⭐ A CROSS-LAUNCH ANCHOR**: `[image+0x1208bd0]` points at the live menu
-  object. Verified on four launches at four different heap addresses. ASLR is
-  off and there are no relocations, so image-relative offsets are stable
-  forever. This is the single most valuable artifact produced.
+Every earlier route had to ARGUE that what it found was what it wanted, and
+route 4 produced a monotonic counter that passed every filter it had. This one
+is **self-validating**: the engine maintains an algebraic relationship between
+the words every frame, and
+
+     Prev == Old ^ Chg
+     Trg  == Old & ~Prev
+     Rel  == Prev & ~Old
+
+is three words constrained by two equations — random data satisfies it with
+probability ~2^-64 per eventful sample. That is a positive identification test,
+not a correlation.
+
+⚠ **`Old` holds the CURRENT state, not the previous one** — by the time the
+record is observable it has already been updated. Reading it the other way
+round makes the true window fail its own test; the scanner then arms a shifted
+window whose last word runs past the record, and the real candidate dies a few
+frames later. The self-test caught this before it ever ran in-game.
+
+### Usage (F5/F6/F7, and it needs a HELD direction)
+
+1. **HOLD a direction and press F5.** Arming requires a live press: an all-zero
+   record satisfies the algebra trivially, and this process has millions of
+   zero dwords. An earlier build without that filter armed 8192 sites of zeroes
+   inside the first region, hit its cap, and never reached the real pad —
+   while reporting "armed 8192 candidate sites" as if that were progress.
+2. **Navigate normally.** The 100 ms tick accumulates evidence; nothing for the
+   user to remember or report.
+3. **F6** reports survivors; **F7** speaks the direction currently held.
+
+⚠ **Several sites confirm legitimately** — a record per player, previous-frame
+snapshots, mirrored copies. The report says how many and picks a
+representative ranked by how many distinct directions it has shown; it does not
+claim to have found a unique pad.
+
+**OFF switch: create `cfc2_pad.off` next to the exe.** The scan is read-only
+(VirtualQuery + guarded reads, no hooks, no calls into game code), but the
+switch ships with the experiment rather than after it bites.
+
+Run `.	oolsun_pad_test.ps1` after any change to `pad_find.c`.
+
+### ⚠ The self-test is only a test because it was proven to FAIL
+
+Each mechanism was sabotaged and the suite re-run:
+
+- `consistent()` forced TRUE → the input-correlated decoy is accepted (case 3)
+- `eventful()` forced TRUE → a quiet struct accumulates evidence (cases 2/4)
+- `Old` treated as previous → the planted pad is never confirmed (case 2)
+- union read replaced by fixed offsets → shifted-window decode breaks (case 6)
+
+⚠ **Case 3 originally passed under sabotage.** It scraped the log, and the
+report prints only the first handful of survivors — so with the algebra
+disabled, 6634 sites confirmed, the decoy among them, and the assertion still
+passed. Fixed by asserting membership through `pad_is_confirmed()` instead of
+the log. **Assert the result, not the header.**
+
+⚠ Case 5 pins the decoder to the planted pad (`pad_debug_pin`). Without that it
+tests the ranking and the decoder at once and fails intermittently for reasons
+unrelated to decoding.
+
+### ⚠ MinHook is no longer linked
+
+Routes 1-4 are gone and everything shipping is read-only, so the build does not
+link MinHook. It stays vendored under `libs/` for a future in-game feature.
+Hooking crashed this game once (`cfc2-seed-pointer-stack-smash`): the fix was
+never a stack local as an out-param, and verification belongs in the CODEGEN
+(`lea 0x...(%rip)`, not `lea -0x14(%rbp)`), auditing every site in the SHIPPED
+binary rather than re-reading the sources you changed.
+
+### ⛔ A false lead worth not repeating
+
+`0x11/0x22/0x44/0x88` tested in that order appear ~24 times in
+`0x14044d000-0x140453000` and look exactly like four-way menu dispatch. They
+are **quadrant masks in SIMD collision code** — 0x1140-byte stack frames, heavy
+`movaps`. Those four constants are just the 2-bit patterns and are not by
+themselves evidence of input handling.
+
+### The four closed routes
+
+1. **hashwatch (text hook) — CLOSED, negative.** 381 calls across 5 game
+   callers, **0 hashing text**, positive control passing. Label hashes are
+   computed at LOAD time. Memory `cfc2-hashwatch-result`.
+2. **GUI name-pool scan — CLOSED, negative.** All **25 of 25** layouts resident
+   simultaneously, so residency is a constant. Memory `cfc2-gui-layout-finder`.
+3. **Instantiated GUI tree — CLOSED, negative.** 1789 pool-referencing objects,
+   full ±128-byte windows AND one hop out, two COMPLETE passes on different
+   screens → **zero changes of any kind**. It is the layout TEMPLATE. Memory
+   `cfc2-gui-tree-walk`.
+4. **Differential heap scan — CLOSED.** 32 ms per sweep over 1.9M fields, both
+   widths, full page coverage, control-subtracted and reversibility-tested:
+   **nothing exceeded 4 distinct values**, where an 8-item list needs 7.
+   ⭐ Consistent, not a miss — the GUI is animation-driven, so selection is
+   *which node holds the SELECT state*, not a central integer. Memory
+   `cfc2-heapdiff`.
+
+### ⭐ Still banked and reusable
+- **Text**: `gmd_find` locates and verifies the live GMD table, closed-loop.
+- **⭐⭐ A CROSS-LAUNCH ANCHOR**: `[image+0x1208bd0]` reaches the live menu
+  object, verified on four launches at four different heap addresses.
 - Infrastructure: `memsafe` fault guard, region walking, page-bulk reads,
-  deadline + partial reporting, MinHook vendored, `VirtualProtect` confirmed.
+  deadline + partial reporting, `VirtualProtect` confirmed working.
 
-### ⛔ Route 4 — differential heap scan (`src/heapdiff.c`) — CLOSED
-The scanner works: **32 ms per sweep over 1.9M fields**, full page coverage,
-u32 *and* u8/u16 widths, control-subtracted, reversibility-tested.
-**Nothing exceeded 4 distinct values.** An 8-item list needs a field reaching 7.
+⚠⚠ **`MEM_GUARDED` is inert unless `mem_guard_install()` ran.** `pad_find.c`
+used the macro without arming it and the self-test died with `0xC0000005`. An
+inert guard is worse than none: every read LOOKS protected.
 
-⭐ **That is consistent, not a miss.** MTFramework's GUI is animation-driven:
-selection is *which node holds the SELECT state* — a per-node flag, not a
-central integer. Route 3 saw the same shape (0/1 toggles per item plus a few
-2-3 state fields). **A scan for a flat index cannot succeed when the game does
-not keep one.**
-
-⚠ Route 4 also produced a monotonic-counter FALSE POSITIVE that passed every
-filter (±1 steps, reversed, quiet in the control) — see
-`anchor-on-what-changes`: controls prove a field is not noise; only
-**reversibility plus plausibility** prove it is state.
-
-### ⭐ NEXT: hook the input handler
-Find the routine that reacts to Down/Up on a menu and read the selection from
-the instruction that writes it. Mostly offline work on the dumped image, so far
-fewer game runs. ⚠ Hooking crashed this game once
-(`cfc2-seed-pointer-stack-smash`); the fault guard and opt-in gating from that
-episode already exist and must be used.
-
-### The three earlier closed routes
-
-1. **hashwatch (text hook) — CLOSED, negative.** It runs clean now (no crash),
-   and observed 381 calls across 5 game callers with **0 hashing text**, while
-   its positive control passed. The label hashes are computed at LOAD time;
-   lookups afterwards never re-hash the label, so there is no text chokepoint
-   on this primitive. See memory `cfc2-hashwatch-result`.
-2. **GUI name-pool scan — CLOSED, negative.** All **25 of 25** layouts are
-   resident simultaneously, so residency is a constant and says nothing about
-   the displayed screen. The focus-state counts it reported are each layout's
-   STATIC file property, not live state. `src/gui_find.c` is kept as a one-shot
-   inventory and as a way to locate a layout's pool. See memory
-   `cfc2-gui-layout-finder`.
-3. **The instantiated GUI tree — CLOSED, negative.** `src/gui_tree.c` ran
-   clean: 1789 pool-referencing objects, their full ±128-byte windows AND one
-   hop out, two COMPLETE passes on different screens → **zero changes of any
-   kind**. The pool-anchored subtree is the loaded layout TEMPLATE and is
-   static by design. See memory `cfc2-gui-tree-walk`.
-
-   ⭐ **The entry point is a pointer INTO the name pool.** A layout does not
-   reference its names by offset — searching the whole shipped file for every
-   deep pool offset (u32/u64, pool-relative and file-absolute) gives **zero**
-   hits. So a `char*` into the pool cannot have come from the file; it is
-   positive evidence of an instantiated object. That is the exact inverse of
-   the residency scan, which only found bytes memcpy'd out of a file.
-
-   ⛔ **`gui_find`'s `pool_base`/`pool_span` are the 256 KB CHUNK, not the
-   pool.** Anchoring on them tests the wrong range: the first harness run found
-   **0 of 12 planted nodes while reporting a clean "complete scan"**. Use
-   `bound_pool()`, which grows outward from the anchor's real hit offset.
-
-   ⚠ **A too-WIDE span passes every end-to-end check.** Sabotaging the bounds
-   back to the chunk window still found 12/12 nodes and still diffed correctly;
-   only the direct assertions on `pool_base`/`pool_span` caught it. Assert the
-   bounds, not just the answer.
-
-   Run `.\tools\run_gui_tree_test.ps1` after any change to `gui_tree.c`.
-
-   ⚠ **Hotkeys: use ordinary keys.** An earlier pass excluded all 70 keys in
-   the game's `KB_*` table and landed on Scroll Lock, a TOGGLE key that never
-   registered in-game — two runs wasted. That table lists what the game CAN
-   bind, not what it DOES; the shell menus use arrows/Enter/Escape. **F5-F10
-   all work fine.** The real hazard is narrower: NumLock-off numpad VKs
-   literally ARE the arrow VKs.
+⚠ **Anything living across `setjmp` must be `volatile`** or `longjmp` may
+restore a stale value — GCC's `-Wclobbered` is right, and in the scan loop that
+would rewind the cursor.
 
 ⚠ Even once focus is detected, joining a focused NODE to its TEXT is unsolved:
 layouts contain no GMD label hashes (0 matches across all 4165), so the binding
 happens somewhere not yet found.
 
 Reading the text itself IS solved and robust — see the GMD notes below.
+
+## Dumping and analysing the unpacked image
 
 1. Launch the game once with the mod deployed. `image_wait_for_unpack()` polls
    for decryption, then `image_dump()` writes `cfc2_dump\` into the game dir
