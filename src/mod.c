@@ -249,17 +249,46 @@ static DWORD WINAPI worker(LPVOID param)
              * question -- is that field the selection? -- is then answered by
              * simply navigating the menus, with no protocol for the user to
              * follow and get wrong. Two reads and a compare. */
-            /* ⚠ NOTHING happens automatically here any more.
+            /* ⭐⭐ CAPTURE ON THE TRANSITION, not while a key is held.
              *
-             * The previous version captured on its own schedule, which is how
-             * it ended up comparing two states eight seconds apart and
-             * measuring elapsed time instead of the keypress. Captures are now
-             * taken only when the user presses the key, so the user controls
-             * exactly what state each one records. */
+             * ⚠ This corrects a flaw that probably produced FALSE NEGATIVES in
+             * every earlier attempt, and the user spotted it by asking why
+             * holding was necessary at all.
+             *
+             * The old scanners gated on `player_dirs != 0` in TWO places -- the
+             * all-zero rejection at seed time and an early return in the tick
+             * -- so the pad record had to be nonzero at the exact instant a
+             * given address was sampled. The seed sweep takes ~600 ms to cross
+             * 1.4 GB and reaches any one address at a single moment in that
+             * window, while a keypress lasts ~150 ms. The odds of coinciding
+             * were poor even with continuous pressing, and the user was told to
+             * "just navigate". A null result from those runs therefore says
+             * almost nothing.
+             *
+             * Two further reasons holding was the wrong instruction:
+             *   - holding a direction in a menu triggers AUTO-REPEAT, so the
+             *     cursor scrolls and the menu state churns between captures;
+             *   - `Trg` is set for a single frame, so a capture taken while a
+             *     key is held reads Trg = 0 and measures only On/Old.
+             *
+             * So the mod now watches the keys itself and captures on the EDGE:
+             * the first poll where a direction goes down (Trg still live), and
+             * the first poll where it goes up. The user just navigates
+             * normally -- no holding, no two-key press, nothing to remember.
+             * A measurement that needs the user to remember something is the
+             * wrong measurement. */
+            if (unpacked && pad_enabled) {
+                unsigned dirs = 0;
+                if (GetAsyncKeyState(VK_UP)    & 0x8000) dirs |= PAD_UP;
+                if (GetAsyncKeyState(VK_DOWN)  & 0x8000) dirs |= PAD_DOWN;
+                if (GetAsyncKeyState(VK_LEFT)  & 0x8000) dirs |= PAD_LEFT;
+                if (GetAsyncKeyState(VK_RIGHT) & 0x8000) dirs |= PAD_RIGHT;
+                pad_auto_capture(dirs);
+            }
+
+            /* F7 still forces a capture, for the two control captures and as
+             * a manual override if the automatic edges misbehave. */
             if (unpacked && pad_enabled && key_pressed(PAD_DUMP_HOTKEY)) {
-                /* Read the arrow keys HERE and pass them in, so pad_watch
-                 * stays free of input policy and testable offline with a
-                 * synthetic player. The mask is recorded, never interpreted. */
                 unsigned dirs = 0;
                 if (GetAsyncKeyState(VK_UP)    & 0x8000) dirs |= PAD_UP;
                 if (GetAsyncKeyState(VK_DOWN)  & 0x8000) dirs |= PAD_DOWN;

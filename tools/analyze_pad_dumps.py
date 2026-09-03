@@ -89,92 +89,134 @@ def differing(a, b, span):
 
 
 def analyse(caps, out=print):
-    """Apply the control subtraction and the two-key cross-check.
+    """Find bytes that track the keyboard, using the recorded masks.
 
-    caps must be five captures in the documented order. Returns the list of
-    surviving offsets.
+    Captures are no longer a fixed five in a fixed order: the mod captures on
+    key EDGES, so the sequence is whatever the player produced. This works
+    from the kb_dirs each capture recorded rather than from position.
     """
-    if len(caps) < 5:
-        out("need 5 captures, have %d -- press F7 five times "
-            "(none, none, DOWN, none, LEFT)." % len(caps))
+    if len(caps) < 4:
+        out("need at least 4 captures, have %d" % len(caps))
         return []
 
-    c1, c2, c3, c4, c5 = caps[:5]
-    span = min(len(c["data"]) for c in caps[:5])
-    out("comparing %d bytes common to all five captures" % span)
+    span = min(len(c["data"]) for c in caps)
+    out("comparing %d bytes common to %d captures" % (span, len(caps)))
 
-    # The object must be the same allocation in every capture, or offsets in
-    # one do not correspond to offsets in another.
-    objs = {c["obj"] for c in caps[:5]}
+    objs = {c["obj"] for c in caps}
     if len(objs) != 1:
         out("!! the object address CHANGED between captures: %s" %
             ", ".join(hex(o) for o in sorted(objs)))
         out("   offsets are not comparable; retake the captures in one run.")
         return []
 
-    # Sanity-check the protocol actually happened, rather than assuming it.
-    for idx, expect_held in ((0, False), (1, False), (2, True),
-                             (3, False), (4, True)):
-        got = bool(caps[idx]["kb"])
-        if got != expect_held:
-            out("!! capture %d recorded keyboard 0x%02x but the protocol "
-                "expects %s. The captures were mis-driven; results below are "
-                "not meaningful." %
-                (idx + 1, caps[idx]["kb"], "a key held" if expect_held
-                 else "nothing held"))
-    if not (c3["kb"] & DOWN):
-        out("!! capture 3 does not record DOWN (got 0x%02x)" % c3["kb"])
-    if not (c5["kb"] & LEFT):
-        out("!! capture 5 does not record LEFT (got 0x%02x)" % c5["kb"])
+    quiet = [c for c in caps if not c["kb"]]
+    held = [c for c in caps if c["kb"]]
+    out("%d capture(s) with nothing held, %d with a direction held"
+        % (len(quiet), len(held)))
 
-    noise = differing(c1["data"], c2["data"], span)
-    sig_down = differing(c2["data"], c3["data"], span)
-    sig_left = differing(c4["data"], c5["data"], span)
+    if len(quiet) < 2:
+        out("!! need at least TWO captures with nothing held -- they are the "
+            "control, and without it a diff measures elapsed time rather "
+            "than the keypress. That is exactly how the previous attempt "
+            "failed.")
+        return []
+    if not held:
+        out("!! no capture recorded a direction held; nothing to compare.")
+        return []
 
-    out("control (1 vs 2): %d bytes differ -- these are timers/counters" %
-        len(noise))
-    out("DOWN    (2 vs 3): %d bytes differ" % len(sig_down))
-    out("LEFT    (4 vs 5): %d bytes differ" % len(sig_left))
+    # ⭐ THE CONTROL: everything that differs between two quiet captures is a
+    # timer, a frame counter or animation. Union over every quiet pair, so a
+    # byte that ticks slowly is still caught.
+    noise = set()
+    for i in range(len(quiet) - 1):
+        noise |= differing(quiet[i]["data"], quiet[i + 1]["data"], span)
+    # ⚠ This set is REPORTED, not used as a separate filter.
+    #
+    # "no quiet pair differs" and "all quiet values equal the baseline" are the
+    # same condition, so subtracting `noise` on top of the return-to-baseline
+    # rule below would be a filter that can never fail on its own -- and a
+    # condition that cannot fail hides whether the real one works. Sabotage
+    # proved exactly that: removing the subtraction changed no outcome.
+    #
+    # It is kept because the COUNT is diagnostic: it distinguishes "the game
+    # was quiet" from "everything churns, so the captures may be unusable".
+    out("control: %d byte(s) differ between quiet captures (diagnostic; the "
+        "return-to-baseline rule below is what enforces it)" % len(noise))
 
-    cand = (sig_down & sig_left) - noise
-    out("changed for BOTH keys and not in the control: %d" % len(cand))
+    # Which distinct directions were actually observed?
+    dirs_seen = {}
+    for c in held:
+        for mask, name in DIR_NAMES:
+            if c["kb"] & mask:
+                dirs_seen.setdefault(name, []).append(c)
+    out("directions observed: %s" %
+        (", ".join(sorted(dirs_seen)) or "none"))
 
-    # The value test: the byte must carry the right direction bit in each
-    # held capture. This is what a timer or a stuck flag cannot do.
+    if len(dirs_seen) < 2:
+        out("!! only %d distinct direction(s) seen. Two are needed: a byte "
+            "that tracks just one key cannot be told from a flag that "
+            "happens to follow it." % len(dirs_seen))
+        return []
+
+    # A surviving byte must, for EVERY observed direction, read that
+    # direction's bits when held and differ from the quiet baseline.
+    base = quiet[-1]["data"]
     survivors = []
-    for off in sorted(cand):
-        d, l = c3["data"][off], c5["data"][off]
-        if (d & DOWN) and (l & LEFT):
-            survivors.append(off)
+    for off in range(span):
+        ok = True
+        for name, cs in dirs_seen.items():
+            mask = dict((n, m) for m, n in DIR_NAMES)[name]
+            # must carry that direction's bits in at least one capture of it,
+            # and must differ from the quiet baseline there
+            if not any((c["data"][off] & mask) and c["data"][off] != base[off]
+                       for c in cs):
+                ok = False
+                break
+        if not ok:
+            continue
+        # ⭐ THE CONTROL, enforced here: the byte must read the SAME value in
+        # every capture where nothing was held. A timer, frame counter or
+        # animation phase differs between two quiet captures and is rejected;
+        # this is what the failed attempt lacked entirely.
+        if any(q["data"][off] != base[off] for q in quiet):
+            continue
+        survivors.append(off)
 
-    out("...and carrying a DOWN bit in capture 3 and a LEFT bit in 5: %d" %
-        len(survivors))
+    out("bytes carrying the right bits for ALL %d directions, quiet in the "
+        "control, and returning to baseline: %d"
+        % (len(dirs_seen), len(survivors)))
     out("")
 
     if survivors:
         for off in survivors:
-            out("  +0x%-6x  none=0x%02x  DOWN=0x%02x  none=0x%02x  LEFT=0x%02x"
-                % (off, c2["data"][off], c3["data"][off],
-                   c4["data"][off], c5["data"][off]))
+            vals = "  ".join("%s=0x%02x" % (
+                ("".join(n[0] for m, n in DIR_NAMES if c["kb"] & m) or "-"),
+                c["data"][off]) for c in caps)
+            out("  +0x%-6x  %s" % (off, vals))
     else:
-        # Say WHICH stage emptied the set -- "nothing found" and "the tool is
-        # broken" must not look the same.
         out("nothing survived. Where it was lost:")
-        if not sig_down:
-            out("  - no byte changed when DOWN was pressed at all")
-        if not sig_left:
-            out("  - no byte changed when LEFT was pressed at all")
-        if sig_down and sig_left and not (sig_down & sig_left):
-            out("  - bytes changed for each key, but never the SAME byte")
-        elif cand and not survivors:
-            out("  - %d bytes tracked both keys but none carried the right "
-                "direction bits; sample:" % len(cand))
-            for off in sorted(cand)[:12]:
-                out("      +0x%-6x DOWN=0x%02x LEFT=0x%02x" %
-                    (off, c3["data"][off], c5["data"][off]))
-        if noise and len(noise) > span // 4:
-            out("  - the control was very noisy (%d of %d bytes), so the "
-                "subtraction may have removed real signal" % (len(noise), span))
+        anychange = set()
+        for c in held:
+            anychange |= differing(base, c["data"], span)
+        if not anychange:
+            out("  - NO byte differed between quiet and held at all. Either "
+                "the pad is outside this region, or the captures were all "
+                "taken in the same state.")
+        else:
+            out("  - %d byte(s) changed when a key was held, but none carried "
+                "the right direction bits for every direction observed."
+                % len(anychange))
+            shown = 0
+            for off in sorted(anychange - noise):
+                if shown >= 12:
+                    break
+                out("      +0x%-6x quiet=0x%02x  %s" % (
+                    off, base[off],
+                    " ".join("0x%02x" % c["data"][off] for c in held)))
+                shown += 1
+        if len(noise) > span // 4:
+            out("  - the control was very noisy (%d of %d bytes); real signal "
+                "may have been subtracted with it" % (len(noise), span))
     return survivors
 
 
@@ -252,23 +294,35 @@ def self_test():
     check(STUCK not in got, "a byte that never changes is not a candidate")
     check(ONEKEY not in got, "a byte tracking only ONE key is rejected")
     check(CHURN not in got,
-          "a byte churning in the CONTROL is removed (needs the subtraction)")
+          "a byte churning in the CONTROL is removed (return-to-baseline)")
     check(WRONGBIT not in got,
           "a byte tracking both keys with the WRONG bits is rejected")
     # ⚠ Assert the PROPERTY, not a count -- a hardcoded number breaks whenever
     # the fixture gains a decoy, which is a test failing for a reason that is
     # not a bug.
-    check(any(l.startswith("control (1 vs 2):") and not l.endswith("0 bytes differ")
+    check(any(l.startswith("control:") and not l.startswith("control: 0 ")
               for l in lines),
           "the control noise is reported, not hidden")
 
-    # A mis-driven protocol must be called out rather than silently analysed.
-    bad = [dict(c) for c in caps]
-    bad[2] = dict(bad[2]); bad[2]["kb"] = 0
+    # ⚠ Order is no longer assumed -- the mod captures on key edges, so the
+    # sequence is whatever the player produced. What MUST still be enforced is
+    # that a control exists: without two quiet captures there is no noise floor
+    # and a diff measures elapsed time, which is how the previous attempt
+    # failed. Sabotaging the `len(quiet) < 2` guard fails this case.
+    # exactly ONE quiet capture: enough captures to proceed, no control pair
+    nocontrol = [caps[0]] + [c for c in caps if c["kb"]] * 2
     lines2 = []
-    analyse(bad, out=lines2.append)
-    check(any("mis-driven" in l for l in lines2),
-          "a capture taken in the wrong state is flagged")
+    r2 = analyse(nocontrol, out=lines2.append)
+    check(r2 == [] and any("control" in l and "!!" in l for l in lines2),
+          "too few quiet captures aborts (no control = no measurement)")
+
+    # Only one direction observed must also abort: a byte tracking a single
+    # key cannot be distinguished from a flag that follows it.
+    onedir = [c for c in caps if not c["kb"] or (c["kb"] & DOWN)]
+    lines2b = []
+    r2b = analyse(onedir, out=lines2b.append)
+    check(r2b == [] and any("distinct direction" in l for l in lines2b),
+          "a single observed direction aborts the comparison")
 
     # A moved object must abort rather than compare unrelated offsets.
     moved = [dict(c) for c in caps]

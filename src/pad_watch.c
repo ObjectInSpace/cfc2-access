@@ -160,3 +160,48 @@ void pad_dump_now(unsigned kb_dirs)
     msg[63] = 0;
     speech_say(msg, TRUE);
 }
+
+/* --- automatic edge capture ---------------------------------------------- */
+
+void pad_auto_capture(unsigned kb_dirs)
+{
+    static unsigned prev;          /* mask at the previous poll */
+    static BOOL     primed;        /* have the two controls been taken? */
+    static unsigned taken;
+
+    if (taken >= PAD_AUTO_MAX)
+        return;
+
+    /* ⭐ Take the two CONTROL captures first, back to back, while nothing is
+     * held. Their difference is the noise floor, and taking them 100 ms apart
+     * rather than seconds apart keeps that floor small -- the previous attempt
+     * compared states eight seconds apart and measured elapsed time. */
+    if (!primed) {
+        if (kb_dirs) {
+            /* Wait for a quiet moment; a control taken mid-press is not a
+             * control. */
+            prev = kb_dirs;
+            return;
+        }
+        log_line("pad: taking the two control captures (nothing held).");
+        pad_dump_now(0);
+        pad_dump_now(0);
+        taken += 2;
+        primed = TRUE;
+        prev = 0;
+        return;
+    }
+
+    /* An edge in either direction is informative: the down-edge catches Trg
+     * while it is live, the up-edge catches Rel and proves the byte returns. */
+    if (kb_dirs != prev) {
+        log_line("pad: %s edge (0x%02x -> 0x%02x)",
+                 kb_dirs ? "press" : "release", prev, kb_dirs);
+        pad_dump_now(kb_dirs);
+        taken++;
+        if (taken >= PAD_AUTO_MAX)
+            log_line("pad: %u captures taken -- that is enough. Close the "
+                     "game and run tools/analyze_pad_dumps.py.", taken);
+    }
+    prev = kb_dirs;
+}

@@ -149,4 +149,34 @@
  * It is RECORDED, never interpreted. */
 void pad_dump_now(unsigned kb_dirs);
 
+/* Poll the arrow-key mask and capture on the EDGES: the first sample where a
+ * direction goes down, and the first where it goes up.
+ *
+ * ⭐⭐ WHY EDGES AND NOT "WHILE HELD" -- this is the correction that probably
+ * un-does a class of FALSE NEGATIVES.
+ *
+ * Every earlier tool required a key to be down at the instant a given address
+ * was sampled. The seed sweep took ~600 ms to cross 1.4 GB and reached any one
+ * address at a single moment inside that window, while a keypress lasts
+ * ~150 ms -- so the pad record was usually all-zero when its own address was
+ * read, and the all-zero rejection then discarded it. A null result from those
+ * runs is close to uninformative.
+ *
+ * Holding was also actively harmful for two more reasons:
+ *   - it triggers menu AUTO-REPEAT, so the cursor scrolls and per-screen state
+ *     churns between captures;
+ *   - `Trg` is set for one frame only, so a capture taken mid-hold reads
+ *     Trg = 0 and observes only On/Old.
+ *
+ * Capturing on the down-edge catches the frame where Trg is live, and asks the
+ * player for nothing but ordinary navigation.
+ *
+ * ⚠ Bounded: it stops after PAD_AUTO_MAX captures so a long session cannot
+ * fill the disk or bury the interesting captures. */
+void pad_auto_capture(unsigned kb_dirs);
+
+/* Automatic captures to take before stopping. Two controls plus a handful of
+ * edges is plenty; more would only make the index harder to read. */
+#define PAD_AUTO_MAX 12
+
 #endif /* CFC2_PAD_WATCH_H */
