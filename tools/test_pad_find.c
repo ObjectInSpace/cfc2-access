@@ -24,6 +24,8 @@
 
 #include "../src/pad_find.h"
 
+#define DIRS (PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT)
+
 /* --- stubs for the mod's services ---------------------------------------- */
 static char g_log[512][512];
 static int  g_nlog;
@@ -106,12 +108,27 @@ static void seed_while_pressed(volatile sim_pad *pad)
     pad_scan_start();
 }
 
-/* Drive a sequence of transitions, sampling after each. */
+/* Hold one direction for several samples, agreeing with the keyboard each
+ * time -- how a real record earns its identification. */
+static void hold(volatile sim_pad *pad, unsigned dir, unsigned n)
+{
+    for (unsigned i = 0; i < n; i++) {
+        pad_step(pad, dir);
+        pad_scan_tick(dir & DIRS);
+    }
+}
+
+/* Drive a sequence of presses, sampling after each.
+ *
+ * The second argument to pad_scan_tick is GROUND TRUTH -- what the player is
+ * holding. Here the simulated pad and the simulated player agree by
+ * construction, which is exactly what a real pad does and what a decoy
+ * cannot. */
 static void drive(volatile sim_pad *pad, const unsigned *seq, unsigned n)
 {
     for (unsigned i = 0; i < n; i++) {
         pad_step(pad, seq[i]);
-        pad_scan_tick();
+        pad_scan_tick(seq[i] & DIRS);
     }
 }
 
@@ -187,7 +204,7 @@ int main(void)
         pad_step(pad, seq[i]);
         decoy[0] = i + 1; decoy[1] = i * 3; decoy[2] = i + 7;
         decoy[3] = i ^ 5; decoy[4] = i * 2;
-        pad_scan_tick();
+        pad_scan_tick(seq[i] & DIRS);
     }
     int decoy_hit = 0;
     for (int off = 0; off <= 16; off += 4)
@@ -210,12 +227,12 @@ int main(void)
     memset((void *)pad, 0, sizeof *pad);
     pad_scan_start();
     for (int i = 0; i < 60; i++)      /* many frames, nothing pressed */
-        pad_scan_tick();
+        pad_scan_tick(0);
     check(pad_record() == 0,
           "case 4: quiet frames alone never identify a record");
     clear();
     pad_scan_report();
-    check(logged("no candidate has seen a transition"),
+    check(logged("no candidate has agreed with the keyboard"),
           "case 4: report SAYS why, so it cannot read as a clean negative");
 
     /* ------------------------------------------------------------------
@@ -238,7 +255,7 @@ int main(void)
      * seeding is the boundary that matters. */
     seed_while_pressed(pad);
     pad_step(pad, 0);            /* ONE real transition after seeding */
-    pad_scan_tick();
+    pad_scan_tick(0);
     check(pad_record() == 0,
           "case 5: a single transition does NOT identify (shift ambiguity)");
     drive(pad, seq, nseq);
@@ -285,7 +302,16 @@ int main(void)
         for (unsigned k = 0; k < 12; k++) {
             decoy[0] = decoy[1] = 0x1000u | lb0[k % 4];
             decoy[2] = decoy[3] = decoy[4] = 0;
-            pad_scan_tick();
+            /* ⚠ The player holds DOWN throughout, as a real one would. The
+             * decoy's value wanders independently, so it agrees only by
+             * accident and is killed the first time it does not.
+             *
+             * An earlier version fed the decoy its OWN value as ground truth,
+             * letting it "agree" every tick. That models a player whose key
+             * presses mirror an internal counter -- impossible, and it made
+             * the case fail for a reason that could never occur in the game. */
+            pad_step(pad, PAD_RDOWN);
+            pad_scan_tick(PAD_DOWN);
         }
     }
     for (unsigned i = 0; i < 40; i++) {
@@ -295,7 +321,7 @@ int main(void)
         unsigned shadow = 0x1000u | lowbytes[i % 8];
         decoy[0] = decoy[1] = shadow;
         decoy[2] = decoy[3] = decoy[4] = 0;
-        pad_scan_tick();
+        pad_scan_tick(((i & 1) ? 0u : PAD_RDOWN) & DIRS);
     }
     int shadow_hit = 0;
     for (int off = 0; off <= 16; off += 4)
@@ -336,13 +362,58 @@ int main(void)
         decoy[0] = 0x04 + (i & 3); decoy[1] = 0x40;
         decoy[2] = 0x04;                    /* Trg nonzero -> evaluated */
         decoy[3] = 0x11; decoy[4] = 0x77;   /* inconsistent with On/Old */
-        pad_scan_tick();
+        pad_scan_tick(((i & 1) ? 0u : PAD_RDOWN) & DIRS);
     }
     int viol_hit = 0;
     for (int off = 0; off <= 16; off += 4)
         if (pad_record() == (uintptr_t)decoy + off) viol_hit = 1;
     check(!viol_hit,
           "case 9: a site violating the invariant on a real event is KILLED");
+    memset((void *)decoy, 0, 12 * sizeof(unsigned));
+
+    /* ------------------------------------------------------------------
+     * Case 10: ⭐⭐ THE ALTERNATING-BOOLEAN DECOY -- the second one that
+     * reached the user, and the case that justifies ground truth at all.
+     *
+     * A state machine keeping `flag, prev, set, cleared, changed` satisfies
+     * the invariant perfectly, is direction-sane (bit 0 only), and sets Trg or
+     * Rel on every change. In-game 480 such sites qualified at once, 300 ms
+     * after startup, and the readout said "no direction" because half the
+     * samples land on zero. NO predicate over the five words can reject it --
+     * as data it is indistinguishable from a pad.
+     *
+     * What it cannot do is agree with the KEYBOARD. Here the player holds Down
+     * throughout while the decoy toggles on its own schedule, so it disagrees
+     * almost immediately.
+     *
+     * Sabotage: removing the dir_set comparison in pad_scan_tick fails this
+     * case. It is the only case that catches it -- every shape-based check
+     * passes this decoy by design.
+     * ------------------------------------------------------------------ */
+    clear();
+    memset((void *)pad, 0, sizeof *pad);
+    memset((void *)decoy, 0, 12 * sizeof(unsigned));
+    /* a perfectly-formed alternating boolean quintet, seeded nonzero */
+    decoy[0] = 1; decoy[1] = 0; decoy[2] = 1; decoy[3] = 0; decoy[4] = 1;
+    seed_while_pressed(pad);
+    for (unsigned i = 0; i < 40; i++) {
+        unsigned on = i & 1, prev = !on;
+        decoy[0] = on;                 /* flag */
+        decoy[1] = prev;               /* previous */
+        decoy[2] = on & ~prev;         /* "set this tick"   */
+        decoy[3] = prev & ~on;         /* "cleared"         */
+        decoy[4] = on ^ prev;          /* "changed"         */
+        /* the player holds DOWN the whole time */
+        pad_step(pad, PAD_RDOWN);
+        pad_scan_tick(PAD_DOWN);
+    }
+    int boolean_hit = 0;
+    for (int off = 0; off <= 16; off += 4)
+        if (pad_record() == (uintptr_t)decoy + off) boolean_hit = 1;
+    check(!boolean_hit,
+          "case 10: ALTERNATING-BOOLEAN decoy is rejected (needs ground truth)");
+    check(pad_record() == (uintptr_t)pad,
+          "case 10: the real pad is identified instead");
     memset((void *)decoy, 0, 12 * sizeof(unsigned));
 
     /* ------------------------------------------------------------------
@@ -386,9 +457,9 @@ int main(void)
     for (unsigned i = 0; i < sizeof cases / sizeof cases[0]; i++) {
         g_nsaid = 0;
         pad_step(pad, 0);
-        pad_scan_tick();
+        pad_scan_tick(0);
         pad_step(pad, cases[i].bits);
-        pad_scan_tick();
+        pad_scan_tick(cases[i].bits & DIRS);
         pad_say_state();
         char what[80];
         snprintf(what, sizeof what, "case 6: %s is decoded and spoken",

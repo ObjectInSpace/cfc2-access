@@ -28,11 +28,17 @@
  * the invariant; a second, DIFFERENT transition leaves exactly one. Three is
  * used here for margin, since the game's neighbouring pad records and analog
  * axes produce more coincidences than the offline model does. */
-#define PAD_CONFIRM_EVENTS 3
+/* Samples a site must agree with the KEYBOARD before it is reported.
+ *
+ * This is not a shape threshold -- it counts agreements with ground truth
+ * observed outside the process. A decoy has no way to track the arrow keys,
+ * so a handful of agreements across changing directions is decisive where no
+ * amount of pattern-matching was. */
+#define PAD_AGREE_NEEDED 6
 
 typedef struct {
     uintptr_t addr;      /* address of the `On` word */
-    unsigned  events;    /* distinct transitions witnessed */
+    unsigned  agree;     /* samples where the record matched the keyboard */
     BOOL      dead;
 } pad_site;
 
@@ -211,7 +217,7 @@ void pad_scan_start(void)
                             break;
                         pad_site *s = &g_sites[g_nsites++];
                         s->addr = (uintptr_t)p + o;
-                        s->events = 0;
+                        s->agree = 0;
                         s->dead = FALSE;
                     }
                 }
@@ -266,15 +272,40 @@ void pad_scan_poll(void)
     pad_scan_start();
 }
 
-void pad_scan_tick(void)
+/* Collapse a button word to one bit per DIRECTION.
+ *
+ * ⚠ The record sets either the D-pad bit or the stick bit for a given
+ * direction, never both, while the keyboard only tells us "down". Comparing
+ * raw masks therefore fails against the real pad -- 0x04 (Rdown) is not equal
+ * to PAD_DOWN (0x44). Compare which directions are present instead. */
+#define DIR_UP    1u
+#define DIR_DOWN  2u
+#define DIR_LEFT  4u
+#define DIR_RIGHT 8u
+
+static unsigned dir_set(unsigned bits)
+{
+    unsigned d = 0;
+    if (bits & PAD_UP)    d |= DIR_UP;
+    if (bits & PAD_DOWN)  d |= DIR_DOWN;
+    if (bits & PAD_LEFT)  d |= DIR_LEFT;
+    if (bits & PAD_RIGHT) d |= DIR_RIGHT;
+    return d;
+}
+
+void pad_scan_tick(unsigned player_dirs)
 {
     if (!g_scanning || g_record)
         return;
 
-    /* volatile: these live across setjmp and would otherwise be restorable to
-     * stale values on a fault, losing progress or resetting the index. */
-    volatile unsigned  alive = 0, best_events = 0;
-    volatile uintptr_t best = 0;
+    /* Only samples where the player is actually holding a direction carry
+     * information. With nothing held, every quiet site "agrees" trivially. */
+    if (!player_dirs)
+        return;
+
+    /* volatile: live across setjmp, so longjmp could restore stale values. */
+    volatile unsigned  alive = 0, best = 0;
+    volatile uintptr_t winner = 0;
     volatile unsigned  i;
 
     for (i = 0; i < g_nsites; i++) {
@@ -286,57 +317,47 @@ void pad_scan_tick(void)
         BOOL faulted;
         MEM_GUARDED(faulted, memcpy(w, (const void *)s->addr, sizeof w));
         if (faulted) {
-            s->dead = TRUE;      /* region went away; cannot be evaluated */
+            s->dead = TRUE;
             continue;
         }
 
-        /* ⛔ A REAL BUTTON EVENT is what carries information -- not merely a
-         * word that changed.
+        /* ⭐⭐ THE TEST: does this record say what the KEYBOARD says?
          *
-         * Quiet memory is all zeros and the invariant holds for any five zero
-         * words, so quiet samples can never count. But "On changed" is not
-         * enough either: the degenerate family (On == Old, forcing
-         * Trg = Rel = Chg = 0) can change value every frame and still satisfy
-         * every equation -- a counter and its shadow copy do exactly that, and
-         * such a site was reported as the pad in-game, reading 0xFF and
-         * speaking "up down left right".
+         * The direction bits the player is holding must be exactly the
+         * direction bits the record reports. A record that reports nothing
+         * while Down is held, or reports Up while Down is held, is not the
+         * pad -- whatever its internal algebra looks like.
          *
-         * A genuine press or release always sets Trg or Rel. That single test
-         * subsumes "did On change", so there is deliberately no separate
-         * changed-word check: a redundant condition looks meaningful, can
-         * never fail on its own, and hides whether the real one works. */
-        if (w[W_TRG] || w[W_REL]) {
-            if (!consistent(w)) {
-                /* ⭐ One violation on a real transition is decisive: the
-                 * engine maintains this every frame. Being strict is what
-                 * keeps the survivor set honest -- "mostly agrees" ranking is
-                 * how route 4's monotonic counter survived as long as it did. */
-                s->dead = TRUE;
-                continue;
-            }
-            s->events++;
+         * Compared over the direction bits only: the record legitimately
+         * carries face buttons and other bits we are not driving. */
+        if (dir_set(w[W_ON]) != dir_set(player_dirs)) {
+            s->dead = TRUE;
+            continue;
+        }
+        /* Still require the record to be internally coherent. */
+        if (!consistent(w)) {
+            s->dead = TRUE;
+            continue;
         }
 
+        s->agree++;
         alive++;
-        if (s->events > best_events) {
-            best_events = s->events;
-            best = s->addr;
+        if (s->agree > best) {
+            best = s->agree;
+            winner = s->addr;
         }
     }
     g_alive = alive;
 
-    if (best_events >= PAD_CONFIRM_EVENTS) {
+    if (best >= PAD_AGREE_NEEDED) {
         unsigned n = 0;
         for (unsigned k = 0; k < g_nsites; k++)
-            if (!g_sites[k].dead && g_sites[k].events >= PAD_CONFIRM_EVENTS)
+            if (!g_sites[k].dead && g_sites[k].agree >= PAD_AGREE_NEEDED)
                 n++;
-        g_record = (uintptr_t)best;
-        /* ⚠ Several sites can legitimately reach the threshold: the engine
-         * keeps a record per pad. Report the count rather than implying the
-         * answer is unique. */
-        log_line("pad: ⭐⭐ record identified at 0x%llx after %u distinct "
-                 "transition(s); %u site(s) reached the threshold",
-                 (unsigned long long)g_record, (unsigned)best_events, n);
+        g_record = (uintptr_t)winner;
+        log_line("pad: ⭐⭐ record identified at 0x%llx -- agreed with the "
+                 "keyboard %u time(s); %u site(s) qualified",
+                 (unsigned long long)g_record, (unsigned)best, n);
         log_line("pad:   On=+0 Old=+4 Trg=+8 Rel=+0xc Chg=+0x10 Rep=+0x14");
         speech_say(L"Pad record found.", TRUE);
     }
@@ -391,15 +412,14 @@ void pad_scan_report(void)
      * earlier version of this module. */
     unsigned with_events = 0;
     for (unsigned k = 0; k < g_nsites; k++)
-        if (!g_sites[k].dead && g_sites[k].events)
+        if (!g_sites[k].dead && g_sites[k].agree)
             with_events++;
     if (!with_events)
-        log_line("pad: no candidate has seen a transition yet -- press a "
-                 "direction a few times, then report again.");
+        log_line("pad: no candidate has agreed with the keyboard yet -- hold "
+                 "an arrow key while the menus are up, then report again.");
     else
-        log_line("pad: %u candidate(s) have seen transitions; need %d "
-                 "distinct ones to identify.", with_events,
-                 PAD_CONFIRM_EVENTS);
+        log_line("pad: %u candidate(s) agree so far; need %d agreements.",
+                 with_events, PAD_AGREE_NEEDED);
     speech_say(L"Not identified yet.", TRUE);
 }
 

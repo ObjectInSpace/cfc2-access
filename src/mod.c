@@ -247,9 +247,10 @@ static DWORD WINAPI worker(LPVOID param)
         /* Starts itself and re-seeds until a press makes the record visible.
          * Nothing is asked of the player except to navigate. */
         pad_scan_start();
-        log_line("pad: searching automatically -- just navigate the menus. "
-                 "The record is identified from the engine's own "
-                 "On/Trg/Rel/Chg invariant and logged when found.");
+        log_line("pad: searching automatically. HOLD an arrow key for a "
+                 "moment or two while navigating -- the record is identified "
+                 "by agreeing with the keyboard, which is the only test a "
+                 "look-alike cannot pass.");
         log_line("pad: F6 = report status. F7 = SPEAK the direction currently "
                  "held (press Down, hear \"down\"); Left/Right, the settings "
                  "axis, read from the same word. F5 = restart the search.");
@@ -272,11 +273,24 @@ static DWORD WINAPI worker(LPVOID param)
              * accumulates the evidence, so it must run while the player is
              * simply navigating -- no protocol for them to follow. */
             if (unpacked && pad_enabled) {
-                /* Re-seed until a press makes the record visible, then sample
-                 * the survivors. Both are cheap and neither asks anything of
-                 * the player beyond navigating normally. */
+                /* ⭐⭐ Read the arrow keys and hand them to the scan as GROUND
+                 * TRUTH. Two shape-based attempts both produced false
+                 * positives in-game -- state machines and shadow copies
+                 * produce pad-shaped data that no predicate over the five
+                 * words can rule out. What a decoy cannot do is agree with the
+                 * keyboard, so the record must report exactly the direction
+                 * the player is holding.
+                 *
+                 * Read here rather than inside pad_find so the scan stays
+                 * testable offline with a synthetic "player". */
+                unsigned dirs = 0;
+                if (GetAsyncKeyState(VK_UP)    & 0x8000) dirs |= PAD_UP;
+                if (GetAsyncKeyState(VK_DOWN)  & 0x8000) dirs |= PAD_DOWN;
+                if (GetAsyncKeyState(VK_LEFT)  & 0x8000) dirs |= PAD_LEFT;
+                if (GetAsyncKeyState(VK_RIGHT) & 0x8000) dirs |= PAD_RIGHT;
+
                 pad_scan_poll();
-                pad_scan_tick();
+                pad_scan_tick(dirs);
             }
 
             if (unpacked && pad_enabled && key_pressed(PAD_ARM_HOTKEY)) {

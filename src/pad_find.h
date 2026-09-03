@@ -112,11 +112,32 @@ void pad_scan_start(void);
  * rate-limits itself and does nothing once the record is identified. */
 void pad_scan_poll(void);
 
-/* Sample every surviving candidate once. Call from the worker loop at input
- * rate; it reads whole pages under one guard and indexes candidates out of the
- * local copy, because a per-candidate VirtualQuery is never affordable at
- * scale -- a lesson this project has paid for three times. */
-void pad_scan_tick(void);
+/* Sample every surviving candidate once, against the direction the PLAYER is
+ * actually holding (passed as a PAD_* bitmask, 0 for none).
+ *
+ * ⭐⭐ GROUND TRUTH IS WHAT IDENTIFIES THE RECORD -- not the shape of the data.
+ *
+ * Two shape-based attempts both produced false positives in-game. The
+ * invariant alone accepted a shadow-copy pair (readout: "up down left right").
+ * Adding direction-sanity and a real-event requirement still left an
+ * alternating boolean with a correctly-derived quintet -- 480 sites qualified
+ * at once, 300 ms after startup, before the player had touched anything, and
+ * the readout said "no direction" because half the samples land on zero.
+ *
+ * State machines produce pad-shaped quintets all over an engine. No predicate
+ * over the five words can separate them, because they are genuinely
+ * indistinguishable AS DATA.
+ *
+ * What a decoy cannot do is AGREE WITH THE KEYBOARD. The mod can read the
+ * arrow keys directly, so a candidate must report DOWN exactly when Down is
+ * held and report it released when it is not. That is a correlation with
+ * something outside the process, and it is the only test here that the data
+ * cannot satisfy by coincidence.
+ *
+ * Call from the worker loop at input rate; it reads whole pages under one
+ * guard and indexes candidates out of the local copy, because a per-candidate
+ * VirtualQuery is never affordable at scale. */
+void pad_scan_tick(unsigned player_dirs);
 
 /* Log what survived and whether the record is identified. */
 void pad_scan_report(void);
