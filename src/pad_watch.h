@@ -59,6 +59,33 @@ void pad_watch_tick(unsigned dirs);
 /* Log the bytes that differed between held and released, with their values. */
 void pad_watch_report(void);
 
+/* ⭐⭐ CONFIRMED BUTTON BYTES, found by the diff above (2026-09-03).
+ *
+ * Holding LEFT produced exactly two bytes that read a Left bit while held and
+ * zero when released:
+ *
+ *     singleton + 0x34bd8 = 0x80   Lleft   (stick)
+ *     singleton + 0x34c00 = 0x08   Rleft   (D-pad)
+ *
+ * Those are the only two Left bits in the layout and no other direction bits
+ * appeared, so this is the input state read off the machine rather than
+ * inferred. 109 bytes differed in total; these two were the only ones matching
+ * a direction.
+ *
+ * ⚠ 0x28 apart, which is neither the 0xb8 record stride nor the 4-byte button
+ * word spacing -- so they are the same logical field in two different
+ * structures (probably raw device vs mapped state), not two pad records. Which
+ * one the MENUS read is still unknown, so both are reported.
+ *
+ * ⚠ Also note singleton+0x33800 read 0x55 (= up|down) while LEFT was held.
+ * That is a mask CONSTANT sitting in the same region, not live state -- a
+ * reminder that a plausible-looking value near real data need not be data. */
+#define PAD_STICK_OFFSET 0x34bd8
+#define PAD_DPAD_OFFSET  0x34c00
+
+/* Speak whichever direction the confirmed bytes currently report. */
+void pad_watch_say(void);
+
 /* Button bits, from the reflected names in the unpacked image:
  * bit 0 Rup, 1 Rright, 2 Rdown, 3 Rleft, 4 Lup, 5 Lright, 6 Ldown, 7 Lleft. */
 #define PAD_UP     0x11u

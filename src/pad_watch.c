@@ -134,6 +134,13 @@ void pad_watch_report(void)
         if (g_held[i] == g_free[i])
             continue;
         diffs++;
+        /* ⚠ Print EVERY differing byte, not only the ones matching the
+         * expected shape. When the expected shape does not appear, what DID
+         * change is the only lead left -- and suppressing it turns a useful
+         * negative into a dead end. */
+        if (diffs <= 64)
+            log_line("pad:   diff +0x%-6llx  held 0x%02x  released 0x%02x",
+                     (unsigned long long)i, g_held[i], g_free[i]);
         /* ⭐ The shape we are looking for: nonzero while held, zero while
          * released, and the nonzero value is one of the direction bits. That
          * is a button byte, read off the machine rather than inferred. */
@@ -163,4 +170,38 @@ void pad_watch_report(void)
     } else {
         speech_say(L"Found candidate button bytes.", TRUE);
     }
+}
+
+/* Read the two confirmed button bytes and name the direction they report.
+ *
+ * This is the end-to-end check the whole route was for: press a direction,
+ * hear it. No searching, no filtering -- a fixed offset from a fixed pointer,
+ * both established before this ran. */
+void pad_watch_say(void)
+{
+    uintptr_t obj = singleton();
+    if (!obj) {
+        speech_say(L"Pad object not ready.", TRUE);
+        return;
+    }
+    BYTE stick = 0, dpad = 0;
+    BOOL f1, f2;
+    MEM_GUARDED(f1, stick = *(BYTE *)(obj + PAD_STICK_OFFSET));
+    MEM_GUARDED(f2, dpad  = *(BYTE *)(obj + PAD_DPAD_OFFSET));
+    if (f1 || f2) {
+        speech_say(L"Pad bytes unreadable.", TRUE);
+        return;
+    }
+
+    /* Either byte may carry the direction; OR them and name what is set. */
+    unsigned bits = (unsigned)stick | (unsigned)dpad;
+    const wchar_t *word = NULL;
+    if (bits & PAD_UP)         word = L"up";
+    else if (bits & PAD_DOWN)  word = L"down";
+    else if (bits & PAD_LEFT)  word = L"left";
+    else if (bits & PAD_RIGHT) word = L"right";
+
+    log_line("pad: stick=0x%02x dpad=0x%02x -> %ls", stick, dpad,
+             word ? word : L"(none)");
+    speech_say(word ? word : L"none", TRUE);
 }
