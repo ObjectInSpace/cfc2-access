@@ -102,11 +102,32 @@
  * fit, which was noise. */
 #define PAD_STRIDE 0x2e0
 
-/* ⚠ INFERRED, not measured: pad[0]'s base is +0x8 within the instance (from
- * Be_flag being the first registered field at record-relative 0x08), and the
- * array is about 5 records. Consistent with the observed +0x1c0 = 0x8 + 0x1b8
- * indexing, but no count constant was found. The dump below covers the whole
- * range regardless, so the analysis does not depend on either. */
+/* ⭐⭐ LAYOUT NOW PROVEN IN LIVE MEMORY, not inferred.
+ *
+ * The update loop at 0x140187b50-0x140187be9 does `lea rbx,[r14+0x1e5]`, calls
+ * with `[rbx-0x18d]`, then `add rbx,0x2e0` / `cmp edi,5`. So:
+ *
+ *     pad[i] = instance + 0x58 + i*0x2e0,  exactly 5 records
+ *
+ * ⚠ The base is +0x58, NOT the +0x8 previously inferred from the reflection
+ * registrar. A live dump settles it: Pad_no reads 0,1,2,3,4 at exactly these
+ * five records and Be_flag is 1 on each. That is the structure identifying
+ * itself.
+ *
+ * ⛔⛔ AND YET On/Old/Trg/Rel/Chg/Rep ARE ALL ZERO IN EVERY CAPTURE, across
+ * three different directions with clean press/release edges.
+ *
+ * Why: every record has **Kind = 0**, and the update dispatcher at
+ * 0x1401880a0 starts `movzx eax,[rcx+0xb]` (Kind) / `test al,al` / `je` --
+ * it returns immediately. The pad update never runs. The records are
+ * allocated and numbered but no device is bound to them.
+ *
+ * ⭐ CONCLUSION: the shell menus do NOT read the keyboard through sPad. This
+ * whole object is a dead end for menu navigation, and that is a fact about the
+ * game rather than a limitation of the tooling -- the layout was confirmed
+ * correct before the negative was accepted. */
+#define PAD_RECORD_BASE 0x58
+#define PAD_RECORD_COUNT 5
 #define PAD_DUMP_SPAN 0xf00
 
 /* ⛔⛔ DISPROVED 2026-09-03 -- KEPT AS A WARNING, NOT A RESULT.
