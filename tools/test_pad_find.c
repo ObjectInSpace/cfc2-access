@@ -246,6 +246,131 @@ int main(void)
           "case 5: further transitions then resolve it to the pad");
 
     /* ------------------------------------------------------------------
+     * Case 7: ⛔⛔ THE SHADOW-COPY DECOY -- the one that reached the user.
+     *
+     * The three equations are trivially satisfied whenever On == Old, because
+     * that forces Trg = Rel = Chg = 0. So ANY pair of equal words followed by
+     * three zeros passes: a value plus its shadow copy, then padding. That
+     * shape is everywhere in a real process.
+     *
+     * In-game this matched a site whose value was 0xFF and the readout said
+     * "up down left right" -- all four directions at once, which no physical
+     * d-pad can report. The whole test suite was green at the time; nothing
+     * here modelled the degenerate family.
+     *
+     * Two defences, and this case requires BOTH:
+     *   - opposite directions cannot be co-held (rejects the value outright)
+     *   - a transition must set Trg or Rel (a shadow pair never does)
+     *
+     * Sabotage: removing sane_dirs() from plausible(), OR removing the
+     * Trg/Rel event requirement, fails this case.
+     * ------------------------------------------------------------------ */
+    clear();
+    memset((void *)pad, 0, sizeof *pad);
+    /* ⚠⚠ THE DECOY MUST EXIST BEFORE SEEDING. Candidates are only created by
+     * the sweep, so anything written afterwards is never a candidate at all --
+     * the first three versions of this case wrote the decoy after
+     * seed_while_pressed() and therefore tested NOTHING, passing happily with
+     * the defence removed. Verified by tracing: only one site was ever
+     * evaluated. */
+    decoy[0] = decoy[1] = 0x1000u;      /* shadow pair, sane, nonzero */
+    decoy[2] = decoy[3] = decoy[4] = 0;
+    seed_while_pressed(pad);
+
+    /* Head start: both sites otherwise reach the threshold on the same tick,
+     * where the tie is broken by allocation order -- so the pad could win by
+     * luck rather than by the decoy being rejected. */
+    {
+        static const unsigned lb0[] = { 0x00, 0x04, 0x00, 0x40 };
+        for (unsigned k = 0; k < 12; k++) {
+            decoy[0] = decoy[1] = 0x1000u | lb0[k % 4];
+            decoy[2] = decoy[3] = decoy[4] = 0;
+            pad_scan_tick();
+        }
+    }
+    for (unsigned i = 0; i < 40; i++) {
+        pad_step(pad, (i & 1) ? 0u : PAD_RDOWN);
+        static const unsigned lowbytes[] = { 0x00, 0x04, 0x00, 0x40,
+                                             0x00, 0x02, 0x00, 0x08 };
+        unsigned shadow = 0x1000u | lowbytes[i % 8];
+        decoy[0] = decoy[1] = shadow;
+        decoy[2] = decoy[3] = decoy[4] = 0;
+        pad_scan_tick();
+    }
+    int shadow_hit = 0;
+    for (int off = 0; off <= 16; off += 4)
+        if (pad_record() == (uintptr_t)decoy + off) shadow_hit = 1;
+    check(!shadow_hit,
+          "case 7: SHADOW-COPY decoy (On==Old, value 0xFF) is rejected");
+    check(pad_record() == (uintptr_t)pad,
+          "case 7: the real pad is identified instead");
+    /* ⚠ Leave no shadow pair behind: later cases seed fresh, and a decoy that
+     * survives into them would dominate and mask what THEY test. Sabotage of
+     * the transition guard and of the kill-on-violation rule stopped being
+     * caught when this case was added without the cleanup. */
+    memset((void *)decoy, 0, 12 * sizeof(unsigned));
+
+    /* ------------------------------------------------------------------
+     * Case 9: a site that VIOLATES the invariant during a real event is
+     * killed, not merely skipped.
+     *
+     * The Trg/Rel guard means most junk never gets evaluated, so the kill rule
+     * needs a decoy built to reach evaluation and then fail: it sets Trg (so
+     * it counts as a real event) but its other words do not satisfy the
+     * equations. Without the kill it survives, keeps accumulating, and can
+     * out-score the pad.
+     *
+     * Sabotage: `if (!consistent(w))` -> `if (0)` fails this case. It is the
+     * only case that does, now that the Trg/Rel guard filters the rest.
+     * ------------------------------------------------------------------ */
+    clear();
+    memset((void *)pad, 0, sizeof *pad);
+    memset((void *)decoy, 0, 12 * sizeof(unsigned));
+    /* seeded consistent-and-nonzero, so it becomes a candidate */
+    decoy[0] = 0x04; decoy[1] = 0x00; decoy[2] = 0x04;
+    decoy[3] = 0x00; decoy[4] = 0x04;
+    seed_while_pressed(pad);
+    for (unsigned i = 0; i < 40; i++) {
+        pad_step(pad, (i & 1) ? 0u : PAD_RDOWN);
+        /* a real "event" (Trg set) whose algebra is WRONG */
+        decoy[0] = 0x04 + (i & 3); decoy[1] = 0x40;
+        decoy[2] = 0x04;                    /* Trg nonzero -> evaluated */
+        decoy[3] = 0x11; decoy[4] = 0x77;   /* inconsistent with On/Old */
+        pad_scan_tick();
+    }
+    int viol_hit = 0;
+    for (int off = 0; off <= 16; off += 4)
+        if (pad_record() == (uintptr_t)decoy + off) viol_hit = 1;
+    check(!viol_hit,
+          "case 9: a site violating the invariant on a real event is KILLED");
+    memset((void *)decoy, 0, 12 * sizeof(unsigned));
+
+    /* ------------------------------------------------------------------
+     * Case 8: a readout must never report opposing directions.
+     *
+     * The user-visible symptom of the bug above. Even if some site were
+     * identified, speaking "up down left right" is self-evidently wrong and
+     * must be impossible by construction.
+     * ------------------------------------------------------------------ */
+    {
+        unsigned bad[] = { 0xFFu, 0x77u, 0x0Fu, 0x55u, 0xAAu };
+        int any_opposed = 0;
+        for (unsigned i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+            unsigned v = bad[i];
+            int up = (v & PAD_UP) != 0, dn = (v & PAD_DOWN) != 0;
+            int lf = (v & PAD_LEFT) != 0, rt = (v & PAD_RIGHT) != 0;
+            /* these values are exactly what plausible() must refuse */
+            if ((up && dn) || (lf && rt)) {
+                unsigned w[PAD_WORDS] = { v, v, 0, 0, 0 };
+                /* a window carrying this value must not be seedable */
+                if (pad_window_acceptable(w)) any_opposed = 1;
+            }
+        }
+        check(!any_opposed,
+              "case 8: windows holding opposing directions are never accepted");
+    }
+
+    /* ------------------------------------------------------------------
      * Case 6: all four directions decode, including the settings axis.
      *
      * Menu navigation is up/down and settings adjustment is left/right, read

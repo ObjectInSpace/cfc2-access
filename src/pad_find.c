@@ -32,7 +32,6 @@
 
 typedef struct {
     uintptr_t addr;      /* address of the `On` word */
-    unsigned  last_on;   /* On as of the previous sample */
     unsigned  events;    /* distinct transitions witnessed */
     BOOL      dead;
 } pad_site;
@@ -54,6 +53,32 @@ static BOOL consistent(const unsigned w[PAD_WORDS])
            w[W_CHG] == (on ^ old);
 }
 
+/* Opposite directions cannot be held at once.
+ *
+ * ⛔⛔ THIS IS WHAT THE INVARIANT ALONE CANNOT DO, and leaving it out shipped a
+ * false positive to the user. The three equations are trivially satisfied by a
+ * huge family of ordinary memory: whenever On == Old, they force
+ * Trg = Rel = Chg = 0, so ANY pair of equal words followed by three zeros
+ * passes -- a value plus its shadow copy, then padding. That shape is
+ * everywhere. My "~2^-96 per sample" estimate assumed five INDEPENDENT random
+ * words and was simply wrong.
+ *
+ * The observed failure: the scan locked onto such a site whose value was
+ * 0xFF, and the readout said "up down left right" -- all four at once.
+ *
+ * A physical d-pad or stick cannot report up AND down, or left AND right. That
+ * is a fact about the hardware, not a heuristic, and it rejects the entire
+ * degenerate family the moment its value has opposing bits set. Diagonals
+ * (e.g. down+right) are legitimate and are kept. */
+static BOOL sane_dirs(unsigned v)
+{
+    if ((v & PAD_UP) && (v & PAD_DOWN))
+        return FALSE;
+    if ((v & PAD_LEFT) && (v & PAD_RIGHT))
+        return FALSE;
+    return TRUE;
+}
+
 /* Could these be button words? Buttons occupy the low bits; a float, pointer
  * half, timer or counter almost always sets something in the top byte. */
 static BOOL plausible(const unsigned w[PAD_WORDS])
@@ -61,7 +86,8 @@ static BOOL plausible(const unsigned w[PAD_WORDS])
     for (int k = 0; k < PAD_WORDS; k++)
         if (w[k] & 0xFF000000u)
             return FALSE;
-    return TRUE;
+    /* Both the current and previous states must be physically possible. */
+    return sane_dirs(w[W_ON]) && sane_dirs(w[W_OLD]);
 }
 
 /* Live state must be written by the game, so it is in private writable
@@ -185,7 +211,6 @@ void pad_scan_start(void)
                             break;
                         pad_site *s = &g_sites[g_nsites++];
                         s->addr = (uintptr_t)p + o;
-                        s->last_on = w[W_ON];
                         s->events = 0;
                         s->dead = FALSE;
                     }
@@ -265,10 +290,22 @@ void pad_scan_tick(void)
             continue;
         }
 
-        /* A TRANSITION is what carries information. While nothing is pressed
-         * every word is zero and the invariant holds for any five zero words,
-         * so quiet samples must never count as evidence. */
-        if (w[W_ON] != s->last_on) {
+        /* ⛔ A REAL BUTTON EVENT is what carries information -- not merely a
+         * word that changed.
+         *
+         * Quiet memory is all zeros and the invariant holds for any five zero
+         * words, so quiet samples can never count. But "On changed" is not
+         * enough either: the degenerate family (On == Old, forcing
+         * Trg = Rel = Chg = 0) can change value every frame and still satisfy
+         * every equation -- a counter and its shadow copy do exactly that, and
+         * such a site was reported as the pad in-game, reading 0xFF and
+         * speaking "up down left right".
+         *
+         * A genuine press or release always sets Trg or Rel. That single test
+         * subsumes "did On change", so there is deliberately no separate
+         * changed-word check: a redundant condition looks meaningful, can
+         * never fail on its own, and hides whether the real one works. */
+        if (w[W_TRG] || w[W_REL]) {
             if (!consistent(w)) {
                 /* ⭐ One violation on a real transition is decisive: the
                  * engine maintains this every frame. Being strict is what
@@ -278,7 +315,6 @@ void pad_scan_tick(void)
                 continue;
             }
             s->events++;
-            s->last_on = w[W_ON];
         }
 
         alive++;
@@ -395,4 +431,11 @@ void pad_say_state(void)
 uintptr_t pad_record(void)
 {
     return g_record;
+}
+
+BOOL pad_window_acceptable(const unsigned w[PAD_WORDS])
+{
+    if (!w[W_ON] && !w[W_OLD] && !w[W_TRG] && !w[W_REL] && !w[W_CHG])
+        return FALSE;                      /* all-zero matches trivially */
+    return plausible(w) && consistent(w);
 }

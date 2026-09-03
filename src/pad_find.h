@@ -127,4 +127,13 @@ void pad_say_state(void);
 /* Address of the identified record's `On` word, or 0 while unresolved. */
 uintptr_t pad_record(void);
 
+/* Would this five-word window be accepted as a candidate?
+ *
+ * Exposed because the seed predicate is where a whole class of false positives
+ * is rejected, and that deserves direct assertions rather than being tested
+ * only through a full scan. A window holding opposing directions (up+down or
+ * left+right) must never be accepted -- a physical pad cannot report them, and
+ * a site that did reached the user speaking "up down left right". */
+BOOL pad_window_acceptable(const unsigned w[PAD_WORDS]);
+
 #endif /* CFC2_PAD_FIND_H */
