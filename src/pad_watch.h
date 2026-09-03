@@ -59,29 +59,34 @@ void pad_watch_tick(unsigned dirs);
 /* Log the bytes that differed between held and released, with their values. */
 void pad_watch_report(void);
 
-/* ⭐⭐ CONFIRMED BUTTON BYTES, found by the diff above (2026-09-03).
+/* ⛔⛔ THESE OFFSETS ARE NOT THE PAD -- DISPROVED 2026-09-03. KEPT AS A
+ * WARNING, NOT AS A RESULT.
  *
- * Holding LEFT produced exactly two bytes that read a Left bit while held and
- * zero when released:
+ * A first run with LEFT held reported exactly two bytes carrying Left bits
+ * (0x80 stick, 0x08 D-pad) and I called it confirmation. It was not:
  *
- *     singleton + 0x34bd8 = 0x80   Lleft   (stick)
- *     singleton + 0x34c00 = 0x08   Rleft   (D-pad)
+ * 1. ⛔ THE FILTER SEARCHED FOR THOSE VALUES. It accepted only held bytes
+ *    equal to 0x08/0x80/0x88, then finding two was reported as independent
+ *    evidence. Circular. With ~80 bytes dropping to zero on release, two
+ *    landing on those values is roughly what chance predicts.
  *
- * Those are the only two Left bits in the layout and no other direction bits
- * appeared, so this is the input state read off the machine rather than
- * inferred. 109 bytes differed in total; these two were the only ones matching
- * a direction.
+ * 2. ⛔⛔ THERE WAS NO SAME-STATE CONTROL. The two captures were taken EIGHT
+ *    SECONDS apart, so the diff is dominated by elapsed time -- timers, frame
+ *    counters, animation phase -- not by the key. A second run holding DOWN
+ *    produced the IDENTICAL count of 109 differing bytes, and +0x34bd8 again
+ *    read 0x80. A byte that says 0x80 whether Left or Down is held is a
+ *    constant flag, not input state.
  *
- * ⚠ 0x28 apart, which is neither the 0xb8 record stride nor the 4-byte button
- * word spacing -- so they are the same logical field in two different
- * structures (probably raw device vs mapped state), not two pad records. Which
- * one the MENUS read is still unknown, so both are reported.
+ * ⭐ This project had already paid for lesson 2 in the heapdiff route: without
+ * a control, everything that merely ticks looks like a signal. A two-state
+ * diff means nothing until a same-state diff shows what changes anyway. I
+ * built the differential tool and left out the part that makes it valid.
  *
- * ⚠ Also note singleton+0x33800 read 0x55 (= up|down) while LEFT was held.
- * That is a mask CONSTANT sitting in the same region, not live state -- a
- * reminder that a plausible-looking value near real data need not be data. */
-#define PAD_STICK_OFFSET 0x34bd8
-#define PAD_DPAD_OFFSET  0x34c00
+ * What IS still solid: the singleton address below. It resolved in-game to a
+ * real object (0x2881a8f0) on every run. Where the pad data lives inside or
+ * behind it remains unknown. */
+#define PAD_STICK_OFFSET 0x34bd8   /* DISPROVED -- reads 0x80 regardless */
+#define PAD_DPAD_OFFSET  0x34c00   /* DISPROVED */
 
 /* Speak whichever direction the confirmed bytes currently report. */
 void pad_watch_say(void);

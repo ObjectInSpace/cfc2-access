@@ -201,7 +201,16 @@ void pad_watch_say(void)
     else if (bits & PAD_LEFT)  word = L"left";
     else if (bits & PAD_RIGHT) word = L"right";
 
-    log_line("pad: stick=0x%02x dpad=0x%02x -> %ls", stick, dpad,
-             word ? word : L"(none)");
+    /* ⚠ Log what the KEYBOARD says alongside what the bytes say, so the two
+     * can be compared without relying on the user to remember. The bytes were
+     * found by a filter that searched for Left bits, which cannot confirm
+     * itself -- only agreement with an independent reading counts. */
+    unsigned kb = 0;
+    if (GetAsyncKeyState(VK_UP)    & 0x8000) kb |= PAD_UP;
+    if (GetAsyncKeyState(VK_DOWN)  & 0x8000) kb |= PAD_DOWN;
+    if (GetAsyncKeyState(VK_LEFT)  & 0x8000) kb |= PAD_LEFT;
+    if (GetAsyncKeyState(VK_RIGHT) & 0x8000) kb |= PAD_RIGHT;
+    log_line("pad: stick=0x%02x dpad=0x%02x -> %ls   (keyboard says 0x%02x)",
+             stick, dpad, word ? word : L"(none)", kb);
     speech_say(word ? word : L"none", TRUE);
 }
