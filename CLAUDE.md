@@ -121,46 +121,48 @@ round makes the true window fail its own test; the scanner then arms a shifted
 window whose last word runs past the record, and the real candidate dies a few
 frames later. The self-test caught this before it ever ran in-game.
 
-### Usage (F5/F6/F7, and it needs a HELD direction)
+### Usage: none. It searches by itself.
 
-1. **HOLD a direction and press F5.** Arming requires a live press: an all-zero
-   record satisfies the algebra trivially, and this process has millions of
-   zero dwords. An earlier build without that filter armed 8192 sites of zeroes
-   inside the first region, hit its cap, and never reached the real pad —
-   while reporting "armed 8192 candidate sites" as if that were progress.
-2. **Navigate normally.** The 100 ms tick accumulates evidence; nothing for the
-   user to remember or report.
-3. **F6** reports survivors; **F7** speaks the direction currently held.
+The mod starts the search once the image unpacks and re-seeds every 250 ms
+until a press makes the record visible. **The player just navigates.**
 
-⚠ **Several sites confirm legitimately** — a record per player, previous-frame
-snapshots, mirrored copies. The report says how many and picks a
-representative ranked by how many distinct directions it has shown; it does not
-claim to have found a unique pad.
+- **F6** = report status · **F7** = speak the direction currently held ·
+  **F5** = restart the search.
+- OFF switch: create `cfc2_pad.off` next to the exe.
 
-**OFF switch: create `cfc2_pad.off` next to the exe.** The scan is read-only
-(VirtualQuery + guarded reads, no hooks, no calls into game code), but the
-switch ships with the experiment rather than after it bites.
+⚠ An earlier design required "hold a direction while pressing F5". That worked
+but pushed a protocol onto the player, and **a measurement that needs the user
+to remember something is the wrong measurement** — instrument it instead.
 
-Run `.	oolsun_pad_test.ps1` after any change to `pad_find.c`.
+### ⛔⛔ The all-zero rejection is load-bearing
+
+All-zero windows satisfy the invariant trivially and a process is mostly
+zeros: **measured 57k matches in 1.8 MB**, extrapolating to tens of millions
+across this game's ~1.5 GB. Without rejecting them the candidate table fills in
+the first few megabytes and never reaches the pad — the same "a fixed budget
+silently becomes a tiny window" failure this project has now hit three times.
+
+⭐ **The fix is a filter that DISCRIMINATES, never a bigger cap.** With zeros
+rejected the sweep finds 5-8 candidates instead of 65536.
+
+The consequence — a sweep only matches while a button is DOWN — is handled by
+re-seeding, not by asking the player to hold a key.
 
 ### ⚠ The self-test is only a test because it was proven to FAIL
 
-Each mechanism was sabotaged and the suite re-run:
+Five sabotages, each caught by the assertion that exists for it:
 
-- `consistent()` forced TRUE → the input-correlated decoy is accepted (case 3)
-- `eventful()` forced TRUE → a quiet struct accumulates evidence (cases 2/4)
-- `Old` treated as previous → the planted pad is never confirmed (case 2)
-- union read replaced by fixed offsets → shifted-window decode breaks (case 6)
+- `consistent()` forced TRUE → the decoy is accepted (cases 2/3/5)
+- quiet samples counted as transitions → everything breaks (8 failures)
+- a violating site not killed → the pad is not identified (cases 2/3/5)
+- `PAD_CONFIRM_EVENTS = 1` → identifies on one transition (case 5)
+- all-zero windows accepted → **the cap binds (case 1)**
 
-⚠ **Case 3 originally passed under sabotage.** It scraped the log, and the
-report prints only the first handful of survivors — so with the algebra
-disabled, 6634 sites confirmed, the decoy among them, and the assertion still
-passed. Fixed by asserting membership through `pad_is_confirmed()` instead of
-the log. **Assert the result, not the header.**
-
-⚠ Case 5 pins the decoder to the planted pad (`pad_debug_pin`). Without that it
-tests the ranking and the decoder at once and fails intermittently for reasons
-unrelated to decoding.
+⚠ **Two of these passed at first.** The cap sabotage was invisible because
+nothing asserted on coverage — the log said "INCOMPLETE" while every check went
+green. And case 5's boundary took two attempts to get right: seeding does not
+count as a transition, and driving the full sequence gives many, so the case
+must drive **exactly one** transition after seeding or it tests nothing.
 
 ### ⚠ MinHook is no longer linked
 

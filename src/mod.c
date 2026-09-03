@@ -59,7 +59,7 @@ static BOOL g_gmd_found;
  *
  * F5 = arm the scan. Hold a direction while pressing it. */
 #define PAD_ARM_HOTKEY       VK_F5
-#define PAD_ARM_HOTKEY_NAME  "F5"
+#define PAD_ARM_HOTKEY_NAME  "F5"   /* restart the search from scratch */
 
 /* F6 = report what survived. Separate from arming so the player can keep
  * navigating and ask for the state whenever they like. */
@@ -244,20 +244,15 @@ static DWORD WINAPI worker(LPVOID param)
         log_line("pad: DISABLED by cfc2_pad.off next to the exe. Delete that "
                  "file to re-enable.");
     if (unpacked && pad_enabled) {
-        log_line("pad: F5 = arm the scan. HOLD a direction (Down works) "
-                 "while pressing F5, then release it. Arming needs a live "
-                 "press: an all-zero record satisfies the test trivially, so "
-                 "a scan on quiet memory finds nothing useful.");
-        log_line("pad: then just navigate normally. The scan confirms the "
-                 "engine's pad record from the Old/Trg/Rel/Chg relationship "
-                 "and logs it.");
-        log_line("pad: F6 = report what survived. F7 = SPEAK the direction "
-                 "currently held -- press Down, hear \"down\". Left/Right "
-                 "(the settings axis) read from the same word.");
-        /* ⚠ Do NOT verify here. This runs before the shell's menu exists, so
-         * the pointers would be null and the log would record a misleading
-         * "0 of 4 resolved". The check happens at a later beat instead, once
-         * a menu is actually up. */
+        /* Starts itself and re-seeds until a press makes the record visible.
+         * Nothing is asked of the player except to navigate. */
+        pad_scan_start();
+        log_line("pad: searching automatically -- just navigate the menus. "
+                 "The record is identified from the engine's own "
+                 "On/Trg/Rel/Chg invariant and logged when found.");
+        log_line("pad: F6 = report status. F7 = SPEAK the direction currently "
+                 "held (press Down, hear \"down\"); Left/Right, the settings "
+                 "axis, read from the same word. F5 = restart the search.");
     }
 
     while (!InterlockedCompareExchange(&g_quit, 0, 0)) {
@@ -276,12 +271,17 @@ static DWORD WINAPI worker(LPVOID param)
              * number of sites, each a 20-byte guarded read. This is what
              * accumulates the evidence, so it must run while the player is
              * simply navigating -- no protocol for them to follow. */
-            if (unpacked && pad_enabled)
+            if (unpacked && pad_enabled) {
+                /* Re-seed until a press makes the record visible, then sample
+                 * the survivors. Both are cheap and neither asks anything of
+                 * the player beyond navigating normally. */
+                pad_scan_poll();
                 pad_scan_tick();
+            }
 
             if (unpacked && pad_enabled && key_pressed(PAD_ARM_HOTKEY)) {
-                log_line("pad: arm triggered by %s", PAD_ARM_HOTKEY_NAME);
-                pad_scan_arm();
+                log_line("pad: restart triggered by %s", PAD_ARM_HOTKEY_NAME);
+                pad_scan_start();
             }
             if (unpacked && pad_enabled && key_pressed(PAD_REPORT_HOTKEY)) {
                 log_line("pad: report triggered by %s",
