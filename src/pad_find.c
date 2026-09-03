@@ -37,8 +37,9 @@
 #define PAD_AGREE_NEEDED 6
 
 typedef struct {
-    uintptr_t addr;      /* address of the `On` word */
-    unsigned  agree;     /* samples where the record matched the keyboard */
+    uintptr_t addr;       /* address of the `On` word */
+    unsigned  agree;      /* samples where the record matched the keyboard */
+    unsigned  held_agree; /* of those, ones where a direction was HELD */
     BOOL      dead;
 } pad_site;
 
@@ -218,6 +219,7 @@ void pad_scan_start(void)
                         pad_site *s = &g_sites[g_nsites++];
                         s->addr = (uintptr_t)p + o;
                         s->agree = 0;
+        s->held_agree = 0;
                         s->dead = FALSE;
                     }
                 }
@@ -298,10 +300,19 @@ void pad_scan_tick(unsigned player_dirs)
     if (!g_scanning || g_record)
         return;
 
-    /* Only samples where the player is actually holding a direction carry
-     * information. With nothing held, every quiet site "agrees" trivially. */
-    if (!player_dirs)
-        return;
+    /* ⛔⛔ DO NOT SKIP THE RELEASE SAMPLES.
+     *
+     * An earlier version returned early when nothing was held, reasoning that
+     * quiet samples agree trivially. That removed the single most
+     * discriminating observation: a site FROZEN at the Down value agrees with
+     * every Down sample and is never once asked "and now that I let go?".
+     * In-game it picked exactly such a site -- the readout said "down" no
+     * matter what.
+     *
+     * Release is evidence. A record that still reads Down when nothing is
+     * held is disproved on the spot, and the comparison is symmetric: a site
+     * constantly reading ZERO is disproved by the first HELD sample. No extra
+     * rule is needed for either. */
 
     /* volatile: live across setjmp, so longjmp could restore stale values. */
     volatile unsigned  alive = 0, best = 0;
@@ -327,8 +338,7 @@ void pad_scan_tick(unsigned player_dirs)
          * direction bits the record reports. A record that reports nothing
          * while Down is held, or reports Up while Down is held, is not the
          * pad -- whatever its internal algebra looks like.
-         *
-         * Compared over the direction bits only: the record legitimately
+         * the direction bits only: the record legitimately
          * carries face buttons and other bits we are not driving. */
         if (dir_set(w[W_ON]) != dir_set(player_dirs)) {
             s->dead = TRUE;
@@ -341,18 +351,38 @@ void pad_scan_tick(unsigned player_dirs)
         }
 
         s->agree++;
+        if (player_dirs)
+            s->held_agree++;
         alive++;
-        if (s->agree > best) {
+        /* ⚠ No separate "must have seen several distinct states" rule here,
+         * deliberately. The comparison is symmetric: a site frozen at Down
+         * dies on the first RELEASE, and one constantly reading zero dies on
+         * the first HELD sample. A distinct-state requirement on top of that
+         * can never fail on its own -- verified by sabotage -- and a condition
+         * that cannot fail hides whether the real one works. */
+        /* ⛔⛔ COUNT ONLY AGREEMENTS WHILE A DIRECTION IS HELD.
+         *
+         * A site reading zero agrees with every release sample, so with enough
+         * quiet frames it reaches the threshold having never once matched a
+         * real press -- 112 sites did exactly that in the harness once
+         * realistic noise was planted, identifying a record with NO input.
+         *
+         * This is the mirror of the frozen-at-Down failure, and I removed this
+         * very requirement earlier as "redundant" because the fixture at the
+         * time was too clean to show it. Release samples still matter -- they
+         * are what KILL a frozen site -- but they must not be able to CONFIRM
+         * one on their own. */
+        if (s->held_agree >= PAD_AGREE_NEEDED && s->agree > best) {
             best = s->agree;
             winner = s->addr;
         }
     }
     g_alive = alive;
 
-    if (best >= PAD_AGREE_NEEDED) {
+    if (best) {
         unsigned n = 0;
         for (unsigned k = 0; k < g_nsites; k++)
-            if (!g_sites[k].dead && g_sites[k].agree >= PAD_AGREE_NEEDED)
+            if (!g_sites[k].dead && g_sites[k].held_agree >= PAD_AGREE_NEEDED)
                 n++;
         g_record = (uintptr_t)winner;
         log_line("pad: ⭐⭐ record identified at 0x%llx -- agreed with the "
@@ -410,16 +440,19 @@ void pad_scan_report(void)
     /* ⚠ Distinguish "nothing has happened yet" from "everything was
      * eliminated". Those mean opposite things and looked identical in an
      * earlier version of this module. */
-    unsigned with_events = 0;
+    /* ⚠ Report agreements made WHILE A DIRECTION WAS HELD. Quiet agreement is
+     * not evidence -- a site reading zero agrees with every release sample --
+     * so counting those would report progress that means nothing. */
+    unsigned with_held = 0;
     for (unsigned k = 0; k < g_nsites; k++)
-        if (!g_sites[k].dead && g_sites[k].agree)
-            with_events++;
-    if (!with_events)
+        if (!g_sites[k].dead && g_sites[k].held_agree)
+            with_held++;
+    if (!with_held)
         log_line("pad: no candidate has agreed with the keyboard yet -- hold "
                  "an arrow key while the menus are up, then report again.");
     else
-        log_line("pad: %u candidate(s) agree so far; need %d agreements.",
-                 with_events, PAD_AGREE_NEEDED);
+        log_line("pad: %u candidate(s) matched a held direction; need %d "
+                 "such agreements.", with_held, PAD_AGREE_NEEDED);
     speech_say(L"Not identified yet.", TRUE);
 }
 
@@ -451,6 +484,19 @@ void pad_say_state(void)
 uintptr_t pad_record(void)
 {
     return g_record;
+}
+
+unsigned pad_seed_count(void)
+{
+    return g_nsites;
+}
+
+BOOL pad_is_alive(uintptr_t addr)
+{
+    for (unsigned i = 0; i < g_nsites; i++)
+        if (g_sites[i].addr == addr)
+            return !g_sites[i].dead;
+    return FALSE;
 }
 
 BOOL pad_window_acceptable(const unsigned w[PAD_WORDS])

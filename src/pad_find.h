@@ -148,6 +148,23 @@ void pad_say_state(void);
 /* Address of the identified record's `On` word, or 0 while unresolved. */
 uintptr_t pad_record(void);
 
+/* How many candidates the last sweep seeded.
+ *
+ * Exposed because the seed filters exist to control exactly this number, and
+ * their effect is invisible in any pass/fail outcome -- sabotaging the
+ * seed-time invariant left the whole suite green while the candidate set grew
+ * without bound. In the game the filters take 1.4 GB down to ~1800; a test
+ * that does not assert on the count cannot tell that apart from millions. */
+unsigned pad_seed_count(void);
+
+/* Is this address still a live candidate?
+ *
+ * Exposed because "the decoy did not win" and "the decoy was REJECTED" are
+ * different claims, and only the second is the property under test. A decoy
+ * can lose a tie on allocation order while remaining perfectly alive, which
+ * made a sabotage of the release-sample handling invisible. */
+BOOL pad_is_alive(uintptr_t addr);
+
 /* Would this five-word window be accepted as a candidate?
  *
  * Exposed because the seed predicate is where a whole class of false positives

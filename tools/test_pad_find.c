@@ -136,6 +136,44 @@ int main(void)
 {
     printf("== pad_find self-test ==\n");
 
+    /* ⚠⚠ PLANT REALISTIC NOISE, or the seed filters cannot be tested.
+     *
+     * This harness's own memory is small and mostly zeros, so the seed-time
+     * invariant rejects almost nothing here: measured 5-13 candidates with it
+     * and 8 without. A threshold on that count would be calibrated against
+     * nothing. The game seeds ~1800 out of 1.4 GB, and the filter is what
+     * keeps that from being millions.
+     *
+     * So plant a megabyte of plausible-looking non-pad data -- small integers
+     * and counters, the shapes plausible() admits -- and require the invariant
+     * to reject the overwhelming majority of it. */
+    {
+        unsigned *noise = (unsigned *)VirtualAlloc(
+            NULL, 1u << 20, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        if (noise) {
+            /* ⚠ Purely RANDOM data yields ZERO consistent windows -- measured
+             * -- so it cannot calibrate anything. The invariant is much
+             * stronger than the earlier "45 million matches" figure suggested;
+             * that number came from ZERO-FILLED memory, not realistic data.
+             *
+             * What actually survives is the degenerate family: a value and its
+             * shadow copy followed by padding (On == Old forces
+             * Trg = Rel = Chg = 0). Plant those densely, since they are what
+             * the seed filters must contend with in the game. */
+            unsigned x = 12345u;
+            for (unsigned i = 0; i + 8 < (1u << 20) / 4u; i += 8) {
+                x = x * 1103515245u + 12345u;
+                unsigned v = (x >> 16) & 0x0FFFu;   /* small, top byte clear */
+                noise[i + 0] = v;                   /* On                    */
+                noise[i + 1] = v;                   /* Old == On             */
+                noise[i + 2] = 0;                   /* Trg                   */
+                noise[i + 3] = 0;                   /* Rel                   */
+                noise[i + 4] = 0;                   /* Chg                   */
+                noise[i + 5] = noise[i + 6] = noise[i + 7] = 0;
+            }
+        }
+    }
+
     volatile sim_pad *pad = (sim_pad *)VirtualAlloc(
         NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     volatile unsigned *decoy = (unsigned *)VirtualAlloc(
@@ -170,6 +208,29 @@ int main(void)
      * ONLY this case. */
     check(!logged("cap reached"),
           "case 1: candidate cap does NOT bind (coverage is complete)");
+    /* ⚠ Assert the candidate COUNT, not just that the sweep ran.
+     *
+     * The seed filters exist solely to control this number and their effect
+     * appears in no pass/fail outcome -- sabotaging the seed-time invariant
+     * left the entire suite green while the candidate set grew without bound.
+     * In the game the filters take 1.4 GB down to ~1800 candidates; a harness
+     * that never looks at the count cannot distinguish that from millions.
+     * This process is far smaller, so the bar is correspondingly low. */
+    /* ⚠ NO threshold on the candidate count, deliberately.
+     *
+     * I tried to assert one and it was wrong twice over. Random data yields
+     * ZERO consistent windows (measured), so it calibrates nothing; and the
+     * shadow-copy family planted above yields ~6300 from 2.3 MB, which the
+     * SEED filters do not reduce at all -- only the ground-truth comparison
+     * eliminates those. So "the seed filters keep the set small" is simply
+     * not a property this code has, and asserting it would have been a
+     * threshold tuned until it passed.
+     *
+     * What the seed filters actually do is reject all-zero windows, which
+     * case 1's cap check already covers. The candidate count is reported in
+     * the log for a human to notice, not asserted. */
+    check(pad_seed_count() > 0,
+          "case 1: the sweep produced candidates to work with");
 
     /* ------------------------------------------------------------------
      * Case 2: the planted pad is IDENTIFIED, at the right address.
@@ -228,6 +289,10 @@ int main(void)
     pad_scan_start();
     for (int i = 0; i < 60; i++)      /* many frames, nothing pressed */
         pad_scan_tick(0);
+    /* ⚠ With the shadow-copy noise planted, thousands of candidates exist and
+     * agree with "nothing held" trivially. The claim that matters is that
+     * nothing is IDENTIFIED without real input, which needs agreements across
+     * held directions too. */
     check(pad_record() == 0,
           "case 4: quiet frames alone never identify a record");
     clear();
@@ -254,10 +319,13 @@ int main(void)
      * still passed and the case tested nothing. Exactly ONE transition after
      * seeding is the boundary that matters. */
     seed_while_pressed(pad);
-    pad_step(pad, 0);            /* ONE real transition after seeding */
-    pad_scan_tick(0);
+    /* Exactly ONE agreement while a direction is held. With thousands of
+     * shadow candidates present, identifying on one would pick among them
+     * arbitrarily -- so one must not be enough. */
+    pad_step(pad, PAD_RDOWN);
+    pad_scan_tick(PAD_DOWN);
     check(pad_record() == 0,
-          "case 5: a single transition does NOT identify (shift ambiguity)");
+          "case 5: ONE held agreement does not identify a record");
     drive(pad, seq, nseq);
     check(pad_record() == (uintptr_t)pad,
           "case 5: further transitions then resolve it to the pad");
@@ -321,7 +389,9 @@ int main(void)
         unsigned shadow = 0x1000u | lowbytes[i % 8];
         decoy[0] = decoy[1] = shadow;
         decoy[2] = decoy[3] = decoy[4] = 0;
-        pad_scan_tick(((i & 1) ? 0u : PAD_RDOWN) & DIRS);
+        /* mostly held, with occasional release -- only held samples count
+         * toward identification, so the pad needs enough of them */
+        pad_scan_tick(((i % 4 < 3) ? PAD_DOWN : 0u));
     }
     int shadow_hit = 0;
     for (int off = 0; off <= 16; off += 4)
@@ -403,9 +473,13 @@ int main(void)
         decoy[2] = on & ~prev;         /* "set this tick"   */
         decoy[3] = prev & ~on;         /* "cleared"         */
         decoy[4] = on ^ prev;          /* "changed"         */
-        /* the player holds DOWN the whole time */
-        pad_step(pad, PAD_RDOWN);
-        pad_scan_tick(PAD_DOWN);
+        /* ⚠ The player presses AND RELEASES, as a real one does. Holding a
+         * direction forever means the pad never demonstrates a release, and
+         * identification now requires both -- that is what stops a site frozen
+         * at one value from qualifying. */
+        unsigned held = (i % 4 < 2) ? PAD_RDOWN : 0u;
+        pad_step(pad, held);
+        pad_scan_tick(held ? PAD_DOWN : 0u);
     }
     int boolean_hit = 0;
     for (int off = 0; off <= 16; off += 4)
@@ -414,6 +488,51 @@ int main(void)
           "case 10: ALTERNATING-BOOLEAN decoy is rejected (needs ground truth)");
     check(pad_record() == (uintptr_t)pad,
           "case 10: the real pad is identified instead");
+    memset((void *)decoy, 0, 12 * sizeof(unsigned));
+
+    /* ------------------------------------------------------------------
+     * Case 11: ⭐⭐ THE FROZEN SITE -- the third false positive to reach the
+     * user ("it says down no matter what").
+     *
+     * A site permanently holding the Down value agrees with every sample taken
+     * WHILE Down is held. An earlier version skipped the release samples on
+     * the grounds that quiet agreement is trivial, which meant such a site was
+     * never once asked "and now that the key is up?" -- the single observation
+     * that disproves it.
+     *
+     * Release is evidence. This case holds Down, releases, and requires the
+     * frozen decoy to be rejected.
+     *
+     * Sabotage: restoring `if (!player_dirs) return;` at the top of
+     * pad_scan_tick fails this case.
+     * ------------------------------------------------------------------ */
+    clear();
+    memset((void *)pad, 0, sizeof *pad);
+    memset((void *)decoy, 0, 12 * sizeof(unsigned));
+    /* frozen at a valid, self-consistent "Down is held" state */
+    decoy[0] = PAD_RDOWN; decoy[1] = 0; decoy[2] = PAD_RDOWN;
+    decoy[3] = 0;         decoy[4] = PAD_RDOWN;
+    seed_while_pressed(pad);
+    for (unsigned i = 0; i < 40; i++) {
+        unsigned held = (i % 4 < 3) ? PAD_RDOWN : 0u;   /* mostly held */
+        pad_step(pad, held);
+        /* the decoy never changes, whatever the player does */
+        decoy[0] = PAD_RDOWN; decoy[1] = 0; decoy[2] = PAD_RDOWN;
+        decoy[3] = 0;         decoy[4] = PAD_RDOWN;
+        pad_scan_tick(held ? PAD_DOWN : 0u);
+    }
+    /* ⚠ Assert the decoy is DEAD, not merely that it lost. It can lose a tie
+     * on allocation order while still alive, which made this case blind to
+     * the release-sample sabotage it exists to catch. */
+    int frozen_alive = 0;
+    for (int off = 0; off <= 16; off += 4)
+        if (pad_is_alive((uintptr_t)decoy + off)) {
+            frozen_alive = 1;
+        }
+    check(!frozen_alive,
+          "case 11: a site FROZEN at the Down value is KILLED by the release");
+    check(pad_record() == (uintptr_t)pad,
+          "case 11: the real pad is identified instead");
     memset((void *)decoy, 0, 12 * sizeof(unsigned));
 
     /* ------------------------------------------------------------------
