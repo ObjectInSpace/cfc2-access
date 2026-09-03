@@ -150,8 +150,12 @@ int probe_hash_candidates(void)
         uintptr_t a = g_candidates[i].addr;
         const char *note = g_candidates[i].note;
         volatile unsigned got = 0;
-        unsigned seed;
         volatile BOOL faulted;
+        /* ⚠ Oversized static scratch, NOT a stack local -- see the confirm
+         * loop below. These are UNIDENTIFIED functions being handed a pointer;
+         * how far one writes through it is exactly what we do not know yet, so
+         * the storage must not neighbour our return address. */
+        static volatile unsigned seed[16];
 
         GUARDED_CALL(got, faulted, ((fn_buf_len)a)(K_LABEL, len));
         try_one(note, a, "(buf,len)", got, faulted);
@@ -168,9 +172,9 @@ int probe_hash_candidates(void)
 
         /* (unsigned *seed, buf, len) -- the shape 0x1400ff460 hints at, where
          * rcx is a context/table pointer rather than a scalar. */
-        seed = 0xFFFFFFFFu;
+        seed[0] = 0xFFFFFFFFu;
         GUARDED_CALL(got, faulted,
-                     ((fn_pseed_buf_len)a)(&seed, K_LABEL, len));
+                     ((fn_pseed_buf_len)a)((unsigned *)seed, K_LABEL, len));
         try_one(note, a, "(&seed,buf,len)", got, faulted);
         if (!faulted && (got == K_PLAIN || got == K_HASH1)) matches++;
 
@@ -190,12 +194,19 @@ int probe_hash_candidates(void)
         for (volatile int v = 0; v < NVEC; v++) {
             volatile unsigned got = 0;
             volatile BOOL faulted;
-            unsigned seed = 0xFFFFFFFFu;
+            /* ⚠ NOT a plain `unsigned seed` local. The primitive writes back
+             * through this pointer wider than 4 bytes; as a tightly-packed
+             * stack local it sits next to the saved registers and return
+             * address, and hash_watch.c was killed by exactly that -- the
+             * call logged OK and then the function's `ret` faulted. Static
+             * oversized storage keeps the overrun in padding. */
+            static volatile unsigned seed[16];
+            seed[0] = 0xFFFFFFFFu;
             const char *lab = g_vectors[v].label;
             unsigned exp = g_vectors[v].expect;
 
             GUARDED_CALL(got, faulted,
-                         ((fn_crc32)CFC2_CRC32)(&seed, lab,
+                         ((fn_crc32)CFC2_CRC32)((unsigned *)seed, lab,
                                                 (unsigned)strlen(lab)));
             if (faulted) {
                 log_line("hashprobe: confirm \"%s\" -> FAULTED", lab);
@@ -215,9 +226,17 @@ int probe_hash_candidates(void)
         {
             volatile unsigned got = 0;
             volatile BOOL faulted;
-            unsigned seed = 0xFFFFFFFFu;
+            /* ⚠ Static scratch, NOT `unsigned seed` on the stack -- the third
+             * and last site of the bug that crashed the game from
+             * hash_watch.c. This one never crashed only because GUARDED_CALL
+             * absorbs the fault, which is precisely what hid it. Verified by
+             * disassembling the DEPLOYED dll: rcx must load RIP-relative, not
+             * `lea -0x14(%rbp)`. */
+            static volatile unsigned seed[16];
+            seed[0] = 0xFFFFFFFFu;
             GUARDED_CALL(got, faulted,
-                         ((fn_crc32)CFC2_CRC32)(&seed, "MENU_TITLE_00", 13));
+                         ((fn_crc32)CFC2_CRC32)((unsigned *)seed,
+                                                "MENU_TITLE_00", 13));
             log_line("hashprobe: negative control -- got 0x%08x, deliberately "
                      "wrong expectation 0xDEADBEEF, equal=%s",
                      got, (!faulted && got == 0xDEADBEEFu) ? "YES (BUG!)"

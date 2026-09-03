@@ -282,14 +282,31 @@ static BOOL verify_label(BYTE *array_base, const gmd_probe *pr, gmd_form form,
  * is not something to guess. Probe the entry's 64-bit fields for a pointer to
  * a string that matches, and report which offset worked, so the layout is
  * discovered rather than assumed. */
-/* Measured live layout (in-game, reproduced across runs):
- *   entry array   at  array_base
- *   label blob    at  array_base + 0x30000
- *   string blob   at  array_base + 0x140000
- * The runtime relocates the blobs to its own 64 KB-aligned deltas rather than
- * keeping the file's (+0x210a0 / +0x328b7), so these are DISCOVERED values,
- * not derived ones. They are treated as a hint and re-derived if they miss. */
-#define LIVE_STRINGS_DELTA 0x140000
+/* ⚠ THE STRING-BLOB DELTA IS NOT STABLE ACROSS RUNS. Measured, three times:
+ *      run 1  entries+0x0d0000
+ *      run 2  entries+0x140000
+ *      run 3  entries+0x170000
+ * Same machine, same build, same array_base (0x3B7100A0, ASLR off). The label
+ * blob has held at +0x30000 so far, but the string blob moves.
+ *
+ * This constant was previously the ONLY way the text check located the blob,
+ * so run 3 read garbage and reported text_verified=no on a table that was
+ * perfectly good -- while the fallback diagnostic search found the string
+ * correctly at +0x170000 a line later. Treating a measured-once offset as
+ * fixed is exactly the trap the comment here used to warn about while the code
+ * did it anyway.
+ *
+ * So the value below is only a FIRST GUESS to try before searching. The
+ * search is what establishes the answer. */
+#define LIVE_STRINGS_HINT 0x140000
+
+/* 64 KB-aligned deltas to try, cheapest first, before falling back to a scan.
+ * The three observed values are all 64 KB multiples. */
+static const SIZE_T g_strings_hints[] = {
+    0x140000, 0x170000, 0x0d0000, 0x30000, 0x100000, 0x200000,
+};
+#define NSTRING_HINTS (int)(sizeof(g_strings_hints) / \
+                            sizeof(g_strings_hints[0]))
 
 /* Walk `count` NUL-terminated strings forward from `p`. */
 static const BYTE *skip_strings(const BYTE *p, int count)
@@ -308,26 +325,74 @@ static const BYTE *skip_strings(const BYTE *p, int count)
     return p;
 }
 
-static BOOL verify_text_live(BYTE *array_base, const gmd_verify *v,
-                             char *out, unsigned out_cap, int *found_off)
+/* Does `s` match this label's display string in ANY shipped language?
+ *
+ * The live table holds whichever locale the game is running in. Comparing
+ * against English alone reported text_verified=no on a correct, label-verified
+ * find (an Italian run read "Giapponese [jp]"). Each candidate is still an
+ * exact match against a real shipped string -- this is not a loosened test.
+ * Returns the matching variant's index, or -1. */
+static int verify_text_variant(const gmd_verify *v, const char *s)
+{
+    for (int i = 0; i < v->ntext; i++) {
+        if (v->text[i] && strcmp(s, v->text[i]) == 0)
+            return i;
+    }
+    return -1;
+}
+
+/* Try to resolve the label's text assuming the string blob sits at `delta`. */
+static BOOL try_strings_at(BYTE *array_base, SIZE_T delta,
+                           const gmd_verify *v, char *out, unsigned out_cap)
 {
     /* sectionId is preserved in the live table (measured: entry[0] has
      * sid=0), so the display string is the sectionId'th string in the blob. */
-    const BYTE *blob = array_base + LIVE_STRINGS_DELTA;
-    const BYTE *p = skip_strings(blob, v->index);
-    if (p) {
-        char buf[256];
-        if (read_cstr(p, buf, sizeof(buf))) {
-            if (!out[0]) {
-                _snprintf(out, out_cap, "%s", buf);
-                out[out_cap - 1] = '\0';
-            }
-            if (strcmp(buf, v->text) == 0) {
-                _snprintf(out, out_cap, "%s", buf);
-                out[out_cap - 1] = '\0';
-                *found_off = LIVE_STRINGS_DELTA;
-                return TRUE;
-            }
+    const BYTE *p = skip_strings(array_base + delta, v->index);
+    if (!p)
+        return FALSE;
+    char buf[256];
+    if (!read_cstr(p, buf, sizeof(buf)))
+        return FALSE;
+    if (!out[0]) {                 /* remember the first thing we read */
+        _snprintf(out, out_cap, "%s", buf);
+        out[out_cap - 1] = '\0';
+    }
+    if (verify_text_variant(v, buf) < 0)
+        return FALSE;
+    _snprintf(out, out_cap, "%s", buf);
+    out[out_cap - 1] = '\0';
+    return TRUE;
+}
+
+static BOOL verify_text_live(BYTE *array_base, const gmd_verify *v,
+                             char *out, unsigned out_cap, int *found_off)
+{
+    /* The blob MOVES between runs (0xd0000 / 0x140000 / 0x170000 observed),
+     * so try the known deltas and then search. Reporting the delta that
+     * actually worked is what keeps this honest -- a hardcoded offset failed
+     * silently on run 3 and claimed the text could not be verified. */
+    for (int i = 0; i < NSTRING_HINTS; i++) {
+        if (try_strings_at(array_base, g_strings_hints[i], v, out, out_cap)) {
+            *found_off = (int)g_strings_hints[i];
+            if (g_strings_hints[i] != LIVE_STRINGS_HINT)
+                log_line("gmdfind: string blob was NOT at the usual "
+                         "+0x%x -- found at +0x%llx this run (it moves)",
+                         LIVE_STRINGS_HINT,
+                         (unsigned long long)g_strings_hints[i]);
+            return TRUE;
+        }
+    }
+
+    /* None of the known deltas worked. Sweep 64 KB-aligned offsets across a
+     * generous window rather than giving up: the blob has always been
+     * 64 KB-aligned and within a few MB of the entry array. */
+    for (SIZE_T d = 0x10000; d <= 0x400000; d += 0x10000) {
+        if (try_strings_at(array_base, d, v, out, out_cap)) {
+            *found_off = (int)d;
+            log_line("gmdfind: ⭐ string blob located by SEARCH at +0x%llx "
+                     "(no known delta matched) -- add it to g_strings_hints",
+                     (unsigned long long)d);
+            return TRUE;
         }
     }
     return FALSE;
@@ -361,7 +426,7 @@ static BOOL verify_text(BYTE *array_base, const gmd_verify *v, gmd_form form,
 
     _snprintf(out, out_cap, "%s", buf);
     out[out_cap - 1] = '\0';
-    return strcmp(buf, v->text) == 0;
+    return verify_text_variant(v, buf) >= 0;
 }
 
 /* --- Classification ------------------------------------------------------- */
@@ -691,18 +756,26 @@ BOOL gmd_find(gmd_result *out)
                                  out->sample_text, sizeof(out->sample_text),
                                  &off)) {
                 out->text_verified = TRUE;
+                int vi = verify_text_variant(&g_gmd_verify[i],
+                                             out->sample_text);
                 log_line("gmdfind: ⭐⭐ TEXT RESOLVED (live) -- \"%s\" = "
                          "\"%s\", via a pointer at entry+0x%02x. We can READ "
-                         "the shell's messages.",
-                         g_gmd_verify[i].label, out->sample_text, off);
+                         "the shell's messages. (matched shipped variant %d "
+                         "of %d%s)",
+                         g_gmd_verify[i].label, out->sample_text, off,
+                         vi + 1, g_gmd_verify[i].ntext,
+                         vi == 0 ? ", English" : ", a non-English locale");
             }
         } else if (verify_text(c->array_base, &g_gmd_verify[i], c->form,
                                out->sample_text, sizeof(out->sample_text))) {
             out->text_verified = TRUE;
+            int vi = verify_text_variant(&g_gmd_verify[i], out->sample_text);
             log_line("gmdfind: ⭐⭐ TEXT RESOLVED -- \"%s\" = \"%s\" "
-                     "(matches the shipped English text). We can READ the "
+                     "(matches shipped variant %d of %d%s). We can READ the "
                      "shell's messages.",
-                     g_gmd_verify[i].label, out->sample_text);
+                     g_gmd_verify[i].label, out->sample_text,
+                     vi + 1, g_gmd_verify[i].ntext,
+                     vi == 0 ? ", English" : ", a non-English locale");
         }
     }
     /* Dump the raw entry so the live layout can be read off the log rather
@@ -740,41 +813,59 @@ BOOL gmd_find(gmd_result *out)
                                           c->array_base),
                      GMD_LABELS_FROM_ENTRIES);
 
-            SIZE_T tlen = strlen(v->text);
+            /* Search for EVERY shipped locale's rendering of this label, not
+             * just English -- otherwise this diagnostic silently reports
+             * "not found" on a non-English build whose blob is right there. */
             BYTE *hay = c->array_base;
             SIZE_T span = 0x400000;      /* 4 MB window around the table */
             volatile BOOL found = FALSE;   /* lives across MEM_GUARDED longjmp */
-            for (SIZE_T d = 0; d + tlen < span && !found; d += 0x1000) {
-                BYTE win[0x1000 + 64];
-                SIZE_T want = 0x1000 + tlen;
-                if (!mem_readable(hay + d, want))
+            for (int t = 0; t < v->ntext && !found; t++) {
+                const char *needle = v->text[t];
+                if (!needle)
                     continue;
-                volatile BOOL wf;
-                MEM_GUARDED(wf, memcpy(win, hay + d, want));
-                if (wf) continue;
-                for (SIZE_T i = 0; i + tlen <= want; i++) {
-                    if (memcmp(win + i, v->text, tlen) == 0) {
-                        log_line("gmdfind: [layout]   ⭐ display text found at "
-                                 "%p = entries+0x%llx",
-                                 (void *)(hay + d + i),
-                                 (unsigned long long)(d + i));
-                        found = TRUE;
-                        break;
+                SIZE_T tlen = strlen(needle);
+                /* volatile: `d` lives across the MEM_GUARDED longjmp, and a
+                 * fault must not resume the scan at a stale offset. */
+                for (volatile SIZE_T d = 0; d + tlen < span && !found;
+                     d += 0x1000) {
+                    BYTE win[0x1000 + 64];
+                    SIZE_T want = 0x1000 + tlen;
+                    if (!mem_readable(hay + d, want))
+                        continue;
+                    volatile BOOL wf;
+                    MEM_GUARDED(wf, memcpy(win, hay + d, want));
+                    if (wf) continue;
+                    for (SIZE_T i = 0; i + tlen <= want; i++) {
+                        if (memcmp(win + i, needle, tlen) == 0) {
+                            log_line("gmdfind: [layout]   ⭐ display text "
+                                     "\"%s\" found at %p = entries+0x%llx",
+                                     needle, (void *)(hay + d + i),
+                                     (unsigned long long)(d + i));
+                            found = TRUE;
+                            break;
+                        }
                     }
                 }
             }
             if (!found)
                 log_line("gmdfind: [layout]   display text NOT found within "
-                         "4 MB after the entry array");
+                         "4 MB after the entry array (tried %d locale "
+                         "variants)", v->ntext);
         }
     }
 
     if (!out->text_verified && out->label_verified) {
-        /* Hashes are language-independent; only the text check is English. */
-        log_line("gmdfind: label verified but text did not match -- either a "
-                 "non-English build (expected: the hashes are language "
-                 "independent, the strings are not) or the string blob is "
-                 "not laid out as in the file. Sample read: \"%s\"",
+        /* Every ASCII locale shipped in msg.arc is now in the expectation
+         * table, so "it must be a non-English build" is no longer an
+         * explanation on its own -- that only still applies to the locales
+         * omitted for being non-ASCII (jp/kr/zh/ru/ar/es/pt). */
+        log_line("gmdfind: label verified but text did not resolve. The blob "
+                 "was tried at %d known deltas and then searched on 64 KB "
+                 "steps to +0x400000, so a MOVED blob is already ruled out; "
+                 "the likely cause is a non-ASCII locale "
+                 "(jp/kr/zh/ru/ar/es/pt, not in the table). Sample read: "
+                 "\"%s\"",
+                 NSTRING_HINTS,
                  out->sample_text[0] ? out->sample_text : "(unreadable)");
     }
 

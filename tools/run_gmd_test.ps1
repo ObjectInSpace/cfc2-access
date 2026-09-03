@@ -23,4 +23,17 @@ if ($LASTEXITCODE -ne 0) { throw "compile failed" }
 
 # 3. Run it.
 & $exe $blob
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+# 4. Regression: the same scan against a NON-ENGLISH image.
+#
+# A live Italian run reported text_verified=no on a table that was in fact
+# correct and label-verified, because the expectation table held English only.
+# English-only planting cannot catch that -- it passes either way.
+Write-Host ''
+Write-Host '==== locale regression: Italian image ===='
+$itaBlob = Join-Path $tmp 'menu_ita.bin'
+python "$root\tools\dump_menu_eng.py" --out $itaBlob --lang ita
+if ($LASTEXITCODE -ne 0) { throw "italian dump failed" }
+& $exe $itaBlob
 exit $LASTEXITCODE

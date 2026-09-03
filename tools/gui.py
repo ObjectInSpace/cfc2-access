@@ -167,6 +167,24 @@ class GuiLayout:
         s, e = best
         names = [x.decode("ascii", "replace")
                  for x in raw[s:e].split(b"\0") if x]
+
+        # ⚠ THE FIRST ELEMENT IS USUALLY NOT A NAME.
+        #
+        # The pool is found as the largest printable run, and the data just
+        # before it is float/binary. Whenever a trailing byte of that data is
+        # incidentally printable it fuses onto the first real name, because
+        # nothing separates them: keyrecorder parses as "Ckeyrecorder" (a
+        # stray 'C' from 0x7f43), keylog as "@keydisplay", gallery_menu_2 as
+        # "?a_index". Measured: 19 of 25 shipped layouts are affected.
+        #
+        # A real name is preceded by a NUL. If the byte before the pool is not
+        # one, the first element is contaminated and must be dropped -- keeping
+        # it once produced the anchor "Ckeyrecorder", a string that does not
+        # exist in the file and so can never be found in memory.
+        if names and raw[s - 1:s] != b"\0":
+            names = names[1:]
+            s = raw.find(b"\0", s) + 1
+
         return s, e, names
 
     @property

@@ -71,10 +71,125 @@ before touching that work.
   degrades instead of killing the process.
 - `src/log.c` — timestamped logging.
 
-## Phase 1.3 workflow — finding the shell's text chokepoint
+## ⚠ hashwatch CRASHED the game (2026-09-02) — read before enabling it
 
-Plan (user's call): **text hook first, then focus**, because the text hook can
-be verified against ground truth and a focus hook cannot.
+`hash_watch.c` is **off by default** behind an opt-in file `cfc2_hashwatch.on`
+next to the exe. Delete that file to disable; that is the OFF switch.
+
+Its first live run killed the process. Cause: the positive control passed
+`&seed` — **a stack local** — to the game's CRC primitive, which writes back
+through that pointer wider than the 4 bytes declared, overwriting the return
+address. The call logged OK and the function's `ret` then faulted.
+
+Diagnosis method worth repeating: the log just stops, which proves nothing.
+The Windows **Application event log (Id 1000)** gave `0xc0000005` and **fault
+offset 0x3dfc in DINPUT8.dll**; `objdump -d` on the deployed DLL mapped that
+offset to the exact instruction. Symbols are stripped — match on RVA.
+
+**Fixed and CONFIRMED in-game 2026-09-02** — it now installs and runs without
+crashing (oversized `static volatile` scratch, never a stack local; call
+wrapped in the fault guard; hooks self-uninstall if the control faults).
+
+⚠ The fix was declared done while still INCOMPLETE. `probe_hash.c` had the same
+bug in **three** places, and the third was found only by disassembling the
+DEPLOYED dll and classifying every call site into `0x1402ef1e0` by how `%rcx`
+is loaded — it had never crashed because `GUARDED_CALL` absorbed the fault. A
+guard that catches a fault makes latent memory corruption look like a working
+experiment. **Audit the shipped binary for ALL sites; re-reading the source of
+the sites you changed is not verification.**
+
+Verify such a fix in the CODEGEN, not the source: the pointer argument must
+load RIP-relative (`lea 0x...(%rip),%rcx`), not `lea -0x14(%rbp),%rcx`.
+
+## ⛔⛔ Focus detection: FOUR routes closed. Next is a CODE HOOK. (2026-09-02)
+
+**Status: reading the shell's text is SOLVED. Finding which item is selected is
+NOT. Four approaches have been closed with evidence — do not restart any of
+them.** Full detail in memory `cfc2-heapdiff` and `cfc2-gui-tree-walk`.
+
+### ⭐ What is banked and reusable
+- **Text**: `gmd_find` locates and verifies the live GMD table; text reads
+  correctly, closed-loop.
+- **⭐⭐ A CROSS-LAUNCH ANCHOR**: `[image+0x1208bd0]` points at the live menu
+  object. Verified on four launches at four different heap addresses. ASLR is
+  off and there are no relocations, so image-relative offsets are stable
+  forever. This is the single most valuable artifact produced.
+- Infrastructure: `memsafe` fault guard, region walking, page-bulk reads,
+  deadline + partial reporting, MinHook vendored, `VirtualProtect` confirmed.
+
+### ⛔ Route 4 — differential heap scan (`src/heapdiff.c`) — CLOSED
+The scanner works: **32 ms per sweep over 1.9M fields**, full page coverage,
+u32 *and* u8/u16 widths, control-subtracted, reversibility-tested.
+**Nothing exceeded 4 distinct values.** An 8-item list needs a field reaching 7.
+
+⭐ **That is consistent, not a miss.** MTFramework's GUI is animation-driven:
+selection is *which node holds the SELECT state* — a per-node flag, not a
+central integer. Route 3 saw the same shape (0/1 toggles per item plus a few
+2-3 state fields). **A scan for a flat index cannot succeed when the game does
+not keep one.**
+
+⚠ Route 4 also produced a monotonic-counter FALSE POSITIVE that passed every
+filter (±1 steps, reversed, quiet in the control) — see
+`anchor-on-what-changes`: controls prove a field is not noise; only
+**reversibility plus plausibility** prove it is state.
+
+### ⭐ NEXT: hook the input handler
+Find the routine that reacts to Down/Up on a menu and read the selection from
+the instruction that writes it. Mostly offline work on the dumped image, so far
+fewer game runs. ⚠ Hooking crashed this game once
+(`cfc2-seed-pointer-stack-smash`); the fault guard and opt-in gating from that
+episode already exist and must be used.
+
+### The three earlier closed routes
+
+1. **hashwatch (text hook) — CLOSED, negative.** It runs clean now (no crash),
+   and observed 381 calls across 5 game callers with **0 hashing text**, while
+   its positive control passed. The label hashes are computed at LOAD time;
+   lookups afterwards never re-hash the label, so there is no text chokepoint
+   on this primitive. See memory `cfc2-hashwatch-result`.
+2. **GUI name-pool scan — CLOSED, negative.** All **25 of 25** layouts are
+   resident simultaneously, so residency is a constant and says nothing about
+   the displayed screen. The focus-state counts it reported are each layout's
+   STATIC file property, not live state. `src/gui_find.c` is kept as a one-shot
+   inventory and as a way to locate a layout's pool. See memory
+   `cfc2-gui-layout-finder`.
+3. **The instantiated GUI tree — CLOSED, negative.** `src/gui_tree.c` ran
+   clean: 1789 pool-referencing objects, their full ±128-byte windows AND one
+   hop out, two COMPLETE passes on different screens → **zero changes of any
+   kind**. The pool-anchored subtree is the loaded layout TEMPLATE and is
+   static by design. See memory `cfc2-gui-tree-walk`.
+
+   ⭐ **The entry point is a pointer INTO the name pool.** A layout does not
+   reference its names by offset — searching the whole shipped file for every
+   deep pool offset (u32/u64, pool-relative and file-absolute) gives **zero**
+   hits. So a `char*` into the pool cannot have come from the file; it is
+   positive evidence of an instantiated object. That is the exact inverse of
+   the residency scan, which only found bytes memcpy'd out of a file.
+
+   ⛔ **`gui_find`'s `pool_base`/`pool_span` are the 256 KB CHUNK, not the
+   pool.** Anchoring on them tests the wrong range: the first harness run found
+   **0 of 12 planted nodes while reporting a clean "complete scan"**. Use
+   `bound_pool()`, which grows outward from the anchor's real hit offset.
+
+   ⚠ **A too-WIDE span passes every end-to-end check.** Sabotaging the bounds
+   back to the chunk window still found 12/12 nodes and still diffed correctly;
+   only the direct assertions on `pool_base`/`pool_span` caught it. Assert the
+   bounds, not just the answer.
+
+   Run `.\tools\run_gui_tree_test.ps1` after any change to `gui_tree.c`.
+
+   ⚠ **Hotkeys: use ordinary keys.** An earlier pass excluded all 70 keys in
+   the game's `KB_*` table and landed on Scroll Lock, a TOGGLE key that never
+   registered in-game — two runs wasted. That table lists what the game CAN
+   bind, not what it DOES; the shell menus use arrows/Enter/Escape. **F5-F10
+   all work fine.** The real hazard is narrower: NumLock-off numpad VKs
+   literally ARE the arrow VKs.
+
+⚠ Even once focus is detected, joining a focused NODE to its TEXT is unsolved:
+layouts contain no GMD label hashes (0 matches across all 4165), so the binding
+happens somewhere not yet found.
+
+Reading the text itself IS solved and robust — see the GMD notes below.
 
 1. Launch the game once with the mod deployed. `image_wait_for_unpack()` polls
    for decryption, then `image_dump()` writes `cfc2_dump\` into the game dir

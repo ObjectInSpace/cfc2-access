@@ -97,6 +97,90 @@ int main(int argc, char **argv)
            !ok2 ? "PASS" : "FAIL");
     if (ok2) fails++;
 
+    VirtualFree(mem, 0, MEM_RELEASE);
+
+    /* ================= LIVE_TABLE, with a MOVED string blob =================
+     *
+     * The FILE_IMAGE case above is not the one that runs in the game, and it
+     * was the only case covered -- so the LIVE_TABLE path had no offline
+     * coverage at all. It broke in exactly the way an untested path does:
+     * the string-blob delta was hardcoded to 0x140000, the runtime put the
+     * blob at 0x170000 on a later run, and gmd_find reported
+     * text_verified=no on a perfectly good table while its own fallback
+     * search printed the correct string one line later.
+     *
+     * Planting at a DELIBERATELY DIFFERENT delta is the whole point: a test
+     * that plants at the hardcoded offset passes no matter how rigid the
+     * code is. */
+    printf("\n==== LIVE_TABLE with a moved string blob ====\n");
+    {
+        const SIZE_T MOVED = 0x1B0000;   /* not in g_strings_hints */
+        const SIZE_T span  = MOVED + 0x40000;
+
+        BYTE *base = (BYTE *)VirtualAlloc(NULL, span,
+                                          MEM_COMMIT | MEM_RESERVE,
+                                          PAGE_READWRITE);
+        if (!base) { fprintf(stderr, "alloc failed\n"); return 2; }
+
+        /* Entry array: 0x20-byte entries, absolute label pointers, pad
+         * 0xCDCDCDCD -- the live form. Labels and strings at our own deltas. */
+        BYTE *labels  = base + 0x30000;
+        BYTE *strings = base + MOVED;
+        SIZE_T lpos = 0, spos = 0;
+
+        int nent = 0;
+        for (int i = 0; i < GMD_NPROBES; i++)
+            if (g_gmd_probes[i].index + 1 > nent) nent = g_gmd_probes[i].index + 1;
+
+        /* Strings in section order; entry N's text is the Nth string. */
+        for (int i = 0; i < nent; i++) {
+            const char *txt = "filler";
+            for (int v = 0; v < GMD_NVERIFY; v++)
+                if (g_gmd_verify[v].index == i) txt = g_gmd_verify[v].text[0];
+            size_t n = strlen(txt) + 1;
+            memcpy(strings + spos, txt, n);
+            spos += n;
+        }
+
+        for (int i = 0; i < GMD_NPROBES; i++) {
+            const gmd_probe *p = &g_gmd_probes[i];
+            BYTE *e = base + (SIZE_T)0x20 * p->index;
+            size_t n = strlen(p->label) + 1;
+            memcpy(labels + lpos, p->label, n);
+            *(int *)(e + 0x00)      = p->index;          /* sectionId */
+            *(unsigned *)(e + 0x04) = p->hash1;
+            *(unsigned *)(e + 0x08) = p->hash2;
+            *(unsigned *)(e + 0x0c) = 0xCDCDCDCDu;       /* pad */
+            *(UINT64 *)(e + 0x10)   = (UINT64)(uintptr_t)(labels + lpos);
+            *(UINT64 *)(e + 0x18)   = 0;
+            lpos += n;
+        }
+
+        printf("planted live table at %p, strings at +0x%llx "
+               "(deliberately NOT a known delta)\n",
+               (void *)base, (unsigned long long)MOVED);
+        fflush(stdout);
+
+        gmd_result r3;
+        BOOL ok3 = gmd_find(&r3);
+        printf("\n---- results ----\n");
+        struct { const char *name; int cond; } lc[] = {
+            { "gmd_find returned success",       ok3 },
+            { "classified as LIVE_TABLE",
+              r3.form == GMD_FORM_LIVE_TABLE },
+            { "label chain verified",            r3.label_verified },
+            { "text verified DESPITE moved blob", r3.text_verified },
+        };
+        for (unsigned i = 0; i < sizeof(lc)/sizeof(lc[0]); i++) {
+            printf("  %-36s %s\n", lc[i].name, lc[i].cond ? "PASS" : "FAIL");
+            if (!lc[i].cond) fails++;
+        }
+        if (r3.sample_text[0]) printf("  text:  \"%s\"\n", r3.sample_text);
+
+        memset(base, 0, span);
+        VirtualFree(base, 0, MEM_RELEASE);
+    }
+
     printf("\n%s (%d failures)\n", fails ? "FAILED" : "ALL PASSED", fails);
     return fails ? 1 : 0;
 }

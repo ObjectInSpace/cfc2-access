@@ -55,6 +55,34 @@ def load_menu_eng(game_dir):
     sys.exit("menu_eng not found in msg.arc")
 
 
+def load_all_languages(game_dir):
+    """Return {label: [display string in every shipped language]}.
+
+    The live table's strings are whatever locale the player runs the game in.
+    An English-only expectation reports text_verified=no on a perfectly good
+    find -- which is exactly what happened on a run in Italian ("Giapponese
+    [jp]" vs the expected "Japanese [jp]"). Every locale's real shipped string
+    is emitted instead, so the check stays an EXACT match against known data
+    rather than being weakened to "any non-empty string".
+    """
+    arc = os.path.join(game_dir, "nativeDX11x64", "arc", "pc", "msg.arc")
+    if not os.path.isfile(arc):
+        sys.exit("msg.arc not found at %s\n(use --game-dir)" % arc)
+    raw, entries = read_arc(arc)
+    out = {}
+    for e in entries:
+        if not e.name.split("\\")[-1].startswith("menu_"):
+            continue
+        try:
+            _n, _lang, table = parse_gmd(
+                zlib.decompress(raw[e.offset:e.offset + e.comp_size]))
+        except (ValueError, zlib.error):
+            continue
+        for label, text in table.items():
+            out.setdefault(label, []).append(text)
+    return out
+
+
 def read_entries(blob):
     """Parse the label-entry array in FILE ORDER.
 
@@ -91,6 +119,7 @@ def build_header(game_dir, count):
     blob = load_menu_eng(game_dir)
     hdr, entries = read_entries(blob)
     _name, _lang, table = parse_gmd(blob)
+    all_langs = load_all_languages(game_dir)
 
     # Self-checks on the invariants the scanner relies on. If any of these ever
     # stops holding, the scanner's logic is wrong and it must fail loudly here
@@ -105,11 +134,33 @@ def build_header(game_dir, count):
     picks = [entries[i] for i in range(0, len(entries), step)][:count]
 
     # Verification set: short strings, taken from the picks.
+    #
+    # Each entry carries EVERY shipped language's string for that label, not
+    # just English -- the live table holds whichever locale the player runs.
+    # Non-ASCII locales (jp/kr/zh/ru/ar) are dropped from the variant list
+    # rather than escaped: the runtime compares bytes it read from memory
+    # against a C string literal, and keeping those readable in the header
+    # matters more than covering locales we cannot compare cheaply. A label is
+    # only usable if at least one ASCII variant survives.
     verify = []
     for idx, label, h1, h2, loff, _pad, _sid in picks:
-        text = table.get(label, "")
-        if 4 <= len(text) <= 40 and text.isprintable() and '"' not in text:
-            verify.append((idx, label, text))
+        variants = []
+        for text in all_langs.get(label, []):
+            if not (4 <= len(text) <= 40):
+                continue
+            if not text.isprintable() or '"' in text or '\\' in text:
+                continue
+            if not text.isascii():
+                continue
+            if text not in variants:
+                variants.append(text)
+        # The English string must lead: it is the one a reader recognises.
+        eng = table.get(label, "")
+        if eng in variants:
+            variants.remove(eng)
+            variants.insert(0, eng)
+        if variants:
+            verify.append((idx, label, variants))
         if len(verify) >= VERIFY_LABELS:
             break
 
@@ -162,17 +213,29 @@ def build_header(game_dir, count):
     a("};")
     a("#define GMD_NPROBES (int)(sizeof(g_gmd_probes) / sizeof(g_gmd_probes[0]))")
     a("")
-    a("/* End-to-end check: label -> its actual English display string. */")
+    a("/* End-to-end check: label -> its actual display string.")
+    a(" *")
+    a(" * ⚠ Every SHIPPED LANGUAGE's string is listed, not just English. The")
+    a(" * live table holds whichever locale the player runs the game in, so an")
+    a(" * English-only expectation reports text_verified=no on a perfectly")
+    a(" * good find -- observed on an Italian run: the table was correct and")
+    a(" * label-verified, but \"Giapponese [jp]\" != \"Japanese [jp]\".")
+    a(" * This stays an EXACT match against known shipped data; it is not")
+    a(" * weakened to accepting any non-empty string. text[0] is English.")
+    a(" * Non-ASCII locales are omitted (see gen_probes.py). */")
+    a("#define GMD_MAXVARIANTS %d" % max(len(v) for _i, _l, v in verify))
+    a("")
     a("typedef struct {")
     a("    int         index;")
     a("    const char *label;")
-    a("    const char *text;")
+    a("    int         ntext;")
+    a("    const char *text[GMD_MAXVARIANTS];")
     a("} gmd_verify;")
     a("")
     a("static const gmd_verify g_gmd_verify[] = {")
-    for idx, label, text in verify:
-        esc = text.replace("\\", "\\\\").replace('"', '\\"')
-        a('    { %d, "%s", "%s" },' % (idx, label, esc))
+    for idx, label, variants in verify:
+        lits = ", ".join('"%s"' % t for t in variants)
+        a('    { %d, "%s", %d, { %s } },' % (idx, label, len(variants), lits))
     a("};")
     a("#define GMD_NVERIFY (int)(sizeof(g_gmd_verify) / sizeof(g_gmd_verify[0]))")
     a("")

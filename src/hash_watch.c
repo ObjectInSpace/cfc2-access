@@ -1,5 +1,6 @@
 #include "hash_watch.h"
 #include "log.h"
+#include "memsafe.h"
 
 #include "MinHook.h"
 
@@ -110,9 +111,29 @@ static BOOL looks_like_text(const char *p, unsigned len)
 
 /* Record one observation. Lock-free: races can only lose a sample, never
  * corrupt the table, and losing a sample does not change a conclusion. */
+/* Stop doing expensive work after this many observations.
+ *
+ * record() calls VirtualQuery -- a syscall -- on a path the game hits during
+ * archive decompression and potentially per frame. The experiment only needs
+ * to learn WHICH callers hash text, and it has learned that long before the
+ * millionth call. Counting continues (cheap, interlocked); the buffer
+ * inspection stops. An experiment must not degrade the game it observes. */
+#define RECORD_BUDGET 200000
+
 static void record(uintptr_t ret, const void *buf, unsigned len)
 {
-    InterlockedIncrement(&g_total);
+    LONG total = InterlockedIncrement(&g_total);
+    if (total > RECORD_BUDGET) {
+        /* Past budget: keep counting, do no reads and no syscalls. */
+        for (int i = 0; i < (int)InterlockedCompareExchange(&g_nsites, 0, 0)
+                        && i < MAX_SITES; i++) {
+            if (g_sites[i].ret == ret) {
+                InterlockedIncrement(&g_sites[i].count);
+                return;
+            }
+        }
+        return;
+    }
 
     int n = (int)InterlockedCompareExchange(&g_nsites, 0, 0);
     for (int i = 0; i < n && i < MAX_SITES; i++) {
@@ -173,6 +194,16 @@ static unsigned __fastcall hook_b(unsigned crc, const void *buf, unsigned len)
 
 BOOL hash_watch_install(void)
 {
+    /* Arm the fault guard HERE rather than relying on probe_hash having run
+     * first. The positive control below calls into game code that writes back
+     * through a pointer we supply; without the guard a fault there takes the
+     * process down, which is exactly how this crashed. Idempotent. */
+    if (!mem_guard_install()) {
+        log_line("hashwatch: fault guard self-test FAILED -- refusing to "
+                 "install hooks (an unguarded detour crashed the game once).");
+        return FALSE;
+    }
+
     if (MH_Initialize() != MH_OK) {
         log_line("hashwatch: MH_Initialize failed");
         return FALSE;
@@ -212,16 +243,47 @@ BOOL hash_watch_install(void)
      * produce the same empty result as a genuine absence -- and I would have no
      * way to tell which I was looking at. */
     if (ok > 0 && g_orig_a) {
-        unsigned seed = 0xFFFFFFFFu;
         static const char probe[] = "MENU_TITLE_00";
+
+        /* ⚠ THE SEED MUST NOT BE A PLAIN STACK LOCAL. This crashed the game.
+         *
+         * Measured: the process died with 0xC0000005 at the `ret` of THIS
+         * function, immediately after the control logged OK -- so the call
+         * itself worked and the damage was to the frame. The compiler had put
+         * `unsigned seed` at rsp+0x3c in a 0x40-byte frame, directly below the
+         * saved rbx and the return address, and the primitive writes back
+         * through the seed pointer past the 4 bytes we declared. Returning
+         * then jumped to a clobbered address.
+         *
+         * probe_hash.c appears to do the same thing safely, but only because
+         * every call there is wrapped in GUARDED_CALL and the fault guard was
+         * quietly absorbing it. Do not copy that pattern unguarded.
+         *
+         * Static, oversized and isolated: nothing of ours shares the storage,
+         * so an over-wide write lands in padding instead of a return address. */
+        static volatile unsigned scratch[16];
+        scratch[0] = 0xFFFFFFFFu;
+
         /* Call the real hooked ADDRESS, not hook_a directly. Calling our own
          * detour function bypasses the very dispatch we are trying to verify,
          * so it would "pass" even if the hook were not actually installed. */
-        unsigned h = ((crc_a_t)CFC2_CRC32_A)(&seed, probe,
-                                             (unsigned)sizeof(probe) - 1);
+        volatile unsigned h = 0;
+        volatile BOOL faulted = FALSE;
+        MEM_GUARDED(faulted,
+                    h = ((crc_a_t)CFC2_CRC32_A)((unsigned *)scratch, probe,
+                                                (unsigned)sizeof(probe) - 1));
+        if (faulted) {
+            log_line("hashwatch: positive control FAULTED -- the detour is "
+                     "not safely callable. Uninstalling: an unverified hook "
+                     "is worse than no hook.");
+            MH_DisableHook(MH_ALL_HOOKS);
+            InterlockedExchange(&g_installed, 0);
+            return FALSE;
+        }
         log_line("hashwatch: positive control -- hashed \"%s\" through the "
                  "hook, got 0x%08x (expect 0xec548ce8) %s",
-                 probe, h, h == 0xec548ce8u ? "OK" : "MISMATCH");
+                 probe, (unsigned)h,
+                 h == 0xec548ce8u ? "OK" : "MISMATCH");
     }
 
     return ok > 0;
@@ -243,6 +305,11 @@ void hash_watch_report(void)
      * never look the same in the log. */
     log_line("hashwatch: %ld calls observed across %d distinct callers",
              total, n);
+    if (total > RECORD_BUDGET)
+        log_line("hashwatch: ⚠ past the %d-call inspection budget -- calls "
+                 "are still COUNTED but buffers are no longer sampled, so a "
+                 "caller first seen after that point has no sample text. "
+                 "Not a complete picture of late callers.", RECORD_BUDGET);
     if (total == 0) {
         log_line("hashwatch: the hooks are installed but NEVER FIRED -- "
                  "these primitives are not on the menu path at all.");

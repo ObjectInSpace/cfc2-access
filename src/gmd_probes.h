@@ -102,17 +102,29 @@ static const gmd_probe g_gmd_probes[] = {
 };
 #define GMD_NPROBES (int)(sizeof(g_gmd_probes) / sizeof(g_gmd_probes[0]))
 
-/* End-to-end check: label -> its actual English display string. */
+/* End-to-end check: label -> its actual display string.
+ *
+ * ⚠ Every SHIPPED LANGUAGE's string is listed, not just English. The
+ * live table holds whichever locale the player runs the game in, so an
+ * English-only expectation reports text_verified=no on a perfectly
+ * good find -- observed on an Italian run: the table was correct and
+ * label-verified, but "Giapponese [jp]" != "Japanese [jp]".
+ * This stays an EXACT match against known shipped data; it is not
+ * weakened to accepting any non-empty string. text[0] is English.
+ * Non-ASCII locales are omitted (see gen_probes.py). */
+#define GMD_MAXVARIANTS 4
+
 typedef struct {
     int         index;
     const char *label;
-    const char *text;
+    int         ntext;
+    const char *text[GMD_MAXVARIANTS];
 } gmd_verify;
 
 static const gmd_verify g_gmd_verify[] = {
-    { 0, "LANG_NAME_JAPANESE", "Japanese [jp]" },
-    { 65, "HELP_GAME_VERSION_ON", "Choose a game version." },
-    { 195, "MENU_OP_HERE_SE_00", "Original" },
+    { 0, "LANG_NAME_JAPANESE", 4, { "Japanese [jp]", "Japonais [jp]", "Giapponese [jp]", "Japanisch [jp]" } },
+    { 65, "HELP_GAME_VERSION_ON", 2, { "Choose a game version.", "Scegli la versione del gioco." } },
+    { 195, "MENU_OP_HERE_SE_00", 3, { "Original", "Originale", "Oryginalny" } },
 };
 #define GMD_NVERIFY (int)(sizeof(g_gmd_verify) / sizeof(g_gmd_verify[0]))
 
