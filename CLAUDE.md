@@ -81,7 +81,26 @@ before touching that work.
 
 - `src/log.c` — timestamped logging.
 
-## ▶ START HERE (next session) — the node → text join
+## ▶ START HERE (next session) — WIDEN THE SCREEN TABLE
+
+**The join is CLOSED for the main menu and deployed, but NOT yet heard.**
+`src/menu_speak.c` speaks "Offline Play, 1 of 6". One screen is in the table:
+caller `0x14009ba21`, base 37, count 6.
+
+**The next run does two things at once:**
+1. Confirms the main menu speaks item NAMES (not just position).
+2. **Discovery**: walk into other menus — options, museum, game select, pause,
+   character select. Each unknown screen logs, once, a
+   `mc: [DISCOVERY] caller=0x... items=N axis=...` line. That line is the table
+   row; find the label run in msg.arc and add it to `g_screens`.
+
+⚠ Speaking position only ("3 of 6") is the CORRECT behaviour for a screen not
+yet in the table — it is not a bug to chase.
+
+⛔⛔ Never key a screen on item count. Menus share counts, and the failure mode
+is confident WRONG names, which a blind user cannot catch. Key on the caller.
+
+## (previous) the node → text join
 
 **Solved:** reading the shell's text (`gmd_find.c`, closed-loop verified).
 **Solved:** reading the shell's keyboard (`kbd_state.c`, confirmed live).
