@@ -160,7 +160,8 @@ static DWORD WINAPI worker(LPVOID param)
      * pair of reports is the evidence that the wait below did something. */
     report_sections("t0");
 
-    /* THE TIMING RULE. .text is ciphertext at DllMain and decrypts ~10 s in.
+    /* THE TIMING RULE. .text is ciphertext at DllMain and decrypts shortly
+     * after -- measured 531 ms, NOT the ~10 s claimed until 2026-09-08.
      * Everything after this point depends on the wait having succeeded, so a
      * timeout is a hard stop, not a warning we scroll past. */
     BOOL unpacked = image_wait_for_unpack(60000);

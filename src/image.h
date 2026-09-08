@@ -3,7 +3,9 @@
  *
  * Everything in this file exists because of one fact: the exe is packed with
  * Enigma Protector, and .text is still CIPHERTEXT when our DllMain runs. It
- * decrypts roughly ten seconds later. Any scan, hook or dump performed before
+ * decrypts a short time later -- MEASURED at 531 ms on 2026-09-08, though an
+ * earlier note in this project claimed ~10 s, so do not trust any fixed
+ * figure. Any scan, hook or dump performed before
  * that point reads garbage -- and reads it *successfully*, with no error, which
  * is the dangerous part. So readiness is something we measure, never assume.
  */

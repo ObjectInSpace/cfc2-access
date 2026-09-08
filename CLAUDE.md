@@ -85,7 +85,44 @@ before touching that work.
 **Solved:** reading the shell's text (`gmd_find.c`, closed-loop verified).
 **Not solved:** knowing which menu item is selected.
 
-### The IAT probe is BUILT, TESTED and DEPLOYED — it needs one game launch
+### ⭐⭐ ANSWERED 2026-09-08: the shell polls `GetAsyncKeyState`
+The IAT probe ran in-game. **`0x140FDC720` -> `user32.dll!GetAsyncKeyState`.**
+
+    polled_keyboard=YES  raw_input=no  window_messages=YES
+    xinput=no  directinput=YES
+    examined 289 slots; 289 readable; 272 resolved; 5 matched
+
+⭐ **This is a trustworthy positive AND a trustworthy negative.** 272 of 289
+slots resolved into loaded modules, so the probe demonstrably read the real
+table — `raw_input=no` is therefore evidence of absence, not absence of
+evidence. (Had it been inconclusive, `iat_probe_run()` would have returned
+FALSE; see [[inconclusive-must-be-a-return-value]].)
+
+Discount two of those: `window_messages` is noise (every Win32 app imports the
+pump), and `directinput` is **us** — we are dinput8.dll.
+
+⚠ Only **53 user32 slots** exist in total and the whole raw-input family is
+absent, which bounds where else input could come from.
+
+### ▶ NEXT: hook GetAsyncKeyState and record the RETURN ADDRESS
+The caller is the shell's input reader, and the selection state is written near
+it. This is the FIRST thing in this project that writes to game memory, so:
+
+- ⭐ **Ship the OFF switch with the experiment, not after it bites**
+  (`cfc2_hook.off` next to the exe). A detour here once broke the game.
+- ⚠⚠ **A caller's pointer is untrusted inside a hook** — `VirtualQuery` it.
+  See [[hooked-function-pointers-are-untrusted]].
+- ⚠ MinHook is no longer linked (everything shipping is read-only); it must be
+  put back in `build.ps1` for this step.
+- ⭐ The goal is the DISTINCT set of return addresses, not a call log:
+  `GetAsyncKeyState` will be called every frame, so log each new caller once
+  and count repeats. A flood is not evidence.
+- ⚠ **We call `GetAsyncKeyState` ourselves** in `mod.c` (the F7 hotkey and the
+  arrow-key edge capture). Those calls will hit our own hook and appear as
+  callers inside our DLL. Filter our module out by base address, or the first
+  finding will be ourselves.
+
+### The IAT probe (built, tested, deployed — kept for reference)
 `src/iat_probe.c` + `tools/test_iat_probe.c`. It runs automatically after
 unpack and **speaks the result**, so the user does not need the log for the
 headline. Nothing to press; just launch the game and listen.
@@ -272,7 +309,10 @@ that WRITES the state and read its offsets, rather than searching memory.
 - A **plain dinput8 proxy survives Enigma**. No bypass needed. `VirtualProtect`
   on `.text` succeeds, so MinHook detours are installable.
 
-- **`.text` is still ENCRYPTED when DllMain runs.** It decrypts ~10 s later
+- **`.text` is still ENCRYPTED when DllMain runs.** ⚠ It decrypts in **~531 ms**
+  (measured 2026-09-08), NOT the ~10 s an earlier note claimed — a 20x error.
+  Anything timed against "roughly ten seconds" is mistimed; poll, never sleep.
+  Historically it decrypted later
   (protection flips RWX `0x80` → RX `0x20`). **Never scan, hook or dump at
   startup** — poll for unpack first. Readiness test already in `mod.c`: sample
   4 KB and count distinct byte values; >240 = still packed, ~85–235 = real code.
