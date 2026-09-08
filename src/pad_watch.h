@@ -152,6 +152,38 @@
 #define PAD_DISPROVED_STICK_OFFSET 0x34bd8
 #define PAD_DISPROVED_DPAD_OFFSET  0x34c00
 
+/* --- sKeyboard: partial trace, 2026-09-08 --------------------------------
+ *
+ * The shell does not read input through sPad (see above), so sKeyboard is the
+ * next candidate. Established from .text, via the DTI REGISTRATION call --
+ * there is exactly one code reference to each class name string:
+ *
+ *     0x14002cce0   sKeyboard registration
+ *                   rcx = DTI  0x1422c9c38
+ *                   rdx = name 0x14104e6f8
+ *                   r9d = size 0xa78
+ *     0x14002a920   sPad registration:  DTI 0x1422c8290, size 0xf10
+ *     0x14002cd30   sMouse registration
+ *
+ * ⭐ Note sPad's size 0xf10 confirms PAD_DUMP_SPAN 0xf00 covered essentially
+ * the whole object -- the sPad negative was not a truncation artefact.
+ *
+ * ⛔ THE sKeyboard INSTANCE SLOT IS NOT YET FOUND. Two candidates rejected:
+ *   - DTI-0x78 (the offset that holds for sPad): 0 code references, so the
+ *     DTI-to-instance distance is NOT constant between classes.
+ *   - 0x1422c9bf0 (82 refs, 3 write sites -- the same shape as the known sPad
+ *     instance slot): its constructor allocates 0x238, not 0xa78, so it is a
+ *     different singleton. Checking the allocation SIZE is what caught this.
+ *
+ * ⚠ Searching for `mov ecx, 0xa78` near a store finds nothing, so sKeyboard is
+ * not allocated with a literal size at a single site -- it is constructed
+ * inline or through a wrapper. Next step is to disassemble the registration
+ * function 0x14002cce0 belongs to and follow what it does with its result.
+ *
+ * ⚠⚠ riprefs.pkl was built at 00:14 against a dump the game REWROTE at 00:55.
+ * The data section differs between runs, so anything derived from it must be
+ * re-derived. Everything above comes from .text and is unaffected. */
+
 /* Button bits, from the reflected names in the unpacked image:
  * bit 0 Rup, 1 Rright, 2 Rdown, 3 Rleft, 4 Lup, 5 Lright, 6 Ldown, 7 Lleft.
  * Menu navigation (up/down) and settings adjustment (left/right) are the same
