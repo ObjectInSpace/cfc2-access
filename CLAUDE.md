@@ -84,10 +84,65 @@ before touching that work.
 ## ▶ START HERE (next session)
 **Solved:** reading the shell's text (`gmd_find.c`, closed-loop verified).
 **Not solved:** knowing which menu item is selected.
-**Immediate next step — an IN-GAME probe, not more disassembly.**
 
-The offline route to sKeyboard is blocked, and it is worth knowing why before
-repeating it. Four attempts, all negative:
+### The IAT probe is BUILT, TESTED and DEPLOYED — it needs one game launch
+`src/iat_probe.c` + `tools/test_iat_probe.c`. It runs automatically after
+unpack and **speaks the result**, so the user does not need the log for the
+headline. Nothing to press; just launch the game and listen.
+
+**What it does:** resolves ~19 input APIs by name from already-loaded modules
+(never `LoadLibrary` — that would change the process being measured), then
+walks the game's import block and reports which slots point at them, by NAME.
+
+⭐ **The block was located OFFLINE first, so this is not a memory search.**
+From the riprefs index: 272 distinct slots are reached by
+`call qword ptr [rip+..]`, and they occupy one tight run
+**`0x140fdc000`–`0x140fdc900`** (289 qwords; in the last dump 257 held
+system-DLL pointers, 15 other, 17 zero). The probe reads that known address
+instead of scanning 1.4 GB for something import-shaped — which is exactly what
+produced this project's three false positives.
+
+**How to read the spoken result:**
+- *"polled keyboard"* → hook `GetAsyncKeyState`/`GetKeyboardState` and record
+  the RETURN ADDRESS; the caller is the shell's input reader and the selection
+  is written near it.
+- *"raw input"* → hook `GetRawInputData` and follow the output pointer into the
+  game's own decoded buffer.
+- *"window messages"* → **on its own this is NOT evidence.** Every Win32 app
+  imports the pump. It only matters if polling and raw input are both absent.
+- *"none of them"* → with sPad inert too, the keyboard comes through a DLL not
+  yet considered. Check the dinput8 proxy's own calls next: **we ARE that DLL**,
+  so every DirectInput call is already observable for free.
+- *"INCONCLUSIVE"* → the probe could not read the block. It found nothing AND
+  proved nothing; do not treat it as a negative.
+
+⭐⭐ **That last distinction is a RETURN VALUE, not a printed warning.**
+`iat_probe_run()` returns FALSE when zero slots resolved into a loaded module,
+so a caller cannot mistake "never looked" for "looked and found none". This
+project already shipped a tool that printed "coverage is INCOMPLETE" while
+every assertion stayed green — *if the code prints a warning, something must
+FAIL on it.*
+
+**Before trusting any in-game negative, run the self-test:**
+    .\tools\run_iat_test.ps1
+Four cases, and **each was verified to FAIL under a deliberate sabotage** —
+a passing test that has never been seen to fail is not evidence:
+1. planted APIs must be FOUND — sabotage: comparison never matches → 6 failures.
+2. absent APIs must be reported ABSENT (the discriminating case) — sabotage:
+   comparison always matches → case 2 fails, which is the false positive the
+   in-game conclusion depends on not happening.
+3. the families must be independent of one another.
+4. an unreadable block must return FALSE, not a tidy clean negative — sabotage:
+   delete that `return FALSE` → **only that one assertion fails while the other
+   three still pass**, which is precisely why it exists.
+
+⚠ The test process must `LoadLibrary("user32.dll")` itself: a plain console exe
+does not link user32, and the probe then correctly refuses to conclude
+anything. That refusal is the desired in-game behaviour, so the fix belongs in
+the harness, never in the probe.
+
+### Why the OFFLINE route to sKeyboard is closed
+Worth knowing before repeating it. Four attempts, all negative:
 
 - `0x14002cce0` is a **registration stub**: it registers the class and stores a
   vtable pointer into the DTI record. It constructs nothing.
@@ -102,12 +157,14 @@ repeating it. Four attempts, all negative:
 
 ⭐ Every remaining route needs a **runtime** fact — the live IAT, or the live
 instance pointer. Both are trivial from inside the process, where the mod
-already runs. So write a small probe that resolves the input APIs by name and
-reports which of them the game's IAT actually points at. That single answer
-says whether the shell uses `GetAsyncKeyState`, raw input, or window messages,
-and each of those has a different and much shorter path to the selection.
+already runs. That is what the IAT probe above does, and why it replaced more
+disassembly.
 
-**First, rebuild the cross-reference index** (~55 s):
+⚠ Note the fourth point cuts BOTH ways: the same fact that makes the IAT
+unmatchable offline makes it trivial to match at runtime, because the process
+resolves the names for us.
+
+**Rebuilding the cross-reference index** (~55 s), when offline work needs it:
     python tools/build_riprefs.py
 ⚠ It refuses to load when stale rather than answering wrongly — the game
 rewrites `cfc2_dump/` on every launch, and `.text` is stable but the DATA

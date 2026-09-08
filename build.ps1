@@ -24,7 +24,7 @@ New-Item -ItemType Directory -Force -Path "$root\build" | Out-Null
     -o "$root\build\dinput8.dll" `
     "$root\src\dinput8_proxy.c" "$root\src\mod.c" "$root\src\speech.c" `
     "$root\src\log.c" "$root\src\image.c" "$root\src\gmd_find.c" `
-    "$root\src\pad_watch.c" "$root\src\memsafe.c" `
+    "$root\src\pad_watch.c" "$root\src\memsafe.c" "$root\src\iat_probe.c" `
     -luser32 -lpsapi -s
 if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 Write-Host "Built build\dinput8.dll"

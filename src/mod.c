@@ -20,6 +20,7 @@
 #include "image.h"
 #include "gmd_find.h"
 #include "pad_watch.h"
+#include "iat_probe.h"
 
 #include <stdio.h>
 
@@ -176,6 +177,22 @@ static DWORD WINAPI worker(LPVOID param)
      * to disable it without rebuilding. */
     BOOL pad_enabled = !opt_in_file_present("cfc2_pad.off");
 
+    /* --- The IAT probe -------------------------------------------------
+     * The one open question is how the shell reads the keyboard: sPad is inert
+     * (Kind = 0 on all five records), and four OFFLINE attempts to answer it
+     * failed -- the last because the IAT holds resolved addresses that cannot
+     * be matched to names from a dump taken when user32 sat at another base.
+     * From inside the process it is a table walk. Run it once, here, where the
+     * module set has settled. Read-only; see iat_probe.h. */
+    iat_probe_result iat;
+    BOOL iat_ok = FALSE;
+    memset(&iat, 0, sizeof(iat));
+    if (unpacked)
+        iat_ok = iat_probe_run(&iat);
+    else
+        log_line("iat: SKIPPED -- image never unpacked, so nothing here would "
+                 "be trustworthy.");
+
     int dumped = 0;
     if (unpacked) {
         dumped = image_dump();
@@ -190,16 +207,34 @@ static DWORD WINAPI worker(LPVOID param)
         /* Speak the outcome: the user is blind and running this themselves,
          * and the whole point of the run is to learn whether the dump worked.
          * Making them alt-tab to a log for the headline would be silly. */
-        if (unpacked && dumped > 0)
+        if (unpacked && iat_ok) {
+            /* ⭐ The IAT answer is what this run exists to learn, so it is the
+             * headline -- not the dump count. Naming the families found means
+             * the user can report the result without opening the log at all.
+             * Say "none of them" explicitly: a silence would be ambiguous
+             * between "not polled" and "the probe did not run". */
             _snwprintf(msg, 255,
-                       L"Access mod ready. Backend %ls. "
-                       L"Dumped %d sections to cfc2 dump folder.",
+                       L"Access mod ready. Backend %ls. Input probe examined "
+                       L"%d slots and found: %ls%ls%ls%ls",
+                       backend ? backend : L"none",
+                       iat.slots_examined,
+                       iat.polled_keyboard ? L"polled keyboard. " : L"",
+                       iat.raw_input       ? L"raw input. "       : L"",
+                       iat.window_messages ? L"window messages. " : L"",
+                       (!iat.polled_keyboard && !iat.raw_input &&
+                        !iat.window_messages) ? L"none of them. " : L"");
+        } else if (unpacked) {
+            /* ⚠ The probe returned FALSE, which means INCONCLUSIVE, not
+             * "found nothing" -- it could not read the import block, so no
+             * family flag means anything. Say so, rather than falling through
+             * to a cheerful dump count that hides a failed measurement. */
+            _snwprintf(msg, 255,
+                       L"Access mod loaded. Backend %ls. Dumped %d sections. "
+                       L"The input probe was INCONCLUSIVE -- it could not read "
+                       L"the import table, so it found nothing AND proved "
+                       L"nothing. Check the log.",
                        backend ? backend : L"none", dumped);
-        else if (unpacked)
-            _snwprintf(msg, 255,
-                       L"Access mod loaded, backend %ls, but the dump wrote "
-                       L"no sections. Check the log.",
-                       backend ? backend : L"none");
+        }
         else
             _snwprintf(msg, 255,
                        L"Access mod loaded, backend %ls, but the image never "
