@@ -21,6 +21,7 @@
 #include "gmd_find.h"
 #include "pad_watch.h"
 #include "iat_probe.h"
+#include "caller_trace.h"
 
 #include <stdio.h>
 
@@ -178,6 +179,14 @@ static DWORD WINAPI worker(LPVOID param)
      * to disable it without rebuilding. */
     BOOL pad_enabled = !opt_in_file_present("cfc2_pad.off");
 
+    /* ⚠ The caller trace is the FIRST thing in this project that writes to
+     * game memory (a MinHook detour on user32!GetAsyncKeyState). Its off
+     * switch therefore ships WITH it, not after it bites -- a detour in this
+     * game once made it refuse to start, and the recovery was a rebuild. With
+     * `cfc2_hook.off` next to the exe the mod is read-only again, exactly as
+     * every shipped version until now. */
+    BOOL hook_enabled = !opt_in_file_present("cfc2_hook.off");
+
     /* --- The IAT probe -------------------------------------------------
      * The one open question is how the shell reads the keyboard: sPad is inert
      * (Kind = 0 on all five records), and four OFFLINE attempts to answer it
@@ -193,6 +202,25 @@ static DWORD WINAPI worker(LPVOID param)
     else
         log_line("iat: SKIPPED -- image never unpacked, so nothing here would "
                  "be trustworthy.");
+
+    /* --- The caller trace ----------------------------------------------
+     * The IAT probe answered WHICH api; this answers WHO calls it. Install
+     * only after unpack: the shell's code does not exist as code until then,
+     * and hooking user32 before the game has started polling would just
+     * accumulate our own calls.
+     *
+     * ⚠ Installed even though we are also a caller -- see caller_trace.h. Our
+     * calls are the hook's liveness proof, not noise to be avoided. */
+    BOOL hook_ok = FALSE;
+    if (unpacked && hook_enabled) {
+        hook_ok = ct_install();
+        if (!hook_ok)
+            log_line("ct: install FAILED -- nothing was written to game "
+                     "memory, and no caller conclusion is available.");
+    } else if (unpacked) {
+        log_line("ct: DISABLED by cfc2_hook.off next to the exe. Delete that "
+                 "file to re-enable the caller trace.");
+    }
 
     int dumped = 0;
     if (unpacked) {
@@ -336,6 +364,15 @@ static DWORD WINAPI worker(LPVOID param)
         beat++;
         if (beat <= 3 || beat % 30 == 0)
             log_line("heartbeat %d (alive %d s)", beat, beat * 2);
+
+        /* Report the caller set periodically. Early beats catch the title
+         * screen, later ones catch the menus -- a routine that only polls in
+         * one state would otherwise be missed, and the log is truncated per
+         * run so successive reports show the set GROWING rather than
+         * overwriting each other. */
+        if (hook_ok && (beat == 3 || beat == 10 || beat == 30 ||
+                        beat % 60 == 0))
+            ct_report_log();
 
         /* Look for the live GMD table. Retried rather than done once: the
          * message file is loaded with the shell's first menu, so an early

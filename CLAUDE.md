@@ -104,23 +104,87 @@ pump), and `directinput` is **us** — we are dinput8.dll.
 ⚠ Only **53 user32 slots** exist in total and the whole raw-input family is
 absent, which bounds where else input could come from.
 
-### ▶ NEXT: hook GetAsyncKeyState and record the RETURN ADDRESS
-The caller is the shell's input reader, and the selection state is written near
-it. This is the FIRST thing in this project that writes to game memory, so:
+### ▶ NEXT: the caller trace is BUILT and DEPLOYED — run it
+`src/caller_trace.c` + `tools/test_ct.c`. Hooks `user32!GetAsyncKeyState` and
+records the **distinct set of return addresses** with a hit count and a
+distinct-VK count each. **Not yet run in-game.**
 
-- ⭐ **Ship the OFF switch with the experiment, not after it bites**
-  (`cfc2_hook.off` next to the exe). A detour here once broke the game.
-- ⚠⚠ **A caller's pointer is untrusted inside a hook** — `VirtualQuery` it.
-  See [[hooked-function-pointers-are-untrusted]].
-- ⚠ MinHook is no longer linked (everything shipping is read-only); it must be
-  put back in `build.ps1` for this step.
-- ⭐ The goal is the DISTINCT set of return addresses, not a call log:
-  `GetAsyncKeyState` will be called every frame, so log each new caller once
-  and count repeats. A flood is not evidence.
-- ⚠ **We call `GetAsyncKeyState` ourselves** in `mod.c` (the F7 hotkey and the
-  arrow-key edge capture). Those calls will hit our own hook and appear as
-  callers inside our DLL. Filter our module out by base address, or the first
-  finding will be ourselves.
+⚠ **This is the first code in this project that WRITES to game memory.**
+Off switch ships with it: create **`cfc2_hook.off`** next to the exe and the
+mod is read-only again, exactly as every previous version.
+
+**The run:** launch, sit on the title screen a few seconds, then go into the
+menus and move around for ~30 s. The trace reports to the log at beats 3, 10,
+30 and every 60 after, so successive reports show the set GROWING. Nothing to
+press. Then read `CFC2Access.log` for lines starting `ct:`.
+
+**⭐ How to read the result — by DISTINCT VKS, not by hits.** The shell's input
+reader sweeps the whole key table (the game's `KB_*` map has ~70 entries); a
+site with `vks=1` is a single hotkey test. A tight one-key check in a hot loop
+easily out-hits a 70-key sweep, so ranking by hits would name the wrong site.
+The self-test asserts that hits and vks genuinely disagree, so this is not a
+guess about which to trust.
+
+Feed the winning site's **rva** to `tools/build_riprefs.py` and disassemble
+around it: the selection state is written near the input reader. That is the
+method that cracked sPad (✅ read the offsets out of the instructions), not the
+one that produced three false positives (⛔ search memory for a shape).
+
+**⭐⭐ The trap this design exists to avoid: we are a caller ourselves.**
+`mod.c` calls `GetAsyncKeyState` at nine sites every 100 ms. Without a filter
+the first "input reader" found would be **us** — not a null result, but a
+confident wrong answer that looks exactly like a finding. Callers inside our
+module are matched by base address and counted separately.
+
+⭐ And that separate count is the hook's **liveness proof**, not a discard:
+we *know* we call it nine times a second, so `self_calls == 0` means the detour
+is not intercepting and `ct_report_log()` refuses to print any findings —
+"0 game callers" is only meaningful alongside a large `self_calls`. See
+[[inconclusive-must-be-a-return-value]].
+
+**Before trusting any in-game result, run the self-test:**
+    .\tools\run_ct_test.ps1
+It needs TWO real modules — the test exe (standing in for our DLL) and
+`test_ct_helper.dll` (standing in for the game exe) — because a single-module
+test cannot exercise the self-filter at all; a perfect filter and no filter
+would give identical results. **Each case was run with its mechanism sabotaged
+and seen to fail:**
+1. self-filter deleted → **case 2 fails** (our own calls become "game sites")
+   — the exact false positive above.
+2. self-range covers all memory → **case 3 fails while case 2 still passes.**
+   That asymmetry is why both directions are asserted: a filter rejecting
+   everything sails through a self-filter test alone.
+3. repeats never collapse → case 4 fails (a call log, not a site set).
+4. `distinct_vks` counted unconditionally → **only case 5 fails**, which is
+   what backs the ranking advice above.
+5. `ct_remove()` returns immediately → case 6 fails.
+   ⚠ **Found by sabotage:** deleting only the `MH_DisableHook` call leaves
+   case 6 PASSING, because `MH_Uninitialize` also tears the detour down. So
+   case 6 proves "removal stops interception" but does not pin which call does
+   it. Recorded rather than papered over.
+6. hook created but never enabled → **case 1 fails first**, so an inert hook
+   cannot masquerade as a clean negative.
+
+⚠⚠ **A caller's return address is untrusted** — it is a value from the live
+stack of a thread we do not control. It is `VirtualQuery`-checked (committed
+*and* executable) before being recorded, and **never dereferenced**. See
+[[hooked-function-pointers-are-untrusted]]: a detour here once dereferenced a
+caller's pointer and killed the game in under a second.
+
+⚠ The hook body takes no locks, allocates nothing and does no I/O — it runs on
+the render thread every frame. Recording is a bounded table plus atomics; the
+log is written later from our own worker thread. Table overflow is **counted
+and reported**, never silently dropped: >64 distinct callers would contradict
+the model and must be visible.
+
+⚠ `__builtin_return_address(0)` is the caller, not MinHook: MinHook patches the
+target with a `jmp` and pushes nothing, so the return address the CPU pushed for
+`call [GetAsyncKeyState]` is the game's. (MSVC's `_ReturnAddress()` does not
+exist in GCC; the toolchain here is MinGW GCC 16.1.)
+
+⚠ MinHook is linked again in `build.ps1` for this step — it had been dropped
+while everything shipping was read-only. Note the `$minhookSrc` array was
+already declared there but not passed to gcc.
 
 ### The IAT probe (built, tested, deployed — kept for reference)
 `src/iat_probe.c` + `tools/test_iat_probe.c`. It runs automatically after
