@@ -6,6 +6,7 @@
 #include "menu_cursor.h"
 #include "log.h"
 #include "memsafe.h"
+#include "menu_speak.h"
 
 #include "../libs/minhook/include/MinHook.h"
 
@@ -388,6 +389,14 @@ void mc_poll_and_log(void)
      * would suggest a queue that does not exist. */
     mc_move m;
     if (mc_take_move(&m)) {
+        /* ⭐ Speak first, log second: the user is waiting on the readout, and
+         * the log is for us. menu_speak() falls back to position-only whenever
+         * the screen is unknown or the text cannot be read -- it never guesses
+         * a name. */
+        menu_speak(&m);
+        if (!menu_speak_lookup((ULONGLONG)(ULONG_PTR)m.caller))
+            menu_speak_log_unknown(&m);
+
         int count = m.max_index - m.min_index + 1;
         log_line("mc: %s cursor %d -> %d  (item %d of %d, range %d..%d, "
                  "step %+d)  caller=%p screen=%p cursor=%p",

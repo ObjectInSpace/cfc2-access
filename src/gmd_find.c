@@ -871,3 +871,75 @@ BOOL gmd_find(gmd_result *out)
 
     return out->label_verified;
 }
+
+/* --- Reading a message by index ------------------------------------------
+ *
+ * See gmd_find.h. sectionId == array index, and the display string is the
+ * sectionId'th string in the trailing blob, so this is a walk of N strings.
+ *
+ * ⚠⚠ The blob offset MOVES between runs (0xd0000 / 0x140000 / 0x170000 all
+ * observed on the same build). It is resolved once here and cached for the
+ * process, never compiled in -- a hardcoded offset already caused this project
+ * to read garbage and report a good table as unverifiable.
+ */
+static BYTE *g_text_blob;          /* resolved base of the string blob */
+static int   g_text_count;
+
+BOOL gmd_text_ready(void)
+{
+    if (g_text_blob)
+        return TRUE;
+
+    gmd_result r;
+    if (!gmd_find(&r))
+        return FALSE;
+    if (r.form != GMD_FORM_LIVE_TABLE || !r.text_verified) {
+        /* ⭐ Refuse rather than guess. Without a VERIFIED text resolution the
+         * blob offset is unknown, and walking from a wrong base yields
+         * plausible-looking strings from the wrong place -- which would be
+         * spoken to the user as item names. */
+        log_line("gmdtext: refusing to serve text -- the table was found but "
+                 "text did not verify (form=%d, text_verified=%d).",
+                 (int)r.form, (int)r.text_verified);
+        return FALSE;
+    }
+
+    /* Re-resolve the blob with the same search gmd_find used, and keep the
+     * offset that actually worked this run. */
+    for (int i = 0; i < GMD_NVERIFY; i++) {
+        char buf[128];
+        buf[0] = '\0';
+        int off = -1;
+        if (verify_text_live(r.array_base, &g_gmd_verify[i],
+                             buf, sizeof(buf), &off) && off > 0) {
+            g_text_blob  = r.array_base + (SIZE_T)off;
+            g_text_count = GMD_LABEL_COUNT;
+            log_line("gmdtext: ⭐ blob resolved at entries+0x%x this run; "
+                     "%d messages are readable by index.", off, g_text_count);
+            return TRUE;
+        }
+    }
+    log_line("gmdtext: could not resolve the string blob this run.");
+    return FALSE;
+}
+
+int gmd_text_count(void) { return g_text_blob ? g_text_count : 0; }
+
+BOOL gmd_text_by_index(int index, char *out, unsigned out_cap)
+{
+    if (!out || out_cap == 0)
+        return FALSE;
+    out[0] = '\0';
+    if (!g_text_blob || index < 0 || index >= g_text_count)
+        return FALSE;
+
+    const BYTE *p = skip_strings(g_text_blob, index);
+    if (!p)
+        return FALSE;                  /* the walk faulted or ran away */
+    char buf[256];
+    if (!read_cstr(p, buf, sizeof(buf)))
+        return FALSE;
+    _snprintf(out, out_cap, "%s", buf);
+    out[out_cap - 1] = '\0';
+    return TRUE;
+}

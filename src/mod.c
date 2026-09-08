@@ -396,6 +396,13 @@ static DWORD WINAPI worker(LPVOID param)
              * (announcing every skipped item would lag badly behind the user),
              * but it means the log is not a complete movement history. Said
              * plainly here so a gap in the log is not read as a missed hook. */
+            /* ⭐ Resolve the message blob lazily, once. It cannot be done at
+             * startup: the table is built during load, and the blob's offset
+             * MOVES between runs, so it must be found in this process. Until
+             * it resolves, movements still speak POSITION, never a guess. */
+            if (mc_ok)
+                gmd_text_ready();
+
             if (mc_ok)
                 mc_poll_and_log();
 
