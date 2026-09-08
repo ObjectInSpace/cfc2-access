@@ -121,9 +121,15 @@ a filter searching for exactly the values it then reported — circular.
 ⭐ **The real cause of all four: I had the WRONG POINTER.** `0x22c82c8` is a
 UI/dialog manager, not sPad, which is exactly why its bytes changed identically
 whichever key was held. The error was reading a **0x38-byte DTI table 8 bytes
-out of alignment**; with the alignment fixed the declared sizes decode cleanly
-(`sPad::Pad` 0xb8, `sPad::Map` 0x50, `sPad` 0x3c4) and the boundaries are
-unambiguous.
+out of alignment** — `0x22c82c8` is the next record's field, not sPad's slot.
+
+⚠⚠ **The DTI size check that originally "proved" this is NOT reproducible.**
+It read 0xb8 / 0x50 / 0x3c4 from DTI+0x30 in one dump; the same addresses read
+**zero** in a later one, because that region is populated during startup and
+the dump's timing decides whether it holds anything. The conclusion does not
+depend on it — the sizes come from `.text` instead (`r9d = 0xf10` at the sPad
+registration `0x14002a920`) — but **do not cite any DATA-derived offset without
+re-deriving it against the dump in front of you.**
 
 ### ⭐⭐ What is now READ OFF THE MACHINE CODE (not inferred)
 

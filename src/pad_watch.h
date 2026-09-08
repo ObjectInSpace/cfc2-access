@@ -61,18 +61,29 @@
  * every attempt this session failed: it pointed at a UI/dialog manager, so a
  * 0x36000-byte diff changed identically no matter which key was held.
  *
- * The error was a MISALIGNED DTI table. Records are 0x38 bytes with the size
- * field at +0x30; reading them 8 bytes late made 0x22c82c8 look like sPad's
- * own slot when it is actually the next record's first field. With the
- * alignment fixed the sizes decode cleanly (sPad::Pad 0xb8, sPad::Map 0x50,
- * sPad 0x3c4), which is the check that proves the boundaries.
+ * The error was a MISALIGNED DTI table: 0x22c82c8 is the NEXT record's field,
+ * not sPad's own slot.
  *
- * ⚠ Verified three ways, not assumed:
+ * ⚠⚠ THE DTI SIZE CHECK THAT ORIGINALLY "PROVED" THE ALIGNMENT IS NOT
+ * REPRODUCIBLE. It read sPad::Pad 0xb8 / sPad::Map 0x50 / sPad 0x3c4 from
+ * DTI+0x30 in one dump; the same addresses read ZERO in a later dump. That
+ * region of the DATA section is populated at some point during startup, so
+ * whether it holds anything depends on when the dump was taken. Do not cite
+ * it, and do not rely on any DATA-derived offset without re-deriving it
+ * against the dump in front of you.
+ *
+ * ⭐ The conclusion does not need it. The size is available from .text
+ * instead: the registration at 0x14002a920 passes r9d = 0xf10 as sPad's
+ * instance size (and 0xa78 for sKeyboard at 0x14002cce0).
+ *
+ * ⚠ Verified four ways, all from .text or live memory, none from the DTI:
  *   - two independent code sites resolve to it:
  *       0x140036de1  mov rcx,[rip+0x2291430]  -> 0x1422c8218
  *       0x1401880e3  mov rcx,[rip+0x214012e]  -> 0x1422c8218
  *   - the gate at 0x1401880ea tests [rcx+0x38] as a live enable flag
- *   - the update routine writes the button words at the offsets below */
+ *   - the update routine writes the button words at the offsets below
+ *   - the registration at 0x14002a920 gives size 0xf10, matching the object
+ *     actually captured */
 #define PAD_INSTANCE_RVA 0x22c8218
 
 /* ⭐⭐ FIELD OFFSETS, READ OFF THE UPDATE CODE at 0x14018449e-0x1401844e7.
