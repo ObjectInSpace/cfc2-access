@@ -84,11 +84,29 @@ before touching that work.
 ## ▶ START HERE (next session)
 **Solved:** reading the shell's text (`gmd_find.c`, closed-loop verified).
 **Not solved:** knowing which menu item is selected.
-**Immediate next step, offline, no game launch needed:** disassemble the
-function containing `0x14002cce0` (the `sKeyboard` DTI registration) and follow
-what it does with its result, to find where the sKeyboard **instance pointer**
-is stored. Everything else about sKeyboard is already known — DTI
-`0x1422c9c38`, size `0xa78`, name `0x14104e6f8`.
+**Immediate next step — an IN-GAME probe, not more disassembly.**
+
+The offline route to sKeyboard is blocked, and it is worth knowing why before
+repeating it. Four attempts, all negative:
+
+- `0x14002cce0` is a **registration stub**: it registers the class and stores a
+  vtable pointer into the DTI record. It constructs nothing.
+- The DTI's 7 code references are that stub, its store, three `lea rcx` uses,
+  and a one-line `getDTI()` accessor. None reaches an instance.
+- VK-table bounds (`0x100`/`0xff`/`0x1f`) appear at 227/1436/1425 sites — far
+  too generic, and chasing common constants is what produced this project's
+  earlier false leads.
+- **The IAT cannot be matched statically.** 295 data slots hold resolved
+  system-DLL addresses, but user32 was at a different base when the dump was
+  taken, so none match this process's `GetAsyncKeyState` etc.
+
+⭐ Every remaining route needs a **runtime** fact — the live IAT, or the live
+instance pointer. Both are trivial from inside the process, where the mod
+already runs. So write a small probe that resolves the input APIs by name and
+reports which of them the game's IAT actually points at. That single answer
+says whether the shell uses `GetAsyncKeyState`, raw input, or window messages,
+and each of those has a different and much shorter path to the selection.
+
 **First, rebuild the cross-reference index** (~55 s):
     python tools/build_riprefs.py
 ⚠ It refuses to load when stale rather than answering wrongly — the game

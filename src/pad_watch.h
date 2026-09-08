@@ -187,13 +187,34 @@
  *     different singleton. Checking the allocation SIZE is what caught this.
  *
  * ⚠ Searching for `mov ecx, 0xa78` near a store finds nothing, so sKeyboard is
- * not allocated with a literal size at a single site -- it is constructed
- * inline or through a wrapper. Next step is to disassemble the registration
- * function 0x14002cce0 belongs to and follow what it does with its result.
+ * not allocated with a literal size at a single site.
  *
- * ⚠⚠ riprefs.pkl was built at 00:14 against a dump the game REWROTE at 00:55.
- * The data section differs between runs, so anything derived from it must be
- * re-derived. Everything above comes from .text and is unaffected. */
+ * ⛔ FOUR further offline attempts, all negative (2026-09-08):
+ *   - 0x14002cce0 turns out to be a REGISTRATION STUB: it registers the class
+ *     and stores a vtable/typeinfo pointer (0x14104e600) into the DTI record.
+ *     It does not construct anything.
+ *   - The DTI's 7 code references are the stub, that store, three `lea rcx`
+ *     uses, and a one-line getDTI() accessor at 0x140253200 (`lea rax,[dti];
+ *     ret`). None reaches an instance.
+ *   - VK-table bounds (0x100 / 0xff / 0x1f) appear at 227 / 1436 / 1425 sites
+ *     -- far too generic to filter on, and chasing common constants is what
+ *     produced this project's earlier false leads.
+ *   - The IAT cannot be matched statically: 295 slots hold resolved system-DLL
+ *     addresses, but user32 was at a different base when the dump was taken,
+ *     so none match this process's GetAsyncKeyState/GetKeyboardState/etc.
+ *
+ * ⭐ WHAT THIS MEANS: the offline route to sKeyboard is blocked at the point
+ * where it needs a RUNTIME fact -- either the live IAT (to find which API the
+ * game calls) or the live instance pointer. Both are cheap to obtain from
+ * inside the process, where the mod already runs. The next step is therefore
+ * a small in-game probe that resolves the input APIs by name and reports which
+ * ones the game's IAT actually points at, rather than more disassembly.
+ *
+ * ⚠⚠ Anything derived from the DATA sections must be re-derived against the
+ * dump in front of you: the game rewrites cfc2_dump on every launch and those
+ * sections are captured at a different startup moment. .text is identical
+ * between runs. tools/build_riprefs.py now enforces this -- it fingerprints
+ * the dump and REFUSES to load a stale index rather than answering wrongly. */
 
 /* Button bits, from the reflected names in the unpacked image:
  * bit 0 Rup, 1 Rright, 2 Rdown, 3 Rleft, 4 Lup, 5 Lright, 6 Ldown, 7 Lleft.
