@@ -83,7 +83,88 @@ before touching that work.
 
 ## ▶ START HERE (next session)
 **Solved:** reading the shell's text (`gmd_find.c`, closed-loop verified).
-**Not solved:** knowing which menu item is selected.
+**Solved offline:** the shell's whole keyboard model — see the next section.
+**Not solved:** joining a focused NODE to its TEXT.
+
+### ⭐⭐ 2026-09-08: sKeyboard FOUND — the entire input model, offline
+The caller trace ran and produced **one** call site inside the exe
+(`0x140253860`). Disassembling around it resolved everything, with **no extra
+game launches**:
+
+- **`sKeyboard`** — the class name is inline ASCII at **`0x14104e6f8`**, sitting
+  inside its own vtable/DTI block. That is a positive identification.
+- **vtable `0x14104e718`**; update method at **slot +0x30 → `0x140253220`**.
+  Exactly ONE qword in the image holds that address.
+- `0x140253220` does `lea rdi,[rcx+0x138]` → **the state block is `this+0x138`**.
+- **`0x140253750`** is the state BUILDER, called from `0x1402532f3` with
+  **`rcx` = the instance, `rdx` = the state bitmap**.
+
+**THE LAYOUT** (read off `0x140253302` onward), 8 dwords = 256 keys per bank:
+
+    this+0x138:  +0x00 current  +0x20 previous
+                 +0x40 Trg      +0x60 Rel      +0x80 Chg
+
+with `Chg = cur^old`, `Trg = Chg&cur`, `Rel = Chg&old`. The same model the sPad
+metadata named — but on the object that **actually updates** (sPad has
+`Kind = 0` and its update never runs).
+
+### ⚠⚠ CORRECTION: GetAsyncKeyState is the MOUSE only
+The keyboard is read by a **virtual call `[rax+0x48]` on `[rbp+0xa40]`** — a
+DirectInput `GetDeviceState` filling a 0x100-byte buffer — then a 0x100-iteration
+loop translates each pressed DIK through a table at **`manager+0x38`** into an
+internal code. Only a **5-iteration mouse loop** uses `GetAsyncKeyState`
+(VK table `0x14104e790` = `01 02 04 05 06`, the five mouse buttons).
+
+⭐ That matches the trace's `vks=5, last_vk=0x06` exactly — **the disassembly
+and the live measurement agree independently.**
+
+⚠ So the earlier "the shell polls" conclusion was right but INCOMPLETE, and the
+"input reader sweeps ~70 KB_* keys" model was **wrong**. Ranking sites by
+distinct-VK count would have pointed at a 243-VK startup enumeration in a
+foreign module; it only worked because site 0 was **the only caller inside the
+exe**. ⭐ The module filter did the real work, not the VK heuristic.
+
+⭐ And **we ARE dinput8.dll**, so the keyboard path is observable for free.
+
+### ▶ NEXT: run it — `src/kbd_state.c` is built and deployed
+Hooks the builder at `0x140253750` and captures `rcx`/`rdx`. **The instance
+pointer arrives as an ARGUMENT — no memory search.** Then `kbd_poll_and_log()`
+reads the five banks on our worker thread and logs **on change only**.
+
+⚠ The instance is NOT statically reachable — `0x140253220` has zero direct
+callers (vtable-dispatched) and nothing points at the `sKeyboard` name string.
+Same fact that closed routes 3 and 5: this engine WALKS its metadata.
+
+**What the run answers:** navigate a menu and watch `kbd:` lines. Codes in
+`pressed=[...]` are the shell's INTERNAL codes (post-DIK-translation), so this
+also yields the code for each direction — needed for everything downstream.
+
+**⭐ The falsifiable check:** the log states whether `state - instance == 0x138`
+as the disassembly predicted. If it says `⚠ UNEXPECTED`, the offline model is
+wrong and the bank offsets cannot be trusted — reported, not assumed.
+
+**Before trusting a null result, run:** `build\test\test_kbd_guard.exe`
+(built by the command in `tools/`). It checks that `kbd_install()` REFUSES when
+the game is not mapped, and — crucially — **which guard refused**.
+
+⛔⛔ **A test that asserts only "install returned FALSE" is worthless here, and
+I shipped one before catching it.** With all three identity guards deleted it
+still passed, because **MinHook independently refuses an unmapped address**. The
+outcome was right; the assertion was not evidence. The fix is
+`kbd_install_why()`: the test now requires `BAD_PROTECT` specifically.
+- delete the VirtualQuery block → status becomes `BAD_VTABLE` → **fails**, while
+  the "returned FALSE" assertion still passes. That asymmetry is the point.
+- delete all three → `MINHOOK_FAILED` → fails. That is the state the old test
+  could not tell from success.
+
+⚠ Off switch `cfc2_hook.off` (shared with the caller trace) disables it.
+
+### The caller trace (RETIRED, kept in tree)
+`src/caller_trace.c` + `tools/test_ct.c` — did its job in one run and is no
+longer installed; `kbd_install()` replaced it in `mod.c`. Six sabotages, each
+verified to fail the case testing it. Keep for the next caller question.
+⚠ Its report text still advises ranking by distinct VKs — **that heuristic was
+wrong here**; see the correction above.
 
 ### ⭐⭐ ANSWERED 2026-09-08: the shell polls `GetAsyncKeyState`
 The IAT probe ran in-game. **`0x140FDC720` -> `user32.dll!GetAsyncKeyState`.**

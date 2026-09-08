@@ -25,7 +25,7 @@ New-Item -ItemType Directory -Force -Path "$root\build" | Out-Null
     "$root\src\dinput8_proxy.c" "$root\src\mod.c" "$root\src\speech.c" `
     "$root\src\log.c" "$root\src\image.c" "$root\src\gmd_find.c" `
     "$root\src\pad_watch.c" "$root\src\memsafe.c" "$root\src\iat_probe.c" `
-    "$root\src\caller_trace.c" `
+    "$root\src\caller_trace.c" "$root\src\kbd_state.c" `
     @minhookSrc `
     -I "$root\libs\minhook\include" `
     -luser32 -lpsapi -s

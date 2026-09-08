@@ -22,6 +22,7 @@
 #include "pad_watch.h"
 #include "iat_probe.h"
 #include "caller_trace.h"
+#include "kbd_state.h"
 
 #include <stdio.h>
 
@@ -211,15 +212,26 @@ static DWORD WINAPI worker(LPVOID param)
      *
      * ⚠ Installed even though we are also a caller -- see caller_trace.h. Our
      * calls are the hook's liveness proof, not noise to be avoided. */
+    /* ⭐ The caller trace is RETIRED -- it did its job. It found exactly one
+     * call site inside the exe (0x140253860), and disassembling around it
+     * resolved the entire input model offline: sKeyboard, its vtable, the
+     * update method, the state builder and the bank layout. Leaving it hooked
+     * would cost a per-frame detour for information we already have.
+     * It stays in the tree, tested, for the next time a caller question comes
+     * up; `ct_install()` is simply no longer called.
+     *
+     * ⚠ It also corrected the model that produced it: GetAsyncKeyState is the
+     * MOUSE path only (5 buttons). The keyboard arrives via DirectInput
+     * GetDeviceState inside the builder we now hook instead. */
     BOOL hook_ok = FALSE;
     if (unpacked && hook_enabled) {
-        hook_ok = ct_install();
+        hook_ok = kbd_install();
         if (!hook_ok)
-            log_line("ct: install FAILED -- nothing was written to game "
-                     "memory, and no caller conclusion is available.");
+            log_line("kbd: install FAILED -- nothing was written to game "
+                     "memory, and no key state is available.");
     } else if (unpacked) {
-        log_line("ct: DISABLED by cfc2_hook.off next to the exe. Delete that "
-                 "file to re-enable the caller trace.");
+        log_line("kbd: DISABLED by cfc2_hook.off next to the exe. Delete that "
+                 "file to re-enable the keyboard state watcher.");
     }
 
     int dumped = 0;
@@ -341,6 +353,13 @@ static DWORD WINAPI worker(LPVOID param)
              * normally -- no holding, no two-key press, nothing to remember.
              * A measurement that needs the user to remember something is the
              * wrong measurement. */
+            /* Read the shell's own decoded key state. Logs only on a change,
+             * so the log shows navigation rather than a per-frame flood.
+             * ⭐ This is a two-read compare against a pointer the game handed
+             * us, not a search -- the whole point of the offline work. */
+            if (hook_ok)
+                kbd_poll_and_log();
+
             if (unpacked && pad_enabled) {
                 unsigned dirs = 0;
                 if (GetAsyncKeyState(VK_UP)    & 0x8000) dirs |= PAD_UP;
@@ -365,14 +384,20 @@ static DWORD WINAPI worker(LPVOID param)
         if (beat <= 3 || beat % 30 == 0)
             log_line("heartbeat %d (alive %d s)", beat, beat * 2);
 
-        /* Report the caller set periodically. Early beats catch the title
-         * screen, later ones catch the menus -- a routine that only polls in
-         * one state would otherwise be missed, and the log is truncated per
-         * run so successive reports show the set GROWING rather than
-         * overwriting each other. */
+        /* Periodic keyboard-state summary: how many times the builder ran and
+         * whether the instance was captured. The per-change lines above carry
+         * the actual key data; this is the liveness context they need. */
         if (hook_ok && (beat == 3 || beat == 10 || beat == 30 ||
-                        beat % 60 == 0))
-            ct_report_log();
+                        beat % 60 == 0)) {
+            kbd_capture cap;
+            kbd_snapshot(&cap);
+            log_line("kbd: builder ran %ld times; instance=%p state=%p "
+                     "offset=%s",
+                     cap.calls, cap.manager, cap.state,
+                     cap.state ? (cap.offset_ok ? "0x138 CONFIRMED"
+                                                : "⚠ UNEXPECTED")
+                               : "(not captured)");
+        }
 
         /* Look for the live GMD table. Retried rather than done once: the
          * message file is loaded with the shell's first menu, so an early
