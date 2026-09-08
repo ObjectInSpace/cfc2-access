@@ -81,51 +81,81 @@ before touching that work.
 
 - `src/log.c` — timestamped logging.
 
-## ▶ START HERE (next session) — the focus join, route 7
+## ▶ START HERE (next session) — the node → text join
+
 **Solved:** reading the shell's text (`gmd_find.c`, closed-loop verified).
-**Solved:** reading the shell's keyboard (`kbd_state.c`, confirmed in live
-memory) — see the sKeyboard section below.
-**Not solved, and the whole remaining problem:** knowing which menu item is
-FOCUSED, so its text can be spoken.
+**Solved:** reading the shell's keyboard (`kbd_state.c`, confirmed live).
+**Solved (2026-09-08, offline):** the **selected index and the item count** —
+route 7, below. ⚠ Built and self-tested, **not yet run in-game**.
+**Not solved, and now the whole remaining problem:** turning an index into the
+item's TEXT.
 
-### ⛔⛔ Read this before proposing any scan
-**There is no flat `0..N-1` selection index in this game — proven, not
-assumed.** A full-coverage span scan over **1,914,880 fields** (u32 and
-low-byte views, no stride, 32 ms/sweep, user walking a long list) found
-**nothing exceeding 4 distinct values**. An 8-item list needs a field
-reaching 7.
+### ⭐⭐ ROUTE 7 ANSWERED: the menu cursor chokepoint
+Every shell menu moves its selection through one of two generic helpers:
 
-⭐ That is consistent rather than a miss: MTFramework's GUI is
-animation-driven, so selection is **which node holds the SELECT state** — a
-per-node flag — not a central integer. Route 3 saw the same independently.
+- **`0x14007cdc0` vertical** (masks `0x10010` up / `0xa00a0` down)
+- **`0x14007c9f0` horizontal** (masks `0x80080` left / `0x50050` right)
 
-Four routes are closed (memory `cfc2-heapdiff`, `cfc2-gui-tree-walk`,
-`cfc2-gui-layout-finder`), each having anchored on something *findable* rather
-than something that *varies*. A fifth scan would fail because the target does
-not exist.
+```
+int move(void *screen /*rcx*/, int *cursor /*rdx*/, int min /*r8d*/,
+         int max /*r9d*/, int sfx /*[rsp+0x20]*/, int wrap /*[rsp+0x28]*/)
+```
 
-### ▶ ROUTE 7: hook the code that REACTS to Down/Up
-Never tried, and the only approach the evidence still allows. `cfc2-heapdiff`
-recommended it and it was not actionable then; it is now, because we know the
-exact instant a direction key is pressed:
+Read the index through `rdx`, clamp/wrap, **write it back**, and — only if it
+changed — play a cursor SFX and return the delta. **34 vertical + 34 horizontal
+call sites**, all inside `0x140079000`–`0x1400b5700`.
 
-1. Find the routine that consumes the keyboard state — start from the builder's
-   caller `0x1402532f3` and the update fn `0x140253220`.
-2. Follow what it writes when Down is pressed: the SELECT-state transition.
-3. The node whose flag is set is the focused node; walk it to its text.
+⭐ The cursor pointer and the range arrive as ARGUMENTS, so `src/menu_cursor.c`
+needs no memory search at all. Many sites pass `max = [screen+0x334]-1` beside
+`cursor = [screen+0x330]`, so the **item count** comes free — that is what
+"item 3 of 8" needs.
 
-**Assets in hand:** `image+0x1208bd0` is a **verified cross-launch anchor** to
-the live menu object (found it on 4 launches at 4 addresses) — that object
-holds VISUAL state, but the anchor is proven. MinHook is linked,
-`VirtualProtect` works, the fault guard and `cfc2_hook.off` gating exist.
+### ⛔⛔ THIS CORRECTS A CLAIM REPEATED ACROSS FOUR CLOSED ROUTES
+Those notes say flatly *"there is no flat `0..N-1` selection index in this game
+— proven, not assumed"* (1,914,880 fields, nothing over 4 distinct values).
+**An index does exist.** It is a field of the **per-screen object**, at a
+different address in every menu.
 
-⚠⚠ **The join is still the hard half.** Even with the focused node, layouts
-carry **no GMD label hashes**, so node → label is the missing link (label →
-string is solved). Do not declare victory on finding the node.
+⭐ The old measurement was **sound for what it tested** — there is no single
+*global* selection integer — and the error was the generalisation drawn from
+it. A span scan for one global could not have found 34 per-screen fields.
 
-⚠ **Do not spend the user's launches debugging our own tools** — several
-rounds of route 4 did exactly that. Verify offline; this session resolved the
-entire input model from ONE traced address with zero extra launches.
+⭐⭐ The method that worked is the one that has now worked four times here:
+**read the answer out of the instructions.** Memory scanning is 0 for 4 on this
+project; disassembly is 4 for 4 (sPad, sKeyboard, the GMD table, this).
+
+### ▶ NEXT: the in-game run, then the join
+`src/menu_cursor.c` is built, wired into `mod.c` and deployed. Launch, walk the
+menus, and read `mc:` lines in the log. What they answer:
+
+- `mc: ... cursor 2 -> 3 (item 4 of 8 ...)` → the model is right, and the index
+  and count are both live.
+- `mc: the cursor helpers have not run yet` → the hook is not intercepting;
+  nothing can be concluded about menu movement (liveness before findings).
+- `mc: N call(s) had an unreadable cursor pointer` → the argument model is
+  wrong somewhere; those movements are MISSING, not absent.
+
+⚠⚠ **The join is still the hard half, and the index does not solve it.**
+Layouts carry **no GMD label hashes** (`cfc2-gui-layout-finder`), so index →
+label is the missing link; label → string is solved (`cfc2-live-gmd-table`).
+The promising direction is that menu items are likely a **contiguous label run**
+in the GMD, so an index may map to a label by offset from a screen's base label
+— but that is a hypothesis, and it needs a positive control before it is
+believed.
+
+⚠ **Do not spend the user's launches debugging our own tools** — several rounds
+of route 4 did exactly that. Both of this session's steps were resolved offline
+with zero game launches.
+
+### The offline caller finder
+`tools/find_callers.py` — scans for the `call rel32` **encoding**, not linear
+disassembly (capstone's linear sweep stops at the first undecodable byte, and
+this project already lost a 16 MB sweep that way). `--jmp` also catches tail
+calls. Used here to count the 68 call sites and to prove nothing branches into
+either helper's first five bytes.
+⚠ Its case 4 is labelled in the file as a **regression guard with no isolating
+sabotage** — two earlier versions of that case claimed coverage they did not
+have. Cases 2 and 3 are the ones carrying weight.
 
 ### ⭐⭐ 2026-09-08: sKeyboard FOUND — the entire input model, offline
 The caller trace ran and produced **one** call site inside the exe
