@@ -81,10 +81,51 @@ before touching that work.
 
 - `src/log.c` — timestamped logging.
 
-## ▶ START HERE (next session)
+## ▶ START HERE (next session) — the focus join, route 7
 **Solved:** reading the shell's text (`gmd_find.c`, closed-loop verified).
-**Solved offline:** the shell's whole keyboard model — see the next section.
-**Not solved:** joining a focused NODE to its TEXT.
+**Solved:** reading the shell's keyboard (`kbd_state.c`, confirmed in live
+memory) — see the sKeyboard section below.
+**Not solved, and the whole remaining problem:** knowing which menu item is
+FOCUSED, so its text can be spoken.
+
+### ⛔⛔ Read this before proposing any scan
+**There is no flat `0..N-1` selection index in this game — proven, not
+assumed.** A full-coverage span scan over **1,914,880 fields** (u32 and
+low-byte views, no stride, 32 ms/sweep, user walking a long list) found
+**nothing exceeding 4 distinct values**. An 8-item list needs a field
+reaching 7.
+
+⭐ That is consistent rather than a miss: MTFramework's GUI is
+animation-driven, so selection is **which node holds the SELECT state** — a
+per-node flag — not a central integer. Route 3 saw the same independently.
+
+Four routes are closed (memory `cfc2-heapdiff`, `cfc2-gui-tree-walk`,
+`cfc2-gui-layout-finder`), each having anchored on something *findable* rather
+than something that *varies*. A fifth scan would fail because the target does
+not exist.
+
+### ▶ ROUTE 7: hook the code that REACTS to Down/Up
+Never tried, and the only approach the evidence still allows. `cfc2-heapdiff`
+recommended it and it was not actionable then; it is now, because we know the
+exact instant a direction key is pressed:
+
+1. Find the routine that consumes the keyboard state — start from the builder's
+   caller `0x1402532f3` and the update fn `0x140253220`.
+2. Follow what it writes when Down is pressed: the SELECT-state transition.
+3. The node whose flag is set is the focused node; walk it to its text.
+
+**Assets in hand:** `image+0x1208bd0` is a **verified cross-launch anchor** to
+the live menu object (found it on 4 launches at 4 addresses) — that object
+holds VISUAL state, but the anchor is proven. MinHook is linked,
+`VirtualProtect` works, the fault guard and `cfc2_hook.off` gating exist.
+
+⚠⚠ **The join is still the hard half.** Even with the focused node, layouts
+carry **no GMD label hashes**, so node → label is the missing link (label →
+string is solved). Do not declare victory on finding the node.
+
+⚠ **Do not spend the user's launches debugging our own tools** — several
+rounds of route 4 did exactly that. Verify offline; this session resolved the
+entire input model from ONE traced address with zero extra launches.
 
 ### ⭐⭐ 2026-09-08: sKeyboard FOUND — the entire input model, offline
 The caller trace ran and produced **one** call site inside the exe
