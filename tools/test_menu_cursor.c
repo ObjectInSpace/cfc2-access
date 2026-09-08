@@ -86,7 +86,7 @@ int main(void)
     /* --- case 1: a real move is observed, with the right old/new ---------- */
     memset(&last, 0, sizeof(last));
     cursor = 3;
-    mc_test_body((void *)0xDEAD0000, &cursor, 0, 7, TRUE, 4, TRUE);
+    mc_test_body((void *)0xDEAD0000, &cursor, 0, 7, TRUE, 4, TRUE, +1);
     int n1 = drain(&last);
     check("1. a movement is reported once, with old and new indices",
           n1 == 1 && last.old_index == 3 && last.new_index == 4 &&
@@ -100,7 +100,7 @@ int main(void)
      * input, not only when something moves. A hook that reported every call
      * would make the mod speak the same item continuously. */
     cursor = 4;
-    mc_test_body((void *)0xDEAD0000, &cursor, 0, 7, TRUE, 4, TRUE);
+    mc_test_body((void *)0xDEAD0000, &cursor, 0, 7, TRUE, 4, TRUE, +1);
     mc_move ignored;
     check("2. a call that leaves the index unchanged reports NOTHING",
           drain(&ignored) == 0, "");
@@ -108,13 +108,13 @@ int main(void)
     /* --- case 3: the cursor variable is actually updated by the original --
      * The hook must not swallow or undo the game's write. */
     cursor = 2;
-    mc_test_body((void *)0xDEAD0000, &cursor, 0, 7, TRUE, 5, TRUE);
+    mc_test_body((void *)0xDEAD0000, &cursor, 0, 7, TRUE, 5, TRUE, +1);
     check("3. the game's write through the cursor pointer survives the hook",
           cursor == 5, "cursor=%d", cursor);
 
     /* --- case 4: horizontal is distinguished from vertical ---------------- */
     cursor = 0;
-    mc_test_body((void *)0xDEAD0000, &cursor, 0, 3, FALSE, 1, TRUE);
+    mc_test_body((void *)0xDEAD0000, &cursor, 0, 3, FALSE, 1, TRUE, +1);
     drain(&last);
     check("4. the horizontal helper is reported as horizontal",
           !last.vertical, "vertical=%d", (int)last.vertical);
@@ -133,7 +133,7 @@ int main(void)
         failures++;
     } else {
         mc_test_body((void *)0xDEAD0000, (int *)reserved, 0, 7, TRUE, 1,
-                     FALSE);
+                     FALSE, +1);
         mc_get_stats(&st); rej_after = st.rejected;
         check("5. an uncommitted cursor pointer is rejected, not dereferenced",
               rej_after == rej_before + 1 && drain(&ignored) == 0,
@@ -143,7 +143,7 @@ int main(void)
 
     /* --- case 6: a NULL cursor is rejected -------------------------------- */
     mc_get_stats(&st); rej_before = st.rejected;
-    mc_test_body((void *)0xDEAD0000, NULL, 0, 7, TRUE, 1, FALSE);
+    mc_test_body((void *)0xDEAD0000, NULL, 0, 7, TRUE, 1, FALSE, +1);
     mc_get_stats(&st);
     check("6. a NULL cursor pointer is rejected",
           st.rejected == rej_before + 1, "rejected %ld -> %ld",
@@ -153,7 +153,7 @@ int main(void)
      * A stale repeat would make the mod re-speak the previous item every poll,
      * which is indistinguishable from the user actually moving there. */
     cursor = 1;
-    mc_test_body((void *)0xDEAD0000, &cursor, 0, 7, TRUE, 2, TRUE);
+    mc_test_body((void *)0xDEAD0000, &cursor, 0, 7, TRUE, 2, TRUE, +1);
     check("7. a movement is taken exactly once",
           drain(&last) == 1 && drain(&ignored) == 0, "");
 
@@ -164,6 +164,26 @@ int main(void)
     check("8. every invocation is counted, moved or not",
           st.calls >= 7, "calls=%ld moves=%ld rejected=%ld",
           st.calls, st.moves, st.rejected);
+
+    /* --- case 9: a WRAP -- step and index delta disagree ------------------
+     * ⭐⭐ THE CASE THAT WOULD HAVE CAUGHT THE REAL BUG, added after the fact.
+     * The helper's return value is the DIRECTION PRESSED, not the change in the
+     * index; the two differ exactly when the cursor wraps. The original test
+     * had a stand-in returning `new - old`, which made them agree by
+     * construction and taught me a false fact that only surfaced in the
+     * in-game log (0 -> 5 reporting step -1, which looked like a sign bug in
+     * the mod and was not).
+     *
+     * Here: index goes 0 -> 5 (a delta of +5) while the user pressed BACKWARD
+     * (step -1). The hook must report the step it was GIVEN, not recompute one.
+     * This is the real main-menu behaviour, verbatim from the log. */
+    cursor = 0;
+    mc_test_body((void *)0xDEAD0000, &cursor, 0, 5, TRUE, 5, TRUE, -1);
+    drain(&last);
+    check("9. on a wrap, step is the direction pressed, not the index delta",
+          last.old_index == 0 && last.new_index == 5 && last.step == -1,
+          "old=%d new=%d step=%+d (a stand-in returning new-old gives +5)",
+          last.old_index, last.new_index, last.step);
 
     printf("\n");
     if (failures) {

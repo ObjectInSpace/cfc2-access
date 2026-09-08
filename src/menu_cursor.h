@@ -71,7 +71,12 @@ typedef struct {
     int   new_index;
     int   min_index;
     int   max_index;   /* r9d: the LAST valid index, so count == max - min + 1 */
-    int   delta;       /* the helper's return value */
+    /* ⚠ The helper's return value is the DIRECTION THE USER PRESSED (+1/-1),
+     * not the change in the index. It is computed before any index arithmetic
+     * and then used as the step. The two differ exactly when the cursor WRAPS:
+     * in-game, 0 -> 5 on a 6-item menu reports step -1. That is the more useful
+     * semantics -- it tells a wrap apart from a jump. */
+    int   step;        /* +1/-1: the direction, NOT new_index - old_index */
     BOOL  vertical;    /* which helper: up/down vs left/right */
 } mc_move;
 
@@ -129,6 +134,7 @@ void mc_poll_and_log(void);
  * hook's own pointer check sabotaged away -- the harness was supplying the
  * mechanism under test. */
 int mc_test_body(void *screen, int *cursor, int min, int max,
-                 BOOL vertical, int simulated_new_index, BOOL writable);
+                 BOOL vertical, int simulated_new_index, BOOL writable,
+                 int simulated_step);
 
 #endif /* CFC2_MENU_CURSOR_H */

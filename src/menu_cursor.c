@@ -136,7 +136,7 @@ static int detour_body(pfn_move real, void *screen, int *cursor,
     g_last.new_index = neu;
     g_last.min_index = min;
     g_last.max_index = max;
-    g_last.delta     = delta;
+    g_last.step      = delta;
     g_last.vertical  = vertical;
     InterlockedIncrement(&g_seq);
 
@@ -154,9 +154,22 @@ static int hook_horz(void *screen, int *cursor, int min, int max)
     return detour_body(g_real_horz, screen, cursor, min, max, FALSE);
 }
 
-/* The stand-in "original" used only by mc_test_body(). It mimics the one thing
- * the real helper does that matters here: write the new index through the
- * caller's pointer and return the delta.
+/* The stand-in "original" used only by mc_test_body(). It writes the new index
+ * through the caller's pointer and returns the STEP the caller asked to
+ * simulate.
+ *
+ * ⛔⛔ IT USED TO RETURN `new - old`, AND THAT TAUGHT ME A FALSE FACT.
+ * The real helper's return value is the DIRECTION THE USER PRESSED (+1/-1),
+ * computed at 0x14007ce96-0x14007ceb6 BEFORE any index arithmetic and then used
+ * as the step: `lea eax,[r15 + rbx]`. It is not the change in the index. The
+ * two only agree when the cursor does not wrap -- so the in-game log showed
+ * `0 -> 5` with `delta -1`, which looked like a sign bug in the mod and was
+ * actually the stand-in having encoded my assumption instead of the game's
+ * behaviour. Case 1 passed because the harness supplied the answer.
+ * ⭐ Same trap as the `cursor_is_safe()` one, in a different place: a stand-in
+ * must be TOLD what to do, never compute it plausibly.
+ * ⭐ And the real semantics are the more useful ones -- a wrap is
+ * distinguishable from a jump, which an index delta cannot express.
  *
  * ⚠ The real helper writes through rdx unconditionally -- in the game that
  * pointer is always the game's own. The test deliberately passes an unmapped
@@ -171,6 +184,7 @@ static int hook_horz(void *screen, int *cursor, int min, int max)
  * it the same way the shipping code does -- otherwise a broken guard and a
  * working one are indistinguishable. */
 static int  g_sim_new;
+static int  g_sim_step;       /* what the real helper returns: the direction */
 static BOOL g_sim_writable;   /* set by mc_test_body: may the stand-in write? */
 
 static int fake_original(void *screen, int *cursor, int min, int max)
@@ -178,17 +192,18 @@ static int fake_original(void *screen, int *cursor, int min, int max)
     (void)screen; (void)min; (void)max;
     if (!g_sim_writable)
         return 0;
-    int old = *cursor;
     *cursor = g_sim_new;
-    return *cursor - old;
+    return g_sim_step;
 }
 
 int mc_test_body(void *screen, int *cursor, int min, int max,
-                 BOOL vertical, int simulated_new_index, BOOL writable)
+                 BOOL vertical, int simulated_new_index, BOOL writable,
+                 int simulated_step)
 {
     /* ⭐ The seam drives the SHIPPING detour_body(), not a copy of it. A test
      * written against a reimplementation proves nothing about what ships. */
     g_sim_new      = simulated_new_index;
+    g_sim_step     = simulated_step;
     g_sim_writable = writable;
     return detour_body(fake_original, screen, cursor, min, max, vertical);
 }
@@ -367,11 +382,11 @@ void mc_poll_and_log(void)
     if (mc_take_move(&m)) {
         int count = m.max_index - m.min_index + 1;
         log_line("mc: %s cursor %d -> %d  (item %d of %d, range %d..%d, "
-                 "delta %+d)  screen=%p cursor=%p",
+                 "step %+d)  screen=%p cursor=%p",
                  m.vertical ? "vertical  " : "horizontal",
                  m.old_index, m.new_index,
                  m.new_index - m.min_index + 1, count,
-                 m.min_index, m.max_index, m.delta, m.screen, m.cursor);
+                 m.min_index, m.max_index, m.step, m.screen, m.cursor);
     }
 
     /* ⚠ A rejected pointer is REPORTED, not silently skipped: it would mean the
