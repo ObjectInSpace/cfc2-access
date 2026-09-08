@@ -6,3 +6,7 @@ data/text_*.json
 # Dumps of the unpacked game image: large, and game-owned code.
 cfc2_dump/
 *.bin
+# Regenerable cross-reference index (tools/build_riprefs.py).
+# Not committed: it is large, derived, and goes stale when the game rewrites
+# the dump -- the tool refuses to load a stale one rather than answer wrongly.
+riprefs.pkl

@@ -134,10 +134,22 @@ void pad_dump_now(unsigned kb_dirs)
                  (unsigned long long)got, (unsigned long long)wrote);
 
     /* The index is the analysis input: it says what state each capture was
-     * taken in. Appended, so the five captures of one session accumulate. */
+     * taken in.
+     *
+     * ⛔⛔ TRUNCATE ON THE FIRST CAPTURE OF A RUN, never append across runs.
+     *
+     * This appended unconditionally while the .bin files were OVERWRITTEN by
+     * each new run. After a second session the index described ten captures
+     * while only the last run's files existed, so stale lines were paired with
+     * bytes from a DIFFERENT run -- metadata silently attached to the wrong
+     * data, which is worse than losing it outright. It was noticed only
+     * because both runs happened to share an object address; with different
+     * addresses it would have produced confident nonsense.
+     *
+     * "w" on seq 1 makes each run self-contained. */
     char ipath[MAX_PATH];
     if (game_path(ipath, sizeof ipath, "cfc2_pad_index.txt")) {
-        FILE *ix = fopen(ipath, "a");
+        FILE *ix = fopen(ipath, seq == 1 ? "w" : "a");
         if (ix) {
             if (seq == 1)
                 fprintf(ix, "# seq, file, object, bytes, kb_dirs, tick_ms\n");
