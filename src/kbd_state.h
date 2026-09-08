@@ -114,6 +114,57 @@ void kbd_snapshot(kbd_capture *out);
  * `words` receives 5 banks x 8 dwords in the order cur, old, trg, rel, chg. */
 BOOL kbd_read(DWORD words[5][KBD_BANK_WORDS]);
 
+/* --- Edges -----------------------------------------------------------------
+ * ⛔⛔ DO NOT USE THE Trg/Rel BANKS FROM A SLOW POLLER. Measured in-game:
+ * `Trg` is set for exactly ONE frame (~16 ms), and polling at 100 ms caught it
+ * roughly 1 press in 6 -- most arrow presses logged `pressed=(none)` while the
+ * `cur` bank plainly showed the key going down. A Trg-based reader silently
+ * misses most keypresses.
+ *
+ * ⭐ So derive edges from `cur` instead: we read `cur` on every poll, and
+ * comparing successive reads gives correct press/release at ANY poll rate.
+ * (The engine's own Trg is correct -- it is computed per frame. It is only
+ * unusable by US, from a 100 ms thread. Read at frame rate inside the hook it
+ * would be fine.)
+ *
+ * ⭐ Same class of error as a sampling gate making negatives meaningless:
+ * never read a single-frame field from a slow sampler.
+ *
+ * kbd_poll_edges() reads the state and reports what CHANGED since the previous
+ * call. Returns FALSE if the state could not be read -- a return value, so
+ * "could not measure" can never be mistaken for "nothing was pressed". */
+typedef struct {
+    DWORD down[KBD_BANK_WORDS];      /* currently held */
+    DWORD pressed[KBD_BANK_WORDS];   /* went down since the previous call */
+    DWORD released[KBD_BANK_WORDS];  /* came up since the previous call */
+    BOOL  first;                     /* TRUE on the first call: `pressed` is
+                                      * seeded, not observed, so callers must
+                                      * not treat it as real presses */
+} kbd_edges;
+
+BOOL kbd_poll_edges(kbd_edges *out);
+
+/* Test-only: feed a synthetic `cur` bank instead of reading the game, so the
+ * edge derivation can be driven through a known sequence offline. NULL (the
+ * default) means "read the real state". This exists so the test drives the
+ * SHIPPING function rather than a copy of its logic. */
+extern const DWORD *g_kbd_test_cur;
+
+/* Test-only: forget the previous sample, so a test can start from a known
+ * state without the residue of an earlier case. */
+void kbd_reset_edges(void);
+
+/* Is a given internal code currently down / newly pressed in `e`? */
+BOOL kbd_is_set(const DWORD bank[KBD_BANK_WORDS], int code);
+
+/* The shell's internal key codes, measured in-game 2026-09-08. The DIK
+ * translation maps back onto the standard VK set. */
+#define KBDC_UP     0x26
+#define KBDC_DOWN   0x28
+#define KBDC_LEFT   0x25
+#define KBDC_RIGHT  0x27
+#define KBDC_ENTER  0x0d
+
 /* Log the state, naming any keys that are down or newly pressed. Called on a
  * change only, so the log shows navigation rather than a per-frame flood. */
 void kbd_poll_and_log(void);

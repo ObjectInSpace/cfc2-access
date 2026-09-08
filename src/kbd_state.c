@@ -177,6 +177,60 @@ BOOL kbd_read(DWORD words[5][KBD_BANK_WORDS])
     return TRUE;
 }
 
+BOOL kbd_is_set(const DWORD bank[KBD_BANK_WORDS], int code)
+{
+    if (code < 0 || code >= KBD_BANK_WORDS * 32)
+        return FALSE;
+    return (bank[code >> 5] & (1u << (code & 31))) != 0;
+}
+
+const DWORD *g_kbd_test_cur;
+
+static DWORD g_prev[KBD_BANK_WORDS];
+static BOOL  g_have_prev;
+
+void kbd_reset_edges(void)
+{
+    memset(g_prev, 0, sizeof(g_prev));
+    g_have_prev = FALSE;
+}
+
+BOOL kbd_poll_edges(kbd_edges *out)
+{
+    DWORD w[5][KBD_BANK_WORDS];
+    memset(out, 0, sizeof(*out));
+    if (g_kbd_test_cur) {
+        memcpy(w[0], g_kbd_test_cur, sizeof(w[0]));
+    } else if (!kbd_read(w)) {
+        return FALSE;   /* could not measure -- NOT "nothing pressed" */
+    }
+
+    /* ⭐ Edges from successive `cur` reads, NOT from the engine's Trg bank.
+     * Trg lives one frame; this poller runs every 100 ms and caught it about
+     * 1 press in 6 when measured in-game. Differencing `cur` is exact at any
+     * poll rate: a key that went down between two reads shows up in exactly
+     * one of them. */
+    for (int i = 0; i < KBD_BANK_WORDS; i++) {
+        DWORD cur = w[0][i];
+        out->down[i]     = cur;
+        out->pressed[i]  = cur & ~g_prev[i];
+        out->released[i] = g_prev[i] & ~cur;
+        g_prev[i] = cur;
+    }
+
+    /* ⚠ On the very first call every held key looks "newly pressed", because
+     * there is no previous sample to difference against. Say so rather than
+     * reporting phantom presses -- a caller that acts on them would fire an
+     * action the user never requested. */
+    out->first = !g_have_prev;
+    if (!g_have_prev) {
+        g_have_prev = TRUE;
+        memset(out->pressed, 0, sizeof(out->pressed));
+        memset(out->released, 0, sizeof(out->released));
+    }
+    return TRUE;
+}
+
 /* Format the set bits of a bank as a list of internal codes. */
 static void fmt_bits(char *buf, size_t cap, const DWORD *bank)
 {
@@ -250,18 +304,31 @@ void kbd_poll_and_log(void)
         return;
     }
 
+    /* Edges DERIVED from successive `cur` reads. This is the reliable source;
+     * see the note on kbd_poll_edges(). */
+    kbd_edges e;
+    if (!kbd_poll_edges(&e))
+        return;
+
     /* Log only on change, so the log shows navigation rather than a per-frame
      * flood -- a flood is not evidence, and it would bury the signal. */
     static DWORD last_cur[KBD_BANK_WORDS];
     static BOOL  have_last;
-    if (have_last && memcmp(last_cur, w[0], sizeof(last_cur)) == 0)
+    if (have_last && memcmp(last_cur, e.down, sizeof(last_cur)) == 0)
         return;
-    memcpy(last_cur, w[0], sizeof(last_cur));
+    memcpy(last_cur, e.down, sizeof(last_cur));
     have_last = TRUE;
 
-    char cur[160], trg[160], rel[160];
-    fmt_bits(cur, sizeof(cur), w[0]);
-    fmt_bits(trg, sizeof(trg), w[2]);
-    fmt_bits(rel, sizeof(rel), w[3]);
-    log_line("kbd: down=[%s]  pressed=[%s]  released=[%s]", cur, trg, rel);
+    char cur[160], press[160], rel[160], engine_trg[160];
+    fmt_bits(cur,   sizeof(cur),   e.down);
+    fmt_bits(press, sizeof(press), e.pressed);
+    fmt_bits(rel,   sizeof(rel),   e.released);
+    /* ⭐ The engine's own Trg is logged ALONGSIDE ours, not instead of it.
+     * In-game it was empty for ~5 of every 6 presses because it lives one
+     * frame and we sample at 100 ms. Showing both keeps that visible as
+     * evidence rather than a remembered caveat -- if engine_trg ever starts
+     * agreeing with pressed, the sampling assumption has changed. */
+    fmt_bits(engine_trg, sizeof(engine_trg), w[2]);
+    log_line("kbd: down=[%s]  pressed=[%s]  released=[%s]  (engine Trg=[%s])",
+             cur, press, rel, engine_trg);
 }
