@@ -23,6 +23,7 @@
 #include "iat_probe.h"
 #include "caller_trace.h"
 #include "kbd_state.h"
+#include "menu_cursor.h"
 
 #include <stdio.h>
 
@@ -234,6 +235,30 @@ static DWORD WINAPI worker(LPVOID param)
                  "file to re-enable the keyboard state watcher.");
     }
 
+    /* --- The menu cursor ------------------------------------------------
+     * ⭐⭐ Route 7's answer. Every shell menu moves its selection through one of
+     * two generic helpers (0x14007cdc0 vertical, 0x14007c9f0 horizontal), and
+     * both receive the SCREEN OBJECT and a POINTER TO THE CURSOR as arguments.
+     * Hooking them yields the selected index, the range, and therefore the item
+     * count -- with no memory search at all. See menu_cursor.h.
+     *
+     * ⚠ This also corrects a claim recorded across four closed routes: that no
+     * flat 0..N-1 selection index exists in this game. One does; it is a field
+     * of the per-screen object, at a different address in every menu, which is
+     * exactly why a scan for a single global integer could never find it.
+     *
+     * Shares cfc2_hook.off, so one file still makes the whole mod read-only. */
+    BOOL mc_ok = FALSE;
+    if (unpacked && hook_enabled) {
+        mc_ok = mc_install();
+        if (!mc_ok)
+            log_line("mc: install FAILED (reason %d) -- nothing was written to "
+                     "game memory, and no menu movement is available.",
+                     (int)mc_install_why());
+    } else if (unpacked) {
+        log_line("mc: DISABLED by cfc2_hook.off next to the exe.");
+    }
+
     int dumped = 0;
     if (unpacked) {
         dumped = image_dump();
@@ -359,6 +384,20 @@ static DWORD WINAPI worker(LPVOID param)
              * us, not a search -- the whole point of the offline work. */
             if (hook_ok)
                 kbd_poll_and_log();
+
+            /* ⭐ The menu cursor. The hook records movements on the game's own
+             * thread as they happen, so unlike a poll of a live field this
+             * cannot miss a move by sampling between frames.
+             *
+             * ⚠ But it keeps only the MOST RECENT movement, not a queue: if the
+             * user holds a direction and the cursor travels several items
+             * between two polls, the intermediate positions are lost and only
+             * the latest is reported. That is the right behaviour for speech
+             * (announcing every skipped item would lag badly behind the user),
+             * but it means the log is not a complete movement history. Said
+             * plainly here so a gap in the log is not read as a missed hook. */
+            if (mc_ok)
+                mc_poll_and_log();
 
             if (unpacked && pad_enabled) {
                 unsigned dirs = 0;
