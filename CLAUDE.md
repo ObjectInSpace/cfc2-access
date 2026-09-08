@@ -144,6 +144,35 @@ before touching that work.
 
 
 
+## ▶ START HERE (next session)
+
+**Solved:** reading the shell's text (`gmd_find.c`, closed-loop verified).
+**Not solved:** knowing which menu item is selected.
+
+**Immediate next step, offline, no game launch needed:** disassemble the
+function containing `0x14002cce0` (the `sKeyboard` DTI registration) and follow
+what it does with its result, to find where the sKeyboard **instance pointer**
+is stored. Everything else about sKeyboard is already known — DTI
+`0x1422c9c38`, size `0xa78`, name `0x14104e6f8`.
+
+**First, rebuild the cross-reference index** (~55 s):
+
+    python tools/build_riprefs.py
+
+⚠ It refuses to load when stale rather than answering wrongly — the game
+rewrites `cfc2_dump/` on every launch, and `.text` is stable but the DATA
+sections are not.
+
+**⭐⭐ The method that works, and the one that does not:**
+- ✅ Find the routine that **writes** the state; read the offsets out of the
+  instructions. This cracked sPad completely.
+- ⛔ Searching memory for something input-shaped. Three false positives; there
+  is an endless supply of look-alikes and they are indistinguishable as data.
+
+⚠ **Do not spend the user's game launches on unverified models.** Five launches
+went on tools built from inferences that turned out wrong. Verify offline
+first; a launch should test a claim, not discover that one was mistaken.
+
 ## ⭐⭐ Route 5 (CURRENT): read the pad record the ENGINE writes
 
 `src/pad_watch.c` + `tools/analyze_pad_dumps.py`. Routes 1-4 are closed with
