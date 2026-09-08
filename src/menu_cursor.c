@@ -92,7 +92,7 @@ static BOOL cursor_is_safe(const int *p)
  * untouched, whatever we manage or fail to observe. The game's control flow
  * must not depend on our success. */
 static int detour_body(pfn_move real, void *screen, int *cursor,
-                       int min, int max, BOOL vertical)
+                       int min, int max, BOOL vertical, void *caller)
 {
     /* ⚠⚠ EVERYTHING LIVE ACROSS A setjmp MUST BE volatile. GCC's -Wclobbered is
      * not pedantry here: longjmp may restore a stale register copy, and a stale
@@ -138,20 +138,27 @@ static int detour_body(pfn_move real, void *screen, int *cursor,
     g_last.max_index = max;
     g_last.step      = delta;
     g_last.vertical  = vertical;
+    g_last.caller    = caller;
     InterlockedIncrement(&g_seq);
 
     InterlockedIncrement(&g_moves);
     return delta;
 }
 
+/* ⚠ __builtin_return_address(0) is the GAME's call site, not MinHook's: MinHook
+ * patches the target with a jmp and pushes nothing, so the return address the
+ * CPU pushed for `call 0x14007cdc0` is still the one on the stack. The caller
+ * trace established this already; GCC has no _ReturnAddress(). */
 static int hook_vert(void *screen, int *cursor, int min, int max)
 {
-    return detour_body(g_real_vert, screen, cursor, min, max, TRUE);
+    return detour_body(g_real_vert, screen, cursor, min, max, TRUE,
+                       __builtin_return_address(0));
 }
 
 static int hook_horz(void *screen, int *cursor, int min, int max)
 {
-    return detour_body(g_real_horz, screen, cursor, min, max, FALSE);
+    return detour_body(g_real_horz, screen, cursor, min, max, FALSE,
+                       __builtin_return_address(0));
 }
 
 /* The stand-in "original" used only by mc_test_body(). It writes the new index
@@ -198,14 +205,15 @@ static int fake_original(void *screen, int *cursor, int min, int max)
 
 int mc_test_body(void *screen, int *cursor, int min, int max,
                  BOOL vertical, int simulated_new_index, BOOL writable,
-                 int simulated_step)
+                 int simulated_step, void *simulated_caller)
 {
     /* ⭐ The seam drives the SHIPPING detour_body(), not a copy of it. A test
      * written against a reimplementation proves nothing about what ships. */
     g_sim_new      = simulated_new_index;
     g_sim_step     = simulated_step;
     g_sim_writable = writable;
-    return detour_body(fake_original, screen, cursor, min, max, vertical);
+    return detour_body(fake_original, screen, cursor, min, max, vertical,
+                       simulated_caller);
 }
 
 /* --- install -------------------------------------------------------------- */
@@ -382,11 +390,11 @@ void mc_poll_and_log(void)
     if (mc_take_move(&m)) {
         int count = m.max_index - m.min_index + 1;
         log_line("mc: %s cursor %d -> %d  (item %d of %d, range %d..%d, "
-                 "step %+d)  screen=%p cursor=%p",
+                 "step %+d)  caller=%p screen=%p cursor=%p",
                  m.vertical ? "vertical  " : "horizontal",
                  m.old_index, m.new_index,
                  m.new_index - m.min_index + 1, count,
-                 m.min_index, m.max_index, m.step, m.screen, m.cursor);
+                 m.min_index, m.max_index, m.step, m.caller, m.screen, m.cursor);
     }
 
     /* ⚠ A rejected pointer is REPORTED, not silently skipped: it would mean the

@@ -78,6 +78,21 @@ typedef struct {
      * semantics -- it tells a wrap apart from a jump. */
     int   step;        /* +1/-1: the direction, NOT new_index - old_index */
     BOOL  vertical;    /* which helper: up/down vs left/right */
+
+    /* ⭐⭐ WHICH SCREEN. The 68 call sites sit in 37 distinct functions -- one
+     * per menu, each a state machine dispatching on [this+8]. So the CALLER
+     * identifies the screen, and the enclosing function identifies it more
+     * coarsely than the exact call site (19 functions contain several cursor
+     * calls, for different lists or axes within one screen).
+     *
+     * ⭐ A code address, valid forever: ASLR is off and the exe has no
+     * relocations. Recording it needs NO dereference, which is what makes this
+     * safe -- see the warning on `screen` above.
+     *
+     * ⚠ `caller` is the raw return address from OUR stack frame, so it is
+     * trustworthy in a way a caller-SUPPLIED pointer is not. It is still only
+     * recorded and compared, never used as a pointer. */
+    void *caller;      /* return address: which call site invoked the helper */
 } mc_move;
 
 /* Why an install attempt ended the way it did.
@@ -135,6 +150,6 @@ void mc_poll_and_log(void);
  * mechanism under test. */
 int mc_test_body(void *screen, int *cursor, int min, int max,
                  BOOL vertical, int simulated_new_index, BOOL writable,
-                 int simulated_step);
+                 int simulated_step, void *simulated_caller);
 
 #endif /* CFC2_MENU_CURSOR_H */
