@@ -20,8 +20,6 @@
 #include "image.h"
 #include "gmd_find.h"
 #include "pad_watch.h"
-#include "iat_probe.h"
-#include "caller_trace.h"
 #include "kbd_state.h"
 #include "menu_cursor.h"
 
@@ -29,7 +27,6 @@
 
 static HANDLE g_thread;
 static volatile LONG g_quit;
-static BOOL g_gmd_found;
 
 /* --- Route 5: read the engine's own pad record ---------------------------
  * Routes 1-4 are closed with evidence (see CLAUDE.md), and route 5's first
@@ -177,9 +174,19 @@ static DWORD WINAPI worker(LPVOID param)
      * The pad scan is read-only (VirtualQuery + guarded reads, no hooks, no
      * calls into game code), so it is far lower risk than the detour that
      * broke this game before. But "lower risk" is not "no risk", and the cost
-     * of the switch is one file check. Create `cfc2_pad.off` next to the exe
+     * of the switch is one file check. Create `cfc2_pad.on` next to the exe
      * to disable it without rebuilding. */
-    BOOL pad_enabled = !opt_in_file_present("cfc2_pad.off");
+    /* ⛔ OFF BY DEFAULT NOW (was on-unless-disabled). sPad is inert for the
+     * SHELL -- Kind=0 on all five records, so the update never runs and every
+     * field reads zero. That is a proven negative, not a tooling failure.
+     *
+     * ⚠ Kept rather than deleted because the IN-GAME work is still ahead, and
+     * controller input during an emulated match may take a different path. Turn
+     * it on with `cfc2_pad.on`.
+     *
+     * The per-poll cost this removes is real: nine GetAsyncKeyState calls every
+     * 100 ms, feeding a record known to be all zeros. */
+    BOOL pad_enabled = opt_in_file_present("cfc2_pad.on");
 
     /* ⚠ The caller trace is the FIRST thing in this project that writes to
      * game memory (a MinHook detour on user32!GetAsyncKeyState). Its off
@@ -196,14 +203,12 @@ static DWORD WINAPI worker(LPVOID param)
      * be matched to names from a dump taken when user32 sat at another base.
      * From inside the process it is a table walk. Run it once, here, where the
      * module set has settled. Read-only; see iat_probe.h. */
-    iat_probe_result iat;
-    BOOL iat_ok = FALSE;
-    memset(&iat, 0, sizeof(iat));
-    if (unpacked)
-        iat_ok = iat_probe_run(&iat);
-    else
-        log_line("iat: SKIPPED -- image never unpacked, so nothing here would "
-                 "be trustworthy.");
+    /* ⛔ RETIRED. It answered its one question -- which input API the shell
+     * uses -- and the answer was later CORRECTED by disassembly anyway:
+     * GetAsyncKeyState is the mouse only, the keyboard arrives via DirectInput.
+     * Re-running it cannot teach us anything new, and it cost ~35 log lines
+     * every launch. Source kept in tree for the next "who calls X" question. */
+
 
     /* --- The caller trace ----------------------------------------------
      * The IAT probe answered WHICH api; this answers WHO calls it. Install
@@ -259,8 +264,18 @@ static DWORD WINAPI worker(LPVOID param)
         log_line("mc: DISABLED by cfc2_hook.off next to the exe.");
     }
 
+    /* ⚠ OPT-IN. The offline tools (disasm.py, find_callers.py,
+     * build_riprefs.py, analyze_dump.py) all read this dump, and it is the
+     * machinery that cracked sPad, sKeyboard and the cursor chokepoint -- so it
+     * is kept, not deleted. But .text is stable across runs (ASLR off, no
+     * relocations) and one dump already sits on disk, so rewriting 60 MB every
+     * launch buys nothing.
+     *
+     * ⚠ The DATA sections are NOT stable, and build_riprefs.py refuses a stale
+     * index rather than answering wrongly -- so a fresh dump IS occasionally
+     * needed. Create `cfc2_dump.on` next to the exe to take one. */
     int dumped = 0;
-    if (unpacked) {
+    if (unpacked && opt_in_file_present("cfc2_dump.on")) {
         dumped = image_dump();
     } else {
         log_line("dump: SKIPPED -- image never unpacked. Any dump taken now "
@@ -273,38 +288,21 @@ static DWORD WINAPI worker(LPVOID param)
         /* Speak the outcome: the user is blind and running this themselves,
          * and the whole point of the run is to learn whether the dump worked.
          * Making them alt-tab to a log for the headline would be silly. */
-        if (unpacked && iat_ok) {
-            /* ⭐ The IAT answer is what this run exists to learn, so it is the
-             * headline -- not the dump count. Naming the families found means
-             * the user can report the result without opening the log at all.
-             * Say "none of them" explicitly: a silence would be ambiguous
-             * between "not polled" and "the probe did not run". */
+        /* ⭐ SAY WHAT MATTERS NOW. This used to announce the IAT probe's
+         * findings, which was the right headline when the run existed to answer
+         * "which input API". That question is long settled, and the probe is
+         * retired. What a user needs to hear today is simply whether the mod
+         * can name menu items -- speech backend, and whether the message table
+         * resolved. */
+        if (unpacked) {
             _snwprintf(msg, 255,
-                       L"Access mod ready. Backend %ls. Input probe examined "
-                       L"%d slots and found: %ls%ls%ls%ls",
-                       backend ? backend : L"none",
-                       iat.slots_examined,
-                       iat.polled_keyboard ? L"polled keyboard. " : L"",
-                       iat.raw_input       ? L"raw input. "       : L"",
-                       iat.window_messages ? L"window messages. " : L"",
-                       (!iat.polled_keyboard && !iat.raw_input &&
-                        !iat.window_messages) ? L"none of them. " : L"");
-        } else if (unpacked) {
-            /* ⚠ The probe returned FALSE, which means INCONCLUSIVE, not
-             * "found nothing" -- it could not read the import block, so no
-             * family flag means anything. Say so, rather than falling through
-             * to a cheerful dump count that hides a failed measurement. */
-            _snwprintf(msg, 255,
-                       L"Access mod loaded. Backend %ls. Dumped %d sections. "
-                       L"The input probe was INCONCLUSIVE -- it could not read "
-                       L"the import table, so it found nothing AND proved "
-                       L"nothing. Check the log.",
-                       backend ? backend : L"none", dumped);
+                       L"Access mod ready. Backend %ls.",
+                       backend ? backend : L"none");
         }
         else
             _snwprintf(msg, 255,
                        L"Access mod loaded, backend %ls, but the image never "
-                       L"unpacked. Dump skipped.",
+                       L"unpacked. Menu reading will not work.",
                        backend ? backend : L"none");
         msg[255] = L'\0';
         speech_say(msg, TRUE);
@@ -319,8 +317,9 @@ static DWORD WINAPI worker(LPVOID param)
      * stopping is itself the finding. */
     int beat = 0;
     if (unpacked && !pad_enabled)
-        log_line("pad: DISABLED by cfc2_pad.off next to the exe. Delete that "
-                 "file to re-enable.");
+        log_line("pad: OFF -- cfc2_pad.on is absent. sPad is inert for the "
+                 "shell (Kind=0, update never runs); create that file only "
+                 "for in-game work.");
     if (unpacked && pad_enabled) {
         /* Starts itself and re-seeds until a press makes the record visible.
          * Nothing is asked of the player except to navigate. */
@@ -451,30 +450,16 @@ static DWORD WINAPI worker(LPVOID param)
                                : "(not captured)");
         }
 
-        /* Look for the live GMD table. Retried rather than done once: the
-         * message file is loaded with the shell's first menu, so an early
-         * scan can legitimately find nothing. Read-only -- VirtualQuery then
-         * read, no writes and no hooks -- so retrying is free of risk to the
-         * game. Stops as soon as it succeeds. */
-        if (unpacked && !g_gmd_found &&
-            (beat == 3 || beat == 8 || beat == 20 || beat % 25 == 0)) {
-            gmd_result r;
-            if (gmd_find(&r)) {
-                /* Only stops retrying on VERIFIED success -- a structural
-                 * match alone is not enough to build on. */
-                g_gmd_found = TRUE;
-                log_line("gmdfind: array_base=%p form=%s label_verified=%s "
-                         "text_verified=%s",
-                         (void *)r.array_base,
-                         r.form == GMD_FORM_FILE_IMAGE ? "FILE_IMAGE"
-                       : r.form == GMD_FORM_LIVE_TABLE ? "LIVE_TABLE"
-                                                       : "UNKNOWN",
-                         r.label_verified ? "YES" : "no",
-                         r.text_verified ? "YES" : "no");
-                if (r.text_verified)
-                    speech_say(L"Message table located and verified.", FALSE);
-            }
-        }
+        /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning
+         * 1.3 GB, and it duplicated work: gmd_text_ready() already calls
+         * gmd_find(), caches the resolved table, and is itself retried by this
+         * poll loop until it succeeds. Two independent retry schedules over the
+         * same expensive scan is one too many.
+         *
+         * ⚠ What is NOT lost: the retry behaviour. gmd_text_ready() returns
+         * FALSE until the shell has loaded its message file, and the poll loop
+         * keeps calling it -- so a table that is not ready at beat 3 is still
+         * picked up later, which was the whole point of retrying. */
 
     }
 

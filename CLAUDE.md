@@ -81,24 +81,38 @@ before touching that work.
 
 - `src/log.c` — timestamped logging.
 
-## ▶ START HERE (next session) — WIDEN THE SCREEN TABLE
+## ▶ START HERE (next session) — name the remaining screens
 
-**The join is CLOSED for the main menu and deployed, but NOT yet heard.**
-`src/menu_speak.c` speaks "Offline Play, 1 of 6". One screen is in the table:
-caller `0x14009ba21`, base 37, count 6.
+**Working end to end:** the mod speaks menu item names. Main menu and Options
+are in the table; every other screen falls back to "3 of 6" (position only),
+which is correct behaviour, not a bug.
 
-**The next run does two things at once:**
-1. Confirms the main menu speaks item NAMES (not just position).
-2. **Discovery**: walk into other menus — options, museum, game select, pause,
-   character select. Each unknown screen logs, once, a
-   `mc: [DISCOVERY] caller=0x... items=N axis=...` line. That line is the table
-   row; find the label run in msg.arc and add it to `g_screens`.
+### Opt-in switches (all absent by default — a normal session does none of this)
+- `cfc2_dump.on` — write `cfc2_dump/` (60 MB). Needed when offline tools want a
+  fresh dump; ⚠ `.text` is stable across runs but the DATA sections are NOT,
+  and `build_riprefs.py` refuses a stale index.
+- `cfc2_discover.on` — log candidate label runs for unknown screens. ⚠ Runs on
+  the poll thread; off by default because three versions of it starved the mod.
+- `cfc2_pad.on` — the sPad watcher. Inert for the shell (`Kind=0`); kept only
+  for the in-game work ahead.
+- `cfc2_hook.off` — makes the whole mod read-only (kills both hooks).
 
-⚠ Speaking position only ("3 of 6") is the CORRECT behaviour for a screen not
-yet in the table — it is not a bug to chase.
+### To name a screen
+1. Create `cfc2_discover.on`, walk into the screen, move the cursor once.
+2. The log prints `mcspeak: [DISCOVERY]` with candidate bases and the live text
+   each would give for the item you are standing on.
+3. Whichever matches names the screen. Add a row to `g_screens` in
+   `src/menu_speak.c` with `MC_VERIFIED_LIVE_TEXT`.
 
-⛔⛔ Never key a screen on item count. Menus share counts, and the failure mode
-is confident WRONG names, which a blind user cannot catch. Key on the caller.
+⛔⛔ **Never add a row from plausibility.** One was added from item count alone
+and made a different 6-item screen speak the main menu's labels — and by
+matching, it SUPPRESSED that screen's discovery block, hiding the fix. The test
+suite now fails unless every row is `MC_VERIFIED_LIVE_TEXT`.
+
+### Known-unnamed callers (from real runs)
+`0x14009ba21` 6 items · `0x1400a1715` 4 · `0x1400b1b69` 3 · `0x140079833` 7 ·
+`0x140099b23` 2 · `0x140079739` 40 (character select, horizontal — ⚠ no HELP_
+run, so the candidate sweep will not find it; needs a different approach).
 
 ## (previous) the node → text join
 
