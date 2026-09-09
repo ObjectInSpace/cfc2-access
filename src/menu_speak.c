@@ -647,16 +647,36 @@ void menu_speak_log_unknown(const mc_move *m)
      *
      * ⚠ Bounded: MAX_REPORTS sightings per caller, so a screen the user
      * lingers on cannot flood the log. After that it goes quiet for good. */
-    enum { MAX_REPORTS = 4 };
+    /* ⭐⭐ THROTTLE ON NEW POSITIONS, NOT ON SIGHTINGS.
+     *
+     * ⛔ The bug this replaces: the cap counted REPORTS, so a screen the user
+     * moved around on spent its budget re-reporting positions already seen.
+     * The 13:09 run visited positions 4 AND 5 of 0x14009ba21 and only 4 was
+     * ever swept -- the second reading, the one that would have discriminated,
+     * was thrown away.
+     *
+     * ⭐ And the data was never missing: every `mc:` line already records the
+     * exact index and count of every movement. The mod knew each position; it
+     * just declined to look anything up for them. The user pointed this out.
+     *
+     * So the budget is now spent only on positions NOT yet seen for this
+     * screen, which is exactly the information that narrows the candidates. */
+    enum { MAX_REPORTS = 8 };
     static int reports[MAX_SEEN];
+    static unsigned seen_pos[MAX_SEEN];   /* bitmask of positions swept */
     BOOL first = TRUE;
 
     for (int i = 0; i < nseen; i++) {
         if (seen[i] == m->caller) {
+            int off0 = m->new_index - m->min_index;
+            unsigned bit = (off0 >= 0 && off0 < 32) ? (1u << off0) : 0u;
+            /* ⭐ Nothing new to learn from a position already swept. */
+            if (bit && (seen_pos[i] & bit))
+                return;
             if (reports[i] >= MAX_REPORTS)
                 return;
             reports[i]++;
-            /* Report this position too, without repeating the header. */
+            seen_pos[i] |= bit;
             first = FALSE;
             goto sweep;
         }
@@ -672,6 +692,10 @@ void menu_speak_log_unknown(const mc_move *m)
         return;
     }
     reports[nseen] = 1;
+    {
+        int off0 = m->new_index - m->min_index;
+        seen_pos[nseen] = (off0 >= 0 && off0 < 32) ? (1u << off0) : 0u;
+    }
     seen[nseen++] = m->caller;
 
 sweep:
