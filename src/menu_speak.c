@@ -476,11 +476,17 @@ void menu_speak(const mc_move *m)
                            rom_table_code(i0, c0, sizeof(c0)); }
             if (i1 >= 0) { rom_table_title(i1, t1, sizeof(t1));
                            rom_table_code(i1, c1, sizeof(c1)); }
-            log_line("mcspeak: [ROMPROBE] game slot %d of %d -- IF the mapping "
-                     "rom=2*game+version holds, this is \"%s\" [%s] / \"%s\" "
-                     "[%s]. ⚠ NOT SPOKEN: compare against the game actually on "
-                     "screen before trusting it.",
-                     sp.position, sp.total, t0, c0, t1, c1);
+            /* ⚠ Print the RAW index alongside the 1-based position. The first
+             * version printed only the position while deriving the title from
+             * the index, so the line read "slot 3 -> Capcom Fighting Jam" when
+             * it meant index 2 -- self-consistent but impossible to check
+             * against without recomputing the off-by-one by hand. A probe whose
+             * output has to be decoded is a probe that will be misread. */
+            log_line("mcspeak: [ROMPROBE] cursor index %d (position %d of %d) "
+                     "-- IF the mapping rom=2*game+version holds, this is "
+                     "\"%s\" [%s] / \"%s\" [%s]. ⚠ NOT SPOKEN: compare "
+                     "against the game actually on screen before trusting it.",
+                     game, sp.position, sp.total, t0, c0, t1, c1);
         }
     }
 
