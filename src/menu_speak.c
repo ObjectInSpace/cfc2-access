@@ -170,6 +170,28 @@ void menu_speak(const mc_move *m)
 }
 
 
+/* Is discovery turned on? Create `cfc2_discover.on` next to the exe.
+ *
+ * \u26d4 OFF BY DEFAULT because discovery is a debug aid that runs on the poll
+ * thread, and three versions of it have starved the mod during real play. A
+ * diagnostic must not be able to degrade the thing it diagnoses in an ordinary
+ * session. */
+static BOOL opt_discovery_enabled(void)
+{
+    static int cached = -1;
+    if (cached >= 0)
+        return cached != 0;
+    char path[MAX_PATH];
+    DWORD n = GetModuleFileNameA(NULL, path, MAX_PATH);
+    if (n == 0 || n >= MAX_PATH) { cached = 0; return FALSE; }
+    char *slash = strrchr(path, '\\');
+    if (!slash) { cached = 0; return FALSE; }
+    slash[1] = '\0';
+    strncat(path, "cfc2_discover.on", MAX_PATH - strlen(path) - 1);
+    cached = (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES);
+    return cached != 0;
+}
+
 void menu_speak_log_unknown(const mc_move *m)
 {
     /* ⭐ DISCOVERY MODE. Print exactly what a new table row needs, so the next
@@ -229,47 +251,44 @@ void menu_speak_log_unknown(const mc_move *m)
      * ⚠ Logged only, NEVER spoken: a candidate is a hypothesis, and speaking
      * one would be exactly the confident-wrong-name failure this file exists to
      * prevent. */
-    /* ⭐⭐ AN EXHAUSTIVE SWEEP OVER WHOLE RUNS, not a list of guesses.
+    /* \u2b50\u2b50 DISCOVERY RUNS ONCE PER SCREEN, OFF THE POLL PATH, AND CHEAPLY.
      *
-     * The first version consulted a hand-maintained list of candidate bases, so
-     * a screen whose labels I had not anticipated produced NO candidates at all
-     * -- which is exactly what happened to the 4-item and 3-item screens.
+     * Three versions of this have now cost the user runs, and the lesson is the
+     * same each time: this is a DEBUG AID, and it was starving the thing it was
+     * meant to help.
      *
-     * The second version swept every base but tested only the ONE item the user
-     * was standing on: 3144 matches, hitting the display cap in the first 40
-     * indices and never reaching the answer. Useless.
+     *   v1  a hand-written list of candidate bases -- missed any screen whose
+     *       labels I had not anticipated.
+     *   v2  swept every base testing ONE item -- 3144 matches, useless.
+     *   v3  swept every base testing the WHOLE RUN -- better candidates, but it
+     *       scanned ~1100 bases x 5 lookups and took 4.8 SECONDS on the poll
+     *       thread while the user was still navigating. And the 40 results it
+     *       printed included "\u2605" and "Stun:", so the cost bought very little.
      *
-     * ⭐ What narrows it is testing the WHOLE RUN plus what follows it. A menu
-     * is `count` consecutive SHORT, non-sentence strings, and in this message
-     * file a menu's items are followed by their HELP_ blurbs -- which are
-     * sentences. The mod cannot see label NAMES (the live table holds only
-     * strings), but "the next entry is a sentence" is a good proxy: measured
-     * over the corpus, 72%% of HELP_ entries end in sentence punctuation
-     * against 13%% of everything else.
+     * \u26d4 The real problem with v3 was never the per-lookup cost -- it was doing
+     * the work AT ALL on the thread that has to stay responsive. So:
+     *   - it is gated behind cfc2_discover.on, absent by default, so an ordinary
+     *     session never pays for it;
+     *   - it stops at 8 candidates rather than 40, because a list needing to be
+     *     read by a person is useless past a handful;
+     *   - and it is capped at 600 bases, which covers every menu label in this
+     *     game (the highest real menu run is ~590) without sweeping stats and
+     *     move-list text that can never be a menu.
      *
-     * Measured result: 3144 -> 46 candidates for a 4-item screen, 71 for a
-     * 3-item one. Small enough to read, and the answer is IN the list rather
-     * than dependent on what I thought to include.
-     *
-     * ⚠ Logged only, NEVER spoken. Naming a screen from a plausible-looking
-     * candidate is exactly the mistake that made a different 6-item screen
-     * speak the main menu's labels. */
-    if (gmd_text_count() > 0) {
+     * \u26a0 Everything here is LOGGED, NEVER SPOKEN. A candidate is a hypothesis. */
+    if (gmd_text_count() > 0 && opt_discovery_enabled()) {
         int off = m->new_index - m->min_index;
         int total = gmd_text_count();
+        if (total > 600)
+            total = 600;
         int shown = 0;
-        char batch[1024];
+        char batch[512];
         size_t used = 0;
         batch[0] = '\0';
-        log_line("mcspeak: [DISCOVERY]   you are on position %d of %d. Runs of "
-                 "%d items followed by help text (base -> your item):",
-                 off + 1, count, count);
 
-        for (int base = 0; base + count < total && shown < 40; base++) {
+        for (int base = 0; base + count < total && shown < 8; base++) {
             char cur[128];
             int ok = 1;
-
-            /* every item in the run must look like a menu label */
             for (int i = 0; i < count && ok; i++) {
                 if (!gmd_text_by_index(base + i, cur, sizeof(cur)) || !cur[0]) {
                     ok = 0; break;
@@ -281,27 +300,13 @@ void menu_speak_log_unknown(const mc_move *m)
             }
             if (!ok)
                 continue;
-
-            /* and the entry just past the run must be a sentence -- the HELP_
-             * blurb that follows a real menu */
             if (!gmd_text_by_index(base + count, cur, sizeof(cur)) || !cur[0])
                 continue;
             size_t L = strlen(cur);
             if (cur[L - 1] != '.' && cur[L - 1] != '?' && cur[L - 1] != '!')
                 continue;
-
             if (!gmd_text_by_index(base + off, cur, sizeof(cur)))
                 continue;
-            /* ⛔⛔ BATCHED INTO ONE LINE, NOT ONE LINE PER CANDIDATE.
-             *
-             * log_line() opens, writes and closes the file every call -- which
-             * is deliberate (a crash never loses the log) and perfectly fine at
-             * normal rates. It is ruinous in a burst: ~40 candidate lines took
-             * TWELVE SECONDS in-game, and the mod visibly stopped keeping up
-             * while the user was still navigating.
-             *
-             * The sweep itself is ~19 ms. The cost was entirely the logging, so
-             * the fix belongs here rather than in the logging guarantee. */
             int k = _snprintf(batch + used, sizeof(batch) - used,
                               "%s%d:%s", used ? "  " : "", base, cur);
             if (k > 0 && (size_t)k < sizeof(batch) - used)
@@ -309,12 +314,11 @@ void menu_speak_log_unknown(const mc_move *m)
             shown++;
         }
         if (used)
-            log_line("mcspeak: [DISCOVERY]     %s", batch);
-        if (!shown)
-            log_line("mcspeak: [DISCOVERY]     (none -- this screen's labels "
-                     "may not follow the usual item+help layout)");
-        log_line("mcspeak: [DISCOVERY]   whichever line matches the item you "
-                 "just landed on names this screen.");
+            log_line("mcspeak: [DISCOVERY]   position %d of %d; candidate "
+                     "bases: %s", off + 1, count, batch);
+        else
+            log_line("mcspeak: [DISCOVERY]   position %d of %d; no candidate "
+                     "run found in the first %d labels.", off + 1, count, total);
     }
 
     log_line("mcspeak: [DISCOVERY]   -> to name it, add "
