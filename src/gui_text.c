@@ -435,7 +435,7 @@ BOOL gt_poll_and_log(void)
 
 /* --- install -------------------------------------------------------------
  *
- * The expected first bytes of 0x1402f9720:
+ * The expected first bytes of 0x1402f8900:
  *     mov [rsp+8], rbx   = 48 89 5c 24 08
  * FIVE bytes, one whole instruction, so MinHook's patch ends on a clean
  * boundary. ⭐ And find_callers.py --jmp found zero branches into
@@ -485,11 +485,15 @@ static BOOL check_target(void)
      * own vtable really does hold this address in the expected slot. If the
      * build moved, we would otherwise hook something and attribute its
      * instances to the wrong class. */
+    /* ⚠ The target sits in the SECOND vtable (0x141056480), not the primary
+     * one -- see the note in the header. Checking it against the primary was
+     * the bug this line existed to prevent, pointed at the wrong table. */
     ULONGLONG slot = 0;
     const void *sp = (const void *)(ULONG_PTR)
-                     (GT_VTABLE_ADDR + GT_VTABLE_SLOT * 8);
+                     (GT_VTABLE2_ADDR + GT_VTABLE_SLOT * 8);  /* ⛔ see header */
     if (!mem_copy(&slot, sp, sizeof(slot)) || slot != GT_UPDATE_ADDR) {
-        log_line("gt: cGUIObjText's vtable slot %d holds 0x%llx, not the "
+        log_line("gt: cGUIObjText's SECOND vtable slot %d holds 0x%llx, not "
+                 "the "
                  "expected 0x%llx -- the class layout does not match the "
                  "offline model. REFUSING.",
                  GT_VTABLE_SLOT, slot, GT_UPDATE_ADDR);

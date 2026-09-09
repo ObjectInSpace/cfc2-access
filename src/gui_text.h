@@ -184,8 +184,38 @@
  * was that it also receives other classes' objects. So we keep the hook and
  * DISCRIMINATE ON THE OBJECT: the vptr filter below. Run 1 already proved the
  * filter works -- it rejected every OutlineFont it was handed. */
-#define GT_UPDATE_ADDR   0x1402f9720ULL   /* vtable slot 5 -- shared helper   */
-#define GT_VTABLE_SLOT   5                /* which slot must hold that value  */
+/* ⛔ NO TARGET IS CURRENTLY CORRECT. Four runs have ruled out every candidate
+ * this vtable offers; see the log above. The address below is the last one
+ * tried and is LEFT ONLY so the module still compiles and its guards still
+ * refuse loudly -- it is NOT a believed answer. */
+#define GT_UPDATE_ADDR   0x1402f8900ULL   /* ⛔ ruled out by run 4            */
+#define GT_VTABLE_SLOT   3
+
+/* ⛔⛔ THE "SECOND VTABLE" READING WAS WRONG -- corrected before believing it.
+ *
+ * The class names in this image are a packed STRING POOL with vtables
+ * interleaved, and I read the qwords after cGUIObjText's vtable as a SECOND
+ * vtable for the same class, because the factory at 0x1402efa10 stores
+ * 0x141056480 into what it builds. Run 4 hooked its slot 3 on that basis and
+ * caught an OutlineFont again.
+ *
+ * ⭐ The check that settles it, and that I should have run FIRST: search every
+ * data section for each vtable address. A vtable is REGISTERED in a DTI record;
+ * that is how this engine finds it.
+ *     0x1410563a8 -> referenced once, from DTI slot 0x1422cae28   (cGUIObjText)
+ *     0x141056480 -> referenced NOWHERE
+ * An unregistered address adjacent to a known vtable is not "the same class's
+ * second vtable". It is a different class's table that happens to sit next to
+ * it in a pool. Adjacency in a string pool is not class membership.
+ *
+ * ⚠ This is the same mistake as run 1, one level up: there I asked "is the
+ * address unique?" instead of "is it reached only through this class"; here I
+ * asked "is it adjacent?" instead of "is it registered?". Both times the
+ * cheaper, more specific question was available and I did not ask it.
+ *
+ * ⭐ GT_VTABLE2_ADDR is kept ONLY so the filter can be told about a vptr that
+ * is NOT ours, and it is deliberately no longer accepted as ours. */
+#define GT_VTABLE2_ADDR  0x141056480ULL
 #define GT_CLASS_SIZE    0x210            /* 528 bytes, from the reg stub     */
 
 /* The two candidate pointer fields the offline accessors revealed. Checked
