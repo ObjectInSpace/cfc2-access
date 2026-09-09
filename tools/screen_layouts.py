@@ -28,6 +28,18 @@ through a vtable. This is a strong signal where it fires, not a complete map --
 and a screen it cannot place is not thereby unidentifiable, just not
 identifiable this way.
 
+⛔⛔ A WIDENING THAT WAS TRIED AND REJECTED -- do not repeat it.
+24 of the 37 screen functions appear in a vtable, so it looked possible to
+place the other 61 sites by scanning a function's vtable NEIGHBOURS for one
+that loads a layout. It "placed" 13 more functions -- and it FAILED ITS
+CONTROLS: the Options screen (0x1400a2050, known from live text) came out as
+`12_mainMenu/main_menu_2`, and the Gallery as `13_gameSelect/game_select_3`.
+The +-24 slot window walks off the end of one vtable into the next, so the
+neighbour it finds belongs to a different class.
+
+⭐ It produced thirteen confident, plausible, WRONG answers, and only the
+controls caught it. That is the whole reason the controls are in this file.
+
 Usage:
     python tools/screen_layouts.py
 """
