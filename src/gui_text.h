@@ -13,162 +13,66 @@
  * carry them in its code. So "read the label id out of the screen's
  * instructions" is closed for the whole family, not merely hard.
  *
- * WHAT WAS FOUND OFFLINE
- * ----------------------
- *   - cGUIObjText: name string 0x141056398 (inline ASCII, a positive ID),
- *     vtable immediately after it at 0x1410563a8, class size 0x210 (528)
- *     bytes from its registration stub (mov r9d,0x210 at 0x14002e823).
- *   - Base-class layout, from the ctor 0x1402f0080 and dtor 0x1402f0980:
- *     +0x00 vptr, +0x54 flags, +0x58 float, +0x60 bitfields, and
- *     ⭐ +0x70 = FIRST CHILD, +0x78 = NEXT SIBLING -- GUI objects form a tree.
- *   - ⭐ Two one-line accessors near the class's own code return POINTERS from
- *     [this+0x1f8] (0x1402fc410) and [this+0x200] (0x1402fc400). Both are
- *     inside the 0x210-byte object and both are the right SHAPE for a text
- *     buffer or a string object. They are the first thing this module looks at
- *     -- but they are candidates, not the answer. Only live bytes decide.
+ * ⭐⭐ THE CLASS IS REAL AND HEAVILY USED -- settled live, 2026-09-09 17:19.
+ * The constructor probe counted **36 cGUIObjText constructed** during ordinary
+ * menu navigation. So the route is OPEN; the earlier four negatives were all
+ * my own targeting errors, not the game withholding anything.
  *
- * ⛔ THE STATIC ROUTE IS CLOSED -- chased to the end, twice
- * The vtable has exactly ONE data reference (the DTI slot 0x1422cae28), and the
- * only code that touches that slot is four one-line getDTI() accessors. There
- * is no constructor to read and the DTI carries no property table. The single
- * "lea rax,[vtable]" site in the whole image (0x14002e786) is the REGISTRATION
- * block, not a ctor. Nothing static reaches an instance.
+ * WHAT THE FIVE RUNS COST, AND THE ONE RULE THAT WOULD HAVE SAVED THEM ALL
+ * -----------------------------------------------------------------------
+ * Each failure was a DERIVED value that a MEASURED one later contradicted:
  *
- * ⭐ This is the third time on this project (sPad, sKeyboard, now this): the
- * engine walks its metadata at runtime, so a class layout has to come from a
- * LIVE object. Stop looking for it in the image.
+ *  1. Hooked a "unique" vtable slot -> got an nGUI::OutlineFont. The address
+ *     was unique to the vtable but ALSO reachable by direct call, so its
+ *     callers passed their own `this`. Uniqueness is not reachability.
+ *  2. Hooked a slot that was unique AND callerless -> got the DTI descriptor.
+ *     It was the class FACTORY. Neither test asks WHAT KIND of method it is.
+ *  3. Filtered a shared helper by vptr -> 10 calls, 0 ours, frozen at 10
+ *     forever. It was not a per-frame method at all; "update method" was a
+ *     guess from the slot's position.
+ *  4. Read the vtable as the qwords after the class NAME -> wrong class. The
+ *     names are a packed pool with vtables interleaved, and the DTI record's
+ *     +0x08 name belongs to its NEIGHBOUR, so everything was off by one
+ *     record: 0x1410563a8 is cGUIObjRoot's, not ours.
+ *  5. Read the instance vtable from the factory's `lea` -> 0x141056c50, which
+ *     is cGUIObjMessage's. Live objects carry 0x141056b40, stamped by the ctor
+ *     itself at 0x1402efc29.
  *
- * WHY *THIS* HOOK TARGET -- and ⛔⛔ THE TEST THAT WAS NOT ENOUGH
- * -------------------------------------------------------------
- * Vtable slot 1 -> 0x1402efa10. THREE properties, and the third is the one
- * this module learned the hard way IN A LIVE RUN:
+ * ⭐⭐ THE RULE: when a derived value and a measured one disagree, the
+ * MEASUREMENT is the fact. Four separate disassembly readings each looked
+ * sound and each was wrong; four live objects agreeing settled it in one run.
+ * Prefer a probe that MEASURES (the ctor count, the observed vptr) over a
+ * chain of inference, even when the inference reads cleanly.
  *
- *  1. It appears in exactly ONE 8-aligned data slot in the whole image --
- *     cGUIObjText's vtable.
- *  2. ⭐⭐ IT HAS ZERO DIRECT CALLERS. Nothing does "call 0x1402efa10", so the
- *     vtable is the ONLY way to reach it, and every "this" it receives really
- *     is a cGUIObjText.
- *  3. Prologue "push rbx; sub rsp,0x20" = 40 53 48 83 ec 20, SIX bytes across
- *     two whole instructions, clearing MinHook's five-byte minimum on a clean
- *     boundary; and find_callers.py --jmp finds zero branches into addr+1..+4.
+ * ⭐ And the guards are what kept five wrong targets from becoming five wrong
+ * FINDINGS: the vptr check refused to dump a foreign object, and `ctor_hooked`
+ * kept "could not measure" from printing as "measured zero".
  *
- * ⛔⛔ PROPERTY 2 IS THE WHOLE LESSON, AND IT COST A GAME LAUNCH.
- * The first shipped target was slot 5, 0x1402f9720. It PASSED property 1 --
- * genuinely unique, genuinely in this class's vtable at +0x28 -- and it was
- * still WRONG. The live run captured an object whose vptr was 0x141101b78:
- * nGUI::OutlineFont, a font object, full of Adobe glyph names ("notequal",
- * "summation", "uniFE82"). Because 0x1402f9720 is a SHARED HELPER that three
- * sites also reach by a direct "call rel32" (0x1402f63d9, 0x1402f6e65,
- * 0x1402f892a), and those callers pass their OWN this.
+ * WHAT IS ESTABLISHED
+ * -------------------
+ *   - cGUIObjText: DTI record 0x1422cb058, class size 0x210 (528) bytes --
+ *     confirmed twice, by the registration stub and by its factory's own
+ *     allocation.
+ *   - Factory 0x1402ef980 -> ctor 0x1402efc10 (exactly ONE caller, which is
+ *     what makes the ctor a complete census of the class).
+ *   - ⭐ The ctor zeroes [this+0x1f8] and [this+0x200] -- the two offsets the
+ *     offline accessors (0x1402fc410, 0x1402fc400) pointed at. They are this
+ *     class's own fields, not a guess.
+ *   - Base layout, from 0x1402f0080/0x1402f0980: +0x00 vptr, +0x54 flags,
+ *     +0x58 float, +0x60 bitfields, +0x70 first child, +0x78 next sibling.
  *
- * ⭐ So the question "is this address unique to the class?" is the WRONG
- * question. The right one is "is this address REACHED ONLY through the class's
- * vtable?" -- which needs the caller count, not just the vtable count. A vtable
- * slot may hold code shared with anything.
+ * ▶ THE REMAINING QUESTION is only WHICH offset holds the string, and the
+ * timing trap around it: see hook_ctor() and gt_poll_and_log() in the .c. An
+ * object is EMPTY when its ctor returns, so it must be re-read later.
  *
- * ⭐⭐ Only FOUR of cGUIObjText's 28 slots satisfy both (1 vtable, 0 callers):
- * 1, 2, 6 and 27. Slot 2 is the destructor and 27 a deleting destructor -- the
- * text is being torn down there, which is the wrong moment to read it. Slot 6
- * is a one-line "lea rax; ret" getDTI() stub, too short to patch. Slot 1 is
- * the only real function among them, which is why it is the target.
- *
- * ⭐ AND THE GUARD DID ITS JOB. The run did not report glyph names as menu
- * labels: the vptr check in gt_poll_and_log() compared the live vptr against
- * this class's and said loudly that every offset below it was unattributed.
- * A positive identity check on the object, not merely on the code address, is
- * what turned a wrong target into a diagnosis instead of a false finding.
- *
- * ⛔⛔ AND SLOT 1 IS *ALSO* WRONG -- second live run, 2026-09-09.
- * It passes both properties above and it is STILL not the target, for a third
- * reason neither test asks about: WHAT KIND of method it is.
- *
- * Slot 1 is the class FACTORY. Read its body (0x1402efa10): it allocates 0xe0
- * bytes via a virtual call, runs the base ctor 0x1402f0080, stores a vtable at
- * [obj+0], zeroes +0xa0..+0xd8 and RETURNS THE NEW OBJECT in rax. So it is
- * called ON THE CLASS DESCRIPTOR, not on an element -- and the run showed
- * exactly that: ONE distinct "instance" for 61 calls, 0x1422cae28, which is
- * cGUIObjText's DTI slot. Its "text" fields were the GUI class NAMES
- * ("cGUIObjRoot", "cGUIObjPolygon"): the descriptor table, not a label.
- *
- * ⚠ Note the vptr check PASSED here -- the descriptor legitimately carries the
- * class's vtable. So a matching vptr proves the class, NOT that the pointer is
- * an instance. Both runs were caught, but by different means: run 1 by the
- * vptr, run 2 only by noticing ONE distinct pointer across 61 calls.
- *
- * ⭐⭐ THE THREE QUESTIONS, now complete, in the order they must be asked:
- *   1. Is the address in exactly one vtable?      (slot 5 passed, was wrong)
- *   2. Does it have zero direct callers?          (slot 1 passed, was wrong)
- *   3. Is it an INSTANCE method -- does it run per-element, per-frame, on
- *      objects the game has already built?        <- the one that decides it
- * A constructor, a destructor and a factory all satisfy 1 and 2 and none of
- * them hands over a live, populated text element.
- *
- * ▶ WHAT IS LEFT. Of the four slots satisfying (1) and (2) -- 1, 2, 6, 27 --
- * slot 1 is the factory, 2 and 27 are destructors (the text is being torn
- * down) and 6 is a one-line getDTI() stub. ⛔ SO NO SLOT OF THIS VTABLE IS
- * BOTH SAFELY UNIQUE AND AN INSTANCE METHOD. The per-frame methods are the
- * shared helpers, and they are shared precisely because they are generic.
- *
- * ⭐ The way forward looked like: keep a shared helper as the hook (they DO
- * run per element per frame) and discriminate on the OBJECT by vptr.
- *
- * ⛔⛔ RUN 3 KILLED THAT TOO, AND THE NUMBER IS THE POINT.
- * Slot 5 with the vptr filter: **10 calls, 0 of them cGUIObjText**, and the
- * count STAYED at exactly 10 across a further 55 seconds of the game running.
- * So 0x1402f9720 is not a per-frame method at all -- it runs ~10 times during
- * startup, on other classes, and never again. The assumption that it was "the
- * update method" was never checked; it came from the slot's position, and the
- * slot's position was a guess.
- *
- * ⭐ The filter itself is PROVEN GOOD by that same run: 10 calls in, 10
- * correctly classified as other classes, 0 faults, 0 wrong-class leaks. Keep
- * it. It is the mechanism that turns any future shared-helper hook into a
- * usable one, and it is now tested both offline (case 2b) and live.
- *
- * ▶ WHAT THE THREE RUNS ACTUALLY ESTABLISH, so the next attempt starts here:
- *   - The whole vtable is accounted for. Slots 1/2/6/27 are factory,
- *     destructor, getDTI stub, deleting destructor. Slots 0/3/4/7/11/15-18/
- *     20-22/26 are shared across hundreds or thousands of vtables. What is
- *     left -- 8/9/10/12/13/14/19/23/24/25 -- are tiny accessors (`mov eax,
- *     [rcx+0x54]; ret` and the like), too short to patch and carrying no text.
- *   - ⛔ SO cGUIObjText's VTABLE DOES NOT CONTAIN A HOOKABLE PER-FRAME METHOD.
- *     That is a property of the class, not a failure to look hard enough.
- *
- * ⭐⭐ THE NEXT ROUTE, and why it is different in kind: stop trying to catch
- * the object being DRAWN and catch it being FILLED. Something copies a GMD
- * string into an element, and that writer takes the element and the message as
- * ARGUMENTS -- the shape that has worked four times on this project (sPad,
- * sKeyboard, the GMD table, the cursor chokepoint) and that scanning has
- * failed at every time. Idea 2 in cfc2-gui-text-route, never tried:
- * find the call that takes an rGUIMessage and an element.
- *
- * ⚠ And the cheap check to run FIRST, before any of that: cGUIObjMessage
- * (0x170 bytes, vtable/DTI already known) may be the class that actually holds
- * menu label text, with cGUIObjText being the free-text/font-rendering half.
- * Nothing in three runs has yet shown a cGUIObjText carrying a menu label.
- *
- * ⚠⚠ SAFETY -- THIS IS THE RISKIEST THING IN THE PROJECT SO FAR
- * It receives a pointer from the game and reads half a kilobyte through it, on
- * the game's own threads. This project has already KILLED THE GAME once by
- * trusting a caller-supplied pointer (memory: hooked-function-pointers-are-
- * untrusted). So, in order:
- *
- *   - The DETOUR ITSELF DEREFERENCES NOTHING. It records the pointer value and
- *     calls the original. That is all. Recording a value cannot fault.
- *   - ⭐ All reading happens LATER, on our worker thread, so a fault can never
- *     land inside a game call.
- *   - Every read is VirtualQuery-checked and runs under the thread-local fault
- *     guard, every time, never cached -- a GUI object is freed when its screen
- *     changes, and a pointer that passed a check a moment ago is not a pointer
- *     that is still valid.
- *   - The original is called unconditionally and its return value passed
- *     through untouched, so the game's control flow does not depend on us.
- *   - Off switch ships WITH the experiment: cfc2_hook.off disables it along
- *     with every other hook.
- *
- * ⭐ AND IT IS OFF BY DEFAULT, behind cfc2_guitext.on. That gate is for an
- * UNPROVEN read on a per-frame path; it comes off once the field offset is
- * known and the read becomes targeted (memory: a-guard-outlives-its-bug).
+ * ⚠⚠ SAFETY -- this reads half a kilobyte through a game-supplied pointer, on
+ * the game's own threads, and this project has already killed the game once by
+ * trusting such a pointer (memory: hooked-function-pointers-are-untrusted).
+ * The detours DEREFERENCE NOTHING beyond a single guarded vptr read; all wide
+ * reading happens on the worker thread, VirtualQuery-checked and fault-guarded
+ * every time and never cached. Originals are always called and their return
+ * values passed through untouched. Off switch: cfc2_guitext.on to enable,
+ * cfc2_hook.off to disable along with every other hook.
  */
 #ifndef CFC2_GUI_TEXT_H
 #define CFC2_GUI_TEXT_H
@@ -223,9 +127,30 @@
 #define GT_DTI_VTABLE    0x141056350ULL   /* its 2-slot descriptor vtable     */
 #define GT_FACTORY_ADDR  0x1402ef980ULL   /* descriptor slot 1: makes objects */
 
-/* ⭐ What an INSTANCE carries at +0x00. This is the value the vptr filter
- * tests, and the whole point of the correction above. */
-#define GT_VTABLE_ADDR   0x141056c50ULL
+/* ⭐⭐ What an INSTANCE ACTUALLY CARRIES at +0x00 -- MEASURED, not derived.
+ *
+ * ⛔ THE FACTORY'S `lea` IS NOT THE ANSWER. The factory at 0x1402ef980 does
+ * `lea rax,[rip+0xd6728b]` -> 0x141056c50 and stores it to [rbx], and I took
+ * that as the instance vtable. It is the BASE's. The ctor it calls first,
+ * 0x1402efc10, stamps 0x141056b40 at 0x1402efc29 -- and although the ctor runs
+ * BEFORE the factory's store in program order, the value live objects carry is
+ * 0x141056b40, measured identically across four distinct instances in the run
+ * of 2026-09-09 17:19.
+ *
+ * ⭐ So the run settled a question the disassembly had already answered wrongly
+ * twice. When a measured value and a derived one disagree, the measurement is
+ * the fact and the derivation is the hypothesis. 0x141056c50 turns out to be
+ * cGUIObjMessage's vtable (its factory allocates 0x1e0 and stamps it), which is
+ * why it looked plausible: a sibling class of identical shape, 0x110 away.
+ *
+ * ⚠ Do NOT "fix" this back to the factory's lea. Four live objects say
+ * otherwise, and there is a comment here because it looks wrong. */
+#define GT_VTABLE_ADDR   0x141056b40ULL
+
+/* What the FACTORY stamps, kept for the record: cGUIObjMessage's vtable, and
+ * the value four runs of derivation kept producing. Naming it in the log turns
+ * "unknown vptr" into "you are looking at the sibling class". */
+#define GT_VTABLE_BASE   0x141056c50ULL
 
 /* A vptr we have positively identified as NOT ours -- nGUI::OutlineFont, seen
  * in runs 1 and 4. Kept so the log can name it instead of saying "unknown". */
@@ -347,6 +272,12 @@ typedef struct {
      * "measured zero". */
     LONG  ctors;
     BOOL  ctor_hooked;
+
+    /* ⭐ Sweep accounting. `distinct` counts objects READ; `with_text` counts
+     * those that actually held a string. Reporting both is what makes a quiet
+     * log interpretable: "swept 400, 0 with text" is a finding, while a bare
+     * absence of log lines could equally mean the sweep never ran. */
+    LONG  with_text;
 } gt_stats;
 
 void gt_get_stats(gt_stats *out);

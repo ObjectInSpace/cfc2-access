@@ -526,22 +526,26 @@ static DWORD WINAPI worker(LPVOID param)
          * never fires is the single most informative outcome available, and
          * watching only `calls` would leave it unreported. */
         static LONG gt_last_ctors = -1;
+        static LONG gt_last_text = -1;
         BOOL gt_changed = gt_ok && (gs_probe.calls != gt_last_calls ||
-                                    gs_probe.ctors != gt_last_ctors);
+                                    gs_probe.ctors != gt_last_ctors ||
+                                    gs_probe.with_text != gt_last_text);
         if (gt_ok && (gt_changed || beat == 3 || beat == 10 || beat == 30 ||
                       beat % 60 == 0)) {
             gt_stats gs;
             gt_get_stats(&gs);
             gt_last_calls = gs.calls;
             gt_last_ctors = gs.ctors;
-            log_line("gt: %ld cGUIObjText CONSTRUCTED%s; update ran %ld "
-                     "time(s); %ld instance(s) inspected; %ld guarded read(s) "
-                     "faulted; %ld of the WRONG CLASS; %ld ours, %ld other "
-                     "classes.%s%s%s",
+            gt_last_text  = gs.with_text;
+            log_line("gt: %ld cGUIObjText CONSTRUCTED%s; %ld object-read(s) "
+                     "swept, %ld held TEXT; update ran %ld time(s); %ld "
+                     "guarded read(s) faulted; %ld of the WRONG CLASS; %ld "
+                     "ours, %ld other classes.%s%s%s",
                      gs.ctors,
                      gs.ctor_hooked ? "" : " (⚠ CTOR NOT HOOKED -- this zero "
                                            "measures nothing)",
-                     gs.calls, gs.distinct, gs.faults, gs.wrong_class,
+                     gs.distinct, gs.with_text,
+                     gs.calls, gs.faults, gs.wrong_class,
                      gs.ours, gs.other_class,
                      /* ⭐⭐ The decisive reading, stated in the log so it does
                       * not have to be reconstructed later from raw counts. */

@@ -59,6 +59,18 @@ static volatile LONG g_ours;
  * every such hook confounds "wrong method" with "no objects exist". */
 static volatile LONG g_ctors;
 
+/* A ring of recently constructed instances, re-inspected by the worker on
+ * later polls -- see hook_ctor() for why capture-time inspection cannot work.
+ * ⚠ Plain pointers, never owned and never freed by us; every use re-validates. */
+#define GT_RING_SIZE 32
+static void *volatile g_ring[GT_RING_SIZE];
+static volatile LONG  g_ring_next;
+/* Which ring entry the worker sweeps next, and how many objects it has found
+ * carrying text. ⭐ The second is reported: "swept N, found text in M" is
+ * interpretable where a bare "no text" is not. */
+static LONG           g_sweep_at;
+static volatile LONG  g_with_text;
+
 /* The most recently seen instance, published for the worker thread.
  *
  * ⚠ A sequence counter, not a flag: the hook runs on the game's render thread
@@ -193,6 +205,27 @@ static void *hook_ctor(void *self)
     InterlockedIncrement(&g_ctors);
 
     void *r = g_real_ctor(self);
+
+    /* ⭐⭐ REMEMBER IT FOR LATER, don't just publish it once.
+     *
+     * ⛔ THE TIMING TRAP, and the reason the first ctor run found no text: at
+     * ctor exit the object is CONSTRUCTED BUT EMPTY. The ctor itself zeroes
+     * +0x1f8 and +0x200 -- the very fields we are hunting. Inspecting at
+     * capture time is guaranteed to find nothing, and would produce a
+     * confident "no text at any offset" about objects that simply had not been
+     * filled yet.
+     *
+     * So keep a small ring of live instances and let the WORKER re-read them on
+     * later polls, by which time the shell has assigned their labels. The ring
+     * is fixed-size and overwrites oldest-first: bounded work, no allocation,
+     * and nothing to free on the game's thread.
+     *
+     * ⚠ Storing a pointer is not keeping the object alive. A GUI object is
+     * freed on a screen change, so every later read re-validates the pointer
+     * and the vptr -- which is exactly what caught the freed-and-reallocated
+     * object in run 4. */
+    LONG slot = InterlockedIncrement(&g_ring_next) - 1;
+    g_ring[(SIZE_T)slot % GT_RING_SIZE] = self;
 
     InterlockedIncrement(&g_seq);
     g_last_self   = self;
@@ -402,16 +435,30 @@ BOOL gt_poll_and_log(void)
     if (!g_installed)
         return FALSE;
 
-    /* Snapshot the published capture, discarding a torn read. */
-    LONG  s1 = InterlockedCompareExchange(&g_seq, 0, 0);
-    void *self   = g_last_self;
+    /* ⭐⭐ SWEEP THE RING, oldest first -- do not inspect at capture time.
+     *
+     * The object is empty when the ctor returns (it zeroes +0x1f8 and +0x200
+     * itself), so a capture-time read is guaranteed to find nothing and would
+     * report a confident negative about objects that had not been filled yet.
+     * Re-reading a remembered instance on a later poll is the whole fix.
+     *
+     * ⚠ ONE object per poll. The ring holds 32 and the worker runs every
+     * 100 ms; inspecting all of them per poll would put a 32x528-byte guarded
+     * read on a timer for the life of the session, for no extra information.
+     * Bounded work per tick is the same discipline the discovery sweep needed
+     * after it starved the mod three times. */
+    LONG made = InterlockedCompareExchange(&g_ring_next, 0, 0);
+    if (made == 0)
+        return FALSE;                 /* nothing constructed yet */
+
+    LONG have = made < GT_RING_SIZE ? made : GT_RING_SIZE;
+    if (g_sweep_at >= have)
+        g_sweep_at = 0;               /* wrap and re-examine: they get FILLED */
+    void *self   = g_ring[g_sweep_at];
     void *caller = g_last_caller;
-    LONG  s2 = InterlockedCompareExchange(&g_seq, 0, 0);
-    if (s1 != s2 || (s1 & 1))
-        return FALSE;                 /* the hook wrote during our copy */
-    if (s1 == g_taken_seq || !self)
-        return FALSE;                 /* nothing new since last time */
-    g_taken_seq = s1;
+    g_sweep_at++;
+    if (!self)
+        return FALSE;
 
     /* Read the whole object under the guard, ONCE, then work on our copy.
      * ⭐ One guarded block for 528 bytes, not one per field: read_cstr once did
@@ -432,8 +479,6 @@ BOOL gt_poll_and_log(void)
 
     ULONGLONG vptr;
     memcpy(&vptr, obj, 8);
-    log_line("gt: --- cGUIObjText instance %p (called from %p) ---",
-             self, caller);
     /* ⭐ A POSITIVE identity check on the copy, not just a plausible shape.
      * If the vptr is not this class's vtable, the object is not what the hook
      * promised and every offset below would be measured against the wrong
@@ -460,10 +505,30 @@ BOOL gt_poll_and_log(void)
                  GT_VTABLE_ADDR);
         return FALSE;
     }
+    /* ⭐⭐ INSPECT QUIETLY FIRST, then log only if there is something to say.
+     *
+     * ⛔ The ring is re-swept continuously, because an object that is empty now
+     * gets FILLED later -- that is the entire point. So an unconditional dump
+     * would reprint every empty object every 100 ms and bury the one sighting
+     * that matters. Run the inspector silently; log the full detail only when
+     * it actually concludes an offset.
+     *
+     * ⚠ Silence here therefore means "swept, nothing had text yet", which is
+     * NOT the same as "not swept". The counts in mod.c's report carry that
+     * distinction -- swept vs. with-text -- so quiet is never mistaken for
+     * idle. */
+    int off = -1;
+    inspect_body(obj, sizeof(obj), resolve_live, NULL, &off, FALSE);
+    if (off < 0)
+        return FALSE;
+
+    InterlockedIncrement(&g_with_text);
+    log_line("gt: --- cGUIObjText instance %p (ctor caller %p) ---",
+             self, caller);
     log_line("gt: vptr CONFIRMED 0x%llx -- this really is a cGUIObjText.",
              vptr);
 
-    int off = -1;
+    /* Re-run with logging now that we know it is worth reading. */
     inspect_body(obj, sizeof(obj), resolve_live, NULL, &off, TRUE);
 
     LONG faults = InterlockedCompareExchange(&g_faults, 0, 0);
@@ -676,6 +741,7 @@ void gt_get_stats(gt_stats *out)
     out->ours        = InterlockedCompareExchange(&g_ours, 0, 0);
     out->ctors       = InterlockedCompareExchange(&g_ctors, 0, 0);
     out->ctor_hooked = (g_real_ctor != NULL);
+    out->with_text   = InterlockedCompareExchange(&g_with_text, 0, 0);
 }
 
 /* --- test seams ----------------------------------------------------------
@@ -772,7 +838,9 @@ BOOL gt_test_inspect(const void *buf, SIZE_T len, int *text_offset)
 void gt_test_reset(void)
 {
     g_calls = g_distinct = g_faults = g_wrong_class = 0;
-    g_other_class = g_ours = g_ctors = 0;
+    g_other_class = g_ours = g_ctors = g_with_text = 0;
+    g_ring_next = 0; g_sweep_at = 0;
+    for (int i = 0; i < GT_RING_SIZE; i++) g_ring[i] = NULL;
     g_seq = 0; g_taken_seq = 0;
     g_last_self = NULL; g_last_caller = NULL;
 }
