@@ -75,8 +75,15 @@ static mc_move mk(ULONGLONG caller, int newi, int mini, int maxi)
     return m;
 }
 
-/* The main menu's real call site, from the 2026-09-08 run. */
-#define MAIN_CALLER 0x14009ba21ULL
+/* The main menu's call site.
+ *
+ * ⛔ This used to be 0x14009ba21 -- a row added from the first run on the
+ * reasoning that it was the only 6-item vertical screen seen. That guess was
+ * WRONG and had to be retracted: it made a DIFFERENT 6-item screen speak the
+ * main menu's labels. 0x140097a59 is the one established by reading LIVE TEXT
+ * ("Quitter" at position 6 of 6), and it is the one that survived contact with
+ * a real run. */
+#define MAIN_CALLER 0x140097a59ULL
 
 int main(void)
 {
@@ -189,13 +196,18 @@ int main(void)
         const mc_screen *a = menu_speak_row(i);
         if (!a || a->count <= 0 || a->base_index < 0 || !a->name || !a->name[0])
             sane = 0;
+        /* ⭐⭐ Provenance. A row justified by plausibility rather than by a
+         * live-text discovery block shipped once and made a different screen
+         * speak the main menu's labels. Only VERIFIED_LIVE_TEXT may ship. */
+        if (a && a->how != MC_VERIFIED_LIVE_TEXT)
+            sane = 0;
         for (int j = i + 1; j < nrows; j++) {
             const mc_screen *b = menu_speak_row(j);
             if (a && b && a->caller == b->caller)
                 sane = 0;
         }
     }
-    check("9. every shipped row is sane and no caller is duplicated",
+    check("9. every row is verified by live text, sane, and unique",
           sane, "rows=%d", nrows);
 
 

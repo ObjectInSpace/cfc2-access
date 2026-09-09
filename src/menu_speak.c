@@ -25,11 +25,22 @@
  * Then find the label run in msg.arc (tools/dump_menu_eng.py) and add it here.
  */
 static const mc_screen g_screens[] = {
-    /* Main menu. Caller 0x14009ba21 (fn 0x14009b920), confirmed in the
-     * 2026-09-08 run: 6 items, range 0..5, wrapping both ways.
-     * Labels: GMD 37..42 = OFFLINE_PLAY ONLINE_PLAY MUSEUM FIGHTER_AWARD
-     * OPTIONS EXIT ("Offline Play" ... "Quit"). */
-    { 0x14009ba21ULL, 37, 6, "Main menu" },
+    /* ⛔⛔ REMOVED: { 0x14009ba21, 37, 6, "Main menu" }.
+     *
+     * This row was added from the FIRST run, before the discovery mechanism
+     * existed, on the reasoning that it was the only 6-item vertical screen
+     * seen. That was a guess, and it was WRONG -- it made a different 6-item
+     * screen speak the main menu's labels ("Quit, 6 of 6", "Offline Play,
+     * 1 of 6") while the real main menu, 0x140097a59, was in use seconds
+     * earlier in the same run.
+     *
+     * ⭐ Exactly the failure this file's rules exist to prevent, committed by
+     * me in this file. The row that survived scrutiny (0x140097a59) was the one
+     * established by READING LIVE TEXT; the one that had to be retracted was
+     * the one justified by item count and plausibility.
+     *
+     * 0x14009ba21 is now unknown again, so it speaks position only and logs a
+     * discovery block -- which is what will identify it properly. */
 
     /* ⭐ CONFIRMED 2026-09-08 by live text, not by guessing: at this call site
      * the mod read base 37 item 6 as "Quitter" while the user stood on
@@ -40,7 +51,7 @@ static const mc_screen g_screens[] = {
      * 0x14009b920), so these are two distinct screens that present the same six
      * choices. Both legitimately map to base 37; neither is a duplicate to be
      * deleted. */
-    { 0x140097a59ULL, 37, 6, "Main menu" },
+    { 0x140097a59ULL, 37, 6, "Main menu", MC_VERIFIED_LIVE_TEXT },
 
     /* ⭐ Options. CONFIRMED 2026-09-08 by live text: standing on position 5 of
      * 5, base 170 read "Credits" (French "Credits"), which is MENU_OP_CREDITS
@@ -51,7 +62,7 @@ static const mc_screen g_screens[] = {
      * been convincing. The item COUNT settles it: this screen has 5 items, the
      * main menu has 6. That is why the count is stored and checked, not merely
      * recorded. */
-    { 0x1400a20fcULL, 170, 5, "Options" },
+    { 0x1400a20fcULL, 170, 5, "Options", MC_VERIFIED_LIVE_TEXT },
 };
 
 #define NSCREENS (int)(sizeof(g_screens) / sizeof(g_screens[0]))

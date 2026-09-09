@@ -32,11 +32,27 @@
 #include "menu_cursor.h"
 
 /* One known screen: which call site, and where its labels start. */
+/* ⛔⛔ EVERY ROW MUST RECORD HOW IT WAS ESTABLISHED, and only one answer is
+ * acceptable in a shipped row.
+ *
+ * A row added on plausibility -- "the only 6-item vertical screen we have seen"
+ * -- shipped, and made a DIFFERENT 6-item screen speak the main menu's labels.
+ * It also SUPPRESSED that screen's discovery block, so the evidence that would
+ * have identified it never appeared. A wrong row is worse than a missing one
+ * twice over: it lies, and it hides the fix.
+ *
+ * The rule: a row exists only if a live-text discovery block showed the item
+ * the user was standing on. VERIFIED_LIVE_TEXT is the only value that ships. */
+typedef enum {
+    MC_VERIFIED_LIVE_TEXT = 1,  /* a discovery block matched the real item */
+} mc_verified;
+
 typedef struct {
     ULONGLONG caller;      /* the cursor-helper call site inside this screen */
     int       base_index;  /* GMD index of item 0 */
     int       count;       /* items expected; a mismatch DISABLES the entry */
     const char *name;      /* screen name, for the log and for context speech */
+    mc_verified how;       /* how this row was established -- see above */
 } mc_screen;
 
 /* What a movement should say. */
