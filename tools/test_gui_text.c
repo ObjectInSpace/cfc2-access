@@ -290,6 +290,56 @@ int main(void)
               gt_test_last_captured() == (void *)raw && st.ctors == 1, d);
     }
 
+    /* --- case 9d: ⭐⭐⭐ THE TEXT SETTER CAPTURES THE STRING ----------------
+     * The product case. setText receives the label as an ARGUMENT, so this is
+     * the whole mechanism the module now rests on: our object in, string out.
+     *
+     * ⚠ Asserted through what the detour PUBLISHED, not by re-reading the
+     * argument -- a test that re-derives the answer from its own input would
+     * pass with the capture deleted. */
+    {
+        gt_test_reset();
+        static ULONGLONG obj[4];
+        obj[0] = GT_VTABLE_ADDR;
+        char got[64] = { 1 };
+        void *r = gt_test_settext_body(obj, "PLAYER SELECT", got, sizeof got);
+        gt_stats st;
+        gt_get_stats(&st);
+        char d[192];
+        snprintf(d, sizeof d, "ret=%p captured=\"%s\" calls=%ld with_text=%ld",
+                 r, got, st.settext_calls, st.with_text);
+        check("case 9d: the text setter captures the string it is handed",
+              r == (void *)(ULONG_PTR)0xFEEDFACE00112233ULL &&
+              strcmp(got, "PLAYER SELECT") == 0 &&
+              st.settext_calls == 1 && st.with_text == 1, d);
+    }
+
+    /* --- case 9e: ⛔ AND IGNORES ANOTHER CLASS'S CALL ---------------------
+     * Slot 26 is SHARED: at least one caller (0x1400f93ca) passes a 32-bit
+     * value in edx, not a char*. Dereferencing that as a string would read an
+     * integer as a pointer. The vptr filter is the only thing preventing it,
+     * so it is asserted directly.
+     *
+     * ⚠ The string here is deliberately valid -- the object is what must be
+     * rejected. A filter keyed on the string instead of the object would pass
+     * this and still be wrong in the game. */
+    {
+        gt_test_reset();
+        static ULONGLONG other[4];
+        other[0] = 0x141101b78ULL;      /* nGUI::OutlineFont */
+        char got[64] = { 0 };
+        gt_test_settext_body(other, "SHOULD NOT BE CAPTURED", got, sizeof got);
+        gt_stats st;
+        gt_get_stats(&st);
+        char d[192];
+        snprintf(d, sizeof d, "captured=\"%s\" (wanted empty) calls=%ld "
+                 "with_text=%ld other_class=%ld", got, st.settext_calls,
+                 st.with_text, st.other_class);
+        check("case 9e: a foreign object's setText is counted but NOT captured",
+              got[0] == '\0' && st.settext_calls == 1 && st.with_text == 0 &&
+              st.other_class == 1, d);
+    }
+
     /* --- case 9c: ⛔⛔ THE TWO PROLOGUE CONSTANTS ARE NOT THE SAME ---------
      * A run was spent on this. The ctor check reused the update method's
      * prologue constant, and the two differ in ONE byte -- both are
@@ -385,6 +435,10 @@ int main(void)
  *   filtering the CTOR detour on vptr too        -> ONLY case 9b fails
  *   ctor count never incremented                 -> ONLY case 9b fails
  *   ctor reuses the update method's prologue     -> ONLY case 9c fails
+ *   setter never copies the string               -> ONLY case 9d fails
+ *   vptr filter removed from the setter          -> ONLY case 9e fails
+ *                                                   (in-game this would read
+ *                                                    an integer as a char*)
  *                                                   (the real bug, replayed)
  *
  * ⭐⭐ THE ONE WORTH READING TWICE is the install guard. With it deleted,

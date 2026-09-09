@@ -168,6 +168,43 @@
  *   - prologue `push rbx; sub rsp,0x30` = 40 53 48 83 ec 30, six bytes over
  *     two whole instructions; find_callers.py --jmp finds no branch into
  *     addr+1..+4. */
+/* ⭐⭐⭐ THE ANSWER, FOUND OFFLINE: THE TEXT SETTER. slot 26 -> 0x1402f0b50.
+ *
+ * Six runs were spent asking "which method hands me a populated object?" That
+ * was the wrong question. The right one -- and the shape that has worked 4/4 on
+ * this project -- is "who RECEIVES the text as an ARGUMENT?"
+ *
+ * The chain, read entirely from the dump:
+ *   - The factory zeroes [obj+0x1f8] and [obj+0x200] (0x1402ef9e1/9e8), which
+ *     is why those two offsets looked like the text fields.
+ *   - ⛔ They are NOT a string. 0x1402f0d03/0d0a write BOTH from the SAME
+ *     value, copied out of [rbx+0xd0] -- a begin/end pointer pair over a
+ *     buffer that +0xd0 owns. And 0x1402f1159 sets +0x1f8 from
+ *     [manager+0x3118] behind a dirty-flag at +0x1e4: that is FONT assignment.
+ *     Reading +0x1f8 as the label would have reported a font object.
+ *   - +0xd0 is filled at 0x1402f0bca, inside 0x1402f0b50, from the result of
+ *     two calls (0x14022af10, 0x14022b550) that take the caller's `rdx`.
+ *
+ * ⭐ So 0x1402f0b50 is setText(cGUIObjText *this [rcx], const char *s [rdx],
+ * ...). It passes all three questions AND the one that matters:
+ *   1. unique -- exactly one 8-aligned data slot in the image (0x141056c10);
+ *   2. zero direct callers -- reachable only through the vtable;
+ *   3. ⭐ it is an INSTANCE method that receives the TEXT ITSELF, so there is
+ *      no waiting for an object to be filled and no timing trap at all.
+ * Prologue `mov [rsp+8],rbx` = 48 89 5c 24 08, five bytes, one instruction, no
+ * branch-ins into addr+1..+4.
+ *
+ * ⭐ `rdx` is a plain char*, established not assumed: the builder walks it a
+ * BYTE at a time (`cmp byte ptr [rdx],0xa`, `cmp byte ptr [rdx+1],0x3b` at
+ * 0x14022b71b/776), so it is 8-bit -- UTF-8 from the GMD, not UTF-16.
+ *
+ * ⚠ Slot 26 is overloaded across classes: one caller (0x1400f93ca) passes a
+ * 32-bit value in edx, so it is NOT a char* for every class that shares this
+ * slot. The vptr filter is what makes reading rdx safe, and it is why that
+ * filter is kept even though this target is far better than the last five. */
+#define GT_SETTEXT_ADDR  0x1402f0b50ULL
+#define GT_SETTEXT_SLOT  26
+
 /* ⚠ Slot 13 of the REAL instance vtable (0x141056b40). The old value
  * 0x1402fd6d0 was slot 13 of 0x141056c50 -- cGUIObjMessage's -- and left
  * behind when GT_VTABLE_ADDR was corrected. The install guard caught it and
@@ -288,6 +325,11 @@ typedef struct {
      * log interpretable: "swept 400, 0 with text" is a finding, while a bare
      * absence of log lines could equally mean the sweep never ran. */
     LONG  with_text;
+
+    /* ⭐ Calls to the text setter. Beside `with_text` it says which of two very
+     * different faults you are looking at: 0 calls means the hook never fired;
+     * many calls with 0 texts means the vptr filter rejected them all. */
+    LONG  settext_calls;
 } gt_stats;
 
 void gt_get_stats(gt_stats *out);
@@ -330,6 +372,12 @@ void *gt_test_last_captured(void);
  * So the test hands it an object whose vptr is deliberately NOT ours and
  * requires it to be captured anyway. */
 void *gt_test_ctor_body(void *self);
+
+/* Drive the shipping TEXT SETTER detour with a synthetic object and string.
+ * `out`/`outlen` receive whatever the detour published, so the test asks what
+ * was CAPTURED rather than re-deriving what the detour should have done.
+ * Returns the value the stand-in original returned, to prove pass-through. */
+void *gt_test_settext_body(void *self, const char *s, char *out, int outlen);
 
 /* Run the shipping INSPECTOR over a caller-supplied buffer that stands in for
  * an instance, and report what it found. "text_offset" is set to the offset

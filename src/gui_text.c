@@ -71,6 +71,16 @@ static volatile LONG  g_ring_next;
 static LONG           g_sweep_at;
 static volatile LONG  g_with_text;
 
+/* ⭐ The text setter's channel. `g_settext_calls` beside `g_with_text` is what
+ * makes a quiet log interpretable: calls with no text means the filter is
+ * rejecting everything, which is a different fault from the hook never firing. */
+static volatile LONG  g_settext_calls;
+#define GT_TEXT_MAX 256
+static char           g_text_buf[GT_TEXT_MAX];
+static void          *g_text_self;
+static volatile LONG  g_text_seq;
+static LONG           g_text_taken;
+
 /* The most recently seen instance, published for the worker thread.
  *
  * ⚠ A sequence counter, not a flag: the hook runs on the game's render thread
@@ -200,6 +210,72 @@ static void *hook_update(void *self, void *arg)
  * moment the object's fields are uninitialised, and a worker poll landing in
  * between would inspect garbage and report it as a finding. Call through
  * first, then publish. */
+/* ⭐⭐⭐ THE TEXT SETTER -- setText(this [rcx], const char *s [rdx], ...).
+ *
+ * This is the target the previous six runs were groping for. It does not need
+ * an object to be "populated later": the TEXT ARRIVES AS AN ARGUMENT, which is
+ * the shape that has worked every time on this project and that scanning has
+ * failed at every time.
+ *
+ * ⚠⚠ SIGNATURE. The real function takes more than two arguments -- the body
+ * reads r8d and r9d (`mov esi,r9d`, `mov ebp,r8d` at 0x1402f0b6a/6d) and a
+ * fifth from [rsp+0x130]. menu_cursor's SFX bug was exactly this: a detour that
+ * declares too few arguments makes the original read junk from stack slots our
+ * frame never filled, and the user HEARD it. So declare six and pass them all
+ * through untouched.
+ *
+ * ⚠ Slot 26 is shared with other classes, and at least one caller passes a
+ * 32-BIT value in edx rather than a pointer. Reading rdx as a char* without
+ * checking the vptr would dereference an integer. The filter is not optional
+ * here even though the target is right. */
+typedef void *(*pfn_settext)(void *self, const char *s, int a, int b,
+                             int c, int d);
+static pfn_settext g_real_settext;
+
+static void *hook_settext(void *self, const char *s, int a, int b,
+                          int c, int d)
+{
+    InterlockedIncrement(&g_settext_calls);
+
+    /* Identify the object before trusting `s`. Two layers, as everywhere in
+     * this file: ask the memory manager, then guard the read. */
+    ULONGLONG vptr = 0;
+    BOOL faulted = FALSE;
+    BOOL ours = FALSE;
+    if (self && !((ULONG_PTR)self & 7u) &&
+        mem_readable_run(self, sizeof(vptr)) >= sizeof(vptr)) {
+        MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)self);
+        ours = !faulted && vptr == GT_VTABLE_ADDR;
+    }
+
+    if (ours && s) {
+        /* Copy the string out on the spot -- it is the caller's buffer and may
+         * not outlive this call. Bounded, guarded, and published for the
+         * worker to log; NO logging on the game's thread. */
+        char buf[GT_TEXT_MAX];
+        SIZE_T run = mem_readable_run(s, sizeof(buf) - 1);
+        if (run > 0) {
+            BOOL f2 = FALSE;
+            MEM_GUARDED(f2, memcpy(buf, s, run));
+            if (!f2) {
+                buf[run < sizeof(buf) ? run : sizeof(buf) - 1] = '\0';
+                InterlockedIncrement(&g_text_seq);
+                g_text_self = self;
+                strncpy(g_text_buf, buf, sizeof(g_text_buf) - 1);
+                g_text_buf[sizeof(g_text_buf) - 1] = '\0';
+                InterlockedIncrement(&g_text_seq);
+                InterlockedIncrement(&g_with_text);
+            } else {
+                InterlockedIncrement(&g_faults);
+            }
+        }
+    } else if (!ours) {
+        InterlockedIncrement(&g_other_class);
+    }
+
+    return g_real_settext(self, s, a, b, c, d);
+}
+
 static void *hook_ctor(void *self)
 {
     InterlockedIncrement(&g_ctors);
@@ -434,6 +510,31 @@ BOOL gt_poll_and_log(void)
 {
     if (!g_installed)
         return FALSE;
+
+    /* ⭐⭐ THE TEXT CHANNEL FIRST -- this is the product, everything below is
+     * the old exploratory sweep.
+     *
+     * The setter hands us the string directly, so there is no object to
+     * inspect, no offset to guess and no waiting for a field to be filled.
+     * Snapshot it with the same seq-bracket discipline as every other channel
+     * here: equal even values either side of the copy mean the copy was clean.
+     *
+     * ⚠ Logged on OUR thread, never in the detour. The hook copies bytes and
+     * returns; formatting and file I/O on the game's render thread is how the
+     * discovery sweep starved the mod three times. */
+    LONG t1 = InterlockedCompareExchange(&g_text_seq, 0, 0);
+    if (t1 != g_text_taken && !(t1 & 1)) {
+        char  copy[GT_TEXT_MAX];
+        void *who = g_text_self;
+        strncpy(copy, g_text_buf, sizeof(copy) - 1);
+        copy[sizeof(copy) - 1] = '\0';
+        LONG t2 = InterlockedCompareExchange(&g_text_seq, 0, 0);
+        if (t1 == t2) {
+            g_text_taken = t1;
+            log_line("gt: ⭐ TEXT SET on %p: \"%s\"", who, copy);
+            return TRUE;
+        }
+    }
 
     /* ⭐⭐ SWEEP THE RING, oldest first -- do not inspect at capture time.
      *
@@ -748,6 +849,48 @@ BOOL gt_install(void)
                  "never instantiates.", GT_CTOR_ADDR, GT_FACTORY_ADDR);
     }
 
+    /* ⭐⭐⭐ THE TEXT SETTER -- the hook this module now exists for.
+     * `setText(this, const char *s, ...)`: the string arrives as an ARGUMENT,
+     * so there is nothing to guess and nothing to wait for. See the header for
+     * how it was derived, and why the vptr filter is still required. */
+    void *x = (void *)(ULONG_PTR)GT_SETTEXT_ADDR;
+    static const BYTE SETTEXT_PROLOGUE[] = { 0x48, 0x89, 0x5c, 0x24, 0x08 };
+    MEMORY_BASIC_INFORMATION xmbi;
+    BYTE xpro[sizeof(SETTEXT_PROLOGUE)];
+    if (VirtualQuery(x, &xmbi, sizeof(xmbi)) != sizeof(xmbi) ||
+        xmbi.State != MEM_COMMIT ||
+        !(xmbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ |
+                          PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))) {
+        log_line("gt: the text setter at 0x%llx is not committed executable "
+                 "memory -- REFUSING. Nothing was written.", GT_SETTEXT_ADDR);
+        g_why = GT_INSTALL_BAD_PROTECT;
+        return FALSE;
+    }
+    if (!mem_copy(xpro, x, sizeof(xpro)) ||
+        memcmp(xpro, SETTEXT_PROLOGUE, sizeof(xpro)) != 0) {
+        log_line("gt: the text setter at 0x%llx carries %02x %02x %02x %02x "
+                 "%02x, not the expected %02x %02x %02x %02x %02x -- the "
+                 "offline model does NOT match this build. REFUSING.",
+                 GT_SETTEXT_ADDR, xpro[0], xpro[1], xpro[2], xpro[3], xpro[4],
+                 SETTEXT_PROLOGUE[0], SETTEXT_PROLOGUE[1], SETTEXT_PROLOGUE[2],
+                 SETTEXT_PROLOGUE[3], SETTEXT_PROLOGUE[4]);
+        g_why = GT_INSTALL_BAD_PROLOGUE;
+        return FALSE;
+    }
+    if (MH_CreateHook(x, (void *)&hook_settext,
+                      (void **)&g_real_settext) != MH_OK ||
+        MH_EnableHook(x) != MH_OK) {
+        MH_RemoveHook(x);
+        g_real_settext = NULL;
+        log_line("gt: ⛔ could not hook the text setter at 0x%llx.",
+                 GT_SETTEXT_ADDR);
+        g_why = GT_INSTALL_MINHOOK_FAILED;
+        return FALSE;
+    }
+    log_line("gt: hooked the TEXT SETTER at 0x%llx (instance vtable slot %d). "
+             "The label arrives as an ARGUMENT -- no offset to guess, no object "
+             "to wait for.", GT_SETTEXT_ADDR, GT_SETTEXT_SLOT);
+
     /* ⭐ The ctor is the one that must work. Without it there is no census and
      * no instances, so reporting a successful install would be a lie that
      * produces a silent, uninterpretable run -- exactly what this project's
@@ -788,6 +931,12 @@ void gt_remove(void)
         MH_RemoveHook(c);
         g_real_ctor = NULL;
     }
+    if (g_real_settext) {
+        void *x = (void *)(ULONG_PTR)GT_SETTEXT_ADDR;
+        MH_DisableHook(x);
+        MH_RemoveHook(x);
+        g_real_settext = NULL;
+    }
 
     g_installed = FALSE;
     log_line("gt: hooks removed.");
@@ -806,6 +955,7 @@ void gt_get_stats(gt_stats *out)
     out->ctors       = InterlockedCompareExchange(&g_ctors, 0, 0);
     out->ctor_hooked = (g_real_ctor != NULL);
     out->with_text   = InterlockedCompareExchange(&g_with_text, 0, 0);
+    out->settext_calls = InterlockedCompareExchange(&g_settext_calls, 0, 0);
 }
 
 /* --- test seams ----------------------------------------------------------
@@ -855,10 +1005,33 @@ const BYTE *gt_test_prologue(int which, int *len)
  * rather than computing a plausible one -- a stand-in that re-derives what the
  * shipping code derives leaves a broken mechanism indistinguishable from a
  * working one. */
+/* ⛔ Returns a value the TEST chose, and records nothing itself -- a stand-in
+ * that re-derived what the detour derives would leave a broken detour and a
+ * working one indistinguishable. */
+static void *fake_settext(void *self, const char *s, int a, int b, int c, int d)
+{
+    (void)self; (void)s; (void)a; (void)b; (void)c; (void)d;
+    return g_sim_ret;
+}
+
 static void *fake_ctor(void *self)
 {
     (void)self;
     return g_sim_ret;
+}
+
+void *gt_test_settext_body(void *self, const char *s, char *out, int outlen)
+{
+    g_sim_ret = (void *)(ULONG_PTR)0xFEEDFACE00112233ULL;
+    pfn_settext saved = g_real_settext;
+    g_real_settext = (pfn_settext)fake_settext;
+    void *r = hook_settext(self, s, 1, 2, 3, 4);
+    g_real_settext = saved;
+    if (out && outlen > 0) {
+        strncpy(out, g_text_buf, (size_t)outlen - 1);
+        out[outlen - 1] = 0;
+    }
+    return r;
 }
 
 void *gt_test_ctor_body(void *self)
@@ -903,6 +1076,8 @@ void gt_test_reset(void)
 {
     g_calls = g_distinct = g_faults = g_wrong_class = 0;
     g_other_class = g_ours = g_ctors = g_with_text = 0;
+    g_settext_calls = 0; g_text_seq = 0; g_text_taken = 0;
+    g_text_self = NULL; g_text_buf[0] = 0;
     g_ring_next = 0; g_sweep_at = 0;
     for (int i = 0; i < GT_RING_SIZE; i++) g_ring[i] = NULL;
     g_seq = 0; g_taken_seq = 0;
