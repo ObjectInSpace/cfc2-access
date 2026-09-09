@@ -81,23 +81,51 @@ before touching that work.
 
 - `src/log.c` — timestamped logging.
 
-## ▶ START HERE (next session) — name the remaining screens
+## ▶ START HERE (next session)
 
-**Working end to end:** the mod speaks menu item names. Main menu and Options
-are in the table; every other screen falls back to "3 of 6" (position only),
-which is correct behaviour, not a bug.
+**Working end to end:** the mod speaks menu item names in the game's own
+language. Verified in a clean run (2026-09-08, 22:33): **zero stalls** -- every
+gap in that log is the user not pressing keys.
 
-### Opt-in switches (all absent by default — a normal session does none of this)
-- `cfc2_dump.on` — write `cfc2_dump/` (60 MB). Needed when offline tools want a
-  fresh dump; ⚠ `.text` is stable across runs but the DATA sections are NOT,
-  and `build_riprefs.py` refuses a stale index.
-- `cfc2_discover.on` — log candidate label runs for unknown screens. ⚠ Runs on
-  the poll thread; off by default because three versions of it starved the mod.
-- `cfc2_pad.on` — the sPad watcher. Inert for the shell (`Kind=0`); kept only
-  for the in-game work ahead.
-- `cfc2_hook.off` — makes the whole mod read-only (kills both hooks).
+**Named:** main menu (`0x140097a59`, base 37, 6 items) and the Options *list*
+(`0x1400a20fc`, base 170, 5 items). Everything else speaks position only
+("3 of 6"), which is correct behaviour, not a bug.
 
-### To name a screen
+### ⛔⛔ THE NEXT PIECE OF WORK: settings screens need a MAP, not a base
+
+The `base + index` model assumes a screen's items are a CONTIGUOUS run of GMD
+labels. That holds for simple menus and **fails for settings screens**.
+
+Measured: the per-game settings screen (caller `0x1400b1bd9`, fn `0x1400b1b10`,
+**8 items**) draws from the `OPT_` family, which interleaves setting NAMES with
+their VALUE labels:
+
+    643 OPT_DIFFICULTY 'Game Difficulty'   644 OPT_DAMAGE_LEVEL 'Attack Power'
+    645..648  its four values              649 OPT_TIMER_SPEED 'Timer Speed'
+
+The names sit at 643, 644, 649, 654, 659, 660, 661, 662, 665, 1108, 1115, 1125
+-- non-contiguous -- and WHICH eight appear depends on the game selected.
+
+⭐ So `mc_screen` needs to grow an optional per-screen `index -> label` map
+alongside `base_index`. Small extension, not a redesign.
+
+⛔ **Do NOT force a base for such a screen.** Any base that "looks close" will
+speak a VALUE label ("Normal", "Fast") where an item name belongs -- confidently
+and wrongly. See the long comment in `src/menu_speak.h`.
+
+### Opt-in switches (all absent by default -- a normal session does none of this)
+- `cfc2_dump.on` -- write `cfc2_dump/` (60 MB). Needed when the offline tools
+  want a fresh dump; ⚠ `.text` is stable across runs but the DATA sections are
+  NOT, and `build_riprefs.py` refuses a stale index rather than answering wrongly.
+- `cfc2_discover.on` -- log candidate label runs for unknown screens.
+  ⚠ Runs on the poll thread and freezes the mod for seconds per new screen;
+  three versions of it starved the mod during real play. Turn it on to name a
+  screen, then turn it off.
+- `cfc2_pad.on` -- the sPad watcher. Inert for the shell (`Kind=0`, update never
+  runs); kept only for the in-game work ahead.
+- `cfc2_hook.off` -- makes the whole mod read-only (kills both hooks).
+
+### To name a SIMPLE screen (contiguous labels)
 1. Create `cfc2_discover.on`, walk into the screen, move the cursor once.
 2. The log prints `mcspeak: [DISCOVERY]` with candidate bases and the live text
    each would give for the item you are standing on.
@@ -105,14 +133,19 @@ which is correct behaviour, not a bug.
    `src/menu_speak.c` with `MC_VERIFIED_LIVE_TEXT`.
 
 ⛔⛔ **Never add a row from plausibility.** One was added from item count alone
-and made a different 6-item screen speak the main menu's labels — and by
-matching, it SUPPRESSED that screen's discovery block, hiding the fix. The test
-suite now fails unless every row is `MC_VERIFIED_LIVE_TEXT`.
+and made a different 6-item screen speak the main menu's labels -- and by
+matching, it SUPPRESSED that screen's discovery block, hiding the fix. The suite
+now fails unless every row is `MC_VERIFIED_LIVE_TEXT`.
 
-### Known-unnamed callers (from real runs)
-`0x14009ba21` 6 items · `0x1400a1715` 4 · `0x1400b1b69` 3 · `0x140079833` 7 ·
-`0x140099b23` 2 · `0x140079739` 40 (character select, horizontal — ⚠ no HELP_
-run, so the candidate sweep will not find it; needs a different approach).
+### Known-unnamed callers (from real runs; counts are MEASURED)
+- `0x1400b1bd9` **8** and `0x1400b1b69` **3** -- same fn `0x1400b1b10`, i.e. ONE
+  screen with two lists. This is the settings screen above; needs the map.
+- `0x14009ba21` 6 · `0x1400a1715` 4 · `0x140079833` 7 · `0x140099b23` 2
+- `0x140079739` **40**, horizontal -- character select. ⚠ No `HELP_` run, so the
+  candidate sweep cannot find it; needs its own approach.
+
+⚠ An earlier note listed `0x1400b1b69` as a plain 3-item screen. That was
+before its sibling call site showed it is half of a two-list screen.
 
 ## (previous) the node → text join
 
