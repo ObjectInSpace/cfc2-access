@@ -705,7 +705,23 @@ void menu_speak_log_unknown(const mc_move *m)
              * Options 170..174, pause 250..256), each of which passes this.
              * ⭐ MEASURED effect on the shipped data: candidates drop from 8
              * to 4 for a 6-item menu, and to exactly ONE for counts of 8, 9
-             * and 10. */
+             * and 10. Checked against every known-real menu first -- main,
+             * Options, pause, online modes, lobby entry -- all five survive.
+             *
+             * ⚠⚠ BUT UNDERSTAND WHAT WAS DISCARDED, because I first called it
+             * "noise" and that was wrong. The eight candidates for a 6-item
+             * menu were every one of them a COHERENT contiguous run: the
+             * Victory Condition values (First to 5..10), the Number of Players
+             * values, the lobby player slots, the audio settings block,
+             * Connection Strength and its values. The filter was not failing;
+             * the GMD genuinely contains many runs of this shape, because
+             * menus and VALUE LISTS share it.
+             *
+             * ⛔ So this narrows an AMBIGUITY, it does not remove noise -- and
+             * a screen whose labels lack per-item blurbs will now be filtered
+             * OUT. That is a real cost, accepted because a list of eight is
+             * unusable, not because the discarded entries were junk. The
+             * "no candidate" message says so explicitly. */
             for (int i = 0; i < count && ok; i++) {
                 if (!gmd_text_by_index(base + count + i, cur, sizeof(cur)) ||
                     !cur[0]) {
@@ -746,7 +762,10 @@ void menu_speak_log_unknown(const mc_move *m)
                      off + 1, count, off + 1, batch);
         else
             log_line("mcspeak: [DISCOVERY]   position %d of %d; no candidate "
-                     "run found in the first %d labels.", off + 1, count, total);
+                     "run found in the first %d labels. ⚠ This screen's labels "
+                     "may simply lack the one-blurb-per-item shape this looks "
+                     "for -- absence here is NOT evidence the labels are "
+                     "missing.", off + 1, count, total);
     }
 
     /* ⭐ Emit a row in the CURRENT shape, including the fields added for
