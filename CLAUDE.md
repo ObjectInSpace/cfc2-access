@@ -129,7 +129,8 @@ and fault-guarded every time and never cached, in ONE guarded block for the
 whole object rather than per byte. Original always called, return value passed
 through untouched. Respects `cfc2_hook.off`.
 
-### The test: `.	oolsun_gt_test.ps1`
+### The test: `.\tools\run_gt_test.ps1`
+un_gt_test.ps1`
 Ten offline cases; every mechanism was sabotaged and seen to fail (log at the
 bottom of `tools/test_gui_text.c`).
 ⭐ Case 5 -- an object with **no** text must yield **-1** -- carries the most
