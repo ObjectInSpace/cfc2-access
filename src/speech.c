@@ -88,10 +88,48 @@ void speech_shutdown(void)
     }
 }
 
-void speech_say(const wchar_t *text, BOOL interrupt)
+/* ⛔⛔ THE RETURN VALUE IS NOT OPTIONAL.
+ *
+ * This used to discard it, which made a FAILING speechSay indistinguishable
+ * from a working one -- and the log then showed a tidy `mcspeak: "..."` line
+ * for every movement while the user heard nothing at all. I read those lines as
+ * evidence that speech worked. They were evidence that the function was
+ * CALLED.
+ *
+ * ⭐ Same rule this project keeps relearning: "could not do it" must be
+ * observable, not inferred. speech_say() now reports whether the backend
+ * accepted the text, and logs the FIRST failure loudly so a silent mod is
+ * diagnosable from the log instead of from the user's ear. */
+BOOL speech_say(const wchar_t *text, BOOL interrupt)
 {
-    if (g_say && text && *text)
-        g_say(text, interrupt ? 1 : 0);
+    if (!g_say) {
+        static BOOL warned;
+        if (!warned) {
+            warned = TRUE;
+            log_line("speech: ⛔ speechSay is NOT available -- nothing this mod "
+                     "says will be heard. Every later 'spoke' line is a call, "
+                     "not audio.");
+        }
+        return FALSE;
+    }
+    if (!text || !*text)
+        return FALSE;
+
+    int rc = g_say(text, interrupt ? 1 : 0);
+
+    /* UniversalSpeech returns non-zero on success; 0 means no backend took it. */
+    if (rc == 0) {
+        static BOOL warned;
+        if (!warned) {
+            warned = TRUE;
+            log_line("speech: ⛔ speechSay REFUSED the text (returned 0). The "
+                     "backend is loaded but is not speaking -- check that NVDA "
+                     "is running and that nvdaControllerClient.dll sits next to "
+                     "the exe.");
+        }
+        return FALSE;
+    }
+    return TRUE;
 }
 
 void speech_stop(void)

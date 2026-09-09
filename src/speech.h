@@ -19,7 +19,10 @@ void speech_shutdown(void);
 
 /* Speak text. interrupt=TRUE cuts off whatever is being spoken (use for
  * round-state changes); FALSE appends (use for on-demand readouts). */
-void speech_say(const wchar_t *text, BOOL interrupt);
+/* Returns TRUE only if the backend ACCEPTED the text. ⛔ Do not ignore this:
+ * discarding it once meant the log showed a spoken line for every menu movement
+ * while the user heard nothing, and the log was mistaken for evidence. */
+BOOL speech_say(const wchar_t *text, BOOL interrupt);
 void speech_stop(void);
 
 /* Name of the backend that actually won, e.g. "NVDA" or "SAPI". Returns NULL
