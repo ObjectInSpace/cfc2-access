@@ -148,6 +148,16 @@ void mc_poll_and_log(void);
  * stand-in: that was tried, and it made those two cases pass even with the
  * hook's own pointer check sabotaged away -- the harness was supplying the
  * mechanism under test. */
+/* Test-only: the sfx_sel and wrap the stand-in "original" was handed on the
+ * last call.
+ *
+ * ⛔⛔ These exist because the detour declared only FOUR arguments while the
+ * real helper takes SIX, so the original read its 5th and 6th out of stack
+ * slots our frame never filled. The 5th is the cursor SFX SELECTOR -- the user
+ * heard the menu sound change. Ten passing tests missed it, because every one
+ * of them asked what the hook REPORTED and none asked what it PASSED ON. */
+void mc_test_last_passthrough(int *sfx_sel, int *wrap);
+
 int mc_test_body(void *screen, int *cursor, int min, int max,
                  BOOL vertical, int simulated_new_index, BOOL writable,
                  int simulated_step, void *simulated_caller);

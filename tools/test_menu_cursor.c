@@ -215,6 +215,32 @@ int main(void)
           c1 == (void *)0xAAAA1111 && c2 == (void *)0xBBBB2222,
           "c1=%p c2=%p", c1, c2);
 
+    /* --- case 11: the ORIGINAL's own arguments reach it intact ------------
+     * ⭐⭐ THE CASE THAT WOULD HAVE CAUGHT A BUG THE USER HEARD.
+     *
+     * The helper takes SIX arguments. The detour declared four, on the
+     * reasoning that the stack arguments "stay in the caller's frame and reach
+     * the original unchanged" -- true for a TAIL call, false for the fresh call
+     * a detour actually makes. The original then read its 5th and 6th arguments
+     * out of stack slots our frame never filled.
+     *
+     * The 5th is the cursor SFX SELECTOR (dispatched at 0x14007cf25), so the
+     * menu movement sound audibly changed. The 6th is `wrap`, which decides
+     * whether the cursor wraps at the ends of a list -- that one did not
+     * visibly break, which was luck rather than design.
+     *
+     * ⚠ Every other case here asks what the hook REPORTED. This one asks what
+     * it PASSED ON. That is a different question, and it is why ten green cases
+     * missed a defect the user could hear. */
+    cursor = 0;
+    mc_test_body((void *)0xDEAD0000, &cursor, 0, 7, TRUE, 3, TRUE, +1,
+                 (void *)0xCA11515E);
+    int got_sfx = 0, got_wrap = 0;
+    mc_test_last_passthrough(&got_sfx, &got_wrap);
+    check("11. the original receives its 5th and 6th arguments unchanged",
+          got_sfx == 307 && got_wrap == 309,
+          "sfx_sel=%d (want 307)  wrap=%d (want 309)", got_sfx, got_wrap);
+
     printf("\n");
     if (failures) {
         printf("FAILED: %d case(s)\n", failures);

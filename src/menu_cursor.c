@@ -13,17 +13,31 @@
 #include <stdio.h>
 #include <string.h>
 
-/* ⭐ Only the arguments we need are declared. On x64 there is one calling
- * convention, so rcx/rdx/r8d/r9d arrive as the first four parameters whatever
- * the function's true arity is; the two stack arguments (sfx_sel, wrap) stay
- * untouched in the caller's frame and reach the original unchanged, because we
- * pass the register arguments straight through and never return early.
+/* ⛔⛔ ALL SIX ARGUMENTS, AND THE LAST TWO ARE NOT OPTIONAL.
  *
- * ⚠ This works only because we do not touch the stack arguments. If this hook
- * ever needs `wrap`, the declaration must grow to the full six -- reading a
- * stack argument that the prototype does not mention is undefined, not merely
- * untidy. */
-typedef int (*pfn_move)(void *screen, int *cursor, int min, int max);
+ * This declared only the four register arguments, with a comment claiming the
+ * two stack arguments "stay untouched in the caller's frame and reach the
+ * original unchanged". THAT REASONING WAS WRONG, and the user heard it: the
+ * cursor-move SOUND changed.
+ *
+ * It is true for a TAIL call. Our detour makes a FRESH call with its own frame,
+ * so the original reads its 5th and 6th arguments out of slots that our frame
+ * never populated -- whatever junk happened to be there.
+ *
+ * The 5th argument is the SFX SELECTOR. At 0x14007cf25 the helper loads
+ * [rsp+0x70] (= arg5 at call time) and dispatches on it: 1, 2, 3 and 4 each
+ * pick a different cursor sound. Feeding it garbage plays the wrong one -- an
+ * audible, game-visible change from a hook that was supposed to observe only.
+ *
+ * ⚠ The 6th (`wrap`) matters just as much: it decides whether the cursor wraps
+ * at the ends of a list. Passing junk there could change NAVIGATION, not just
+ * sound. That it did not visibly break is luck, not design.
+ *
+ * ⭐ THE LESSON: a detour must reproduce the FULL signature. "We only need the
+ * first four" is a statement about what WE read, not about what the ORIGINAL
+ * reads. Declare everything the target takes and pass it all through. */
+typedef int (*pfn_move)(void *screen, int *cursor, int min, int max,
+                        int sfx_sel, int wrap);
 
 static pfn_move g_real_vert;
 static pfn_move g_real_horz;
@@ -93,7 +107,8 @@ static BOOL cursor_is_safe(const int *p)
  * untouched, whatever we manage or fail to observe. The game's control flow
  * must not depend on our success. */
 static int detour_body(pfn_move real, void *screen, int *cursor,
-                       int min, int max, BOOL vertical, void *caller)
+                       int min, int max, int sfx_sel, int wrap,
+                       BOOL vertical, void *caller)
 {
     /* ⚠⚠ EVERYTHING LIVE ACROSS A setjmp MUST BE volatile. GCC's -Wclobbered is
      * not pedantry here: longjmp may restore a stale register copy, and a stale
@@ -110,7 +125,7 @@ static int detour_body(pfn_move real, void *screen, int *cursor,
     if (faulted)
         safe = FALSE;
 
-    delta = real(screen, cursor, min, max);
+    delta = real(screen, cursor, min, max, sfx_sel, wrap);
 
     InterlockedIncrement(&g_calls);
     if (!safe) {
@@ -173,15 +188,19 @@ static void *call_site_of(void *ret)
     return p;
 }
 
-static int hook_vert(void *screen, int *cursor, int min, int max)
+static int hook_vert(void *screen, int *cursor, int min, int max,
+                     int sfx_sel, int wrap)
 {
-    return detour_body(g_real_vert, screen, cursor, min, max, TRUE,
+    return detour_body(g_real_vert, screen, cursor, min, max,
+                       sfx_sel, wrap, TRUE,
                        call_site_of(__builtin_return_address(0)));
 }
 
-static int hook_horz(void *screen, int *cursor, int min, int max)
+static int hook_horz(void *screen, int *cursor, int min, int max,
+                     int sfx_sel, int wrap)
 {
-    return detour_body(g_real_horz, screen, cursor, min, max, FALSE,
+    return detour_body(g_real_horz, screen, cursor, min, max,
+                       sfx_sel, wrap, FALSE,
                        call_site_of(__builtin_return_address(0)));
 }
 
@@ -218,9 +237,20 @@ static int  g_sim_new;
 static int  g_sim_step;       /* what the real helper returns: the direction */
 static BOOL g_sim_writable;   /* set by mc_test_body: may the stand-in write? */
 
-static int fake_original(void *screen, int *cursor, int min, int max)
+static int g_seen_sfx, g_seen_wrap;
+
+void mc_test_last_passthrough(int *sfx_sel, int *wrap)
+{
+    if (sfx_sel) *sfx_sel = g_seen_sfx;
+    if (wrap)    *wrap    = g_seen_wrap;
+}
+
+static int fake_original(void *screen, int *cursor, int min, int max,
+                         int sfx_sel, int wrap)
 {
     (void)screen; (void)min; (void)max;
+    g_seen_sfx = sfx_sel;
+    g_seen_wrap = wrap;
     if (!g_sim_writable)
         return 0;
     *cursor = g_sim_new;
@@ -236,8 +266,10 @@ int mc_test_body(void *screen, int *cursor, int min, int max,
     g_sim_new      = simulated_new_index;
     g_sim_step     = simulated_step;
     g_sim_writable = writable;
-    return detour_body(fake_original, screen, cursor, min, max, vertical,
-                       simulated_caller);
+    return detour_body(fake_original, screen, cursor, min, max,
+                       simulated_new_index * 100 + 7,   /* sfx_sel */
+                       simulated_new_index * 100 + 9,   /* wrap    */
+                       vertical, simulated_caller);
 }
 
 /* --- install -------------------------------------------------------------- */
