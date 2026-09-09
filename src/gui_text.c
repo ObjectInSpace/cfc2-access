@@ -412,11 +412,13 @@ BOOL gt_poll_and_log(void)
          * offsets at all, which is the honest output: we did not measure
          * cGUIObjText, so we have nothing to say about its layout. */
         InterlockedIncrement(&g_wrong_class);
-        log_line("gt: ⛔ vptr is 0x%llx, NOT cGUIObjText's 0x%llx -- this "
+        log_line("gt: ⛔ vptr is 0x%llx%s, NOT cGUIObjText's 0x%llx -- this "
                  "object is NOT the class we hooked for. REFUSING to dump its "
                  "offsets: they would describe the wrong layout. Fix the hook "
                  "target; a shared helper reached by a direct call receives "
-                 "its callers' own objects.", vptr, GT_VTABLE_ADDR);
+                 "its callers' own objects.", vptr,
+                 vptr == GT_VTABLE2_ADDR ? " (nGUI::OutlineFont)" : "",
+                 GT_VTABLE_ADDR);
         return FALSE;
     }
     log_line("gt: vptr CONFIRMED 0x%llx -- this really is a cGUIObjText.",
@@ -435,10 +437,10 @@ BOOL gt_poll_and_log(void)
 
 /* --- install -------------------------------------------------------------
  *
- * The expected first bytes of 0x1402f8900:
- *     mov [rsp+8], rbx   = 48 89 5c 24 08
- * FIVE bytes, one whole instruction, so MinHook's patch ends on a clean
- * boundary. ⭐ And find_callers.py --jmp found zero branches into
+ * The expected first bytes of 0x1402fd6d0:
+ *     push rbx; sub rsp,0x30   = 40 53 48 83 ec 30
+ * SIX bytes across two whole instructions, so MinHook's five-byte patch ends
+ * on a clean boundary. ⭐ And find_callers.py --jmp found zero branches into
  * addr+1..+4, so nothing can land inside the patch.
  *
  * ⭐⭐ THE PROPERTY THAT MATTERS MOST is not visible in these bytes: this
@@ -450,7 +452,7 @@ BOOL gt_poll_and_log(void)
  * The prologue is re-checked here at runtime because the exe is Enigma-packed
  * and these addresses hold ciphertext until unpack completes; hooking early
  * would patch encrypted bytes. */
-static const BYTE GT_PROLOGUE[] = { 0x48, 0x89, 0x5c, 0x24, 0x08 };
+static const BYTE GT_PROLOGUE[] = { 0x40, 0x53, 0x48, 0x83, 0xec, 0x30 };
 
 static BOOL check_target(void)
 {
@@ -485,14 +487,15 @@ static BOOL check_target(void)
      * own vtable really does hold this address in the expected slot. If the
      * build moved, we would otherwise hook something and attribute its
      * instances to the wrong class. */
-    /* ⚠ The target sits in the SECOND vtable (0x141056480), not the primary
-     * one -- see the note in the header. Checking it against the primary was
-     * the bug this line existed to prevent, pointed at the wrong table. */
+    /* ⭐ Checked against the INSTANCE vtable -- the one an object actually
+     * carries, and the one the detour's filter tests. The DTI's descriptor
+     * vtable (0x141056350) is a different, two-slot table; confusing the two
+     * is half of what went wrong in the first four runs. */
     ULONGLONG slot = 0;
     const void *sp = (const void *)(ULONG_PTR)
-                     (GT_VTABLE2_ADDR + GT_VTABLE_SLOT * 8);  /* ⛔ see header */
+                     (GT_VTABLE_ADDR + GT_VTABLE_SLOT * 8);
     if (!mem_copy(&slot, sp, sizeof(slot)) || slot != GT_UPDATE_ADDR) {
-        log_line("gt: cGUIObjText's SECOND vtable slot %d holds 0x%llx, not "
+        log_line("gt: cGUIObjText's instance vtable slot %d holds 0x%llx, not "
                  "the "
                  "expected 0x%llx -- the class layout does not match the "
                  "offline model. REFUSING.",

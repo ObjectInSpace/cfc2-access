@@ -175,58 +175,91 @@
 
 #include <windows.h>
 
+/* ⭐⭐⭐ THE ERROR UNDERNEATH ALL FOUR FAILED RUNS: THE VTABLE WAS OFF BY ONE
+ * DTI RECORD, so every run hooked cGUIObjRoot and called it cGUIObjText.
+ *
+ * The DTI table is a 0x38-byte stride array of records:
+ *     +0x00 = the class's vtable        +0x08 = a class NAME pointer
+ * ⚠ but the NAME at +0x08 belongs to the record's NEIGHBOUR, not to itself.
+ * Reading "the name beside the vtable" therefore shifts every class by one.
+ * Walking the table properly (tools/dti_table.py) gives:
+ *
+ *     0x1422cae28  vtable 0x1410563a8  cGUIObjRoot     <- what we hooked
+ *     ...
+ *     0x1422cb020  vtable 0x1410562e8  cGUIObjMessage
+ *     0x1422cb058  vtable 0x141056350  cGUIObjText     <- the real one
+ *
+ * So 0x1410563a8 -- the address in every note, and in the first four runs --
+ * is cGUIObjRoot's. That single off-by-one explains all four negatives at once,
+ * and it is why an OutlineFont kept arriving: we were never filtering for the
+ * class we wanted.
+ *
+ * ⭐⭐ AND THE DTI VTABLE IS NOT THE OBJECT VTABLE. 0x141056350 is a TWO-slot
+ * class-descriptor table (getDTI + factory). What an INSTANCE carries is what
+ * its factory stamps in. cGUIObjText's factory is slot 1, 0x1402ef980:
+ *
+ *     mov edx, 0x210            <- allocates 528 bytes: the documented size,
+ *                                  which independently confirms the class
+ *     call [r10+0x38]           <- allocate
+ *     call 0x1402efc10          <- the REAL ctor
+ *     lea rax,[rip+0xd6728b]    <- 0x141056c50
+ *     mov [rbx], rax            <- stamped into the object
+ *
+ * ⭐ THE CONTROL THAT SETTLES IT: that ctor zeroes [rbx+0x1f8] and [rbx+0x200]
+ * -- the EXACT two offsets the offline accessors pointed at (0x1402fc410,
+ * 0x1402fc400). The original candidates were right the whole time; they were
+ * being read out of the wrong class's objects. And slot 29 of the instance
+ * vtable IS 0x1402fc410, the [this+0x1f8] accessor. The class agrees with
+ * itself from three directions.
+ *
+ * ⚠ Note the size check cuts the other way too: the FIRST factory I found
+ * (0x1402efa10, in cGUIObjRoot's table) allocated 0xe0 = 224 bytes, not 0x210.
+ * That mismatch was visible in run 2 and I read past it. A documented class
+ * size is a free identity check on any factory -- use it. */
+
 /* Live addresses. ASLR is off and the exe has no relocations, so these are
  * valid in every future run. */
-#define GT_VTABLE_ADDR   0x1410563a8ULL   /* cGUIObjText's vtable             */
-/* ⭐⭐ BACK TO SLOT 5 -- DELIBERATELY, and with the filter that makes it work.
- * It is a SHARED helper, which is exactly why it runs per element per frame,
- * which is what we need. Its problem was never that it fires too rarely; it
- * was that it also receives other classes' objects. So we keep the hook and
- * DISCRIMINATE ON THE OBJECT: the vptr filter below. Run 1 already proved the
- * filter works -- it rejected every OutlineFont it was handed. */
-/* ⛔ NO TARGET IS CURRENTLY CORRECT. Four runs have ruled out every candidate
- * this vtable offers; see the log above. The address below is the last one
- * tried and is LEFT ONLY so the module still compiles and its guards still
- * refuse loudly -- it is NOT a believed answer. */
-#define GT_UPDATE_ADDR   0x1402f8900ULL   /* ⛔ ruled out by run 4            */
-#define GT_VTABLE_SLOT   3
+#define GT_DTI_RECORD    0x1422cb058ULL   /* cGUIObjText's DTI record         */
+#define GT_DTI_VTABLE    0x141056350ULL   /* its 2-slot descriptor vtable     */
+#define GT_FACTORY_ADDR  0x1402ef980ULL   /* descriptor slot 1: makes objects */
 
-/* ⛔⛔ THE "SECOND VTABLE" READING WAS WRONG -- corrected before believing it.
- *
- * The class names in this image are a packed STRING POOL with vtables
- * interleaved, and I read the qwords after cGUIObjText's vtable as a SECOND
- * vtable for the same class, because the factory at 0x1402efa10 stores
- * 0x141056480 into what it builds. Run 4 hooked its slot 3 on that basis and
- * caught an OutlineFont again.
- *
- * ⭐ The check that settles it, and that I should have run FIRST: search every
- * data section for each vtable address. A vtable is REGISTERED in a DTI record;
- * that is how this engine finds it.
- *     0x1410563a8 -> referenced once, from DTI slot 0x1422cae28   (cGUIObjText)
- *     0x141056480 -> referenced NOWHERE
- * An unregistered address adjacent to a known vtable is not "the same class's
- * second vtable". It is a different class's table that happens to sit next to
- * it in a pool. Adjacency in a string pool is not class membership.
- *
- * ⚠ This is the same mistake as run 1, one level up: there I asked "is the
- * address unique?" instead of "is it reached only through this class"; here I
- * asked "is it adjacent?" instead of "is it registered?". Both times the
- * cheaper, more specific question was available and I did not ask it.
- *
- * ⭐ GT_VTABLE2_ADDR is kept ONLY so the filter can be told about a vptr that
- * is NOT ours, and it is deliberately no longer accepted as ours. */
-#define GT_VTABLE2_ADDR  0x141056480ULL
-#define GT_CLASS_SIZE    0x210            /* 528 bytes, from the reg stub     */
+/* ⭐ What an INSTANCE carries at +0x00. This is the value the vptr filter
+ * tests, and the whole point of the correction above. */
+#define GT_VTABLE_ADDR   0x141056c50ULL
 
-/* The two candidate pointer fields the offline accessors revealed. Checked
- * first when inspecting an instance -- and reported as candidates, never as
- * the answer.
+/* A vptr we have positively identified as NOT ours -- nGUI::OutlineFont, seen
+ * in runs 1 and 4. Kept so the log can name it instead of saying "unknown". */
+#define GT_VTABLE2_ADDR  0x141101b78ULL
+
+/* The hook target: instance-vtable slot 13.
+ *   - unique: appears in exactly one vtable
+ *   - callerless: nothing reaches it by a direct call, so the vtable is the
+ *     only way in
+ *   - ⭐ AN INSTANCE METHOD, which is question 3 and the one the first four
+ *     runs kept failing: it reads [this+0x142], [this+0x1e0] and [this+0xd0]
+ *     -- deep fields inside the 0x210 object, including +0x1e0 which the real
+ *     ctor initialises -- and takes a float in xmm1. That is a per-object
+ *     update/draw, not a factory, a destructor or a getter.
+ *   - prologue `push rbx; sub rsp,0x30` = 40 53 48 83 ec 30, six bytes over
+ *     two whole instructions; find_callers.py --jmp finds no branch into
+ *     addr+1..+4. */
+#define GT_UPDATE_ADDR   0x1402fd6d0ULL
+#define GT_VTABLE_SLOT   13
+#define GT_CLASS_SIZE    0x210            /* 528 bytes -- confirmed by the
+                                           * factory's own allocation size    */
+
+/* The two candidate pointer fields.
  *
- * ⚠ The first live run is a standing warning about them: in the (wrong) font
- * object BOTH offsets held plausible strings -- "uni0623" and "uniFE84" --
- * purely because they were two more entries in a glyph-name array. Two
- * candidates both "hitting" is not corroboration; it is what a dense array of
- * pointers looks like from the outside. Only the vptr check told them apart. */
+ * ⭐⭐ NO LONGER MERE CANDIDATES: the real constructor (0x1402efc10, reached
+ * from the factory) explicitly zeroes BOTH of these, which is what a ctor does
+ * to its own members. They are cGUIObjText's fields. Whether either holds the
+ * TEXT is still open -- that is what the run answers -- but they are no longer
+ * a guess about which offsets belong to this class.
+ *
+ * ⚠ The standing warning from run 1 still applies to reading them: in the
+ * wrong (font) object both offsets held plausible strings purely because they
+ * were entries in a glyph-name array. Two candidates both "hitting" is not
+ * corroboration; it is what a dense pointer array looks like from outside. */
 #define GT_CAND_A        0x1f8
 #define GT_CAND_B        0x200
 
