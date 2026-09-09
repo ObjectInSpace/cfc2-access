@@ -648,10 +648,67 @@ void menu_speak(const mc_move *m)
  * wrong thing, and they were right.
  *
  * ⛔ Still never spoken until the mapping is confirmed. */
+/* ⭐⭐ THE OPTION-ID PROBE -- ONE SCREEN ONLY, and that is the point.
+ *
+ * The 3-item options strip (caller 0x1400b2729, layout 11_option/option_2)
+ * cannot be named from the GMD: its three labels are non-contiguous
+ * (MENU_OP_GAME_SETTING 225, PAD_SETTING 226, DISPLAY_SOUND_SETTINGS 574) so
+ * no contiguous-run sweep can propose them, and the function holds no label
+ * constants -- the text comes through layout data.
+ *
+ * But the screen keeps an ARRAY OF OPTION IDS at screen+0x340, indexed by the
+ * cursor, and dispatches on it: id 1 sets +0xd0338, id 2 sets +0xd0330=1 with
+ * +0xd0334=0, id 3 sets +0xd0330/+0xd0334 from the value. Read off
+ * 0x1400b27ab..0x1400b280c. Those ids say WHICH option each item is, which is
+ * what a label map needs.
+ *
+ * ⛔⛔ SCOPED TO THIS ONE CALLER, deliberately. I previously dumped this same
+ * offset for EVERY screen and it printed pointers and padding formatted as
+ * menu semantics -- 741845392, 1090385120 -- because +0x340 means this only
+ * here. A field offset read out of one function describes that function. */
+static void probe_option_ids(const mc_move *m)
+{
+    if (!m || !m->screen || !m->cursor)
+        return;
+    if ((ULONGLONG)(ULONG_PTR)m->caller != 0x1400b2729ULL)
+        return;
+
+    int count = m->max_index - m->min_index + 1;
+    if (count <= 0 || count > 8)
+        return;
+
+    static BOOL done;
+    if (done)
+        return;
+
+    const char *ids = (const char *)m->screen + 0x340;
+    if (!mem_readable(ids, (SIZE_T)count * 4))
+        return;
+    int v[8];
+    if (!mem_copy(v, ids, (SIZE_T)count * 4))
+        return;
+    done = TRUE;
+
+    char b[128];
+    size_t u = 0;
+    b[0] = 0;
+    for (int i = 0; i < count; i++) {
+        int k = _snprintf(b + u, sizeof(b) - u, "%s%d", u ? " " : "", v[i]);
+        if (k > 0 && (size_t)k < sizeof(b) - u)
+            u += (size_t)k;
+    }
+    log_line("mcspeak: [OPTPROBE] options strip (caller 0x1400b2729): "
+             "%d items, option ids [%s]. ⚠ These identify WHICH setting each "
+             "item is; the dispatch at 0x1400b27b2 treats 1, 2 and 3 as three "
+             "different destinations.", count, b);
+}
+
 void menu_speak_probe_rest(const mc_move *m)
 {
     if (!m || !m->screen)
         return;
+
+    probe_option_ids(m);
 
     const mc_screen *s = menu_speak_lookup((ULONGLONG)(ULONG_PTR)m->caller);
     if (!s || s->kind != MC_SETTINGS_VALUE)
