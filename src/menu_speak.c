@@ -37,7 +37,10 @@ static const int g_select_game_rows[] = { 51, 52, 56 };
  *
  * ⛔ Row 0 (Game) is deliberately ABSENT: the eight game titles have no clean
  * run in the GMD -- they occur only inside ACHIEVEMENT_*_DESC text -- so they
- * are drawn as logo images. A row with no variant here names nothing, which is
+ * are drawn as logo images. ⛔ THAT WAS WRONG -- see rom_table.h: the titles
+ * are in the EXE, as a ROM table. Row 0 still has no variant here, but for a
+ * DIFFERENT reason: the cursor-index -> ROM-index mapping is not yet confirmed.
+ * A row with no variant here names nothing, which is
  * the correct outcome, not a gap to be filled with the nearest-looking run.
  *
  * Row 1, Game Version. Labels: 53 GAME_VERSION_J "Japanese Version",
@@ -135,7 +138,12 @@ static const mc_screen g_screens[] = {
      * ⛔ NO labels here, deliberately. The row labels are known; the VALUE
      * labels are not. The eight game titles do not exist as a clean run in the
      * GMD at all -- the only occurrences are inside achievement descriptions --
-     * so the game names are almost certainly drawn as logo IMAGES. Speaking a
+     * so the game names are almost certainly drawn as logo IMAGES.
+     * ⛔⛔ WRONG, corrected 2026-09-08: they are in the EXE's own data
+     * (src/rom_table.h, 18 records at 0x141208b00). "Not in the GMD" was a
+     * fact about the GMD; "they are images" was a claim I had no evidence for.
+     * Row 0 is still unnamed because the INDEX MAPPING is unconfirmed, not
+     * because the text is missing. Speaking a
      * value here would be a guess. It reports the row it belongs to, which the
      * row label then names, and the value's POSITION. */
     { 0x1400b1bd9ULL, -1, 0, "Select Game", MC_VERIFIED_LIVE_TEXT,

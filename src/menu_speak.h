@@ -127,7 +127,9 @@ typedef struct {
     int        nlabels;    /* entries in `labels`; must equal `count` */
     /* ⭐⭐ VALUE labels, for MC_SETTINGS_VALUE: one variant per row, chosen by
      * the row's LIVE count. See mc_value_set. NULL when the values cannot be
-     * named (Select Game's row 0 -- the game titles are logo images). */
+     * named (Select Game's row 0). ⚠ Not because the titles do not exist --
+     * they are in the exe, see rom_table.h -- but because the mapping from
+     * cursor index to ROM index is not yet confirmed against a real screen. */
     const struct mc_value_set *values;
     int        nvalues;    /* entries in `values` */
 } mc_screen;

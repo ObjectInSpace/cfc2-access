@@ -439,7 +439,8 @@ int main(void)
         const mc_value_set *ver2 = menu_speak_values_for(v, 1, 2);
         const mc_value_set *ply2 = menu_speak_values_for(v, 2, 2);
         const mc_value_set *ply4 = menu_speak_values_for(v, 2, 4);
-        /* Row 0 is the games -- logo images, deliberately absent. */
+        /* Row 0 is the games -- deliberately absent until the ROM index
+         * mapping is confirmed (rom_table.h). The titles DO exist. */
         const mc_value_set *game = menu_speak_values_for(v, 0, 8);
         /* A count nobody has measured must not borrow another variant. */
         const mc_value_set *ver3 = menu_speak_values_for(v, 1, 3);
@@ -454,10 +455,15 @@ int main(void)
     }
 
     /* --- case 21: row 0's values are never named ------------------------
-     * ⛔ The eight game titles are logo images -- they have no clean run in
-     * the GMD. Naming one would be the confident-wrong-name failure. This
-     * pins the absence, so a later edit that "fills the gap" with a
-     * nearest-looking run fails here instead of in the user's ears.
+     * ⛔ Row 0 must have NO GMD value variant. The eight game titles have no
+     * clean run in the GMD, so any base that "looks close" names something
+     * else -- the confident-wrong-name failure.
+     *
+     * ⚠ This case does NOT say the titles are unavailable. They are in the
+     * exe (src/rom_table.h) and readable; what is missing is confirmation that
+     * cursor index N corresponds to ROM index 2N. When a run confirms that,
+     * the fix is a ROM-backed name, NOT a GMD variant -- so this case stays
+     * as it is even then.
      *
      * ⚠ Asserted STRUCTURALLY, not through menu_speak_build(). With no live
      * GMD table in this process the text read fails anyway, so a behavioural
