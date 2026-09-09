@@ -41,6 +41,14 @@ static volatile LONG g_faults;
 /* Instances whose vptr was not this class's -- see gt_poll_and_log(). A
  * nonzero count means the hook target is wrong, not that the game misbehaved. */
 static volatile LONG g_wrong_class;
+/* Calls whose object was a DIFFERENT class -- expected and normal for a shared
+ * helper, so counted separately from g_wrong_class (which means the filter let
+ * one through and is a BUG). */
+static volatile LONG g_other_class;
+/* Calls whose object WAS ours. ⭐ The number that says the filter is working:
+ * a large g_other_class with g_ours == 0 means we are hooked to something this
+ * class never reaches. */
+static volatile LONG g_ours;
 
 /* The most recently seen instance, published for the worker thread.
  *
@@ -74,6 +82,57 @@ gt_install_status gt_install_why(void) { return g_why; }
 static void *detour_body(pfn_update real, void *self, void *arg, void *caller)
 {
     InterlockedIncrement(&g_calls);
+
+    /* ⭐⭐ THE FILTER THAT MAKES A SHARED HELPER USABLE.
+     *
+     * This helper runs for several GUI classes -- that is WHY it runs per
+     * element per frame, and why it is the right hook. But it means most calls
+     * are not ours. Publishing every one would fill the channel with
+     * OutlineFonts and the worker would rarely see a cGUIObjText.
+     *
+     * So read ONE qword -- the vptr -- and publish only our class's objects.
+     *
+     * ⚠⚠ THIS IS THE ONLY DEREFERENCE IN THE DETOUR, and it is the narrowest
+     * possible one: 8 bytes at offset 0 of a pointer the game is CURRENTLY
+     * making a virtual call through. If [self+0] were unreadable the game
+     * would already have crashed reaching us. It is still guarded, because
+     * "the game would have crashed" is an argument, and this project has been
+     * wrong about exactly this kind of argument before -- a caller's pointer
+     * is untrusted even when the reasoning says otherwise.
+     *
+     * ⭐ Everything wider than these 8 bytes stays where it was: on the worker
+     * thread, under the guard, off the game's threads. */
+    /* ⚠⚠ TWO LAYERS, NOT ONE. The fault guard alone is not enough and this was
+     * proven here, not reasoned about: with only MEM_GUARDED around the read,
+     * the offline suite died with 0xC0000005 on the test's synthetic pointer.
+     * The guard is a vectored handler, and a fault taken on a thread whose
+     * frame it cannot unwind still takes the process down.
+     *
+     * ⭐ So ask the memory manager FIRST (mem_readable_run), and keep the guard
+     * as the second layer for the TOCTOU window -- another thread can free the
+     * region between the query and the read. This is exactly the pairing
+     * menu_cursor's cursor_is_safe() + MEM_GUARDED uses, and the same reason.
+     *
+     * ⚠ Checked every call, never cached: a GUI object is freed on a screen
+     * change and a pointer that passed a moment ago is not a pointer that
+     * still passes. */
+    ULONGLONG vptr = 0;
+    BOOL faulted = FALSE;
+    if (!self || ((ULONG_PTR)self & 7u) ||
+        mem_readable_run(self, sizeof(vptr)) < sizeof(vptr)) {
+        InterlockedIncrement(&g_other_class);
+        return real(self, arg);
+    }
+    MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)self);
+    if (faulted || vptr != GT_VTABLE_ADDR) {
+        if (faulted)
+            InterlockedIncrement(&g_faults);
+        else
+            InterlockedIncrement(&g_other_class);
+        return real(self, arg);
+    }
+
+    InterlockedIncrement(&g_ours);
 
     /* Publish. Bump, write, bump: a reader seeing the same even value either
      * side of its copy knows the copy was clean. */
@@ -376,10 +435,10 @@ BOOL gt_poll_and_log(void)
 
 /* --- install -------------------------------------------------------------
  *
- * The expected first bytes of 0x1402efa10:
- *     push rbx; sub rsp,0x20   = 40 53 48 83 ec 20
- * SIX bytes across two whole instructions, so MinHook's five-byte patch ends
- * on a clean boundary. ⭐ And find_callers.py --jmp found zero branches into
+ * The expected first bytes of 0x1402f9720:
+ *     mov [rsp+8], rbx   = 48 89 5c 24 08
+ * FIVE bytes, one whole instruction, so MinHook's patch ends on a clean
+ * boundary. ⭐ And find_callers.py --jmp found zero branches into
  * addr+1..+4, so nothing can land inside the patch.
  *
  * ⭐⭐ THE PROPERTY THAT MATTERS MOST is not visible in these bytes: this
@@ -391,7 +450,7 @@ BOOL gt_poll_and_log(void)
  * The prologue is re-checked here at runtime because the exe is Enigma-packed
  * and these addresses hold ciphertext until unpack completes; hooking early
  * would patch encrypted bytes. */
-static const BYTE GT_PROLOGUE[] = { 0x40, 0x53, 0x48, 0x83, 0xec, 0x20 };
+static const BYTE GT_PROLOGUE[] = { 0x48, 0x89, 0x5c, 0x24, 0x08 };
 
 static BOOL check_target(void)
 {
@@ -502,6 +561,8 @@ void gt_get_stats(gt_stats *out)
     out->distinct  = InterlockedCompareExchange(&g_distinct, 0, 0);
     out->faults    = InterlockedCompareExchange(&g_faults, 0, 0);
     out->wrong_class = InterlockedCompareExchange(&g_wrong_class, 0, 0);
+    out->other_class = InterlockedCompareExchange(&g_other_class, 0, 0);
+    out->ours        = InterlockedCompareExchange(&g_ours, 0, 0);
 }
 
 /* --- test seams ----------------------------------------------------------
@@ -562,6 +623,7 @@ BOOL gt_test_inspect(const void *buf, SIZE_T len, int *text_offset)
 void gt_test_reset(void)
 {
     g_calls = g_distinct = g_faults = g_wrong_class = 0;
+    g_other_class = g_ours = 0;
     g_seq = 0; g_taken_seq = 0;
     g_last_self = NULL; g_last_caller = NULL;
 }

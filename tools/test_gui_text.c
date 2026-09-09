@@ -71,32 +71,69 @@ int main(void)
         return 1;
     }
 
+    /* The detour filters on the vptr, so the objects handed to it must be
+     * REAL memory whose first qword is (or is not) cGUIObjText's vtable.
+     * ⭐ ours[] stands in for one of our elements, theirs[] for the
+     * OutlineFont the first live run actually caught. */
+    static ULONGLONG ours[4], theirs[4];
+    ours[0]   = GT_VTABLE_ADDR;
+    theirs[0] = 0x141101b78ULL;      /* nGUI::OutlineFont, from run 1 */
+
     /* --- case 1: the detour passes the original's return value through ----
      * ⚠ The value is chosen by the stand-in, not computed, so "passed through"
-     * is provable rather than merely plausible. */
+     * is provable rather than merely plausible.
+     * ⭐ Asserted for a FILTERED-OUT object too (case 1b): the game's control
+     * flow must not depend on whether we were interested in the object. */
     gt_test_reset();
     {
-        void *r = gt_test_body((void *)0x11110000ULL, (void *)0x22220000ULL);
+        void *r = gt_test_body(ours, (void *)0x22220000ULL);
         check("case 1: the original's return value is passed through untouched",
               r == (void *)(ULONG_PTR)0xABCDEF0012345678ULL,
               "the detour altered or replaced the game's return value");
+
+        void *r2 = gt_test_body(theirs, NULL);
+        check("case 1b: ... and also for an object we filter OUT",
+              r2 == (void *)(ULONG_PTR)0xABCDEF0012345678ULL,
+              "a filtered call did not pass the original's return value");
     }
 
-    /* --- case 2: the detour captures the instance pointer ---------------- */
-    check("case 2: the instance pointer is captured",
-          gt_test_last_captured() == (void *)0x11110000ULL,
+    /* --- case 2: the detour captures OUR instance ------------------------ */
+    check("case 2: an object with our vptr is captured",
+          gt_test_last_captured() == (void *)ours,
           "the pointer the game handed us was not recorded");
+
+    /* --- case 2b: ⭐⭐ AND ANOTHER CLASS'S OBJECT IS NOT ------------------
+     * THE case this whole revision exists for. Slot 5 is a SHARED helper: it
+     * really does receive OutlineFonts, and run 1 dumped one as though it were
+     * a text element. Capturing must be selective, or the worker thread spends
+     * every poll inspecting objects that were never ours.
+     *
+     * ⚠ Asserted as "still the previous capture", not merely "not theirs" --
+     * a detour that captured nothing at all would pass the weaker form. */
+    {
+        gt_stats st;
+        gt_get_stats(&st);
+        char d[160];
+        snprintf(d, sizeof d, "captured=%p (wanted %p, unchanged); ours=%ld "
+                 "other_class=%ld", gt_test_last_captured(), (void *)ours,
+                 st.ours, st.other_class);
+        check("case 2b: another class's object is filtered out, not captured",
+              gt_test_last_captured() == (void *)ours &&
+              st.ours == 1 && st.other_class == 1, d);
+    }
 
     /* --- case 3: it counts calls -----------------------------------------
      * ⭐ The call count is what makes "0 instances" interpretable. With calls
-     * == 0 the hook is not intercepting and nothing can be concluded. */
+     * == 0 the hook is not intercepting and nothing can be concluded. And it
+     * counts EVERY call, filtered or not -- filtering is our business, not a
+     * reason to under-report what the game did. */
     {
-        gt_test_body((void *)0x33330000ULL, NULL);
         gt_stats st;
         gt_get_stats(&st);
         char d[128];
         snprintf(d, sizeof d, "expected 2 calls, got %ld", st.calls);
-        check("case 3: invocations are counted", st.calls == 2, d);
+        check("case 3: invocations are counted, filtered ones included",
+              st.calls == 2, d);
     }
 
     /* --- case 4: a pointer field holding text is found ------------------- */

@@ -109,13 +109,43 @@
  * BOTH SAFELY UNIQUE AND AN INSTANCE METHOD. The per-frame methods are the
  * shared helpers, and they are shared precisely because they are generic.
  *
- * ⭐ The way forward is therefore NOT another slot of this vtable. It is to
- * keep a shared helper as the hook (they DO run per element, per frame) and
- * discriminate on the OBJECT: the detour already records the pointer without
- * dereferencing, and gt_poll_and_log() already rejects any vptr that is not
- * this class's. That combination -- hook the generic helper, filter by vptr --
- * gets live cGUIObjText instances with no new risk. Slot 5's run proves the
- * filter works; it rejected every OutlineFont it was handed.
+ * ⭐ The way forward looked like: keep a shared helper as the hook (they DO
+ * run per element per frame) and discriminate on the OBJECT by vptr.
+ *
+ * ⛔⛔ RUN 3 KILLED THAT TOO, AND THE NUMBER IS THE POINT.
+ * Slot 5 with the vptr filter: **10 calls, 0 of them cGUIObjText**, and the
+ * count STAYED at exactly 10 across a further 55 seconds of the game running.
+ * So 0x1402f9720 is not a per-frame method at all -- it runs ~10 times during
+ * startup, on other classes, and never again. The assumption that it was "the
+ * update method" was never checked; it came from the slot's position, and the
+ * slot's position was a guess.
+ *
+ * ⭐ The filter itself is PROVEN GOOD by that same run: 10 calls in, 10
+ * correctly classified as other classes, 0 faults, 0 wrong-class leaks. Keep
+ * it. It is the mechanism that turns any future shared-helper hook into a
+ * usable one, and it is now tested both offline (case 2b) and live.
+ *
+ * ▶ WHAT THE THREE RUNS ACTUALLY ESTABLISH, so the next attempt starts here:
+ *   - The whole vtable is accounted for. Slots 1/2/6/27 are factory,
+ *     destructor, getDTI stub, deleting destructor. Slots 0/3/4/7/11/15-18/
+ *     20-22/26 are shared across hundreds or thousands of vtables. What is
+ *     left -- 8/9/10/12/13/14/19/23/24/25 -- are tiny accessors (`mov eax,
+ *     [rcx+0x54]; ret` and the like), too short to patch and carrying no text.
+ *   - ⛔ SO cGUIObjText's VTABLE DOES NOT CONTAIN A HOOKABLE PER-FRAME METHOD.
+ *     That is a property of the class, not a failure to look hard enough.
+ *
+ * ⭐⭐ THE NEXT ROUTE, and why it is different in kind: stop trying to catch
+ * the object being DRAWN and catch it being FILLED. Something copies a GMD
+ * string into an element, and that writer takes the element and the message as
+ * ARGUMENTS -- the shape that has worked four times on this project (sPad,
+ * sKeyboard, the GMD table, the cursor chokepoint) and that scanning has
+ * failed at every time. Idea 2 in cfc2-gui-text-route, never tried:
+ * find the call that takes an rGUIMessage and an element.
+ *
+ * ⚠ And the cheap check to run FIRST, before any of that: cGUIObjMessage
+ * (0x170 bytes, vtable/DTI already known) may be the class that actually holds
+ * menu label text, with cGUIObjText being the free-text/font-rendering half.
+ * Nothing in three runs has yet shown a cGUIObjText carrying a menu label.
  *
  * ⚠⚠ SAFETY -- THIS IS THE RISKIEST THING IN THE PROJECT SO FAR
  * It receives a pointer from the game and reads half a kilobyte through it, on
@@ -148,8 +178,14 @@
 /* Live addresses. ASLR is off and the exe has no relocations, so these are
  * valid in every future run. */
 #define GT_VTABLE_ADDR   0x1410563a8ULL   /* cGUIObjText's vtable             */
-#define GT_UPDATE_ADDR   0x1402efa10ULL   /* vtable slot 1 -- the hook target */
-#define GT_VTABLE_SLOT   1                /* which slot must hold that value  */
+/* ⭐⭐ BACK TO SLOT 5 -- DELIBERATELY, and with the filter that makes it work.
+ * It is a SHARED helper, which is exactly why it runs per element per frame,
+ * which is what we need. Its problem was never that it fires too rarely; it
+ * was that it also receives other classes' objects. So we keep the hook and
+ * DISCRIMINATE ON THE OBJECT: the vptr filter below. Run 1 already proved the
+ * filter works -- it rejected every OutlineFont it was handed. */
+#define GT_UPDATE_ADDR   0x1402f9720ULL   /* vtable slot 5 -- shared helper   */
+#define GT_VTABLE_SLOT   5                /* which slot must hold that value  */
 #define GT_CLASS_SIZE    0x210            /* 528 bytes, from the reg stub     */
 
 /* The two candidate pointer fields the offline accessors revealed. Checked
@@ -198,6 +234,12 @@ typedef struct {
      * log because that is exactly the failure the first live run hit, and a
      * failure worth a diagnosis is worth a number. */
     LONG  wrong_class;
+    /* Calls filtered out in the detour because the object was another class.
+     * ⭐ EXPECTED and normal -- this is a shared helper. It is `ours` beside it
+     * that says whether the hook is useful: a big other_class with ours == 0
+     * means we are hooked where this class never goes. */
+    LONG  other_class;
+    LONG  ours;       /* calls whose object WAS a cGUIObjText */
 } gt_stats;
 
 void gt_get_stats(gt_stats *out);
