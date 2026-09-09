@@ -691,10 +691,32 @@ void menu_speak_log_unknown(const mc_move *m)
             }
             if (!ok)
                 continue;
-            if (!gmd_text_by_index(base + count, cur, sizeof(cur)) || !cur[0])
-                continue;
-            size_t L = strlen(cur);
-            if (cur[L - 1] != '.' && cur[L - 1] != '?' && cur[L - 1] != '!')
+            /* ⭐⭐ REQUIRE A PARALLEL HELP RUN -- one blurb per item, not
+             * merely one sentence after the run.
+             *
+             * The old test accepted any run of short strings followed by a
+             * single sentence, and a run's log showed what that is worth: a
+             * 6-item menu drew EIGHT candidates, nearly all unrelated
+             * ("First to 5", "Player 3", "Connection Strength"). A list of
+             * eight guesses is not evidence a person can act on.
+             *
+             * Menus in this GMD carry one HELP_ blurb per item, in the same
+             * order -- verified on all three known menus (main 37..42,
+             * Options 170..174, pause 250..256), each of which passes this.
+             * ⭐ MEASURED effect on the shipped data: candidates drop from 8
+             * to 4 for a 6-item menu, and to exactly ONE for counts of 8, 9
+             * and 10. */
+            for (int i = 0; i < count && ok; i++) {
+                if (!gmd_text_by_index(base + count + i, cur, sizeof(cur)) ||
+                    !cur[0]) {
+                    ok = 0; break;
+                }
+                size_t HL = strlen(cur);
+                if (cur[HL - 1] != '.' && cur[HL - 1] != '?' &&
+                    cur[HL - 1] != '!')
+                    ok = 0;
+            }
+            if (!ok)
                 continue;
             if (!gmd_text_by_index(base + off, cur, sizeof(cur)))
                 continue;
@@ -704,9 +726,24 @@ void menu_speak_log_unknown(const mc_move *m)
                 used += (size_t)k;
             shown++;
         }
+        /* ⚠⚠ A SURVIVING CANDIDATE IS STILL NOT A CONFIRMATION.
+         *
+         * The filter cannot tell a real run from a SLIDE of one: on the
+         * shipped data, bases 247, 248 and 249 all survive for counts of 10,
+         * 9 and 8, because they are the same pause-menu run starting one label
+         * earlier each time. Only one of them is the menu; the others begin on
+         * "Medium Kick" and "Heavy Kick".
+         *
+         * ⭐ Which is why the LIVE TEXT of the item the user is standing on is
+         * printed beside each base, and why a person still has to match it to
+         * the screen. That comparison is the confirmation; this list is only
+         * the shortlist. */
         if (used)
             log_line("mcspeak: [DISCOVERY]   position %d of %d; candidate "
-                     "bases: %s", off + 1, count, batch);
+                     "bases (each shows what item %d would be called -- ⚠ "
+                     "neighbouring bases can be SLIDES of one real run, so "
+                     "match the text to the screen): %s",
+                     off + 1, count, off + 1, batch);
         else
             log_line("mcspeak: [DISCOVERY]   position %d of %d; no candidate "
                      "run found in the first %d labels.", off + 1, count, total);
