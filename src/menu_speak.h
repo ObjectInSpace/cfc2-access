@@ -215,6 +215,10 @@ void menu_speak_build(const mc_move *m, mc_speech *out);
 /* Build it and speak it. */
 void menu_speak(const mc_move *m);
 
+/* Report what the ROM table would name the game the cursor is RESTING on.
+ * Logged, never spoken -- the index mapping is not yet confirmed. */
+void menu_speak_probe_rest(const mc_move *m);
+
 /* Log a movement from an UNKNOWN screen in the exact form needed to add it to
  * the table -- caller address, count, axis. ⭐ This is the discovery mode: the
  * next run's log becomes the table, instead of another guessing round. */

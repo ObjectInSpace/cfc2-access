@@ -241,6 +241,72 @@ int main(void)
           got_sfx == 307 && got_wrap == 309,
           "sfx_sel=%d (want 307)  wrap=%d (want 309)", got_sfx, got_wrap);
 
+
+    /* --- case 12: A RESTING CURSOR IS REPORTED WITH NO MOVEMENT ----------
+     * ⭐⭐ THE CASE THAT EXISTS BECAUSE A PROBE MEASURED THE WRONG THING.
+     *
+     * Everything here used to hang off movement, so nothing could describe the
+     * item the user was ALREADY SITTING ON: to learn what slot 0 was they had
+     * to leave slot 0, and the report then named wherever they moved to. The
+     * user said that measures the wrong thing, and it did.
+     *
+     * So: drive the body with new == old (the helper ran, the cursor did not
+     * move -- what happens every frame a menu polls input) and require that
+     * the resting channel STILL reports the position. */
+    {
+        int cur = 3;
+        (void)mc_test_body((void *)0xDEAD0000, &cur, 0, 7, FALSE, 3, TRUE, 0, (void *)0x14009BA21ULL);
+        mc_move rest;
+        BOOL got = mc_take_rest(&rest);
+        check("12. a cursor that did NOT move is still reported as resting",
+              got && rest.new_index == 3 && rest.min_index == 0 &&
+              rest.max_index == 7 && rest.caller == (void *)0x14009BA21ULL,
+              "got=%d index=%d range=%d..%d", (int)got, rest.new_index,
+              rest.min_index, rest.max_index);
+    }
+
+    /* --- case 13: the resting channel does not repeat itself -------------
+     * ⭐ The helper runs every frame, so without de-duplication this would
+     * fire ~60 times a second and bury the log it exists to write. A SECOND
+     * call at the same position must report nothing; moving must report again.
+     * ⚠ Both halves asserted: a channel that never repeats AND never fires
+     * again would pass the first half alone. */
+    {
+        int cur = 5;
+        (void)mc_test_body((void *)0xDEAD0000, &cur, 0, 7, FALSE, 5, TRUE, 0, (void *)0x14009BA21ULL);
+        mc_move r1;
+        BOOL first = mc_take_rest(&r1);
+
+        (void)mc_test_body((void *)0xDEAD0000, &cur, 0, 7, FALSE, 5, TRUE, 0, (void *)0x14009BA21ULL);
+        mc_move r2;
+        BOOL repeat = mc_take_rest(&r2);
+
+        cur = 5;
+        (void)mc_test_body((void *)0xDEAD0000, &cur, 0, 7, FALSE, 6, TRUE, 1, (void *)0x14009BA21ULL);
+        mc_move r3;
+        BOOL moved = mc_take_rest(&r3);
+
+        check("13. resting is reported once per position, and again on a change",
+              first && !repeat && moved && r3.new_index == 6,
+              "first=%d repeat=%d moved=%d idx=%d",
+              (int)first, (int)repeat, (int)moved, r3.new_index);
+    }
+
+    /* --- case 14: speech is still movement-driven -----------------------
+     * ⛔ The resting channel must NOT leak into mc_take_move(). If it did, the
+     * mod would re-speak the same item every frame -- the exact failure the
+     * `neu == old` early return was written to prevent. A cursor that did not
+     * move must yield NOTHING on the movement channel. */
+    {
+        mc_move drain;
+        while (mc_take_move(&drain)) { }        /* start clean */
+        int cur = 2;
+        (void)mc_test_body((void *)0xDEAD0000, &cur, 0, 7, FALSE, 2, TRUE, 0, (void *)0x14009BA21ULL);
+        mc_move m;
+        BOOL spoke = mc_take_move(&m);
+        check("14. a cursor that did not move yields NO movement to speak",
+              !spoke, "spoke=%d", (int)spoke);
+    }
     printf("\n");
     if (failures) {
         printf("FAILED: %d case(s)\n", failures);

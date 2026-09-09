@@ -56,6 +56,10 @@ static volatile LONG g_rejected;
  * reported torn. */
 static volatile LONG g_seq;
 static mc_move       g_last;
+/* ⭐ The RESTING cursor, republished on every call -- see the detour body. */
+static mc_move       g_rest;
+static volatile LONG g_rest_seq;
+static LONG          g_rest_taken;
 static volatile LONG g_taken_seq;
 
 static BOOL              g_installed;
@@ -139,6 +143,34 @@ static int detour_body(pfn_move real, void *screen, int *cursor,
         InterlockedIncrement(&g_rejected);
         return delta;
     }
+
+    /* ⭐⭐ THE RESTING POSITION -- published even when nothing moved.
+     *
+     * ⛔ THE FLAW THIS FIXES. Everything downstream hung off MOVEMENT, so the
+     * mod could never report the item the user was ALREADY SITTING ON. To find
+     * out what slot 0 was, the user had to leave slot 0 -- and then the report
+     * described wherever they had moved TO. Asking someone to move away and
+     * back in order to identify their resting position is a probe that
+     * measures the wrong thing, and the user said so.
+     *
+     * The helper runs every frame a menu polls input, so the resting index is
+     * available continuously; it was being thrown away one line below. This
+     * publishes it on its OWN channel.
+     *
+     * ⚠ Deliberately separate from g_last: speech must keep firing only on a
+     * CHANGE, or holding a direction would read the same item forever. This
+     * channel is for probes and diagnostics, which want the opposite. */
+    InterlockedIncrement(&g_rest_seq);
+    g_rest.screen    = screen;
+    g_rest.cursor    = cursor;
+    g_rest.old_index = neu;
+    g_rest.new_index = neu;
+    g_rest.min_index = min;
+    g_rest.max_index = max;
+    g_rest.step      = 0;
+    g_rest.vertical  = vertical;
+    g_rest.caller    = caller;
+    InterlockedIncrement(&g_rest_seq);
 
     if (neu == old)
         return delta;   /* the helper ran but the cursor did not move */
@@ -395,6 +427,49 @@ void mc_get_stats(mc_stats *out)
     out->rejected  = InterlockedCompareExchange(&g_rejected, 0, 0);
 }
 
+/* The cursor's RESTING position -- where the user is sitting right now, not
+ * where they last moved to. Returns TRUE at most once per distinct
+ * (caller, index) pair.
+ *
+ * ⭐ Why the de-duplication lives HERE and not in the caller: the helper runs
+ * every frame a menu polls input, so without it this would fire ~60 times a
+ * second. Returning FALSE for "same place as last time" makes the common case
+ * free for every caller, instead of each one reinventing the filter.
+ *
+ * ⚠ Reports the FIRST sighting of a screen too, which is the whole point --
+ * that is the reading no movement-based channel can ever produce. */
+BOOL mc_take_rest(mc_move *out)
+{
+    LONG before = InterlockedCompareExchange(&g_rest_seq, 0, 0);
+    if (before & 1)
+        return FALSE;                       /* a write is in flight */
+
+    mc_move snap = g_rest;
+
+    LONG after = InterlockedCompareExchange(&g_rest_seq, 0, 0);
+    if (after != before)
+        return FALSE;                       /* torn -- discard, never report */
+
+    if (!snap.cursor)
+        return FALSE;                       /* nothing published yet */
+
+    /* Only report a position we have not already reported. */
+    static void *last_caller;
+    static int   last_index = -1;
+    static int   last_total = -1;
+    int total = snap.max_index - snap.min_index + 1;
+    if (snap.caller == last_caller && snap.new_index == last_index &&
+        total == last_total)
+        return FALSE;
+    last_caller = snap.caller;
+    last_index  = snap.new_index;
+    last_total  = total;
+
+    g_rest_taken = after;
+    *out = snap;
+    return TRUE;
+}
+
 BOOL mc_take_move(mc_move *out)
 {
     LONG before = InterlockedCompareExchange(&g_seq, 0, 0);
@@ -438,6 +513,23 @@ void mc_poll_and_log(void)
         announced = TRUE;
         log_line("mc: the helpers ARE running (%ld calls so far). The hook is "
                  "live.", st.calls);
+    }
+
+    /* ⭐ The RESTING position, before movements. This is what lets a probe
+     * describe where the user is SITTING -- including the moment a screen
+     * first appears, which no movement-driven channel can observe. It
+     * self-limits to one report per distinct position, so this is quiet. */
+    mc_move rest;
+    if (mc_take_rest(&rest)) {
+        menu_speak_probe_rest(&rest);
+        /* ⭐⭐ Discovery belongs on this channel too. Hanging it off movement
+         * meant a screen the user ENTERED but never moved on was never
+         * reported -- so the menus hardest to navigate blind, the ones where
+         * you cannot tell whether the cursor moved, were exactly the ones that
+         * produced no evidence. The resting channel sees a screen the moment
+         * it starts polling input. */
+        if (!menu_speak_lookup((ULONGLONG)(ULONG_PTR)rest.caller))
+            menu_speak_log_unknown(&rest);
     }
 
     /* ⚠ `if`, not `while`: only the most recent movement is kept, so a loop

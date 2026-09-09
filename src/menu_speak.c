@@ -457,48 +457,6 @@ void menu_speak(const mc_move *m)
         return;
     }
 
-    /* ⭐⭐ THE GAME-NAME PROBE -- LOGGED, NEVER SPOKEN.
-     *
-     * The Select Game screen's Game row (row 0) has no value labels in the
-     * GMD, but the exe carries a ROM table with the real titles
-     * (src/rom_table.h). The mapping from the cursor's 0..7 to a ROM index is
-     * a HYPOTHESIS -- rom = 2*game + version, from the table's JP/US pairing --
-     * and this is how it gets tested: print what the hypothesis WOULD say, so
-     * a run's log can be compared against the game actually on screen.
-     *
-     * ⛔ Deliberately not spoken. A title from an unconfirmed mapping is
-     * exactly the confident-wrong-name failure this file exists to prevent,
-     * and it would be indistinguishable from a right one. Once a run confirms
-     * it, this becomes a value variant like any other. */
-    if (sp.axis == MC_AXIS_VALUE && sp.have_row && sp.row == 0 &&
-        sp.screen_name[0] && rom_table_ready()) {
-        static int last_logged = -1;
-        int game = sp.position - 1;
-        if (game != last_logged) {
-            last_logged = game;
-            /* Both regions, because which one the version row selects is part
-             * of what is being tested. */
-            char t0[128] = "", t1[128] = "", c0[16] = "", c1[16] = "";
-            int i0 = rom_table_index_for(game, 0);
-            int i1 = rom_table_index_for(game, 1);
-            if (i0 >= 0) { rom_table_title(i0, t0, sizeof(t0));
-                           rom_table_code(i0, c0, sizeof(c0)); }
-            if (i1 >= 0) { rom_table_title(i1, t1, sizeof(t1));
-                           rom_table_code(i1, c1, sizeof(c1)); }
-            /* ⚠ Print the RAW index alongside the 1-based position. The first
-             * version printed only the position while deriving the title from
-             * the index, so the line read "slot 3 -> Capcom Fighting Jam" when
-             * it meant index 2 -- self-consistent but impossible to check
-             * against without recomputing the off-by-one by hand. A probe whose
-             * output has to be decoded is a probe that will be misread. */
-            log_line("mcspeak: [ROMPROBE] cursor index %d (position %d of %d) "
-                     "-- IF the mapping rom=2*game+version holds, this is "
-                     "\"%s\" [%s] / \"%s\" [%s]. ⚠ NOT SPOKEN: compare "
-                     "against the game actually on screen before trusting it.",
-                     game, sp.position, sp.total, t0, c0, t1, c1);
-        }
-    }
-
     /* interrupt=TRUE: the user has moved on, so a queued previous item is
      * stale. Holding a direction must not build a backlog to read out. */
     /* ⚠ The log says what ACTUALLY happened. Writing `mcspeak: "..."`
@@ -531,6 +489,62 @@ static BOOL opt_discovery_enabled(void)
     strncat(path, "cfc2_discover.on", MAX_PATH - strlen(path) - 1);
     cached = (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES);
     return cached != 0;
+}
+
+/* ⭐⭐ THE GAME-NAME PROBE -- LOGGED, NEVER SPOKEN.
+ *
+ * The Select Game screen's Game row has no value labels in the GMD, but the
+ * exe carries a ROM table with the real titles (src/rom_table.h). The mapping
+ * from the cursor's 0..7 to a ROM index is a HYPOTHESIS -- rom = 2*game +
+ * version, from the table's JP/US pairing -- and this prints what the
+ * hypothesis WOULD say, so a run's log can be compared against the game
+ * actually on screen.
+ *
+ * ⛔⛔ IT TAKES THE RESTING POSITION, NOT A MOVEMENT, AND THAT IS THE POINT.
+ * The first version hung off menu_speak(), which only runs on a CHANGE -- so
+ * it could never describe the item the user was already sitting on. Confirming
+ * the FIRST game meant leaving it and coming back, and the report then named
+ * whatever they had moved to. The user pointed out that this measures the
+ * wrong thing, and they were right: a probe that cannot observe a resting
+ * state cannot answer "what am I on?".
+ *
+ * ⛔ Still never spoken. A title from an unconfirmed mapping is exactly the
+ * confident-wrong-name failure this file exists to prevent. Once a run
+ * confirms it, this becomes a value variant like any other. */
+void menu_speak_probe_rest(const mc_move *m)
+{
+    if (!m || !m->screen)
+        return;
+
+    const mc_screen *s = menu_speak_lookup((ULONGLONG)(ULONG_PTR)m->caller);
+    if (!s || s->kind != MC_SETTINGS_VALUE)
+        return;
+
+    /* Only the GAME row, and only when the row is derivable. */
+    int row = 0;
+    if (!menu_speak_derive_row(m->screen, m->cursor, s->values_off, 0, &row))
+        return;
+    if (row != 0)
+        return;
+    if (!rom_table_ready())
+        return;
+
+    int game  = m->new_index - m->min_index;
+    int total = m->max_index - m->min_index + 1;
+
+    char t0[128] = "", t1[128] = "", c0[16] = "", c1[16] = "";
+    int i0 = rom_table_index_for(game, 0);
+    int i1 = rom_table_index_for(game, 1);
+    if (i0 >= 0) { rom_table_title(i0, t0, sizeof(t0));
+                   rom_table_code(i0, c0, sizeof(c0)); }
+    if (i1 >= 0) { rom_table_title(i1, t1, sizeof(t1));
+                   rom_table_code(i1, c1, sizeof(c1)); }
+
+    log_line("mcspeak: [ROMPROBE] RESTING on cursor index %d (position %d of "
+             "%d) -- IF the mapping rom=2*game+version holds, this is \"%s\" "
+             "[%s] / \"%s\" [%s]. ⚠ NOT SPOKEN: compare against the game "
+             "actually on screen before trusting it.",
+             game, game + 1, total, t0, c0, t1, c1);
 }
 
 void menu_speak_log_unknown(const mc_move *m)

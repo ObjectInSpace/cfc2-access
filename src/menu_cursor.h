@@ -132,6 +132,17 @@ void mc_get_stats(mc_stats *out);
  * movement" cannot be confused with a stale repeat of the previous one. */
 BOOL mc_take_move(mc_move *out);
 
+/* The cursor's RESTING position -- where the user is SITTING, not where they
+ * last moved to. Returns TRUE at most once per distinct (caller, index).
+ *
+ * ⭐⭐ This exists because everything else here is movement-driven, and a
+ * movement channel structurally cannot answer "what am I on right now?" --
+ * to learn what slot 0 is you would have to leave slot 0. That made the game
+ * probe ask the user to move away and back, which is measuring the wrong
+ * thing. The helper sees the resting index every frame; it was being
+ * discarded. */
+BOOL mc_take_rest(mc_move *out);
+
 /* Log any movement, plus a one-time report of the first capture. Called from
  * the worker thread. */
 void mc_poll_and_log(void);
