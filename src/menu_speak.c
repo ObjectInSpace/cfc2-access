@@ -754,6 +754,25 @@ sweep:
      * ⚠ I have twice estimated this kind of cost by arithmetic and been wrong
      * both times. This number came from running it. */
     if (gmd_text_count() > 0) {
+        /* ⭐⭐ TWO PASSES: strict first, relaxed if strict finds too little.
+         *
+         * ⛔ THE FAILURE THIS FIXES, measured on a real run. Requiring a full
+         * parallel HELP run leaves exactly ONE candidate for a 9-item screen
+         * -- base 248, which reads "Heavy Kick / Pause Menu" and is plainly a
+         * slide, not the menu. Meanwhile 76 loose 9-item runs exist and the
+         * true answer is among them. The strict rule did not sharpen the
+         * shortlist there; it DELETED the answer and left only a wrong one,
+         * which is worse than a long list.
+         *
+         * ⭐ The user challenged my calling the extra candidates "nonsense",
+         * and was right: they are coherent runs, and the filter is choosing
+         * among real possibilities rather than removing junk. A chooser that
+         * can discard the true answer must therefore be able to back off.
+         *
+         * So: run strict; if it yields fewer than 2 candidates, run again
+         * accepting one trailing sentence, and SAY which pass produced the
+         * list -- a shortlist means something different depending on how hard
+         * it had to try. */
         int off = m->new_index - m->min_index;
         int total = gmd_text_count();
         if (total > 600)
@@ -761,7 +780,12 @@ sweep:
         int shown = 0;
         char batch[512];
         size_t used = 0;
-        batch[0] = '\0';
+        int strict = 1;
+
+    again:
+        shown = 0;
+        used = 0;
+        batch[0] = 0;
 
         for (int base = 0; base + count < total && shown < 8; base++) {
             char cur[128];
@@ -808,7 +832,11 @@ sweep:
              * OUT. That is a real cost, accepted because a list of eight is
              * unusable, not because the discarded entries were junk. The
              * "no candidate" message says so explicitly. */
-            for (int i = 0; i < count && ok; i++) {
+            /* ⚠ `strict` demands the full parallel run; when the sweep is
+             * re-run relaxed, ONE trailing sentence is enough. See the
+             * two-pass logic below for why both exist. */
+            int need = strict ? count : 1;
+            for (int i = 0; i < need && ok; i++) {
                 if (!gmd_text_by_index(base + count + i, cur, sizeof(cur)) ||
                     !cur[0]) {
                     ok = 0; break;
@@ -845,13 +873,25 @@ sweep:
          * under whatever header happened to come before it, and grouping the
          * log by screen becomes guesswork. A diagnostic whose lines cannot be
          * attributed is much weaker than it looks. */
+        /* ⭐ Back off rather than report a shortlist that may exclude the
+         * answer. Fewer than two survivors means the strict rule was too
+         * sharp for this screen's labels. */
+        if (strict && shown < 2) {
+            strict = 0;
+            goto again;
+        }
+
         if (used)
             log_line("mcspeak: [DISCOVERY] caller=0x%llx  position %d of %d; "
-                     "candidate bases (each shows what item %d would be called "
-                     "-- ⚠ neighbouring bases can be SLIDES of one real run, so "
-                     "match the text to the screen): %s",
+                     "%s candidate bases (each shows what item %d would be "
+                     "called -- ⚠ neighbouring bases can be SLIDES of one real "
+                     "run, so match the text to the screen): %s",
                      (unsigned long long)(ULONG_PTR)m->caller,
-                     off + 1, count, off + 1, batch);
+                     off + 1, count,
+                     strict ? "[strict: one blurb per item]"
+                            : "[RELAXED: strict found <2, list is longer and "
+                              "weaker]",
+                     off + 1, batch);
         else
             log_line("mcspeak: [DISCOVERY] caller=0x%llx  position %d of %d; "
                      "no candidate "
