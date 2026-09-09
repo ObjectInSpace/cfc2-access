@@ -895,6 +895,9 @@ static int   g_text_count;
  * Returns a static short code, or NULL if the file has no Language key (the
  * default state -- the game does not write one itself).
  */
+/* Defined below, beside the index it frees. */
+static void text_index_free(void);
+
 static const char *gmd_expected_language(void)
 {
     static char code[8];
@@ -958,51 +961,123 @@ BOOL gmd_text_ready(void)
 
     /* Re-resolve the blob with the same search gmd_find used, and keep the
      * offset that actually worked this run. */
-    /* ⭐⭐ TRY EVERY CANDIDATE, AND PREFER THE GAME'S OWN LANGUAGE.
+    /* \u2b50\u2b50 THE STRING BLOB IS PER-LANGUAGE; THE LABEL ARRAY IS NOT.
      *
-     * gmd_find() returns the single candidate it liked best, chosen on
-     * STRUCTURE alone. That was enough while only one table was resident -- and
-     * it stopped being enough the moment a stale table from a previous locale
-     * outlived a language change. The scan then found the old table, verified
-     * it perfectly (it IS a valid GMD table), and the mod spoke French at a
-     * screen showing English.
+     * Labels are language-independent hashes, so ONE label array can be paired
+     * with several string blobs -- and after a language change the old blob is
+     * still resident. verify_text_live() accepted the FIRST offset whose text
+     * matched ANY shipped language, and offset 0x140000 (the stale French blob)
+     * is tried first. That is the whole bug: the game showed English while we
+     * read French, with every structural check passing.
      *
-     * gmd_expected_language() reads the locale out of config.ini, which the
-     * game demonstrably honours. If the resolved table disagrees, say so
-     * loudly: a mismatch means the text we serve is wrong even though every
-     * structural check passed. */
-    for (int i = 0; i < GMD_NVERIFY; i++) {
-        char buf[128];
-        buf[0] = '\0';
-        int off = -1;
-        if (verify_text_live(r.array_base, &g_gmd_verify[i],
-                             buf, sizeof(buf), &off) && off > 0) {
-            g_text_blob  = r.array_base + (SIZE_T)off;
-            g_text_count = GMD_LABEL_COUNT;
-            /* ⭐⭐ SAY WHICH LANGUAGE. The verifier accepts any shipped
-             * variant, so a resolved table is NOT necessarily the one the game
-             * is displaying -- a stale French table outlived a switch to
-             * English and the mod spoke French for a whole session while the
-             * screen read English. Naming the locale in the log makes that
-             * visible instead of silent. */
-            const char *lang = gmd_text_language();
-            log_line("gmdtext: ⭐ blob resolved at entries+0x%x this run; "
-                     "%d messages readable. Table language: %s",
-                     off, g_text_count, lang ? lang : "UNRECOGNISED");
-            if (!lang)
-                log_line("gmdtext: ⚠⚠ index 0 matches no shipped table. This "
-                         "table is not one we recognise; treat any text from "
-                         "it as suspect.");
-            const char *want = gmd_expected_language();
-            if (want && lang && strcmp(want, lang) != 0)
-                log_line("gmdtext: ⛔⛔ LANGUAGE MISMATCH -- config.ini says the "
-                         "game is running \"%s\" but the table we resolved is "
-                         "\"%s\". Every item name spoken from it will be in the "
-                         "WRONG LANGUAGE. This is a stale table left over from a "
-                         "previous locale, not a bad read.", want, lang);
-            return TRUE;
+     * So do not take the first match. Resolve the blob at EVERY known offset,
+     * ask each one which language it is, and keep the one that agrees with
+     * config.ini -- which the game demonstrably reads and writes.
+     *
+     * \u26a0 If none agrees, fall back to the first that resolved at all and say so
+     * loudly. Serving the wrong language is bad; serving nothing is worse, and
+     * the log has to make clear which happened.
+     */
+    const char *want = gmd_expected_language();
+
+    int  best_off = -1;
+    char best_lang[8] = { 0 };
+    int  first_off = -1;
+    char first_lang[8] = { 0 };
+
+    for (int h = 0; h < NSTRING_HINTS && best_off < 0; h++) {
+        SIZE_T delta = g_strings_hints[h];
+        /* Point the accessor at this candidate blob and ask what it is. */
+        g_text_blob  = r.array_base + delta;
+        g_text_count = GMD_LABEL_COUNT;
+        text_index_free();
+
+        const char *lang = gmd_text_language();
+        if (!lang)
+            continue;                   /* not a table we recognise */
+
+        if (first_off < 0) {
+            first_off = (int)delta;
+            _snprintf(first_lang, sizeof(first_lang), "%s", lang);
+        }
+        log_line("gmdtext:   blob at entries+0x%llx is \"%s\"%s",
+                 (unsigned long long)delta, lang,
+                 (want && strcmp(want, lang) == 0) ? "  <== matches config.ini"
+                                                   : "");
+        if (want && strcmp(want, lang) == 0) {
+            best_off = (int)delta;
+            _snprintf(best_lang, sizeof(best_lang), "%s", lang);
         }
     }
+
+    if (best_off >= 0) {
+        g_text_blob  = r.array_base + (SIZE_T)best_off;
+        g_text_count = GMD_LABEL_COUNT;
+        text_index_free();
+        log_line("gmdtext: \u2b50\u2b50 blob resolved at entries+0x%x; %d messages "
+                 "readable. Table language: %s (matches config.ini).",
+                 best_off, g_text_count, best_lang);
+        return TRUE;
+    }
+
+    /* \u2b50\u2b50 THE HINT LIST IS SIX GUESSES; THE BLOB MOVES. If none of them is the
+     * game's current language, SEARCH. The blob has always been 64 KB-aligned
+     * and within a few MB of the label array, and asking "which language is
+     * this?" is a single indexed lookup now, so a sweep is cheap.
+     *
+     * \u26a0 This exists because a fixed list already failed twice in this project:
+     * once when the blob moved between runs, and again here when a stale blob
+     * occupied the first hint while the live one sat elsewhere. A list of
+     * remembered offsets is a convenience, never the mechanism. */
+    if (best_off < 0 && want) {
+        for (SIZE_T d = 0x10000; d <= 0x400000; d += 0x10000) {
+            g_text_blob  = r.array_base + d;
+            g_text_count = GMD_LABEL_COUNT;
+            text_index_free();
+            const char *lang = gmd_text_language();
+            if (lang && strcmp(lang, want) == 0) {
+                best_off = (int)d;
+                _snprintf(best_lang, sizeof(best_lang), "%s", lang);
+                log_line("gmdtext: \u2b50 found the \"%s\" blob by SEARCH at "
+                         "entries+0x%llx (not in the hint list -- add it).",
+                         want, (unsigned long long)d);
+                break;
+            }
+            if (lang && first_off < 0) {
+                first_off = (int)d;
+                _snprintf(first_lang, sizeof(first_lang), "%s", lang);
+            }
+        }
+    }
+
+    if (best_off >= 0) {
+        g_text_blob  = r.array_base + (SIZE_T)best_off;
+        g_text_count = GMD_LABEL_COUNT;
+        text_index_free();
+        log_line("gmdtext: \u2b50\u2b50 blob resolved at entries+0x%x; %d messages "
+                 "readable. Table language: %s (matches config.ini).",
+                 best_off, g_text_count, best_lang);
+        return TRUE;
+    }
+
+    if (first_off >= 0) {
+        g_text_blob  = r.array_base + (SIZE_T)first_off;
+        g_text_count = GMD_LABEL_COUNT;
+        text_index_free();
+        if (want)
+            log_line("gmdtext: \u26d4\u26d4 NO blob matches config.ini (\"%s\"). Falling "
+                     "back to entries+0x%x, which is \"%s\" -- item names will "
+                     "be in the WRONG LANGUAGE. The game's current blob is at an "
+                     "offset not in the hint list.", want, first_off, first_lang);
+        else
+            log_line("gmdtext: blob resolved at entries+0x%x, language \"%s\". "
+                     "config.ini has no Language key, so there is nothing to "
+                     "check it against.", first_off, first_lang);
+        return TRUE;
+    }
+
+    g_text_blob = NULL;
+    g_text_count = 0;
     log_line("gmdtext: could not resolve the string blob this run.");
     return FALSE;
 }
