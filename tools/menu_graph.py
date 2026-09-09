@@ -139,6 +139,27 @@ def table_targets(secs, table, count):
     return out
 
 
+# The globals a navigation branch writes: the screen id and the mode selector.
+# ⭐ Measured: of the six cursor-indexed dispatches, only TWO write these. The
+# other four compute help-string ids, layout floats or flags -- they are
+# indexed by the cursor but they do not CHANGE SCREEN, so reporting them as
+# menu choices would be a false positive dressed as a finding.
+STATE_GLOBAL_HINT = "+ 0xd0"
+
+
+def navigates(secs, addr):
+    """Does this branch write the state globals, i.e. actually change screen?"""
+    sec = [s for s in secs if s.live == 0x140001000][0]
+    md = Cs(CS_ARCH_X86, CS_MODE_64)
+    win = sec.data[addr - sec.live:addr - sec.live + 0x60]
+    for ins in md.disasm(win, addr):
+        if ins.mnemonic == "mov" and STATE_GLOBAL_HINT in ins.op_str and                 "dword" in ins.op_str:
+            return True
+        if ins.mnemonic in ("jmp", "ret"):
+            break
+    return False
+
+
 def branch_summary(secs, addr, limit=14):
     """What a branch DOES: the globals it writes, which identify the target."""
     sec = [s for s in secs if s.live == 0x140001000][0]
@@ -168,13 +189,20 @@ def main():
     print("dispatch sites decoded in %#x..%#x: %d" %
           (MENU_LO, MENU_HI, len(sites)))
 
-    rows = []
+    rows, cursor_only = [], 0
     for site, table in sites:
         is_cursor, count = classify(secs, site)
-        if is_cursor:
-            rows.append((site, table, count))
-    print("of those, indexed by a CURSOR field (i.e. menu choices): %d\n"
-          % len(rows))
+        if not is_cursor:
+            continue
+        cursor_only += 1
+        nav = False
+        if count:
+            nav = any(navigates(secs, t)
+                      for t in table_targets(secs, table, count))
+        rows.append((site, table, count, nav))
+    print("of those, indexed by a CURSOR field: %d" % cursor_only)
+    print("of those, whose branches actually CHANGE SCREEN: %d\n"
+          % sum(1 for r in rows if r[3]))
 
     if args.site:
         want = int(args.site, 0)
@@ -182,8 +210,12 @@ def main():
         if not rows:
             sys.exit("%#x is not a cursor-indexed dispatch site" % want)
 
-    for site, table, count in rows:
-        print("site %#x  table %#x  entries=%s" % (site, table, count))
+    for site, table, count, nav in rows:
+        print("site %#x  table %#x  entries=%s  %s"
+              % (site, table, count,
+                 "MENU NAVIGATION" if nav else
+                 "(NOT navigation -- help ids, layout or flags: indexed by "
+                 "the cursor but never changes screen)"))
         if not count:
             print("   ⚠ no bound found; cannot decode the table safely\n")
             continue
