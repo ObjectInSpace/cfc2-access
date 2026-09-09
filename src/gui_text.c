@@ -493,6 +493,19 @@ BOOL gt_poll_and_log(void)
  * would patch encrypted bytes. */
 static const BYTE GT_PROLOGUE[] = { 0x40, 0x53, 0x48, 0x83, 0xec, 0x30 };
 
+/* ⛔⛔ THE CTOR NEEDS ITS OWN. It is `push rbx; sub rsp,0x20` -- the SAME shape
+ * as the update method but a different frame size, so the last byte is 0x20,
+ * not 0x30.
+ *
+ * The first version reused GT_PROLOGUE for both, and the ctor hook silently
+ * declined to install for exactly that one byte. It cost a run. ⭐ It cost
+ * only ONE run because the refusal was loud and the stats carried
+ * `ctor_hooked`, so the log said "this zero measures nothing" instead of
+ * "0 constructed" -- the difference between a wasted run and a wrong
+ * conclusion. Two functions never share a prologue constant just because they
+ * start with the same two instructions. */
+static const BYTE GT_CTOR_PROLOGUE[] = { 0x40, 0x53, 0x48, 0x83, 0xec, 0x20 };
+
 static BOOL check_target(void)
 {
     void *p = (void *)(ULONG_PTR)GT_UPDATE_ADDR;
@@ -587,13 +600,23 @@ BOOL gt_install(void)
      * makes a zero interpretable -- without it, "update ran 0 times" cannot be
      * told apart from "no objects were ever created". */
     void *c = (void *)(ULONG_PTR)GT_CTOR_ADDR;
-    BYTE cpro[sizeof(GT_PROLOGUE)];
+    BYTE cpro[sizeof(GT_CTOR_PROLOGUE)];
     if (!mem_copy(cpro, c, sizeof(cpro)) ||
-        memcmp(cpro, GT_PROLOGUE, sizeof(cpro)) != 0) {
-        log_line("gt: ⚠ the ctor at 0x%llx does not carry the expected "
-                 "prologue -- NOT hooking it. The construction count will be "
-                 "absent, so a zero update count cannot be told apart from "
-                 "'no objects exist'.", GT_CTOR_ADDR);
+        memcmp(cpro, GT_CTOR_PROLOGUE, sizeof(cpro)) != 0) {
+        /* ⭐ PRINT WHAT WE SAW, not just that it mismatched. The first version
+         * of this line said only "does not carry the expected prologue", and
+         * the cause was a single byte (0x20 vs 0x30) that the message could
+         * have shown. A refusal that does not say what it saw makes the reader
+         * re-derive the disassembly to find a one-byte bug. */
+        log_line("gt: ⚠ the ctor at 0x%llx carries %02x %02x %02x %02x %02x "
+                 "%02x, not the expected %02x %02x %02x %02x %02x %02x -- NOT "
+                 "hooking it. The construction count will be absent, so a zero "
+                 "update count cannot be told apart from 'no objects exist'.",
+                 GT_CTOR_ADDR,
+                 cpro[0], cpro[1], cpro[2], cpro[3], cpro[4], cpro[5],
+                 GT_CTOR_PROLOGUE[0], GT_CTOR_PROLOGUE[1], GT_CTOR_PROLOGUE[2],
+                 GT_CTOR_PROLOGUE[3], GT_CTOR_PROLOGUE[4],
+                 GT_CTOR_PROLOGUE[5]);
     } else if (MH_CreateHook(c, (void *)&hook_ctor,
                              (void **)&g_real_ctor) != MH_OK ||
                MH_EnableHook(c) != MH_OK) {
@@ -680,6 +703,22 @@ void *gt_test_body(void *self, void *arg)
 void *gt_test_last_captured(void)
 {
     return g_last_self;
+}
+
+/* Expose the prologue constants so a test can pin them. `which`: 0 = the
+ * update method, 1 = the ctor.
+ *
+ * ⭐ Returns the SHIPPING constants, not copies -- a test against a duplicate
+ * of the values would pass while the values the install actually compares
+ * against were wrong, which is precisely the bug this exists to catch. */
+const BYTE *gt_test_prologue(int which, int *len)
+{
+    if (which == 0) {
+        if (len) *len = (int)sizeof(GT_PROLOGUE);
+        return GT_PROLOGUE;
+    }
+    if (len) *len = (int)sizeof(GT_CTOR_PROLOGUE);
+    return GT_CTOR_PROLOGUE;
 }
 
 /* The stand-in "original" ctor. ⛔ It returns a value the TEST recognises

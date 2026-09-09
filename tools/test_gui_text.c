@@ -290,6 +290,41 @@ int main(void)
               gt_test_last_captured() == (void *)raw && st.ctors == 1, d);
     }
 
+    /* --- case 9c: ⛔⛔ THE TWO PROLOGUE CONSTANTS ARE NOT THE SAME ---------
+     * A run was spent on this. The ctor check reused the update method's
+     * prologue constant, and the two differ in ONE byte -- both are
+     * `push rbx; sub rsp,N` but with N = 0x20 and 0x30. The ctor hook silently
+     * declined to install.
+     *
+     * ⭐ The offline suite could not have caught it as written, because
+     * nothing here asserted what the constants ARE. This case fixes that: it
+     * pins the expected bytes for both targets against the values read from
+     * the dump. If someone "simplifies" the two constants back into one, or
+     * edits a target address without re-reading its prologue, this fails on
+     * the bench instead of costing a launch.
+     *
+     * ⚠ It cannot verify the addresses are the RIGHT functions -- only that
+     * the recorded bytes match what was disassembled. That distinction is the
+     * same one stated at the top of this file. */
+    {
+        extern const BYTE *gt_test_prologue(int which, int *len);
+        int ul = 0, cl = 0;
+        const BYTE *up = gt_test_prologue(0, &ul);
+        const BYTE *cp = gt_test_prologue(1, &cl);
+        const BYTE want_u[] = { 0x40, 0x53, 0x48, 0x83, 0xec, 0x30 };
+        const BYTE want_c[] = { 0x40, 0x53, 0x48, 0x83, 0xec, 0x20 };
+        BOOL ok = up && cp && ul == 6 && cl == 6 &&
+                  memcmp(up, want_u, 6) == 0 && memcmp(cp, want_c, 6) == 0 &&
+                  memcmp(up, cp, 6) != 0;
+        char d[192];
+        snprintf(d, sizeof d,
+                 "update=%02x %02x %02x %02x %02x %02x  ctor=%02x %02x %02x "
+                 "%02x %02x %02x", up[0], up[1], up[2], up[3], up[4], up[5],
+                 cp[0], cp[1], cp[2], cp[3], cp[4], cp[5]);
+        check("case 9c: update and ctor prologues are pinned AND distinct",
+              ok, d);
+    }
+
     /* --- case 10: install REFUSES when the target is not the expected code -
      * ⭐⭐ Reported as a REASON, not a bare FALSE. A test asserting only
      * "install failed" passes with every guard deleted, because MinHook
@@ -341,6 +376,8 @@ int main(void)
  *   delete the inline-string sweep               -> ONLY case 6 fails
  *   filtering the CTOR detour on vptr too        -> ONLY case 9b fails
  *   ctor count never incremented                 -> ONLY case 9b fails
+ *   ctor reuses the update method's prologue     -> ONLY case 9c fails
+ *                                                   (the real bug, replayed)
  *
  * ⭐⭐ THE ONE WORTH READING TWICE is the install guard. With it deleted,
  * gt_install() STILL returns FALSE -- MinHook refuses an unmapped address on
