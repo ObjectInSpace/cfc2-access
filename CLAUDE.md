@@ -81,64 +81,84 @@ before touching that work.
 
 - `src/log.c` — timestamped logging.
 
-## ▶ START HERE (next session): RUN the GUI text reader
+## ▶ START HERE (next session): the GUI text route needs a NEW KIND of target
 
-**It is built, tested, deployed, and `cfc2_guitext.on` is already created in
-the game dir. It has NOT been run in-game.** `src/gui_text.c`, commit 107676b.
+**The reader is built, tested and deployed. It has been RUN FOUR TIMES and
+every hook target was wrong.** `src/gui_text.c`, commits 107676b..e4a46ed.
 Full detail in memory `cfc2-gui-text-reader-built`.
 
-**The run:** launch via Steam, walk into any menu, then read `gt:` lines in
-`CFC2Access.log`. What they answer:
+⛔⛔ **Do not try another slot of cGUIObjText's vtable.** All 28 are accounted
+for: four are unique+callerless (factory, destructor, getDTI stub, deleting
+destructor), thirteen are shared across 214-4196 vtables, and the rest are
+tiny accessors too short to patch. **The class exposes no hookable per-frame
+method.** That is a property of the class, not a failure to look harder.
 
-- `gt: vptr CONFIRMED` followed by `⭐ best candidate is +0xNNN` -> **that is
-  the text field offset**, which is the whole point. If it is `0x1f8` or
-  `0x200`, the two offline accessors were right.
-- `gt: examined N pointer-shaped field(s) ... 0 resolved to text` -> a real
-  negative: the string is not a plain pointer or an inline ASCII/UTF-16 array
-  in this object. Next ideas, in order: `cGUIObjMessage` (0x170 bytes), then
-  find the writer that copies an rGUIMessage into an element.
-- `gt: update ran 0 time(s)` -> ⚠ the hook is NOT intercepting. **Nothing in
-  that run is evidence either way** -- liveness before findings.
+### ⭐⭐ The three questions, in order -- each one bought with a game launch
+Before hooking ANY vtable slot in this engine:
 
-**Then:** the offset becomes a targeted read, the `cfc2_guitext.on` gate comes
-off (a guard must not outlive its bug -- the discovery sweep's gate stayed on
-for days after the cost that justified it was fixed), and the join into
-`menu_speak` names the ~14 remaining screens.
+1. Is the address in exactly one vtable?
+   ⛔ Run 1: slot 5 passed and was still wrong. It is a **shared helper** that
+   three sites reach by direct `call rel32`, so they pass their OWN `this`. It
+   handed us an `nGUI::OutlineFont` and 41 Adobe glyph names. "Unique to the
+   class" is the wrong question; **"reached only through the class's vtable"**
+   needs the caller count too.
+2. Does it have zero direct callers?
+   ⛔ Run 2: slot 1 passed 1 and 2 and was still wrong. It is the class
+   **factory** -- so it is called on the DTI descriptor, not an element. One
+   distinct pointer across 61 calls, whose "text" was the GUI class names.
+3. ⭐⭐ **Is it an INSTANCE method** -- does it run per element, per frame, on
+   objects already built? A ctor, a dtor and a factory all pass 1 and 2 and
+   none hands over a live populated element.
 
-### ⭐⭐ Why slot 5, and the check that changed the answer
-Hook target is `0x1402f9720` = cGUIObjText's vtable + 0x28. Three properties
-were CHECKED, not assumed:
+### ⭐ And the check that decides class membership: is the vtable REGISTERED?
+Run 4 hooked what I had read as cGUIObjText's "second vtable" (`0x141056480`,
+the address its factory stores). Searching every data section for it:
 
-1. **It is unique to this class.** Searching every data section for that qword
-   finds it in exactly ONE 8-aligned slot. So every captured instance is
-   certainly a cGUIObjText and the detour needs no type check.
-2. Its first instruction is exactly 5 bytes -- clean MinHook boundary.
-3. `find_callers.py --jmp` finds zero branches into addr+1..+4.
+    0x1410563a8 -> referenced once, DTI slot 0x1422cae28  (cGUIObjText)
+    0x141056480 -> referenced NOWHERE
 
-⛔⛔ **The first target considered failed test 1.** `0x1402fed50` had a real
-prologue and walked the child list, and it appears in **NINE vtables -- none of
-them cGUIObjText's**. Hooking it would have captured other classes' objects and
-read 528 bytes out of things that are not 528 bytes long. Ask "is this address
-unique to the class?" before hooking any vtable slot; a plausible prologue says
-nothing about whose method it is.
+Class names here are a **packed string pool with vtables interleaved**, so an
+unregistered address next to a known vtable is just a different class's table
+sitting nearby. ⭐⭐ **Adjacency in a pool is not class membership.**
 
-### Safety shape (the riskiest module here)
-The detour **dereferences nothing** -- it records the pointer and calls the
-original. All reading happens later on the worker thread, VirtualQuery-checked
-and fault-guarded every time and never cached, in ONE guarded block for the
-whole object rather than per byte. Original always called, return value passed
-through untouched. Respects `cfc2_hook.off`.
+### ▶ The next route -- different in kind, not another slot
+⭐⭐ **Catch the element being FILLED, not drawn.** Something copies a GMD
+string into an element, and that writer takes the element and the message as
+ARGUMENTS -- the shape that has worked 4/4 here (sPad, sKeyboard, the GMD
+table, the cursor chokepoint) and that scanning has failed at every time. Find
+the call taking an `rGUIMessage` and an element.
+
+⚠ **Cheap check first:** `cGUIObjMessage` (0x170 bytes, registration stub
+`0x14002e850`) may be the class that actually holds menu label text, with
+cGUIObjText being the free-text/font half. **Nothing in four runs has shown a
+cGUIObjText carrying a menu label.** ⛔ Resolve its vtable from its DTI
+reference, NOT from what follows its name in the pool.
+
+### What is proven good and stays
+- **The vptr filter** -- run 3: 10 calls in, 10 correctly classified, 0 faults,
+  0 leaks. Tested offline (case 2b) and live. It makes any future shared-helper
+  hook usable.
+- **The refusal** -- a foreign vptr RETURNS instead of warning above a full
+  dump. Run 1 printed 41 glyph-name lines under a warning, and both "candidate"
+  offsets held plausible strings. Two candidates both hitting is not
+  corroboration; it is what a dense pointer array looks like from outside.
+  ⭐ If the code prints a warning, something must FAIL on it.
+- ⚠⚠ **The vptr read needs BOTH layers** -- `mem_readable_run()` then
+  `MEM_GUARDED`. With only the guard, the offline suite died 0xC0000005 on a
+  synthetic pointer: a vectored handler cannot save a fault it cannot unwind.
+  Same pairing as `menu_cursor`'s `cursor_is_safe()`, same reason.
+- Switch: `cfc2_guitext.on` (absent = off). Respects `cfc2_hook.off`.
 
 ### The test: `.\tools\run_gt_test.ps1`
 un_gt_test.ps1`
-Ten offline cases; every mechanism was sabotaged and seen to fail (log at the
-bottom of `tools/test_gui_text.c`).
-⭐ Case 5 -- an object with **no** text must yield **-1** -- carries the most
-weight: an inspector that always names some offset is useless, because if it
-cannot say "no" its "yes" means nothing.
-⚠ A green run is NOT evidence the live read is safe; the test path never
-touches foreign memory. It is evidence the inspector draws right conclusions
-from bytes it was given.
+Thirteen offline cases; each mechanism sabotaged and seen to fail.
+⭐ Case 5 (no text -> **-1**) and case 2b (another class's object is filtered,
+and "still the previous capture" rather than merely "not theirs") carry the
+weight.
+⚠ A green run is NOT evidence the live read is safe -- the test path never
+touches foreign memory.
+⛔ Run it with PowerShell directly. Via some shells a crashing suite reported
+exit 0 with no output; the real result was 0xC0000005.
 
 ## Screens named so far (7 rows in `g_screens`)
 Main menu · Options · Museum (992 GALLERY/SOUND) · Select Game (rows +
