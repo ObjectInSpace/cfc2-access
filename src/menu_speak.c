@@ -108,6 +108,28 @@ static const mc_screen g_screens[] = {
     { 0x1400a20fcULL, 170, 5, "Options", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0,
       NULL, 0, NULL, 0 },
 
+    /* ⭐ Museum. ESTABLISHED FROM THE NAVIGATION SEQUENCE, not from a lone
+     * candidate list. The 12:45 run shows the user on "Museum, 3 of 6", then
+     * Enter, then this caller appearing with 2 items -- so this is the screen
+     * Museum leads to.
+     *
+     * GMD 992 GALLERY / 993 SOUND, with HELP twins at 995/996 pairing by NAME
+     * (HELP_GALLERY <-> GALLERY, HELP_SOUND <-> SOUND). Two items, matching the
+     * live count. Verified across English, French and Japanese: the labels are
+     * GALLERY/SOUND in all three, so this is not an artifact of one language.
+     *
+     * ⚠ TITLE_SELECT ("Game Select") sits at 994, immediately after -- close
+     * enough to look like a third item, and it is NOT one here: the screen
+     * reported TWO items and only 992/993 have paired HELP entries.
+     *
+     * ⛔ The rival candidate my filter offered was base 993 ("Music", "Game
+     * Select"), which passes the structural test purely by luck -- its
+     * "parallel HELP run" is HELP_GALLERY and HELP_SOUND, which belong to the
+     * labels BEFORE it. The label NAMES are what settled it; the structure
+     * alone would have shipped the off-by-one. */
+    { 0x140099b23ULL, 992, 2, "Museum", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0,
+      NULL, 0, NULL, 0 },
+
     /* --- Select Game (from Offline Play), fn 0x1400b1b10 -----------------
      *
      * ⛔⛔ THIS SCREEN WAS MISNAMED "Game settings" AND IT COST A RUN.
