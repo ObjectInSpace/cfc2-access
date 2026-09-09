@@ -428,6 +428,52 @@ int main(void)
           sp.position == 2 && sp.total == 4,
           "named=%d why=%d %d of %d", (int)sp.named, (int)sp.why,
           sp.position, sp.total);
+
+    /* --- case 20: value variants are keyed on the LIVE count -------------
+     * ⭐⭐ The live value list is a SUBSET of the labels that exist: "Either"
+     * is an online lobby filter, P3/P4 belong to the 4-player games. So a
+     * variant is selected by the count actually on screen, and a count nobody
+     * has measured selects NOTHING rather than the nearest list. */
+    {
+        const mc_screen *v = menu_speak_lookup(0x1400b1bd9ULL);
+        const mc_value_set *ver2 = menu_speak_values_for(v, 1, 2);
+        const mc_value_set *ply2 = menu_speak_values_for(v, 2, 2);
+        const mc_value_set *ply4 = menu_speak_values_for(v, 2, 4);
+        /* Row 0 is the games -- logo images, deliberately absent. */
+        const mc_value_set *game = menu_speak_values_for(v, 0, 8);
+        /* A count nobody has measured must not borrow another variant. */
+        const mc_value_set *ver3 = menu_speak_values_for(v, 1, 3);
+        const mc_value_set *ply7 = menu_speak_values_for(v, 2, 7);
+        check("20. value variants match on live count; unmeasured counts refuse",
+              ver2 && ver2->first == 53 && ply2 && ply2->first == 58 &&
+              ply4 && ply4->first == 58 && ply4->count == 4 &&
+              game == NULL && ver3 == NULL && ply7 == NULL,
+              "ver2=%p ply2=%p ply4=%p game=%p ver3=%p ply7=%p",
+              (const void *)ver2, (const void *)ply2, (const void *)ply4,
+              (const void *)game, (const void *)ver3, (const void *)ply7);
+    }
+
+    /* --- case 21: row 0's values are never named ------------------------
+     * ⛔ The eight game titles are logo images -- they have no clean run in
+     * the GMD. Naming one would be the confident-wrong-name failure. This
+     * pins the absence, so a later edit that "fills the gap" with a
+     * nearest-looking run fails here instead of in the user's ears.
+     *
+     * ⚠ Asserted STRUCTURALLY, not through menu_speak_build(). With no live
+     * GMD table in this process the text read fails anyway, so a behavioural
+     * assertion would pass even with a games variant added -- two layers, one
+     * outcome, the trap this suite has hit before. Checking the TABLE is what
+     * isolates it: no variant may exist for row 0. Verified by sabotage --
+     * adding { 0, 8, 51 } fails this case. */
+    {
+        const mc_screen *v = menu_speak_lookup(0x1400b1bd9ULL);
+        int any_row0 = 0;
+        for (int i = 0; v && i < v->nvalues; i++)
+            if (v->values[i].row == 0)
+                any_row0 = 1;
+        check("21. row 0 (the games) has NO value variant -- they are images",
+              v && !any_row0, "any_row0=%d", any_row0);
+    }
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");

@@ -125,6 +125,11 @@ typedef struct {
      * REPLACES the base, and base_index stays -1 on such a row. */
     const int *labels;     /* GMD index per item, or NULL */
     int        nlabels;    /* entries in `labels`; must equal `count` */
+    /* ⭐⭐ VALUE labels, for MC_SETTINGS_VALUE: one variant per row, chosen by
+     * the row's LIVE count. See mc_value_set. NULL when the values cannot be
+     * named (Select Game's row 0 -- the game titles are logo images). */
+    const struct mc_value_set *values;
+    int        nvalues;    /* entries in `values` */
 } mc_screen;
 
 /* What a movement should say. */
@@ -153,6 +158,29 @@ typedef enum {
      * discovery pass. */
     MC_UNNAMED_NO_LABELS
 } mc_named_why;
+
+/* ⭐⭐ One row's value labels, keyed by how many values are LIVE.
+ *
+ * The Select Game screen's value lists are shorter than the label sets that
+ * exist for them, because some labels are online-only or game-dependent:
+ *   - Game Version has THREE labels (Japanese / English / Either) but "Either"
+ *     is a lobby-search filter; offline the list is J/E, and the live count
+ *     was measured at 2.
+ *   - Player has FOUR (P1..P4) but only the 4-player games (Power Stone 2,
+ *     Project Justice) offer P3/P4; the live count was measured at 2.
+ *
+ * ⛔ So the labels CANNOT be indexed directly -- the live list is a subset, and
+ * which subset depends on the game and on online/offline. Keying each variant
+ * on its `count` makes the match checkable: a count with no matching variant
+ * names nothing rather than indexing a list that does not apply.
+ *
+ * ⚠ `count` is the LIVE number of values, and `first` the GMD index the list
+ * starts at. Variants are only ever added from a MEASURED count. */
+typedef struct mc_value_set {
+    int row;      /* which row of the screen these values belong to */
+    int count;    /* the live value count this variant applies to */
+    int first;    /* GMD index of value 0 */
+} mc_value_set;
 
 /* Which axis a movement was on -- so the readout can say what the user
  * actually did. ⭐ On a settings screen "3 of 8" is ambiguous between "the
@@ -213,6 +241,10 @@ void menu_speak_log_unknown(const mc_move *m);
 #define MC_MAX_PLAUSIBLE_ROWS 64
 BOOL menu_speak_derive_row(const void *screen, const void *cursor,
                            int values_off, int max_row, int *row);
+
+/* The value-label variant for `row` matching the LIVE value count, or NULL. */
+const mc_value_set *menu_speak_values_for(const mc_screen *s, int row,
+                                          int live_count);
 
 /* The MC_SETTINGS_ROW entry of the same screen as a value entry, or NULL --
  * so a value can name the row it belongs to. */

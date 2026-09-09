@@ -27,6 +27,20 @@ ARC = (r"C:\Program Files (x86)\Steam\steamapps\common"
 ROW_MAP = [51, 52, 56]
 EXPECT_KEYS = ["GAME_TITLE", "GAME_VERSION", "PLAYER"]
 
+# Must match g_select_game_values in src/menu_speak.c: (row, live count, first
+# GMD index, expected label keys).
+#
+# ⭐ Keyed on the LIVE count because the live list is a SUBSET of the labels
+# that exist: GAME_VERSION_ANY ("Either") is an online lobby filter, and
+# PLAYER_3P/4P belong to the 4-player games (Power Stone 2, Project Justice).
+# The 2-value variants were MEASURED in the 23:03 run; the 4-player one is
+# predicted and flagged as such in the C table.
+VALUE_SETS = [
+    (1, 2, 53, ["GAME_VERSION_J", "GAME_VERSION_E"]),
+    (2, 2, 58, ["PLAYER_1P", "PLAYER_2P"]),
+    (2, 4, 58, ["PLAYER_1P", "PLAYER_2P", "PLAYER_3P", "PLAYER_4P"]),
+]
+
 
 def main():
     if not os.path.isfile(ARC):
@@ -53,6 +67,18 @@ def main():
         if not all(v and v.strip() for v in vals):
             print("  FAIL  %-12s a row label is empty: %r" % (short, vals))
             failures += 1
+            continue
+
+        # ⭐⭐ The VALUE lists, which are the half the C suite cannot check.
+        bad = False
+        for row, count, first, keys in VALUE_SETS:
+            got = [items[first + i][0] for i in range(count)]
+            if got != keys:
+                print("  FAIL  %-12s row %d/%d values land on %s, expected %s"
+                      % (short, row, count, got, keys))
+                failures += 1
+                bad = True
+        if bad:
             continue
         print("  PASS  %-12s %s" % (short, " | ".join(vals)))
 

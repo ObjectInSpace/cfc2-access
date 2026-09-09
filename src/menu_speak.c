@@ -32,6 +32,35 @@
  * hook reports it. */
 static const int g_select_game_rows[] = { 51, 52, 56 };
 
+/* ⭐⭐ Select Game's VALUE labels, per row, keyed by the LIVE count.
+ *
+ * ⛔ Row 0 (Game) is deliberately ABSENT: the eight game titles have no clean
+ * run in the GMD -- they occur only inside ACHIEVEMENT_*_DESC text -- so they
+ * are drawn as logo images. A row with no variant here names nothing, which is
+ * the correct outcome, not a gap to be filled with the nearest-looking run.
+ *
+ * Row 1, Game Version. Labels: 53 GAME_VERSION_J "Japanese Version",
+ * 54 GAME_VERSION_E "English Version", 55 GAME_VERSION_ANY "Either".
+ * ⭐ "Either" is a LOBBY SEARCH FILTER, so offline the live list is J/E only --
+ * which is exactly the count of 2 measured in the 23:03 run. The 3-value
+ * variant is NOT listed: it has never been observed, and an unobserved variant
+ * is a guess. If an online screen ever shows 3, it will name nothing and log a
+ * mismatch, which is how it should be found.
+ *
+ * Row 2, Player. Labels: 58 PLAYER_1P "P1" .. 61 PLAYER_4P "P4".
+ * ⭐ P3/P4 exist for the 4-player games (Power Stone 2, Project Justice); a
+ * 2-player game offers P1/P2, the count of 2 measured in the run. Both the
+ * 2-value and 4-value variants start at 58, so the 4-value case is a PREFIX
+ * extension, not a different list -- but it is still listed explicitly rather
+ * than inferred, so that a count of 3 (which no game should produce) refuses
+ * instead of quietly reading three of the four.
+ * ⚠ The 4-value row is NOT yet confirmed live -- see MC_VALUES_UNCONFIRMED. */
+static const mc_value_set g_select_game_values[] = {
+    { 1, 2, 53 },   /* Game Version: Japanese / English  -- MEASURED */
+    { 2, 2, 58 },   /* Player: P1 / P2                   -- MEASURED */
+    { 2, 4, 58 },   /* Player: P1..P4 on 4-player games  -- PREDICTED */
+};
+
 static const mc_screen g_screens[] = {
     /* ⛔⛔ REMOVED: { 0x14009ba21, 37, 6, "Main menu" }.
      *
@@ -60,7 +89,7 @@ static const mc_screen g_screens[] = {
      * choices. Both legitimately map to base 37; neither is a duplicate to be
      * deleted. */
     { 0x140097a59ULL, 37, 6, "Main menu", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0,
-      NULL, 0 },
+      NULL, 0, NULL, 0 },
 
     /* ⭐ Options. CONFIRMED 2026-09-08 by live text: standing on position 5 of
      * 5, base 170 read "Credits" (French "Credits"), which is MENU_OP_CREDITS
@@ -72,7 +101,7 @@ static const mc_screen g_screens[] = {
      * main menu has 6. That is why the count is stored and checked, not merely
      * recorded. */
     { 0x1400a20fcULL, 170, 5, "Options", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0,
-      NULL, 0 },
+      NULL, 0, NULL, 0 },
 
     /* --- Select Game (from Offline Play), fn 0x1400b1b10 -----------------
      *
@@ -94,7 +123,7 @@ static const mc_screen g_screens[] = {
      * ⭐⭐ 51, 52, 56 is exactly the non-contiguous case: no base+index can
      * address it. That is what `labels` exists for. */
     { 0x1400b1b69ULL, -1, 3, "Select Game", MC_VERIFIED_LIVE_TEXT,
-      MC_SETTINGS_ROW, 0, g_select_game_rows, 3 },
+      MC_SETTINGS_ROW, 0, g_select_game_rows, 3, NULL, 0 },
 
     /* The value site of the same screen. ⚠ count 0 -- one call site drives all
      * three rows' value lists, whose lengths differ (8 games; the version and
@@ -109,7 +138,9 @@ static const mc_screen g_screens[] = {
      * value here would be a guess. It reports the row it belongs to, which the
      * row label then names, and the value's POSITION. */
     { 0x1400b1bd9ULL, -1, 0, "Select Game", MC_VERIFIED_LIVE_TEXT,
-      MC_SETTINGS_VALUE, 0x338, NULL, 0 },
+      MC_SETTINGS_VALUE, 0x338, NULL, 0,
+      g_select_game_values,
+      (int)(sizeof(g_select_game_values) / sizeof(g_select_game_values[0])) },
 };
 
 #define NSCREENS (int)(sizeof(g_screens) / sizeof(g_screens[0]))
@@ -136,6 +167,21 @@ const mc_screen *menu_speak_sibling_row(const mc_screen *v)
         if (g_screens[i].kind == MC_SETTINGS_ROW &&
             g_screens[i].name && strcmp(g_screens[i].name, v->name) == 0)
             return &g_screens[i];
+    }
+    return NULL;
+}
+
+/* The value-label variant for `row` whose count matches the LIVE count, or
+ * NULL. ⭐ Matching on the count is what makes an unmeasured list refuse
+ * itself rather than borrow another row's labels. */
+const mc_value_set *menu_speak_values_for(const mc_screen *s, int row,
+                                          int live_count)
+{
+    if (!s || !s->values || row < 0 || live_count <= 0)
+        return NULL;
+    for (int i = 0; i < s->nvalues; i++) {
+        if (s->values[i].row == row && s->values[i].count == live_count)
+            return &s->values[i];
     }
     return NULL;
 }
@@ -304,6 +350,31 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
                     out->row_name[sizeof(out->row_name) - 1] = '\0';
                 }
             }
+            /* ⭐⭐ NAME THE VALUE ITSELF, when this row has a variant matching
+             * the LIVE count: "Game Version, English Version" rather than
+             * "Game Version, 2 of 2".
+             *
+             * ⛔ Keyed on the count, because the live list is a SUBSET of the
+             * labels that exist -- "Either" is an online lobby filter, and
+             * P3/P4 belong to the 4-player games. No matching variant means no
+             * name, which is the right answer: an unrecognised count is a list
+             * nobody has measured, and indexing the nearest one would speak a
+             * value that is not on the screen. */
+            const mc_value_set *vs = menu_speak_values_for(s, row, out->total);
+            if (vs) {
+                int vidx = m->new_index - m->min_index;
+                char vtext[128];
+                if (vidx >= 0 && vidx < vs->count &&
+                    gmd_text_by_index(vs->first + vidx, vtext, sizeof(vtext)) &&
+                    vtext[0]) {
+                    _snprintf(out->item, sizeof(out->item), "%s", vtext);
+                    out->item[sizeof(out->item) - 1] = '\0';
+                    out->named = TRUE;
+                    out->why = MC_NAMED_OK;
+                } else {
+                    out->why = MC_UNNAMED_TEXT_UNREADABLE;
+                }
+            }
         } else {
             out->why = MC_UNNAMED_ROW_UNDERIVABLE;
         }
@@ -330,7 +401,14 @@ void menu_speak(const mc_move *m)
     /* ⚠ The item NAME leads, then the position. A screen reader user wants the
      * word first; the position is context, not the headline. */
     char line[256];
-    if (sp.named)
+    /* ⭐ A named VALUE reads as "row name, value name" -- "Game Version,
+     * English Version". The row name is the context a blind user needs in
+     * order to know what the value is a value OF, and it leads for the same
+     * reason the item name leads elsewhere. */
+    if (sp.named && sp.axis == MC_AXIS_VALUE && sp.row_name[0])
+        _snprintf(line, sizeof(line), "%s, %s, %d of %d",
+                  sp.row_name, sp.item, sp.position, sp.total);
+    else if (sp.named)
         _snprintf(line, sizeof(line), "%s, %d of %d",
                   sp.item, sp.position, sp.total);
     /* ⭐⭐ Settings screens: say which AXIS moved. Without this, moving Right
