@@ -33,6 +33,26 @@
  * kbd_install_why() lesson: when two layers can produce one outcome, asserting
  * the outcome tests neither.
  *
+ * SABOTAGE RESULTS FOR THE SETTINGS-SCREEN CASES (10-15), same method:
+ *   drop the alignment check    -> 11 and 14 fail. ⭐⭐ And 14 shows the real
+ *                                  danger: without it a MISALIGNED cursor is
+ *                                  silently rounded into "row 0", i.e. the mod
+ *                                  would name the wrong setting confidently.
+ *   drop the range ceiling      -> ONLY 11 fails (row 6 on a 3-row screen)
+ *   let a settings ROW be named -> ONLY 12 fails
+ *   never report a derived row  -> ONLY 13 fails
+ *   apply the count check to the
+ *     varying-count site        -> 13, 14 and 15 fail
+ *
+ * ⭐⭐ AND ONE MECHANISM THAT WAS DELETED RATHER THAN TESTED. derive_row first
+ * carried a separate "is the cursor below the array?" check beside the range
+ * ceiling. Sabotage proved it REDUNDANT, not protective: deleting it -- in both
+ * unsigned and signed form -- left the entire suite green, because a cursor
+ * below the base wraps to a delta of ~2^63 that the ceiling rejects anyway.
+ * Two expressions of one property are not two layers; they just make the
+ * property untestable. The check was removed and the ceiling now carries it
+ * alone, which is why case 11's `below` sub-case is meaningful.
+ *
  * ⚠ A fifth sabotage (drop the unknown-screen guard) does NOT discriminate --
  * it also falls through to the failing text lookup. The risk it models (an
  * unknown menu borrowing row 0's labels) is covered by case 2 demanding
@@ -194,8 +214,25 @@ int main(void)
     int sane = (nrows >= 1);
     for (int i = 0; i < nrows; i++) {
         const mc_screen *a = menu_speak_row(i);
-        if (!a || a->count <= 0 || a->base_index < 0 || !a->name || !a->name[0])
+        if (!a || !a->name || !a->name[0])
             sane = 0;
+        /* ⭐⭐ The sanity rule is per-KIND, not one rule loosened to fit.
+         * A flat list MUST have a real base and count -- that is what gets
+         * indexed, and a bad one speaks a wrong name. A settings row must have
+         * NO base (-1), because it is forbidden from naming anything until a
+         * discovery pass proves its labels; a base here would be the exact
+         * confident-wrong-name failure. */
+        else if (a->kind == MC_LIST) {
+            if (a->count <= 0 || a->base_index < 0)
+                sane = 0;
+        } else {
+            if (a->base_index != -1)
+                sane = 0;             /* a settings row must claim NO label */
+            if (a->count < 0)
+                sane = 0;
+            if (a->kind == MC_SETTINGS_VALUE && a->values_off <= 0)
+                sane = 0;             /* the row cannot be derived without it */
+        }
         /* ⭐⭐ Provenance. A row justified by plausibility rather than by a
          * live-text discovery block shipped once and made a different screen
          * speak the main menu's labels. Only VERIFIED_LIVE_TEXT may ship. */
@@ -211,6 +248,119 @@ int main(void)
           sane, "rows=%d", nrows);
 
 
+
+    /* --- case 10: the row derivation, on the REAL numbers ----------------
+     * ⭐⭐ These are the addresses from the 22:46 run's log, not invented ones:
+     * screen 0x2C3B1D00, value cursors 0x2C3B2038 / 203C / 2040 for rows 0/1/2,
+     * with the array at +0x338 read out of fn 0x1400b1b10. If the arithmetic in
+     * the shipping code disagrees with the game's own layout, this fails. */
+    {
+        const void *screen = (const void *)(ULONG_PTR)0x2C3B1D00ULL;
+        int row = -1;
+        int ok0 = menu_speak_derive_row(screen,
+                    (const void *)(ULONG_PTR)0x2C3B2038ULL, 0x338, 3, &row)
+                  && row == 0;
+        int ok1 = menu_speak_derive_row(screen,
+                    (const void *)(ULONG_PTR)0x2C3B203CULL, 0x338, 3, &row)
+                  && row == 1;
+        int ok2 = menu_speak_derive_row(screen,
+                    (const void *)(ULONG_PTR)0x2C3B2040ULL, 0x338, 3, &row)
+                  && row == 2;
+        check("10. the row is derived correctly from the real run's pointers",
+              ok0 && ok1 && ok2, "ok0=%d ok1=%d ok2=%d", ok0, ok1, ok2);
+    }
+
+    /* --- case 11: a derivation that does NOT fit is REFUSED ---------------
+     * ⭐⭐ THE CASE THAT MATTERS MOST HERE. The whole justification for deriving
+     * the row by arithmetic is that a wrong model FAILS rather than yielding a
+     * plausible row number. Three ways it can be wrong, all of which must
+     * return FALSE and not a rounded answer:
+     *   - the cursor lies BELOW the array (a different screen layout);
+     *   - the difference is MISALIGNED (not an int array at all);
+     *   - the row is OUT OF RANGE (past the end of a 3-row screen).
+     * ⚠ `row` is left at a poison value to prove nothing was written. */
+    {
+        const void *screen = (const void *)(ULONG_PTR)0x2C3B1D00ULL;
+        int row = -999;
+        /* ⚠⚠ AN HONEST NOTE ON THIS SUB-CASE. With max_row passed, deleting
+         * the `cur < base` check alone leaves the suite GREEN: the unsigned
+         * subtraction wraps to a huge delta which the range bound then rejects
+         * anyway -- two layers producing one outcome, which is the trap this
+         * project has now hit four times. So `below` is tested with max_row 0,
+         * where the range bound is explicitly NOT in play and only the lower
+         * bound can produce the refusal. */
+        int below = !menu_speak_derive_row(screen,
+                      (const void *)(ULONG_PTR)0x2C3B2000ULL, 0x338, 0, &row);
+        int misaligned = !menu_speak_derive_row(screen,
+                      (const void *)(ULONG_PTR)0x2C3B203AULL, 0x338, 3, &row);
+        int too_far = !menu_speak_derive_row(screen,
+                      (const void *)(ULONG_PTR)0x2C3B2050ULL, 0x338, 3, &row);
+        check("11. a cursor that does not fit the model is REFUSED, not rounded",
+              below && misaligned && too_far && row == -999,
+              "below=%d misaligned=%d too_far=%d row=%d",
+              below, misaligned, too_far, row);
+    }
+
+    /* --- case 12: a settings ROW speaks its axis and is NEVER named -------
+     * ⭐ base+index cannot name a settings row, so the row must report
+     * MC_AXIS_ROW with named=FALSE and the reason NO_LABELS. Demanding the
+     * REASON (not merely !named) is what keeps this from passing for the wrong
+     * cause -- the lesson case 3 already paid for. */
+    m = mk(0x1400b1b69ULL, 1, 0, 2);
+    menu_speak_build(&m, &sp);
+    check("12. a settings ROW reports its axis, unnamed, with the right reason",
+          !sp.named && sp.axis == MC_AXIS_ROW &&
+          sp.why == MC_UNNAMED_NO_LABELS &&
+          sp.position == 2 && sp.total == 3,
+          "named=%d axis=%d why=%d %d of %d", (int)sp.named, (int)sp.axis,
+          (int)sp.why, sp.position, sp.total);
+
+    /* --- case 13: a settings VALUE carries the row it belongs to ---------- */
+    m = mk(0x1400b1bd9ULL, 2, 0, 7);
+    m.screen = (void *)(ULONG_PTR)0x2C3B1D00ULL;
+    m.cursor = (int *)(ULONG_PTR)0x2C3B2038ULL;   /* row 0 */
+    menu_speak_build(&m, &sp);
+    check("13. a settings VALUE reports its axis and derives its row",
+          !sp.named && sp.axis == MC_AXIS_VALUE && sp.have_row && sp.row == 0 &&
+          sp.why == MC_UNNAMED_NO_LABELS && sp.position == 3 && sp.total == 8,
+          "axis=%d have_row=%d row=%d why=%d %d of %d", (int)sp.axis,
+          (int)sp.have_row, sp.row, (int)sp.why, sp.position, sp.total);
+
+    /* --- case 14: an underivable row still speaks POSITION ----------------
+     * ⭐⭐ The safety property. When the row cannot be derived the mod must
+     * still say something TRUE ("value 3 of 8"), not fall silent and not invent
+     * a row. `have_row` FALSE is what the speech path keys on. */
+    m = mk(0x1400b1bd9ULL, 2, 0, 7);
+    m.screen = (void *)(ULONG_PTR)0x2C3B1D00ULL;
+    m.cursor = (int *)(ULONG_PTR)0x2C3B2039ULL;   /* misaligned on purpose */
+    menu_speak_build(&m, &sp);
+    check("14. an underivable row still yields a true position, and says why",
+          !sp.named && !sp.have_row && sp.axis == MC_AXIS_VALUE &&
+          sp.why == MC_UNNAMED_ROW_UNDERIVABLE &&
+          sp.position == 3 && sp.total == 8,
+          "have_row=%d why=%d %d of %d", (int)sp.have_row, (int)sp.why,
+          sp.position, sp.total);
+
+    /* --- case 15: the varying-count site is NOT rejected by staleness -----
+     * ⭐ The same call site legitimately drives an 8-value row and two 2-value
+     * rows, so its table row carries count 0 ("do not check"). This pins that:
+     * all three counts must be accepted. A regression to a fixed count would
+     * silently reject two rows out of three. */
+    {
+        int accepted = 1;
+        const int counts[3] = { 8, 2, 2 };
+        for (int i = 0; i < 3; i++) {
+            mc_move v = mk(0x1400b1bd9ULL, 0, 0, counts[i] - 1);
+            v.screen = (void *)(ULONG_PTR)0x2C3B1D00ULL;
+            v.cursor = (int *)(ULONG_PTR)(0x2C3B2038ULL + 4u * (unsigned)i);
+            mc_speech vs;
+            menu_speak_build(&v, &vs);
+            if (vs.why == MC_UNNAMED_COUNT_MISMATCH || vs.total != counts[i])
+                accepted = 0;
+        }
+        check("15. a varying-count settings site is never rejected on count",
+              accepted, "");
+    }
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");

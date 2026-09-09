@@ -51,7 +51,7 @@ static const mc_screen g_screens[] = {
      * 0x14009b920), so these are two distinct screens that present the same six
      * choices. Both legitimately map to base 37; neither is a duplicate to be
      * deleted. */
-    { 0x140097a59ULL, 37, 6, "Main menu", MC_VERIFIED_LIVE_TEXT },
+    { 0x140097a59ULL, 37, 6, "Main menu", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0 },
 
     /* ⭐ Options. CONFIRMED 2026-09-08 by live text: standing on position 5 of
      * 5, base 170 read "Credits" (French "Credits"), which is MENU_OP_CREDITS
@@ -62,7 +62,35 @@ static const mc_screen g_screens[] = {
      * been convincing. The item COUNT settles it: this screen has 5 items, the
      * main menu has 6. That is why the count is stored and checked, not merely
      * recorded. */
-    { 0x1400a20fcULL, 170, 5, "Options", MC_VERIFIED_LIVE_TEXT },
+    { 0x1400a20fcULL, 170, 5, "Options", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0 },
+
+    /* --- the per-game settings screen, fn 0x1400b1b10 --------------------
+     *
+     * ⭐⭐ SHAPE MEASURED, LABELS NOT. Both rows below carry base_index -1 and
+     * are NEVER named: they exist to give the movement its correct FRAMING
+     * ("setting 2 of 3" / "setting 1, value 3 of 8") rather than the bare and
+     * misleading "3 of 8" this screen used to produce.
+     *
+     * ⚠ `how` is VERIFIED_LIVE_TEXT for the SHAPE: the 22:46 run walked this
+     * screen and the log's cursor addresses match the disassembly's array
+     * exactly (row 0 -> +0x338, row 1 -> +0x33c, row 2 -> +0x340, 22 movements,
+     * zero exceptions). No LABEL is claimed by either row, so the provenance
+     * rule -- never ship a label that live text has not shown -- is not being
+     * bent here; there is simply no label to ship yet.
+     *
+     * ⛔ Do NOT give these a base_index until a discovery pass proves one.
+     * Which setting each row names depends on the GAME selected, and the OPT_
+     * family interleaves setting names with their value labels, so any base
+     * that "looks close" will read out a value where a name belongs. */
+    { 0x1400b1b69ULL, -1, 3, "Game settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_ROW, 0 },
+    /* ⚠ count is 0 -- this site's item count is the VALUE count of whichever
+     * row is focused (8, 2 and 2 were all observed at this one call site), so
+     * a fixed expected count would be wrong for two rows out of three. 0 means
+     * "do not check the count", which is safe here precisely BECAUSE the row
+     * never claims a label. */
+    { 0x1400b1bd9ULL, -1, 0, "Game settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x338 },
 };
 
 #define NSCREENS (int)(sizeof(g_screens) / sizeof(g_screens[0]))
@@ -85,6 +113,57 @@ const mc_screen *menu_speak_lookup(ULONGLONG caller)
     return NULL;
 }
 
+/* ⭐⭐ THE ROW DERIVATION -- see the header for why this is arithmetic and not
+ * remembered state.
+ *
+ * ⚠ Neither pointer is DEREFERENCED here. They are subtracted as values. That
+ * matters: `screen` is caller-supplied and this project has already killed the
+ * game once by trusting such a pointer, so the rule is that `screen` is never
+ * read. Subtracting two addresses reads neither. */
+BOOL menu_speak_derive_row(const void *screen, const void *cursor,
+                           int values_off, int max_row, int *row)
+{
+    if (!screen || !cursor || !row)
+        return FALSE;
+
+    /* ⚠ Compare as integers, not as pointers: `cursor` may legitimately be
+     * below `screen` on a screen we have modelled wrongly, and pointer
+     * subtraction on unrelated objects is undefined.
+     *
+     * ⭐⭐ ONE bound, not two. A separate "is the cursor below the array?"
+     * test was written first, in both unsigned and signed form, and BOTH were
+     * proven unnecessary by sabotage: deleting either left the entire suite
+     * green, because a cursor below the base yields a delta of ~2^63 which the
+     * single range check below rejects on its own. That is not defence in
+     * depth -- it is one property written twice, and the cost is that neither
+     * copy can be tested. So the range check is the whole guard, and case 11's
+     * `below` sub-case exercises it through that one path. */
+    LONGLONG base = (LONGLONG)(ULONG_PTR)screen + (LONGLONG)values_off;
+    LONGLONG cur  = (LONGLONG)(ULONG_PTR)cursor;
+    ULONGLONG delta = (ULONGLONG)(cur - base);
+    if (delta % 4u != 0)
+        return FALSE;                      /* misaligned: not an int array */
+
+    ULONGLONG r = delta / 4u;
+    /* ⭐⭐ THE BOUND -- and the ONLY one, per the note above. Without it a
+     * screen laid out differently would still yield SOME row number, and a
+     * plausible-looking wrong row is exactly the failure mode this design
+     * refuses. It rejects three things at once: a row past the end of a known
+     * screen, a row absurdly far out, and (via the wraparound) a cursor sitting
+     * BELOW the array entirely.
+     *
+     * ⚠ `max_row == 0` means "the row count is not known here" -- the ceiling
+     * then falls back to MC_MAX_PLAUSIBLE_ROWS rather than to no ceiling at
+     * all, because "unknown count" must not mean "accept anything". */
+    ULONGLONG ceiling = (max_row > 0) ? (ULONGLONG)max_row
+                                      : (ULONGLONG)MC_MAX_PLAUSIBLE_ROWS;
+    if (r >= ceiling)
+        return FALSE;
+
+    *row = (int)r;
+    return TRUE;
+}
+
 void menu_speak_build(const mc_move *m, mc_speech *out)
 {
     memset(out, 0, sizeof(*out));
@@ -104,7 +183,13 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
      * table expects, this screen is not the screen the row describes -- a game
      * update reordered a menu, or the caller was reused. Refuse the row rather
      * than index into the wrong label run. */
-    if (out->total != s->count) {
+    /* ⭐ count == 0 means "this screen's item count VARIES legitimately", which
+     * is true of a settings screen's value site: the same call site drives an
+     * 8-value row and two 2-value rows. Such a row never claims a label, so
+     * there is nothing for a stale count to corrupt -- checking it would only
+     * reject every movement. Every LABELLED row still has a real count and is
+     * still checked. */
+    if (s->count > 0 && out->total != s->count) {
         out->why = MC_UNNAMED_COUNT_MISMATCH;
         static BOOL warned;
         if (!warned) {
@@ -119,6 +204,36 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
 
     _snprintf(out->screen_name, sizeof(out->screen_name), "%s", s->name);
     out->screen_name[sizeof(out->screen_name) - 1] = '\0';
+
+    /* --- settings screens ------------------------------------------------
+     * ⭐⭐ These are NOT flat lists (see the header): a settings screen has
+     * setting ROWS, each with its own list of VALUES. base+index cannot name
+     * either half, so both kinds report position with the correct FRAMING and
+     * leave `named` FALSE until a verified label map exists.
+     *
+     * ⭐ The framing is the whole benefit available today: "row 2 of 3" and
+     * "value 3 of 8" are both TRUE statements telling a blind user which axis
+     * they just moved on -- which a bare "3 of 8" did not. */
+    if (s->kind == MC_SETTINGS_ROW) {
+        out->axis = MC_AXIS_ROW;
+        out->why  = MC_UNNAMED_NO_LABELS;
+        return;
+    }
+    if (s->kind == MC_SETTINGS_VALUE) {
+        out->axis = MC_AXIS_VALUE;
+        /* ⭐ Derive which row this value belongs to, purely from the pointers
+         * the hook was handed. A failure here is REPORTED, never rounded. */
+        int row = 0;
+        if (menu_speak_derive_row(m->screen, m->cursor, s->values_off,
+                                  0, &row)) {
+            out->row = row;
+            out->have_row = TRUE;
+            out->why = MC_UNNAMED_NO_LABELS;
+        } else {
+            out->why = MC_UNNAMED_ROW_UNDERIVABLE;
+        }
+        return;
+    }
 
     char text[128];
     if (!gmd_text_by_index(s->base_index + (m->new_index - m->min_index),
@@ -143,6 +258,20 @@ void menu_speak(const mc_move *m)
     if (sp.named)
         _snprintf(line, sizeof(line), "%s, %d of %d",
                   sp.item, sp.position, sp.total);
+    /* ⭐⭐ Settings screens: say which AXIS moved. Without this, moving Right
+     * on the settings screen said "3 of 8" -- indistinguishable from having
+     * moved to the third of eight menu items, when in fact the user changed
+     * the focused setting to its third value. Both forms below are true with
+     * no label knowledge at all. */
+    else if (sp.axis == MC_AXIS_ROW)
+        _snprintf(line, sizeof(line), "setting %d of %d",
+                  sp.position, sp.total);
+    else if (sp.axis == MC_AXIS_VALUE && sp.have_row)
+        _snprintf(line, sizeof(line), "setting %d, value %d of %d",
+                  sp.row + 1, sp.position, sp.total);
+    else if (sp.axis == MC_AXIS_VALUE)
+        _snprintf(line, sizeof(line), "value %d of %d",
+                  sp.position, sp.total);
     else
         _snprintf(line, sizeof(line), "%d of %d", sp.position, sp.total);
     line[sizeof(line) - 1] = '\0';
@@ -321,8 +450,36 @@ void menu_speak_log_unknown(const mc_move *m)
                      "run found in the first %d labels.", off + 1, count, total);
     }
 
+    /* ⭐ Emit a row in the CURRENT shape, including the fields added for
+     * settings screens. An older version of this line printed a 4-field row
+     * that no longer compiles -- a discovery hint that produces a broken row is
+     * worse than none, because it is followed. */
     log_line("mcspeak: [DISCOVERY]   -> to name it, add "
-             "{ 0x%llx, <base>, %d, \"<name>\" } to g_screens "
-             "(src/menu_speak.c) using tools/find_label_runs.py %d",
+             "{ 0x%llx, <base>, %d, \"<name>\", MC_VERIFIED_LIVE_TEXT, "
+             "MC_LIST, 0 } to g_screens (src/menu_speak.c) using "
+             "tools/find_label_runs.py %d",
              (unsigned long long)(ULONG_PTR)m->caller, count, count);
+
+    /* ⭐⭐ IS THIS A SETTINGS SCREEN? Say so, because the answer changes which
+     * KIND of row to write, and getting it wrong means naming a VALUE where a
+     * setting belongs.
+     *
+     * The tell needs no table and no dereference: on a settings screen the
+     * value cursor sits inside an ARRAY at a fixed offset from the screen
+     * object, so a horizontal site whose cursor is NOT the same distance from
+     * `screen` every time is a per-row value list. Here we can only report the
+     * distance seen on THIS movement -- a person comparing two lines for one
+     * caller sees it move. ⚠ A hint, explicitly not a conclusion: nothing is
+     * ever spoken from it. */
+    if (m->screen && m->cursor) {
+        LONGLONG off = (LONGLONG)(ULONG_PTR)m->cursor
+                     - (LONGLONG)(ULONG_PTR)m->screen;
+        log_line("mcspeak: [DISCOVERY]   cursor sits at screen+0x%llx on this "
+                 "movement. ⚠ If this OFFSET CHANGES between movements at the "
+                 "same caller, it is a settings VALUE list (row + per-row "
+                 "values), NOT a flat menu -- use MC_SETTINGS_VALUE with "
+                 "values_off set to the SMALLEST offset seen, and give it NO "
+                 "base index. See memory cfc2-settings-screen-shape.",
+                 (unsigned long long)off);
+    }
 }

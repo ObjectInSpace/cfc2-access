@@ -20,6 +20,7 @@ $minhookSrc = @(
 & $gcc -O2 -Wall -Wextra -Wclobbered -o "$out\test_menu_cursor.exe" `
     "$root\tools\test_menu_cursor.c" "$root\src\menu_cursor.c" `
     "$root\src\log.c" "$root\src\memsafe.c" `
+    "$root\src\menu_speak.c" "$root\src\gmd_find.c" "$root\src\speech.c" `
     @minhookSrc `
     -I "$root\libs\minhook\include" `
     -luser32

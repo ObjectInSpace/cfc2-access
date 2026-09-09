@@ -27,18 +27,38 @@
  * for the menus verified so far (main menu 37..42, Options 170..174, pause
  * 250..256) and it does NOT hold for settings screens.
  *
- * Measured: the game-settings screen (caller 0x1400b1bd9, fn 0x1400b1b10,
- * EIGHT items) draws from the OPT_ family, where setting NAMES are interleaved
- * with their VALUE labels -- OPT_DIFFICULTY 643, OPT_DAMAGE_LEVEL 644, then
- * 645..648 are its four values, OPT_TIMER_SPEED 649, and so on. The names sit
- * at 643, 644, 649, 654, 659, 660, 661, 662, 665, 1108, 1115, 1125. No base
- * plus offset can address them, and WHICH eight appear depends on the game
- * selected.
+ * ⭐⭐ WHAT A SETTINGS SCREEN ACTUALLY IS (read off fn 0x1400b1b10; memory
+ * cfc2-settings-screen-shape). It is NOT a flat list. It is a set of setting
+ * ROWS, each row carrying its OWN list of values:
  *
- * ⭐ So such a screen cannot be named by a g_screens row at all. It needs a
- * per-screen index->label MAP, not a base. Do not try to force a base for one:
- * any base that "looks close" will speak a value label where an item name
- * belongs -- confidently and wrongly.
+ *     0x1400b1b53  lea rdi,[rbx+0x330]          ; the ROW cursor
+ *     0x1400b1b3d  mov r9d,[rbx+0x334]          ; the ROW count
+ *     0x1400b1b69  call <vertical>              ; move between rows
+ *
+ *     0x1400b1b9f  movsxd rax,[rdi]             ; rax = the current ROW
+ *     0x1400b1ba2  lea rcx,[rbx+0x338]          ; base of the VALUE-cursor array
+ *     0x1400b1bbf  mov r9d,[rbx+rax*4+0x348]    ; value count FOR THIS ROW
+ *     0x1400b1bc7  lea rdx,[rcx+rax*4]          ; &value_cursor[row]
+ *     0x1400b1bd9  call <horizontal>            ; change that row's value
+ *
+ * So the VERTICAL site moves the row and the HORIZONTAL site changes a value.
+ * ⛔⛔ An earlier note read the horizontal site as "an 8-item screen". It is
+ * not: those eight are row 0's eight VALUES. Speaking base+index there would
+ * read out a VALUE label where an item name belongs.
+ *
+ * ⭐⭐ AND THE ROW IS DERIVABLE, NOT REMEMBERED. Because the value cursor is
+ * `screen + values_off + 4*row`, the hook can recover the row from its OWN
+ * arguments by arithmetic:  row = (cursor - screen - values_off) / 4.
+ * That is why this needs no state shared between the two hooks and no
+ * assumption about which fires first -- and why a bad case is DETECTABLE
+ * (a misaligned or out-of-range result is refused, not rounded).
+ * Confirmed against a live run: 22 movements, zero exceptions.
+ *
+ * ⚠ The label side is still NOT solved: which setting a row names depends on
+ * the game selected, and the OPT_ family interleaves setting names with their
+ * value labels (names at 643, 644, 649, 654, 659, 660, 661, 662, 665, 1108,
+ * 1115, 1125). So a settings screen ships with NO labels until a live-text
+ * discovery block proves them -- it speaks the row position only.
  *
  * ⚠ Keying on item count alone was considered and REJECTED: several menus share
  * a count, so it would produce confident wrong names. The caller address is
@@ -66,12 +86,30 @@ typedef enum {
     MC_VERIFIED_LIVE_TEXT = 1,  /* a discovery block matched the real item */
 } mc_verified;
 
+/* What SHAPE of list a call site drives.
+ *
+ * ⭐ Measured offline over all 68 cursor call sites, by how each computes the
+ * cursor pointer it passes: 54 pass a fixed `lea [reg+imm]` (a flat list) and
+ * 14 pass an INDEXED `lea [reg+reg*4]` (a per-row value list). So the shape is
+ * knowable from the code for every site, without visiting the screen. */
+typedef enum {
+    MC_LIST = 0,      /* a flat list: base_index + index names the item */
+    MC_SETTINGS_ROW,  /* the VERTICAL site of a settings screen: moves rows */
+    MC_SETTINGS_VALUE /* the HORIZONTAL site: changes the focused row's value */
+} mc_kind;
+
 typedef struct {
     ULONGLONG caller;      /* the cursor-helper call site inside this screen */
     int       base_index;  /* GMD index of item 0 */
     int       count;       /* items expected; a mismatch DISABLES the entry */
     const char *name;      /* screen name, for the log and for context speech */
     mc_verified how;       /* how this row was established -- see above */
+    mc_kind   kind;        /* flat list, or half of a settings screen */
+    /* For MC_SETTINGS_VALUE only: the offset of the value-cursor ARRAY within
+     * the screen object, so the focused row can be derived by arithmetic.
+     * 0x338 for fn 0x1400b1b10. ⚠ Read from the DISASSEMBLY of the specific
+     * screen, never assumed -- other settings screens index different fields. */
+    int       values_off;
 } mc_screen;
 
 /* What a movement should say. */
@@ -85,12 +123,38 @@ typedef enum {
     MC_NAMED_OK = 0,           /* the item was named */
     MC_UNNAMED_SCREEN_UNKNOWN, /* caller not in the table */
     MC_UNNAMED_COUNT_MISMATCH, /* table row exists but the count disagrees */
-    MC_UNNAMED_TEXT_UNREADABLE /* screen known, count matched, read failed */
+    MC_UNNAMED_TEXT_UNREADABLE,/* screen known, count matched, read failed */
+    /* ⭐ Settings-screen specific. The row is derived by arithmetic from the
+     * cursor and screen pointers; when that arithmetic does not land cleanly
+     * -- a misaligned difference, or a row outside 0..count-1 -- the answer is
+     * REFUSED rather than rounded into a plausible-looking row. A wrong row
+     * would name the wrong setting, which is the failure this file exists to
+     * prevent. */
+    MC_UNNAMED_ROW_UNDERIVABLE,
+    /* ⭐ The screen's SHAPE is known but its LABELS are not. Distinct from
+     * SCREEN_UNKNOWN: we do know what this screen is and can say "row 2 of 3"
+     * meaningfully; we simply have no verified label for the row. Kept as its
+     * own reason so a run's log shows which settings screens still need a
+     * discovery pass. */
+    MC_UNNAMED_NO_LABELS
 } mc_named_why;
+
+/* Which axis a movement was on -- so the readout can say what the user
+ * actually did. ⭐ On a settings screen "3 of 8" is ambiguous between "the
+ * third setting" and "the third value of this setting"; these disambiguate it
+ * without needing any label. */
+typedef enum {
+    MC_AXIS_ITEM = 0,  /* an ordinary menu item */
+    MC_AXIS_ROW,       /* a settings ROW (which setting is focused) */
+    MC_AXIS_VALUE      /* a settings VALUE (what that setting is set to) */
+} mc_axis;
 
 typedef struct {
     BOOL  named;               /* did we resolve an item NAME? */
     mc_named_why why;          /* if not, WHICH guard declined */
+    mc_axis axis;              /* item / settings row / settings value */
+    int   row;                 /* MC_AXIS_VALUE: which row, 0-based */
+    BOOL  have_row;            /* was `row` successfully derived? */
     char  item[128];           /* the item text, if named */
     char  screen_name[64];     /* the screen, if known */
     int   position;            /* 1-based, for "item 3 of 6" */
@@ -108,6 +172,30 @@ void menu_speak(const mc_move *m);
  * the table -- caller address, count, axis. ⭐ This is the discovery mode: the
  * next run's log becomes the table, instead of another guessing round. */
 void menu_speak_log_unknown(const mc_move *m);
+
+/* ⭐⭐ Derive which setting ROW is focused, from the hook's own arguments.
+ *
+ * The value cursor of a settings screen lives at `screen + values_off + 4*row`,
+ * so the row is recoverable by arithmetic -- no state, no ordering assumption
+ * between the vertical and horizontal hooks, and no dereference of either
+ * pointer (both are compared as VALUES only, never read).
+ *
+ * Returns TRUE and writes *row on success. Returns FALSE when the difference is
+ * negative, not a multiple of 4, or lands outside 0..max_row-1 -- which is the
+ * point: a settings screen we have modelled WRONGLY fails loudly here instead
+ * of naming an arbitrary row.
+ *
+ * ⚠ `max_row` bounds the answer. Pass the row count when it is known; pass 0
+ * when it is not, which falls back to MC_MAX_PLAUSIBLE_ROWS -- "unknown count"
+ * must not mean "accept any row". */
+/* ⭐ The ceiling used when a screen's row count is not known. No settings
+ * screen in this shell comes close: the one measured has 3 rows, and the
+ * largest cursor list seen anywhere is the 40-slot character select. 64 is
+ * loose enough never to reject a real row and tight enough that a wrong model
+ * -- which lands in the millions via wraparound -- is always refused. */
+#define MC_MAX_PLAUSIBLE_ROWS 64
+BOOL menu_speak_derive_row(const void *screen, const void *cursor,
+                           int values_off, int max_row, int *row);
 
 /* Test seam: how many screens the table holds, and lookup by caller. */
 int  menu_speak_screen_count(void);
