@@ -39,8 +39,11 @@ BOOL mem_guard_install(void);
 void mem_guard_remove(void);
 
 /* Internal, used by the macro. */
-extern jmp_buf       g_mem_guard;
-extern volatile LONG g_mem_guard_armed;
+/* ⛔ THREAD-LOCAL. A shared jmp_buf meant a fault on one thread could longjmp
+ * onto another thread's stack -- see the comment in memsafe.c. Hooks run the
+ * guard on the game's threads, so this is load-bearing, not tidiness. */
+extern __thread jmp_buf g_mem_guard;
+extern __thread int     g_mem_guard_armed;
 
 /* Run `stmt` under the guard. `faulted` is set TRUE if it faulted.
  * A macro because setjmp's buffer must belong to a frame that is still live
@@ -49,9 +52,9 @@ extern volatile LONG g_mem_guard_armed;
     do {                                                                      \
         (faulted) = FALSE;                                                    \
         if (setjmp(g_mem_guard) == 0) {                                       \
-            InterlockedExchange(&g_mem_guard_armed, 1);                       \
+            g_mem_guard_armed = 1;         /* per-thread: no interlock needed */\
             { stmt; }                                                         \
-            InterlockedExchange(&g_mem_guard_armed, 0);                       \
+            g_mem_guard_armed = 0;                                            \
         } else {                                                              \
             (faulted) = TRUE;                                                 \
         }                                                                     \

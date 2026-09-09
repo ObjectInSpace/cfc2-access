@@ -3,8 +3,21 @@
 
 #include <string.h>
 
-jmp_buf       g_mem_guard;
-volatile LONG g_mem_guard_armed;
+/* ⛔⛔ THREAD-LOCAL, AND THAT IS NOT A DETAIL.
+ *
+ * These were ordinary globals, which was safe only while a single worker
+ * thread used the guard. The menu-cursor hooks broke that: a detour runs on the
+ * GAME's thread while gmd_find()/gmd_text_by_index() run on ours. With one
+ * shared jmp_buf, whichever thread called setjmp last owns it -- so a fault on
+ * the other thread longjmps onto a stack frame belonging to a DIFFERENT THREAD.
+ * That is an immediate, unexplainable crash, and it is far likelier during a
+ * language change, which triggers a GMD rescan while the user is navigating.
+ *
+ * The user hit exactly that: the game died on a language change and named
+ * dinput8. Making the state __thread gives every thread its own buffer and its
+ * own armed flag, which is what the design assumed all along. */
+__thread jmp_buf g_mem_guard;
+__thread int     g_mem_guard_armed;
 
 static void         *g_veh;
 static volatile LONG g_faults;
@@ -51,7 +64,10 @@ BOOL mem_readable(const void *p, SIZE_T len)
 
 static LONG CALLBACK guard_veh(EXCEPTION_POINTERS *ep)
 {
-    if (!InterlockedCompareExchange(&g_mem_guard_armed, 0, 0))
+    /* ⚠ Per-thread: the VEH runs on whichever thread faulted, so this reads
+     * THAT thread's flag. A thread with no armed guard falls through to the
+     * normal handler chain, exactly as before. */
+    if (!g_mem_guard_armed)
         return EXCEPTION_CONTINUE_SEARCH;
 
     DWORD code = ep->ExceptionRecord->ExceptionCode;
@@ -75,8 +91,8 @@ static LONG CALLBACK guard_veh(EXCEPTION_POINTERS *ep)
      * these reaches here, the caller has a bug that must be fixed at the
      * source, so let it propagate loudly. */
 
-    InterlockedIncrement(&g_faults);
-    InterlockedExchange(&g_mem_guard_armed, 0);
+    InterlockedIncrement(&g_faults);   /* still global: a count, not state */
+    g_mem_guard_armed = 0;
     longjmp(g_mem_guard, (int)code);
     return EXCEPTION_CONTINUE_SEARCH;   /* not reached */
 }
