@@ -925,6 +925,95 @@ BOOL gmd_text_ready(void)
 
 int gmd_text_count(void) { return g_text_blob ? g_text_count : 0; }
 
+/* ⛔⛔ WHY THIS IS INDEXED RATHER THAN WALKED EACH TIME.
+ *
+ * The first version called skip_strings() from the blob base on every lookup:
+ * one GUARDED single-byte read per character, so index 250 cost thousands of
+ * them. Measured in-game: FOUR lookups took ELEVEN SECONDS, on the poll thread,
+ * which starved the whole mod -- a run that should have logged dozens of menu
+ * movements recorded exactly one.
+ *
+ * ⭐ The lesson is the project's own: a per-byte guarded read is fine once and
+ * ruinous in a loop. Build the offsets ONCE, in bulk, then every lookup is a
+ * single bounded read.
+ *
+ * The index is built with big block reads instead of byte reads, so the whole
+ * 4165-entry table costs a few hundred guarded copies rather than ~1.5 million.
+ */
+#define GMD_BLOCK 0x1000
+
+static unsigned *g_text_off;      /* byte offset of each string from the blob */
+static int       g_text_indexed;
+
+static void text_index_free(void)
+{
+    if (g_text_off) {
+        HeapFree(GetProcessHeap(), 0, g_text_off);
+        g_text_off = NULL;
+    }
+    g_text_indexed = 0;
+}
+
+/* Walk the blob once in blocks, recording where each string starts. */
+static BOOL text_index_build(void)
+{
+    if (g_text_indexed)
+        return TRUE;
+    if (!g_text_blob || g_text_count <= 0)
+        return FALSE;
+
+    g_text_off = (unsigned *)HeapAlloc(GetProcessHeap(), 0,
+                                       sizeof(unsigned) * (SIZE_T)g_text_count);
+    if (!g_text_off)
+        return FALSE;
+
+    BYTE  block[GMD_BLOCK];
+    SIZE_T pos = 0;            /* byte offset within the blob */
+    int    found = 0;
+    g_text_off[found++] = 0;   /* string 0 starts at the blob base */
+
+    /* ⚠ A hard ceiling: a corrupt blob must not spin forever. 4165 strings of
+     * plausible length fit far inside this. If the ceiling is hit the index is
+     * abandoned rather than truncated silently -- a partial index would return
+     * the WRONG string for high indices, which is worse than none. */
+    const SIZE_T LIMIT = 4u * 1024u * 1024u;
+
+    while (found < g_text_count && pos < LIMIT) {
+        SIZE_T want = GMD_BLOCK;
+        if (!mem_copy(block, g_text_blob + pos, want)) {
+            /* Near the end of a region a full block may not be readable; try
+             * a smaller tail before giving up. */
+            want = 0;
+            for (SIZE_T t = GMD_BLOCK / 2; t >= 64; t /= 2) {
+                if (mem_copy(block, g_text_blob + pos, t)) { want = t; break; }
+            }
+            if (!want) {
+                text_index_free();
+                return FALSE;
+            }
+        }
+        for (SIZE_T i = 0; i < want && found < g_text_count; i++) {
+            if (block[i] == 0)
+                g_text_off[found++] = (unsigned)(pos + i + 1);
+        }
+        pos += want;
+    }
+
+    if (found < g_text_count) {
+        log_line("gmdtext: ⛔ only %d of %d string offsets were found before "
+                 "the %llu-byte ceiling -- abandoning the index rather than "
+                 "serving wrong text for high indices.",
+                 found, g_text_count, (unsigned long long)LIMIT);
+        text_index_free();
+        return FALSE;
+    }
+
+    g_text_indexed = 1;
+    log_line("gmdtext: ⭐ indexed %d string offsets in one pass; lookups are "
+             "now a single bounded read each.", g_text_count);
+    return TRUE;
+}
+
 BOOL gmd_text_by_index(int index, char *out, unsigned out_cap)
 {
     if (!out || out_cap == 0)
@@ -932,14 +1021,24 @@ BOOL gmd_text_by_index(int index, char *out, unsigned out_cap)
     out[0] = '\0';
     if (!g_text_blob || index < 0 || index >= g_text_count)
         return FALSE;
+    if (!g_text_indexed && !text_index_build())
+        return FALSE;
 
-    const BYTE *p = skip_strings(g_text_blob, index);
-    if (!p)
-        return FALSE;                  /* the walk faulted or ran away */
     char buf[256];
-    if (!read_cstr(p, buf, sizeof(buf)))
+    if (!read_cstr(g_text_blob + g_text_off[index], buf, sizeof(buf)))
         return FALSE;
     _snprintf(out, out_cap, "%s", buf);
     out[out_cap - 1] = '\0';
     return TRUE;
 }
+
+/* --- test seams ---------------------------------------------------------- */
+
+void gmd_test_set_blob(BYTE *blob, int count)
+{
+    text_index_free();
+    g_text_blob  = blob;
+    g_text_count = count;
+}
+
+int gmd_test_label_count(void) { return GMD_LABEL_COUNT; }

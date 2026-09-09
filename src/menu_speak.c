@@ -30,6 +30,17 @@ static const mc_screen g_screens[] = {
      * Labels: GMD 37..42 = OFFLINE_PLAY ONLINE_PLAY MUSEUM FIGHTER_AWARD
      * OPTIONS EXIT ("Offline Play" ... "Quit"). */
     { 0x14009ba21ULL, 37, 6, "Main menu" },
+
+    /* ⭐ CONFIRMED 2026-09-08 by live text, not by guessing: at this call site
+     * the mod read base 37 item 6 as "Quitter" while the user stood on
+     * position 6 of 6, in a French-language run. That is EXIT/FR -- the main
+     * menu's last item.
+     *
+     * ⚠ It is a DIFFERENT function from the row above (0x1400973d0 vs
+     * 0x14009b920), so these are two distinct screens that present the same six
+     * choices. Both legitimately map to base 37; neither is a duplicate to be
+     * deleted. */
+    { 0x140097a59ULL, 37, 6, "Main menu" },
 };
 
 #define NSCREENS (int)(sizeof(g_screens) / sizeof(g_screens[0]))

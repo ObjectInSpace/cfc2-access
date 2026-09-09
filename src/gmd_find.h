@@ -78,4 +78,9 @@ BOOL gmd_text_by_index(int index, char *out, unsigned out_cap);
 /* How many messages the resolved table holds (4165 in every shipped locale). */
 int gmd_text_count(void);
 
+/* Test-only seams: plant a synthetic blob so the index can be exercised
+ * offline, against the SHIPPING lookup rather than a copy of it. */
+void gmd_test_set_blob(BYTE *blob, int count);
+int  gmd_test_label_count(void);
+
 #endif /* CFC2_GMD_FIND_H */
