@@ -74,6 +74,25 @@ static const int g_select_game_rows[] = { 51, 52, 56 };
  * nothing here is inferred from item count or from base 37 being "close". */
 static const int g_mode_select_rows[] = { 4105, 4106, 4107 };
 
+/* ⚠⚠ CANDIDATE ONLY -- NOT REFERENCED BY ANY SHIPPED ROW.
+ *
+ * The 3-item horizontal screen at caller 0x1400b2729 loads the layout
+ * `ui_menu	_option\option_2` (the lea at 0x1400b28fe is inside the same
+ * function, 0x1400b26a0), so it is an OPTIONS screen -- the per-game options
+ * strip reached after choosing a game. The three settings categories in the
+ * GMD are MENU_OP_GAME_SETTING 225, PAD_SETTING 226 and
+ * DISPLAY_SOUND_SETTINGS 574: "Game Settings", "Controller Settings",
+ * "Display & Sound Settings". Three of them, matching the live count, and
+ * non-contiguous, which is why a base cannot address them.
+ *
+ * ⛔ It FITS but it is not PROVEN. Nothing has shown these three labels on
+ * that screen -- the layout name proves the screen is an options screen, not
+ * which labels it draws, and the order is assumed. This project shipped a row
+ * on exactly this quality of reasoning once and it spoke another menu's
+ * labels. Left here so the next run's log can confirm or kill it in one look;
+ * wire it to a row only after that. */
+/* static const int g_game_options_candidate[] = { 225, 226, 574 }; */
+
 /* PC Settings, row 1 (Display): Windowed / Borderless Windowed / Fullscreen.
  * ⚠ Only the row MEASURED in a run is listed. Resolution (row 0) has a
  * variable value list that nobody has observed, so it is absent and names
