@@ -798,9 +798,17 @@ sweep:
          * list -- a shortlist means something different depending on how hard
          * it had to try. */
         int off = m->new_index - m->min_index;
+        /* ⛔⛔ THE CAP THAT HID A REAL MENU. This was 600, justified as "the
+         * highest real menu run is ~590". That was wrong: MODE_SELECT and its
+         * Arcade / Versus / Training items sit at 4103..4108, and the screen
+         * reached from Offline Play is that menu. No number of runs could have
+         * found it, because the sweep never looked past label 600.
+         *
+         * ⭐ The whole table is ~4165 labels and a full sweep measured under a
+         * millisecond, so the cap was never buying anything worth this. Sweep
+         * everything. A bound chosen from an assumption about the data is the
+         * thing to distrust, not the cost. */
         int total = gmd_text_count();
-        if (total > 600)
-            total = 600;
         int shown = 0;
         char batch[512];
         size_t used = 0;

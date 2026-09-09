@@ -62,7 +62,7 @@ def plausible_item(v):
     return bool(v) and not is_sentence(v) and len(v) <= 32 and v[0] != "<"
 
 
-def candidates(labels, count, cap=600):
+def candidates(labels, count, cap=None):
     """Bases whose `count` labels all look like items, with a blurb after.
 
     ⚠ Two tiers, exactly as the shipped sweep does it: a full parallel HELP run
@@ -74,7 +74,7 @@ def candidates(labels, count, cap=600):
     n = len(labels)
     for need_all in (True, False):
         out = []
-        for b in range(min(cap, n)):
+        for b in range(n if cap is None else min(cap, n)):
             if b + count >= n:
                 break
             if not all(plausible_item(labels[b + i]) for i in range(count)):
