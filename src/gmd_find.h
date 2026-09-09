@@ -83,4 +83,27 @@ int gmd_text_count(void);
 void gmd_test_set_blob(BYTE *blob, int count);
 int  gmd_test_label_count(void);
 
+/* --- Which LANGUAGE is the resolved table? --------------------------------
+ *
+ * ⛔⛔ THE BUG THIS EXISTS FOR. The verifier accepted ANY shipped language
+ * variant -- it proved "this is a valid GMD table" and never asked "is this the
+ * language the game is currently displaying". The user switched the game to
+ * English and the mod kept speaking French, because a stale French table was
+ * still resident and the scan found it first. Nothing failed; the wrong answer
+ * was simply confident.
+ *
+ * ⭐ Every shipped table names ITSELF uniquely at index 0 -- "Japanese [jp]"
+ * in English, "Japonais [jp]" in French, and so on for all 14. So a table can
+ * be asked which language it is, with no disassembly and no live-language
+ * lookup.
+ *
+ * Returns a short code ("eng", "fre", ...) or NULL if index 0 matches no
+ * shipped table -- which itself means the resolved table is not one we
+ * recognise, and must be reported rather than used. */
+const char *gmd_text_language(void);
+
+/* Drop the cached blob and index so the next call re-resolves. Use when the
+ * game may have rebuilt its table -- a language change does exactly that. */
+void gmd_text_invalidate(void);
+
 #endif /* CFC2_GMD_FIND_H */

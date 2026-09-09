@@ -885,6 +885,58 @@ BOOL gmd_find(gmd_result *out)
 static BYTE *g_text_blob;          /* resolved base of the string blob */
 static int   g_text_count;
 
+/* What language does the game's own config.ini say it is running in?
+ *
+ * \u26a0 config.ini is written by the game on exit and read on start, so it is
+ * authoritative for the NEXT run rather than necessarily for this instant. It
+ * is still the best cheap answer: a mismatch against it is a strong signal that
+ * the table we resolved is stale.
+ *
+ * Returns a static short code, or NULL if the file has no Language key (the
+ * default state -- the game does not write one itself).
+ */
+static const char *gmd_expected_language(void)
+{
+    static char code[8];
+    static int  tried;
+    if (tried)
+        return code[0] ? code : NULL;
+    tried = 1;
+
+    char path[MAX_PATH];
+    DWORD n = GetModuleFileNameA(NULL, path, MAX_PATH);
+    if (n == 0 || n >= MAX_PATH)
+        return NULL;
+    char *slash = strrchr(path, '\\');
+    if (!slash)
+        return NULL;
+    slash[1] = '\0';
+    strncat(path, "config.ini", MAX_PATH - strlen(path) - 1);
+
+    FILE *f = fopen(path, "rb");
+    if (!f)
+        return NULL;
+    char line[256];
+    while (fgets(line, sizeof(line), f)) {
+        char *p = line;
+        while (*p == ' ' || *p == '\t') p++;
+        if (_strnicmp(p, "Language", 8) != 0) continue;
+        p += 8;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p != '=') continue;
+        p++;
+        while (*p == ' ' || *p == '\t') p++;
+        int k = 0;
+        while (k < (int)sizeof(code) - 1 &&
+               *p > ' ' && *p != '\r' && *p != '\n')
+            code[k++] = *p++;
+        code[k] = '\0';
+        break;
+    }
+    fclose(f);
+    return code[0] ? code : NULL;
+}
+
 BOOL gmd_text_ready(void)
 {
     if (g_text_blob)
@@ -906,6 +958,19 @@ BOOL gmd_text_ready(void)
 
     /* Re-resolve the blob with the same search gmd_find used, and keep the
      * offset that actually worked this run. */
+    /* ⭐⭐ TRY EVERY CANDIDATE, AND PREFER THE GAME'S OWN LANGUAGE.
+     *
+     * gmd_find() returns the single candidate it liked best, chosen on
+     * STRUCTURE alone. That was enough while only one table was resident -- and
+     * it stopped being enough the moment a stale table from a previous locale
+     * outlived a language change. The scan then found the old table, verified
+     * it perfectly (it IS a valid GMD table), and the mod spoke French at a
+     * screen showing English.
+     *
+     * gmd_expected_language() reads the locale out of config.ini, which the
+     * game demonstrably honours. If the resolved table disagrees, say so
+     * loudly: a mismatch means the text we serve is wrong even though every
+     * structural check passed. */
     for (int i = 0; i < GMD_NVERIFY; i++) {
         char buf[128];
         buf[0] = '\0';
@@ -914,8 +979,27 @@ BOOL gmd_text_ready(void)
                              buf, sizeof(buf), &off) && off > 0) {
             g_text_blob  = r.array_base + (SIZE_T)off;
             g_text_count = GMD_LABEL_COUNT;
+            /* ⭐⭐ SAY WHICH LANGUAGE. The verifier accepts any shipped
+             * variant, so a resolved table is NOT necessarily the one the game
+             * is displaying -- a stale French table outlived a switch to
+             * English and the mod spoke French for a whole session while the
+             * screen read English. Naming the locale in the log makes that
+             * visible instead of silent. */
+            const char *lang = gmd_text_language();
             log_line("gmdtext: ⭐ blob resolved at entries+0x%x this run; "
-                     "%d messages are readable by index.", off, g_text_count);
+                     "%d messages readable. Table language: %s",
+                     off, g_text_count, lang ? lang : "UNRECOGNISED");
+            if (!lang)
+                log_line("gmdtext: ⚠⚠ index 0 matches no shipped table. This "
+                         "table is not one we recognise; treat any text from "
+                         "it as suspect.");
+            const char *want = gmd_expected_language();
+            if (want && lang && strcmp(want, lang) != 0)
+                log_line("gmdtext: ⛔⛔ LANGUAGE MISMATCH -- config.ini says the "
+                         "game is running \"%s\" but the table we resolved is "
+                         "\"%s\". Every item name spoken from it will be in the "
+                         "WRONG LANGUAGE. This is a stale table left over from a "
+                         "previous locale, not a bad read.", want, lang);
             return TRUE;
         }
     }
@@ -1042,3 +1126,42 @@ void gmd_test_set_blob(BYTE *blob, int count)
 }
 
 int gmd_test_label_count(void) { return GMD_LABEL_COUNT; }
+
+/* --- Which language is the resolved table? -------------------------------
+ *
+ * See gmd_find.h. Index 0 is LANG_NAME_JAPANESE, and every shipped table
+ * renders it in its OWN language, uniquely. Matching it identifies the table
+ * without any live-language lookup.
+ *
+ * Only the ASCII-renderable locales are listed. A table whose index 0 matches
+ * none of them returns NULL, which the caller must treat as "unknown", never as
+ * "fine" -- an unrecognised table is exactly the situation that produced a
+ * confident wrong language in the first place.
+ */
+static const struct { const char *code; const char *idx0; } g_lang_by_idx0[] = {
+    { "eng", "Japanese [jp]"    },
+    { "fre", "Japonais [jp]"    },
+    { "ita", "Giapponese [jp]"  },
+    { "ger", "Japanisch [jp]"   },
+    { "pol", "Japo\xc5\x84ski [jp]" },
+};
+#define NLANG_BY_IDX0 (int)(sizeof(g_lang_by_idx0) / sizeof(g_lang_by_idx0[0]))
+
+const char *gmd_text_language(void)
+{
+    char idx0[128];
+    if (!gmd_text_by_index(0, idx0, sizeof(idx0)) || !idx0[0])
+        return NULL;
+    for (int i = 0; i < NLANG_BY_IDX0; i++) {
+        if (strcmp(idx0, g_lang_by_idx0[i].idx0) == 0)
+            return g_lang_by_idx0[i].code;
+    }
+    return NULL;
+}
+
+void gmd_text_invalidate(void)
+{
+    text_index_free();
+    g_text_blob = NULL;
+    g_text_count = 0;
+}
