@@ -666,6 +666,26 @@ void menu_speak(const mc_move *m)
  * offset for EVERY screen and it printed pointers and padding formatted as
  * menu semantics -- 741845392, 1090385120 -- because +0x340 means this only
  * here. A field offset read out of one function describes that function. */
+/* ⭐⭐ WHAT THE SETUP CODE SAYS -- read at 0x1400b2460, no run needed.
+ *
+ *     [rbx+0x340] = 0                    ; item 0 -> option id 0
+ *     [rbx+0x33c] = 1                    ; count = 1
+ *     if (mode != 1 || [+0xd037c] < 2)   ; CONDITIONAL
+ *         [rbx+rdx*4+0x344] = 1          ; item 1 -> option id 1
+ *         count++
+ *     [rbx+rax*4+0x340] = 2              ; last item -> option id 2
+ *     count++
+ *
+ * So the strip is ids 0, 1, 2 in cursor order and the MIDDLE item is
+ * conditional -- which is why the item count varies between 2 and 3. The
+ * dispatch at 0x1400b27b2 then treats them distinctly: id 0 writes no flag,
+ * id 1 sets +0xd0338, id 2 sets +0xd0330=1 with +0xd0334=0.
+ *
+ * ⛔ AND THAT STILL DOES NOT NAME THEM. The ids are positions in a switch,
+ * not label indices, and the flags they set are consumed somewhere that does
+ * not name them either. The live probe below therefore confirms the ORDER and
+ * the COUNT, not the words. Naming this screen needs the runtime GUI text,
+ * which is a bigger piece of work than a label map. */
 static void probe_option_ids(const mc_move *m)
 {
     if (!m || !m->screen || !m->cursor)
