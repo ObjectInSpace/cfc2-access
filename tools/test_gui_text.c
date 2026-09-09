@@ -191,7 +191,39 @@ int main(void)
         check("case 8: a UTF-16 string is recognised", off == GT_CAND_B, d);
     }
 
-    /* --- case 9: install REFUSES when the target is not the expected code -
+    /* --- case 9: the WRONG CLASS is refused, not dumped ------------------
+     * ⛔⛔ THE CASE THE FIRST LIVE RUN BOUGHT. The hook target was a shared
+     * helper three sites reach by a direct call, so it received an
+     * nGUI::OutlineFont -- and the module dumped 41 lines of Adobe glyph
+     * names, with BOTH "candidate" offsets holding plausible strings
+     * ("uni0623", "uniFE84"). Nothing there was a menu label.
+     *
+     * ⭐ The vptr check saved it from being a false finding, but only as a
+     * WARNING above a full dump. If the code prints a warning, something must
+     * FAIL on it -- so a foreign vptr now REFUSES, and this case pins that.
+     *
+     * ⚠ Checked through the stats counter rather than by inspecting the log,
+     * because a log line is not a mechanism. This asserts the refusal HAPPENED
+     * and was COUNTED.
+     *
+     * ⛔ NOTE the limit: gt_poll_and_log() needs an installed hook, which no
+     * offline test has. So this case asserts the counter's contract -- that a
+     * fresh module reports zero wrong-class sightings and that the field is
+     * actually plumbed through gt_get_stats() -- while the REFUSAL ITSELF is
+     * proven by the live run recorded in the sabotage log, not here. Said
+     * plainly so a green suite is not read as covering it. */
+    {
+        gt_test_reset();
+        gt_stats st;
+        gt_get_stats(&st);
+        char d[128];
+        snprintf(d, sizeof d, "a fresh module reported %ld wrong-class "
+                 "sighting(s)", st.wrong_class);
+        check("case 9: the wrong-class counter is plumbed and starts at zero",
+              st.wrong_class == 0, d);
+    }
+
+    /* --- case 10: install REFUSES when the target is not the expected code -
      * ⭐⭐ Reported as a REASON, not a bare FALSE. A test asserting only
      * "install failed" passes with every guard deleted, because MinHook
      * independently refuses an unmapped address -- the outcome would be right
@@ -211,14 +243,14 @@ int main(void)
                  "GT_INSTALL_BAD_PROTECT=%d), installed=%d",
                  (int)ok, (int)why, (int)GT_INSTALL_BAD_PROTECT,
                  (int)st.installed);
-        check("case 9: install refuses at the PROTECTION check, and says so",
+        check("case 10: install refuses at the PROTECTION check, and says so",
               !ok && why == GT_INSTALL_BAD_PROTECT && !st.installed, d);
     }
 
-    /* --- case 10: polling without an install reports nothing -------------
+    /* --- case 11: polling without an install reports nothing -------------
      * ⚠ Not "returns quietly": it must return FALSE, so a caller can tell
      * "no new instance" from "inspected and found nothing". */
-    check("case 10: gt_poll_and_log reports FALSE when not installed",
+    check("case 11: gt_poll_and_log reports FALSE when not installed",
           !gt_poll_and_log(),
           "it claimed to have something to report with no hook installed");
 

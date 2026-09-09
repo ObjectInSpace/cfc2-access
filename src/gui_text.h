@@ -38,24 +38,84 @@
  * engine walks its metadata at runtime, so a class layout has to come from a
  * LIVE object. Stop looking for it in the image.
  *
- * WHY *THIS* HOOK TARGET
- * ----------------------
- * Vtable slot 5 -> 0x1402f9720. Three properties were CHECKED, not assumed:
+ * WHY *THIS* HOOK TARGET -- and ⛔⛔ THE TEST THAT WAS NOT ENOUGH
+ * -------------------------------------------------------------
+ * Vtable slot 1 -> 0x1402efa10. THREE properties, and the third is the one
+ * this module learned the hard way IN A LIVE RUN:
  *
- *  1. ⭐⭐ It is UNIQUE TO cGUIObjText. A search of every data section for the
- *     qword 0x1402f9720 finds it in exactly ONE 8-aligned slot, 0x1410563d0 =
- *     this class's vtable + 0x28. So every "this" it receives really is a
- *     cGUIObjText, and no type check is needed at all.
- *     ⛔ The first target considered, 0x1402fed50, FAILED this test: it appears
- *     in NINE vtables and in none of them is it cGUIObjText's. Hooking it would
- *     have captured objects of other classes and then read 528 bytes out of
- *     things that are not 528 bytes long. The check took one search and it
- *     changed the target.
- *  2. Its first instruction, "mov [rsp+8],rbx" = 48 89 5c 24 08, is exactly
- *     FIVE bytes, so MinHook's patch lands on a clean instruction boundary.
- *  3. Nothing branches into those five bytes: find_callers.py --jmp was run
- *     against addr+1..addr+4 and found zero sites. A branch landing
- *     mid-prologue would jump into the middle of the trampoline patch.
+ *  1. It appears in exactly ONE 8-aligned data slot in the whole image --
+ *     cGUIObjText's vtable.
+ *  2. ⭐⭐ IT HAS ZERO DIRECT CALLERS. Nothing does "call 0x1402efa10", so the
+ *     vtable is the ONLY way to reach it, and every "this" it receives really
+ *     is a cGUIObjText.
+ *  3. Prologue "push rbx; sub rsp,0x20" = 40 53 48 83 ec 20, SIX bytes across
+ *     two whole instructions, clearing MinHook's five-byte minimum on a clean
+ *     boundary; and find_callers.py --jmp finds zero branches into addr+1..+4.
+ *
+ * ⛔⛔ PROPERTY 2 IS THE WHOLE LESSON, AND IT COST A GAME LAUNCH.
+ * The first shipped target was slot 5, 0x1402f9720. It PASSED property 1 --
+ * genuinely unique, genuinely in this class's vtable at +0x28 -- and it was
+ * still WRONG. The live run captured an object whose vptr was 0x141101b78:
+ * nGUI::OutlineFont, a font object, full of Adobe glyph names ("notequal",
+ * "summation", "uniFE82"). Because 0x1402f9720 is a SHARED HELPER that three
+ * sites also reach by a direct "call rel32" (0x1402f63d9, 0x1402f6e65,
+ * 0x1402f892a), and those callers pass their OWN this.
+ *
+ * ⭐ So the question "is this address unique to the class?" is the WRONG
+ * question. The right one is "is this address REACHED ONLY through the class's
+ * vtable?" -- which needs the caller count, not just the vtable count. A vtable
+ * slot may hold code shared with anything.
+ *
+ * ⭐⭐ Only FOUR of cGUIObjText's 28 slots satisfy both (1 vtable, 0 callers):
+ * 1, 2, 6 and 27. Slot 2 is the destructor and 27 a deleting destructor -- the
+ * text is being torn down there, which is the wrong moment to read it. Slot 6
+ * is a one-line "lea rax; ret" getDTI() stub, too short to patch. Slot 1 is
+ * the only real function among them, which is why it is the target.
+ *
+ * ⭐ AND THE GUARD DID ITS JOB. The run did not report glyph names as menu
+ * labels: the vptr check in gt_poll_and_log() compared the live vptr against
+ * this class's and said loudly that every offset below it was unattributed.
+ * A positive identity check on the object, not merely on the code address, is
+ * what turned a wrong target into a diagnosis instead of a false finding.
+ *
+ * ⛔⛔ AND SLOT 1 IS *ALSO* WRONG -- second live run, 2026-09-09.
+ * It passes both properties above and it is STILL not the target, for a third
+ * reason neither test asks about: WHAT KIND of method it is.
+ *
+ * Slot 1 is the class FACTORY. Read its body (0x1402efa10): it allocates 0xe0
+ * bytes via a virtual call, runs the base ctor 0x1402f0080, stores a vtable at
+ * [obj+0], zeroes +0xa0..+0xd8 and RETURNS THE NEW OBJECT in rax. So it is
+ * called ON THE CLASS DESCRIPTOR, not on an element -- and the run showed
+ * exactly that: ONE distinct "instance" for 61 calls, 0x1422cae28, which is
+ * cGUIObjText's DTI slot. Its "text" fields were the GUI class NAMES
+ * ("cGUIObjRoot", "cGUIObjPolygon"): the descriptor table, not a label.
+ *
+ * ⚠ Note the vptr check PASSED here -- the descriptor legitimately carries the
+ * class's vtable. So a matching vptr proves the class, NOT that the pointer is
+ * an instance. Both runs were caught, but by different means: run 1 by the
+ * vptr, run 2 only by noticing ONE distinct pointer across 61 calls.
+ *
+ * ⭐⭐ THE THREE QUESTIONS, now complete, in the order they must be asked:
+ *   1. Is the address in exactly one vtable?      (slot 5 passed, was wrong)
+ *   2. Does it have zero direct callers?          (slot 1 passed, was wrong)
+ *   3. Is it an INSTANCE method -- does it run per-element, per-frame, on
+ *      objects the game has already built?        <- the one that decides it
+ * A constructor, a destructor and a factory all satisfy 1 and 2 and none of
+ * them hands over a live, populated text element.
+ *
+ * ▶ WHAT IS LEFT. Of the four slots satisfying (1) and (2) -- 1, 2, 6, 27 --
+ * slot 1 is the factory, 2 and 27 are destructors (the text is being torn
+ * down) and 6 is a one-line getDTI() stub. ⛔ SO NO SLOT OF THIS VTABLE IS
+ * BOTH SAFELY UNIQUE AND AN INSTANCE METHOD. The per-frame methods are the
+ * shared helpers, and they are shared precisely because they are generic.
+ *
+ * ⭐ The way forward is therefore NOT another slot of this vtable. It is to
+ * keep a shared helper as the hook (they DO run per element, per frame) and
+ * discriminate on the OBJECT: the detour already records the pointer without
+ * dereferencing, and gt_poll_and_log() already rejects any vptr that is not
+ * this class's. That combination -- hook the generic helper, filter by vptr --
+ * gets live cGUIObjText instances with no new risk. Slot 5's run proves the
+ * filter works; it rejected every OutlineFont it was handed.
  *
  * ⚠⚠ SAFETY -- THIS IS THE RISKIEST THING IN THE PROJECT SO FAR
  * It receives a pointer from the game and reads half a kilobyte through it, on
@@ -88,13 +148,19 @@
 /* Live addresses. ASLR is off and the exe has no relocations, so these are
  * valid in every future run. */
 #define GT_VTABLE_ADDR   0x1410563a8ULL   /* cGUIObjText's vtable             */
-#define GT_UPDATE_ADDR   0x1402f9720ULL   /* vtable slot 5 -- the hook target */
-#define GT_VTABLE_SLOT   5                /* which slot must hold that value  */
+#define GT_UPDATE_ADDR   0x1402efa10ULL   /* vtable slot 1 -- the hook target */
+#define GT_VTABLE_SLOT   1                /* which slot must hold that value  */
 #define GT_CLASS_SIZE    0x210            /* 528 bytes, from the reg stub     */
 
 /* The two candidate pointer fields the offline accessors revealed. Checked
  * first when inspecting an instance -- and reported as candidates, never as
- * the answer. */
+ * the answer.
+ *
+ * ⚠ The first live run is a standing warning about them: in the (wrong) font
+ * object BOTH offsets held plausible strings -- "uni0623" and "uniFE84" --
+ * purely because they were two more entries in a glyph-name array. Two
+ * candidates both "hitting" is not corroboration; it is what a dense array of
+ * pointers looks like from the outside. Only the vptr check told them apart. */
 #define GT_CAND_A        0x1f8
 #define GT_CAND_B        0x200
 
@@ -126,6 +192,12 @@ typedef struct {
     LONG  calls;      /* how many times the update method ran                */
     LONG  distinct;   /* how many distinct instances were inspected          */
     LONG  faults;     /* guarded reads that faulted while inspecting         */
+    /* ⭐⭐ Instances whose vptr was NOT cGUIObjText's. Nonzero means the hook
+     * target is reached by something other than this class's vtable -- i.e.
+     * the target is wrong. It is surfaced as a COUNT rather than left in the
+     * log because that is exactly the failure the first live run hit, and a
+     * failure worth a diagnosis is worth a number. */
+    LONG  wrong_class;
 } gt_stats;
 
 void gt_get_stats(gt_stats *out);

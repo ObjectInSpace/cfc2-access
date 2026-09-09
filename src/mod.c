@@ -511,11 +511,17 @@ static DWORD WINAPI worker(LPVOID param)
             gt_stats gs;
             gt_get_stats(&gs);
             log_line("gt: update ran %ld time(s); %ld instance(s) inspected; "
-                     "%ld guarded read(s) faulted.%s",
-                     gs.calls, gs.distinct, gs.faults,
+                     "%ld guarded read(s) faulted; %ld object(s) of the WRONG "
+                     "CLASS.%s%s",
+                     gs.calls, gs.distinct, gs.faults, gs.wrong_class,
                      gs.calls == 0
                          ? "  ⚠ calls==0: the hook is NOT intercepting, so "
                            "nothing here is evidence either way."
+                         : "",
+                     gs.wrong_class > 0
+                         ? "  ⛔ A nonzero wrong-class count means the HOOK "
+                           "TARGET is wrong -- it is reached by something "
+                           "other than cGUIObjText's vtable."
                          : "");
         }
 

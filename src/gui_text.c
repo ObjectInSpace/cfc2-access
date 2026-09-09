@@ -38,6 +38,9 @@ static pfn_update g_real_update;
 static volatile LONG g_calls;
 static volatile LONG g_distinct;
 static volatile LONG g_faults;
+/* Instances whose vptr was not this class's -- see gt_poll_and_log(). A
+ * nonzero count means the hook target is wrong, not that the game misbehaved. */
+static volatile LONG g_wrong_class;
 
 /* The most recently seen instance, published for the worker thread.
  *
@@ -337,13 +340,28 @@ BOOL gt_poll_and_log(void)
      * If the vptr is not this class's vtable, the object is not what the hook
      * promised and every offset below would be measured against the wrong
      * layout -- say so loudly rather than quietly reporting nonsense. */
-    if (vptr != GT_VTABLE_ADDR)
-        log_line("gt: ⚠⚠ vptr is 0x%llx, NOT cGUIObjText's 0x%llx. The hook "
-                 "target was supposed to be unique to this class. Treat every "
-                 "offset below as unattributed.", vptr, GT_VTABLE_ADDR);
-    else
-        log_line("gt: vptr CONFIRMED 0x%llx -- this really is a cGUIObjText.",
-                 vptr);
+    if (vptr != GT_VTABLE_ADDR) {
+        /* ⛔⛔ REFUSE, do not merely warn. This started as a warning followed
+         * by the full dump, and the first live run showed why that is wrong:
+         * the object was an nGUI::OutlineFont and the dump was 41 lines of
+         * Adobe glyph names, with BOTH "candidate" offsets holding
+         * plausible-looking strings. Nothing there was a menu label, and a
+         * reader skimming for an offset could easily have taken one.
+         *
+         * ⭐ If the code prints a warning, something must FAIL on it -- this
+         * project's own rule. So the wrong class produces a diagnosis and NO
+         * offsets at all, which is the honest output: we did not measure
+         * cGUIObjText, so we have nothing to say about its layout. */
+        InterlockedIncrement(&g_wrong_class);
+        log_line("gt: ⛔ vptr is 0x%llx, NOT cGUIObjText's 0x%llx -- this "
+                 "object is NOT the class we hooked for. REFUSING to dump its "
+                 "offsets: they would describe the wrong layout. Fix the hook "
+                 "target; a shared helper reached by a direct call receives "
+                 "its callers' own objects.", vptr, GT_VTABLE_ADDR);
+        return FALSE;
+    }
+    log_line("gt: vptr CONFIRMED 0x%llx -- this really is a cGUIObjText.",
+             vptr);
 
     int off = -1;
     inspect_body(obj, sizeof(obj), resolve_live, NULL, &off, TRUE);
@@ -358,15 +376,22 @@ BOOL gt_poll_and_log(void)
 
 /* --- install -------------------------------------------------------------
  *
- * The expected first bytes of 0x1402f9720:
- *     mov [rsp+8], rbx   = 48 89 5c 24 08
- * FIVE bytes, one whole instruction, so MinHook's patch ends on a clean
- * boundary. ⭐ And find_callers.py --jmp found zero branches into addr+1..+4,
- * so nothing can land inside the patch. Both checked offline before this file
- * was written, and the prologue is checked again here at runtime -- the exe is
- * Enigma-packed, so these addresses hold ciphertext until unpack completes and
- * hooking early would patch encrypted bytes. */
-static const BYTE GT_PROLOGUE[] = { 0x48, 0x89, 0x5c, 0x24, 0x08 };
+ * The expected first bytes of 0x1402efa10:
+ *     push rbx; sub rsp,0x20   = 40 53 48 83 ec 20
+ * SIX bytes across two whole instructions, so MinHook's five-byte patch ends
+ * on a clean boundary. ⭐ And find_callers.py --jmp found zero branches into
+ * addr+1..+4, so nothing can land inside the patch.
+ *
+ * ⭐⭐ THE PROPERTY THAT MATTERS MOST is not visible in these bytes: this
+ * function has ZERO direct callers, so the vtable is the only way to reach it.
+ * The previous target had a perfectly good prologue and was still wrong,
+ * because it was a shared helper three sites called directly. A prologue check
+ * confirms WHICH CODE we patched; it says nothing about WHOSE OBJECTS arrive.
+ *
+ * The prologue is re-checked here at runtime because the exe is Enigma-packed
+ * and these addresses hold ciphertext until unpack completes; hooking early
+ * would patch encrypted bytes. */
+static const BYTE GT_PROLOGUE[] = { 0x40, 0x53, 0x48, 0x83, 0xec, 0x20 };
 
 static BOOL check_target(void)
 {
@@ -476,6 +501,7 @@ void gt_get_stats(gt_stats *out)
     out->calls     = InterlockedCompareExchange(&g_calls, 0, 0);
     out->distinct  = InterlockedCompareExchange(&g_distinct, 0, 0);
     out->faults    = InterlockedCompareExchange(&g_faults, 0, 0);
+    out->wrong_class = InterlockedCompareExchange(&g_wrong_class, 0, 0);
 }
 
 /* --- test seams ----------------------------------------------------------
@@ -535,7 +561,7 @@ BOOL gt_test_inspect(const void *buf, SIZE_T len, int *text_offset)
 
 void gt_test_reset(void)
 {
-    g_calls = g_distinct = g_faults = 0;
+    g_calls = g_distinct = g_faults = g_wrong_class = 0;
     g_seq = 0; g_taken_seq = 0;
     g_last_self = NULL; g_last_caller = NULL;
 }
