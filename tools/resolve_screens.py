@@ -43,6 +43,17 @@ NAMED = {
 MOVE = re.compile(
     r"mc: \w+\s+cursor \d+ -> \d+\s+\(item (\d+) of (\d+),.*?caller=([0-9A-Fa-f]+)")
 
+# ⭐⭐ The DISCOVERY lines carry positions the `mc:` lines do not.
+#
+# ⛔ The bug this fixes: a discovery sighting can come from the RESTING channel,
+# which reports where the cursor IS without a movement -- and a resting sighting
+# emits no `mc:` line at all. Reading only movements therefore threw away half
+# the positions the mod had already captured. A run that visited positions 1 and
+# 3 of a screen was read as having visited only position 1, and the intersection
+# that would have narrowed it never happened.
+DISC = re.compile(
+    r"\[DISCOVERY\] caller=(0x[0-9a-fA-F]+)\s+position (\d+) of (\d+)")
+
 
 def load_labels():
     sep = chr(92)
@@ -100,9 +111,17 @@ def main():
     screens = {}
     for line in open(log, encoding="utf-8", errors="replace"):
         m = MOVE.search(line)
-        if not m:
-            continue
-        pos, count, caller = int(m.group(1)), int(m.group(2)), int(m.group(3), 16)
+        if m:
+            pos = int(m.group(1))
+            count = int(m.group(2))
+            caller = int(m.group(3), 16)
+        else:
+            m = DISC.search(line)
+            if not m:
+                continue
+            caller = int(m.group(1), 16)
+            pos = int(m.group(2))
+            count = int(m.group(3))
         entry = screens.setdefault(caller, [count, set()])
         # ⚠ A caller whose count CHANGES between sightings is a value row of a
         # settings screen, not a menu -- flag it rather than intersect nonsense.
