@@ -48,14 +48,27 @@ int main(void)
      * Contents are unique per index, so a wrong offset is caught by VALUE and
      * not merely by length. */
     const int N = gmd_test_label_count();
-    SIZE_T cap = (SIZE_T)N * 16 + 64;
+    SIZE_T cap = (SIZE_T)N * 160 + 64;
     char *blob = (char *)VirtualAlloc(NULL, cap, MEM_COMMIT | MEM_RESERVE,
                                       PAGE_READWRITE);
     if (!blob) { printf("FATAL: alloc failed\n"); return 1; }
 
+    /* ⚠ REALISTIC STRING LENGTHS. The first version of this test planted
+     * ~6-byte strings, measured 4165 lookups at 6 ms, and passed -- while the
+     * real thing took EIGHT SECONDS, because read_cstr() was doing one guarded
+     * read PER BYTE and the real labels are far longer. A benchmark whose data
+     * is unlike the real data measures the wrong thing. Real menu labels run to
+     * ~30 characters and help blurbs to ~120, so plant that. */
     SIZE_T pos = 0;
     for (int i = 0; i < N; i++) {
-        int n = _snprintf(blob + pos, cap - pos, "s%d", i);
+        int n;
+        if (i % 3 == 0)
+            n = _snprintf(blob + pos, cap - pos,
+                          "s%d_this_is_a_help_blurb_of_realistic_length_for_a_"
+                          "menu_item_description_padding_padding", i);
+        else
+            n = _snprintf(blob + pos, cap - pos,
+                          "s%d_menu_item_label_text", i);
         pos += (SIZE_T)n + 1;                  /* keep the NUL */
     }
 
@@ -63,13 +76,14 @@ int main(void)
 
     /* --- case 1: the first, a middle and the last string all read back ---- */
     char buf[128];
-    int ok1 = gmd_text_by_index(0, buf, sizeof(buf)) && strcmp(buf, "s0") == 0;
+    int ok1 = gmd_text_by_index(0, buf, sizeof(buf)) &&
+              strncmp(buf, "s0_", 3) == 0;
     int okm = gmd_text_by_index(N / 2, buf, sizeof(buf));
-    char expect[32]; _snprintf(expect, sizeof(expect), "s%d", N / 2);
-    okm = okm && strcmp(buf, expect) == 0;
+    char expect[64]; _snprintf(expect, sizeof(expect), "s%d_", N / 2);
+    okm = okm && strncmp(buf, expect, strlen(expect)) == 0;
     int okl = gmd_text_by_index(N - 1, buf, sizeof(buf));
-    _snprintf(expect, sizeof(expect), "s%d", N - 1);
-    okl = okl && strcmp(buf, expect) == 0;
+    _snprintf(expect, sizeof(expect), "s%d_", N - 1);
+    okl = okl && strncmp(buf, expect, strlen(expect)) == 0;
     check("1. first, middle and last strings read back correctly",
           ok1 && okm && okl, "first=%d middle=%d last=%d", ok1, okm, okl);
 
@@ -79,8 +93,8 @@ int main(void)
     int bad = -1;
     for (int i = 0; i < N; i++) {
         if (!gmd_text_by_index(i, buf, sizeof(buf))) { bad = i; break; }
-        _snprintf(expect, sizeof(expect), "s%d", i);
-        if (strcmp(buf, expect) != 0) { bad = i; break; }
+        _snprintf(expect, sizeof(expect), "s%d_", i);
+        if (strncmp(buf, expect, strlen(expect)) != 0) { bad = i; break; }
     }
     check("2. all N indices return exactly their own string",
           bad < 0, "first wrong index = %d", bad);
@@ -97,8 +111,19 @@ int main(void)
         gmd_text_by_index(i, buf, sizeof(buf));
     QueryPerformanceCounter(&b);
     double ms = (double)(b.QuadPart - a.QuadPart) * 1000.0 / (double)f.QuadPart;
+    /* ⚠ THE BUDGET IS 50 ms, NOT 2 s, AND THAT MATTERS.
+     *
+     * The old 2 s budget passed the per-byte read_cstr() at 172 ms -- so it
+     * would have shipped the regression that made a discovery block take EIGHT
+     * SECONDS in-game. The discovery sweep performs roughly THREE TIMES this
+     * many reads, so a per-lookup cost that looks harmless here is seconds
+     * there.
+     *
+     * 50 ms leaves ~13x headroom over the measured 3.8 ms (slow machines, a
+     * loaded CI box) while still failing the 172 ms version outright. A budget
+     * loose enough to pass the bug is not a budget. */
     check("3. N lookups complete well inside the budget",
-          ms < 2000.0, "%d lookups took %.1f ms", N, ms);
+          ms < 50.0, "%d lookups took %.1f ms (budget 50 ms)", N, ms);
     printf("        (%d lookups in %.1f ms, %.3f ms each)\n", N, ms, ms / N);
 
     /* --- case 4: out-of-range is refused, not clamped ---------------------- */

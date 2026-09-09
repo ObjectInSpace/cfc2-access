@@ -221,19 +221,50 @@ static BOOL check_geometry(const region_hits *hits, BYTE **array_base,
 /* --- Verification --------------------------------------------------------- */
 
 /* Read a NUL-terminated string from game memory into `dst`. Guarded. */
+/* Read a NUL-terminated string out of foreign memory.
+ *
+ * \u26d4\u26d4 THIS USED TO DO ONE GUARDED mem_copy PER BYTE, and each of those does a
+ * VirtualQuery plus a setjmp. That is ~100 guarded reads for a typical label,
+ * and the discovery sweep performs about 12,500 string reads -- which is why a
+ * single discovery block took EIGHT SECONDS in-game and starved the mod while
+ * the user was still navigating.
+ *
+ * \u26a0 The offline index test did not catch it: its synthetic strings are ~6
+ * bytes and sit in one clean page, so 4165 lookups measured 6 ms. The real blob
+ * has longer strings, and the sweep does far more reads. A benchmark whose data
+ * is unlike the real data measures the wrong thing -- twice now in this file.
+ *
+ * So: copy a BLOCK under one guard, then find the NUL in our own memory. The
+ * block is trimmed if it would cross into unreadable pages, so a string near
+ * the end of a region still reads correctly rather than failing.
+ */
 static BOOL read_cstr(const BYTE *src, char *dst, unsigned cap)
 {
-    unsigned n = 0;
-    while (n < cap - 1) {
-        char c;
-        if (!mem_copy(&c, src + n, 1))
-            return FALSE;
-        dst[n] = c;
-        if (!c)
+    if (!dst || cap == 0)
+        return FALSE;
+    dst[0] = '\0';
+
+    volatile unsigned want = cap - 1;   /* lives across the guard setjmp */
+
+    /* Do not read past what is actually mapped: ask first, then copy once. */
+    SIZE_T avail = mem_readable_run(src, want);
+    if (avail == 0)
+        return FALSE;
+    if (avail < want)
+        want = (unsigned)avail;
+
+    BOOL faulted = FALSE;
+    unsigned n = want;
+    MEM_GUARDED(faulted, memcpy(dst, src, n));
+    if (faulted)
+        return FALSE;
+
+    /* Terminate: either the string ended inside the block, or we cap it. */
+    for (unsigned i = 0; i < n; i++) {
+        if (dst[i] == '\0')
             return TRUE;
-        n++;
     }
-    dst[cap - 1] = '\0';
+    dst[want] = '\0';
     return TRUE;
 }
 
