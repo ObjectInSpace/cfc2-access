@@ -81,39 +81,63 @@ before touching that work.
 
 - `src/log.c` — timestamped logging.
 
-## ▶ START HERE (next session): the GUI TEXT READER
+## ▶ START HERE (next session): RUN the GUI text reader
 
-**The one thing that unblocks most of what is left.** ~14 shell screens still
-speak position only, and they are blocked on the SAME cause: their labels are
-assigned to GUI text elements at RUNTIME, so no GMD search can name them.
+**It is built, tested, deployed, and `cfc2_guitext.on` is already created in
+the game dir. It has NOT been run in-game.** `src/gui_text.c`, commit 107676b.
+Full detail in memory `cfc2-gui-text-reader-built`.
 
-⭐⭐ The control that proves it: the **Options** screen's labels are known (GMD
-170..174), and **index 170 appears nowhere in its function**. A screen whose
-labels we already know does not carry them in its code. So stop looking for
-label ids in screen code -- that route is closed for the whole family.
+**The run:** launch via Steam, walk into any menu, then read `gt:` lines in
+`CFC2Access.log`. What they answer:
 
-**What is already established** (memory `cfc2-gui-text-route`):
-- `cGUIObjText` -- 528 bytes (`mov r9d,0x210` at its registration stub
-  `0x14002e800`), vtable **`0x1410563a8`**, verified by its single DTI
-  registration at `0x1422cae28`. `cGUIObjMessage` is 368 bytes.
-- Object layout from ctor `0x1402f0080` / dtor `0x1402f0980`: `+0x54` flags,
-  `+0x58` float, `+0x60` bitfields, and **`+0x70` = first child,
-  `+0x78` = next sibling** -- GUI objects form a TREE.
-- ⛔ The static route is CLOSED, same as sPad: the four references to the DTI
-  slot are one-line `getDTI()` accessors, and these descriptors carry no
-  property table. The layout must come from a LIVE object.
+- `gt: vptr CONFIRMED` followed by `⭐ best candidate is +0xNNN` -> **that is
+  the text field offset**, which is the whole point. If it is `0x1f8` or
+  `0x200`, the two offline accessors were right.
+- `gt: examined N pointer-shaped field(s) ... 0 resolved to text` -> a real
+  negative: the string is not a plain pointer or an inline ASCII/UTF-16 array
+  in this object. Next ideas, in order: `cGUIObjMessage` (0x170 bytes), then
+  find the writer that copies an rGUIMessage into an element.
+- `gt: update ran 0 time(s)` -> ⚠ the hook is NOT intercepting. **Nothing in
+  that run is evidence either way** -- liveness before findings.
 
-**The next step:** hook a `cGUIObjText` vtable method (fixed address, so no
-memory search) and let the game hand over a real instance, then find the string
-by inspecting it. Same move that cracked `sKeyboard`.
+**Then:** the offset becomes a targeted read, the `cfc2_guitext.on` gate comes
+off (a guard must not outlive its bug -- the discovery sweep's gate stayed on
+for days after the cost that justified it was fixed), and the join into
+`menu_speak` names the ~14 remaining screens.
 
-⚠⚠ **This is riskier than anything shipped so far.** It dereferences a tree of
-caller-supplied pointers on the game's own threads, and this project has
-already killed the game once by trusting such a pointer
-(`hooked-function-pointers-are-untrusted`). Build it with the same discipline
-as the existing hooks: identity check before install, `VirtualQuery` on every
-dereference (never cached), the thread-local fault guard, a bounded walk, and
-`cfc2_hook.off` respected. Ship the OFF switch with the experiment.
+### ⭐⭐ Why slot 5, and the check that changed the answer
+Hook target is `0x1402f9720` = cGUIObjText's vtable + 0x28. Three properties
+were CHECKED, not assumed:
+
+1. **It is unique to this class.** Searching every data section for that qword
+   finds it in exactly ONE 8-aligned slot. So every captured instance is
+   certainly a cGUIObjText and the detour needs no type check.
+2. Its first instruction is exactly 5 bytes -- clean MinHook boundary.
+3. `find_callers.py --jmp` finds zero branches into addr+1..+4.
+
+⛔⛔ **The first target considered failed test 1.** `0x1402fed50` had a real
+prologue and walked the child list, and it appears in **NINE vtables -- none of
+them cGUIObjText's**. Hooking it would have captured other classes' objects and
+read 528 bytes out of things that are not 528 bytes long. Ask "is this address
+unique to the class?" before hooking any vtable slot; a plausible prologue says
+nothing about whose method it is.
+
+### Safety shape (the riskiest module here)
+The detour **dereferences nothing** -- it records the pointer and calls the
+original. All reading happens later on the worker thread, VirtualQuery-checked
+and fault-guarded every time and never cached, in ONE guarded block for the
+whole object rather than per byte. Original always called, return value passed
+through untouched. Respects `cfc2_hook.off`.
+
+### The test: `.	oolsun_gt_test.ps1`
+Ten offline cases; every mechanism was sabotaged and seen to fail (log at the
+bottom of `tools/test_gui_text.c`).
+⭐ Case 5 -- an object with **no** text must yield **-1** -- carries the most
+weight: an inspector that always names some offset is useless, because if it
+cannot say "no" its "yes" means nothing.
+⚠ A green run is NOT evidence the live read is safe; the test path never
+touches foreign memory. It is evidence the inspector draws right conclusions
+from bytes it was given.
 
 ## Screens named so far (7 rows in `g_screens`)
 Main menu · Options · Museum (992 GALLERY/SOUND) · Select Game (rows +
