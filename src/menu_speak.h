@@ -21,6 +21,25 @@
  *     that is the check that catches a stale table after a game update;
  *   - if the text cannot be read, position is still spoken, never a guess.
  *
+ * ⛔⛔ A KNOWN LIMIT OF THE base+index MODEL -- SETTINGS SCREENS.
+ *
+ * It assumes a screen's items are a CONTIGUOUS run of GMD labels. That holds
+ * for the menus verified so far (main menu 37..42, Options 170..174, pause
+ * 250..256) and it does NOT hold for settings screens.
+ *
+ * Measured: the game-settings screen (caller 0x1400b1bd9, fn 0x1400b1b10,
+ * EIGHT items) draws from the OPT_ family, where setting NAMES are interleaved
+ * with their VALUE labels -- OPT_DIFFICULTY 643, OPT_DAMAGE_LEVEL 644, then
+ * 645..648 are its four values, OPT_TIMER_SPEED 649, and so on. The names sit
+ * at 643, 644, 649, 654, 659, 660, 661, 662, 665, 1108, 1115, 1125. No base
+ * plus offset can address them, and WHICH eight appear depends on the game
+ * selected.
+ *
+ * ⭐ So such a screen cannot be named by a g_screens row at all. It needs a
+ * per-screen index->label MAP, not a base. Do not try to force a base for one:
+ * any base that "looks close" will speak a value label where an item name
+ * belongs -- confidently and wrongly.
+ *
  * ⚠ Keying on item count alone was considered and REJECTED: several menus share
  * a count, so it would produce confident wrong names. The caller address is
  * exact.
