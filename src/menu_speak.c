@@ -575,9 +575,36 @@ void menu_speak_log_unknown(const mc_move *m)
     static int   nseen;
     static BOOL  overflowed;
 
+    /* ⭐⭐ ONE SIGHTING NAMES NOTHING -- KEEP WATCHING A SCREEN AS IT MOVES.
+     *
+     * Reporting once per caller gave one position of live text per screen, and
+     * one position cannot discriminate: for a 7-item menu, base 250 says
+     * "Resume" and base 587 says "Original (4:3)", and BOTH are consistent
+     * with a single reading. Every screen then cost the user a question, which
+     * does not scale to 21 of them.
+     *
+     * ⭐ But the rival bases disagree at OTHER positions. So a screen is
+     * re-examined while its candidate set is still ambiguous: each new
+     * position the user visits prints what each surviving base would call it,
+     * and a wrong base is eliminated the moment its guess stops making sense
+     * as a menu. Three positions of "Resume / Restart / How to Play" identify
+     * base 250 with no input from anyone.
+     *
+     * ⚠ Bounded: MAX_REPORTS sightings per caller, so a screen the user
+     * lingers on cannot flood the log. After that it goes quiet for good. */
+    enum { MAX_REPORTS = 4 };
+    static int reports[MAX_SEEN];
+    BOOL first = TRUE;
+
     for (int i = 0; i < nseen; i++) {
-        if (seen[i] == m->caller)
-            return;
+        if (seen[i] == m->caller) {
+            if (reports[i] >= MAX_REPORTS)
+                return;
+            reports[i]++;
+            /* Report this position too, without repeating the header. */
+            first = FALSE;
+            goto sweep;
+        }
     }
     if (nseen >= MAX_SEEN) {
         if (!overflowed) {
@@ -589,13 +616,17 @@ void menu_speak_log_unknown(const mc_move *m)
         }
         return;
     }
+    reports[nseen] = 1;
     seen[nseen++] = m->caller;
 
+sweep:
+    ;
     int count = m->max_index - m->min_index + 1;
-    log_line("mcspeak: [DISCOVERY] unknown screen -- caller=0x%llx  "
-             "items=%d  axis=%s  (screen=%p).",
-             (unsigned long long)(ULONG_PTR)m->caller, count,
-             m->vertical ? "vertical" : "horizontal", m->screen);
+    if (first)
+        log_line("mcspeak: [DISCOVERY] unknown screen -- caller=0x%llx  "
+                 "items=%d  axis=%s  (screen=%p).",
+                 (unsigned long long)(ULONG_PTR)m->caller, count,
+                 m->vertical ? "vertical" : "horizontal", m->screen);
 
     /* ⭐ The caller and the item COUNT are everything an offline tool needs to
      * propose a label run: menu labels sit in contiguous GMD runs, so
@@ -772,6 +803,9 @@ void menu_speak_log_unknown(const mc_move *m)
      * settings screens. An older version of this line printed a 4-field row
      * that no longer compiles -- a discovery hint that produces a broken row is
      * worse than none, because it is followed. */
+    if (!first)
+        return;                 /* the how-to-name-it hint is a one-time note */
+
     log_line("mcspeak: [DISCOVERY]   -> to name it, add "
              "{ 0x%llx, <base>, %d, \"<name>\", MC_VERIFIED_LIVE_TEXT, "
              "MC_LIST, 0 } to g_screens (src/menu_speak.c) using "
