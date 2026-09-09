@@ -4,6 +4,7 @@
 
 #include "menu_speak.h"
 #include "gmd_find.h"
+#include "rom_table.h"
 #include "speech.h"
 #include "log.h"
 
@@ -445,6 +446,42 @@ void menu_speak(const mc_move *m)
         log_line("mcspeak: could not convert \"%s\" to UTF-16; not speaking.",
                  line);
         return;
+    }
+
+    /* ⭐⭐ THE GAME-NAME PROBE -- LOGGED, NEVER SPOKEN.
+     *
+     * The Select Game screen's Game row (row 0) has no value labels in the
+     * GMD, but the exe carries a ROM table with the real titles
+     * (src/rom_table.h). The mapping from the cursor's 0..7 to a ROM index is
+     * a HYPOTHESIS -- rom = 2*game + version, from the table's JP/US pairing --
+     * and this is how it gets tested: print what the hypothesis WOULD say, so
+     * a run's log can be compared against the game actually on screen.
+     *
+     * ⛔ Deliberately not spoken. A title from an unconfirmed mapping is
+     * exactly the confident-wrong-name failure this file exists to prevent,
+     * and it would be indistinguishable from a right one. Once a run confirms
+     * it, this becomes a value variant like any other. */
+    if (sp.axis == MC_AXIS_VALUE && sp.have_row && sp.row == 0 &&
+        sp.screen_name[0] && rom_table_ready()) {
+        static int last_logged = -1;
+        int game = sp.position - 1;
+        if (game != last_logged) {
+            last_logged = game;
+            /* Both regions, because which one the version row selects is part
+             * of what is being tested. */
+            char t0[128] = "", t1[128] = "", c0[16] = "", c1[16] = "";
+            int i0 = rom_table_index_for(game, 0);
+            int i1 = rom_table_index_for(game, 1);
+            if (i0 >= 0) { rom_table_title(i0, t0, sizeof(t0));
+                           rom_table_code(i0, c0, sizeof(c0)); }
+            if (i1 >= 0) { rom_table_title(i1, t1, sizeof(t1));
+                           rom_table_code(i1, c1, sizeof(c1)); }
+            log_line("mcspeak: [ROMPROBE] game slot %d of %d -- IF the mapping "
+                     "rom=2*game+version holds, this is \"%s\" [%s] / \"%s\" "
+                     "[%s]. ⚠ NOT SPOKEN: compare against the game actually on "
+                     "screen before trusting it.",
+                     sp.position, sp.total, t0, c0, t1, c1);
+        }
     }
 
     /* interrupt=TRUE: the user has moved on, so a queued previous item is

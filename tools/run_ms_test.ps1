@@ -8,6 +8,7 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 & $gcc -O2 -Wall -Wextra -o "$out\test_menu_speak.exe" `
     "$root\tools\test_menu_speak.c" "$root\src\menu_speak.c" `
     "$root\src\gmd_find.c" "$root\src\speech.c" "$root\src\log.c" `
+    "$root\src\rom_table.c" `
     "$root\src\memsafe.c" -luser32
 if ($LASTEXITCODE -ne 0) { throw "test build failed" }
 Push-Location $out
