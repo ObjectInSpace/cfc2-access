@@ -5,6 +5,7 @@
 #include "menu_speak.h"
 #include "gmd_find.h"
 #include "rom_table.h"
+#include "memsafe.h"
 #include "speech.h"
 #include "log.h"
 
@@ -692,5 +693,40 @@ void menu_speak_log_unknown(const mc_move *m)
                  "values_off set to the SMALLEST offset seen, and give it NO "
                  "base index. See memory cfc2-settings-screen-shape.",
                  (unsigned long long)off);
+    }
+
+    /* ⭐⭐ THE OPTION-ID ARRAY, when the screen has one.
+     *
+     * Some menus keep a parallel array of option IDs beside the cursor and
+     * dispatch on `[screen + idarray + 4*cursor]` rather than on the cursor
+     * itself -- the post-game-select menu at 0x1400b2729 does exactly that
+     * (`mov edx,[rbx + rcx*4 + 0x340]`, then compares against 1, 2 and 3).
+     *
+     * ⭐ Those IDs identify the ITEMS in a way the cursor position cannot: the
+     * same three-item menu with a different ID triple is a different menu. And
+     * they survive the case the HELP-twin sweep below cannot handle -- a menu
+     * whose labels are not a contiguous run with a blurb after it, which is
+     * why that sweep found nothing for this screen.
+     *
+     * ⚠ Read through the fault guard and printed as raw numbers only. Nothing
+     * is inferred from them here: they are for a person to match against the
+     * screen, exactly like the candidate bases. */
+    if (m->screen && mem_readable((const char *)m->screen + 0x340,
+                                  (SIZE_T)count * 4)) {
+        int ids[16];
+        int n = (count > 16) ? 16 : count;
+        if (n > 0 && mem_copy(ids, (const char *)m->screen + 0x340,
+                              (SIZE_T)n * 4)) {
+            char b[256]; size_t u = 0; b[0] = '\0';
+            for (int i = 0; i < n; i++) {
+                int k = _snprintf(b + u, sizeof(b) - u, "%s%d",
+                                  u ? " " : "", ids[i]);
+                if (k > 0 && (size_t)k < sizeof(b) - u) u += (size_t)k;
+            }
+            log_line("mcspeak: [DISCOVERY]   option IDs at screen+0x340: [%s]"
+                     "  ⚠ raw values -- if these look like a small set (1 2 3)"
+                     " the menu dispatches on them, and they name the items"
+                     " more reliably than the cursor position does.", b);
+        }
     }
 }
