@@ -34,6 +34,32 @@
  * hook reports it. */
 static const int g_select_game_rows[] = { 51, 52, 56 };
 
+/* ⭐⭐ Select Mode, reached from Offline Play -> Select Game.
+ *
+ * ESTABLISHED FROM THE CODE, not from a candidate list. The main menu's
+ * dispatch sends Offline Play to screen id 4 (0x140097b6a), and the function
+ * holding this caller (0x14009b920) contains the confirm dispatch at
+ * 0x14009bb34, whose branches write mode 0, 1 and 2 to +0xd0374 for items 0,
+ * 1 and 2. The GMD names those modes at 4105..4107: Arcade, Versus, Training.
+ * MODE_SELECT "Select Mode" sits at 4103 with its blurb at 4104.
+ *
+ * ⛔⛔ A MAP, NOT A BASE, and only THREE entries for a SIX-item screen. The
+ * mode labels are not a contiguous run covering the whole list -- items 3..5
+ * are something else (4108 is "Training Mode (Boss)", but nothing establishes
+ * it is item 3 here). So the map names what the dispatch proves and leaves the
+ * rest unnamed; menu_speak_build refuses a map whose length disagrees with the
+ * live count, which is exactly the guard that keeps this honest.
+ *
+ * ⚠ Consequence: this row currently names NOTHING at 6 items, by design. It
+ * ships so that the moment a run shows the screen at 3 items -- or a later
+ * session establishes items 3..5 -- the mapping is already correct rather than
+ * guessed. ⛔ Do NOT pad it to six with plausible labels.
+ *
+ * ⚠⚠ 0x14009ba21 is the exact caller a GUESSED row was once shipped for, which
+ * made a different 6-item screen read out the main menu's labels. That is why
+ * nothing here is inferred from item count or from base 37 being "close". */
+static const int g_mode_select_rows[] = { 4105, 4106, 4107 };
+
 /* PC Settings, row 1 (Display): Windowed / Borderless Windowed / Fullscreen.
  * ⚠ Only the row MEASURED in a run is listed. Resolution (row 0) has a
  * variable value list that nobody has observed, so it is absent and names
@@ -115,6 +141,12 @@ static const mc_screen g_screens[] = {
      * recorded. */
     { 0x1400a20fcULL, 170, 5, "Options", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0,
       NULL, 0, NULL, 0 },
+
+    /* Select Mode. ⚠ nlabels 3 vs a live count of 6 means menu_speak_build
+     * REFUSES the map and speaks position only -- correct until items 3..5 are
+     * established. See the comment on g_mode_select_rows. */
+    { 0x14009ba21ULL, -1, 3, "Select Mode", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_ROW, 0, g_mode_select_rows, 3, NULL, 0 },
 
     /* ⭐ PC Settings -- a row/value screen like Select Game.
      *
