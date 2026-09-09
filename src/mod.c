@@ -506,24 +506,58 @@ static DWORD WINAPI worker(LPVOID param)
          * finding from "inspected elements and none held text". This project's
          * rule is that "could not measure" must never look like "measured
          * nothing". */
-        if (gt_ok && (beat == 3 || beat == 10 || beat == 30 ||
+        /* ⛔⛔ REPORT ON CHANGE, NOT ON A SCHEDULE.
+         *
+         * This used to fire only at beats 3, 10, 30 and every 60. A real run
+         * ended at beat 25, so the last report was taken at beat 10 -- BEFORE
+         * the user had navigated anywhere. It printed "0 calls", which was true
+         * of the title screen and said nothing about the menus that followed.
+         *
+         * ⭐ A measurement whose timing is unrelated to the thing being
+         * measured can report a confident zero about a period it never
+         * observed. Reporting whenever the count MOVES ties the log to the
+         * user's actions instead of to the clock, and the periodic beat is
+         * kept only as a liveness floor for when nothing changes at all. */
+        static LONG gt_last_calls = -1;
+        gt_stats gs_probe;
+        if (gt_ok)
+            gt_get_stats(&gs_probe);
+        /* ⚠ Track the CTOR count too. A run where objects are built but slot 13
+         * never fires is the single most informative outcome available, and
+         * watching only `calls` would leave it unreported. */
+        static LONG gt_last_ctors = -1;
+        BOOL gt_changed = gt_ok && (gs_probe.calls != gt_last_calls ||
+                                    gs_probe.ctors != gt_last_ctors);
+        if (gt_ok && (gt_changed || beat == 3 || beat == 10 || beat == 30 ||
                       beat % 60 == 0)) {
             gt_stats gs;
             gt_get_stats(&gs);
-            log_line("gt: update ran %ld time(s); %ld instance(s) inspected; "
-                     "%ld guarded read(s) faulted; %ld object(s) of the WRONG "
-                     "CLASS; %ld were ours, %ld other classes (filtered in "
-                     "the detour).%s%s",
+            gt_last_calls = gs.calls;
+            gt_last_ctors = gs.ctors;
+            log_line("gt: %ld cGUIObjText CONSTRUCTED%s; update ran %ld "
+                     "time(s); %ld instance(s) inspected; %ld guarded read(s) "
+                     "faulted; %ld of the WRONG CLASS; %ld ours, %ld other "
+                     "classes.%s%s%s",
+                     gs.ctors,
+                     gs.ctor_hooked ? "" : " (⚠ CTOR NOT HOOKED -- this zero "
+                                           "measures nothing)",
                      gs.calls, gs.distinct, gs.faults, gs.wrong_class,
                      gs.ours, gs.other_class,
-                     gs.calls == 0
-                         ? "  ⚠ calls==0: the hook is NOT intercepting, so "
-                           "nothing here is evidence either way."
+                     /* ⭐⭐ The decisive reading, stated in the log so it does
+                      * not have to be reconstructed later from raw counts. */
+                     (gs.ctor_hooked && gs.ctors == 0)
+                         ? "  ⛔⛔ ZERO CONSTRUCTED: the shell never builds this "
+                           "class. The whole cGUIObjText route is CLOSED -- "
+                           "this is a decisive answer, not a missed hook."
+                         : "",
+                     (gs.ctor_hooked && gs.ctors > 0 && gs.calls == 0)
+                         ? "  ⭐ Objects EXIST but slot 13 never ran: the class "
+                           "is right and the update method is wrong. Instance "
+                           "pointers were still captured at construction."
                          : "",
                      (gs.calls > 0 && gs.ours == 0)
-                         ? "  ⛔ calls>0 but NONE were ours: this helper runs, "
-                           "but cGUIObjText never reaches it. The target is "
-                           "wrong, and that is a finding, not a quiet zero."
+                         ? "  ⛔ calls>0 but NONE were ours: this method runs, "
+                           "but cGUIObjText never reaches it."
                          : "");
         }
 

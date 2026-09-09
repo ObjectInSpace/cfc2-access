@@ -260,6 +260,36 @@ int main(void)
               st.wrong_class == 0, d);
     }
 
+    /* --- case 9b: ⭐⭐ the CTOR probe captures UNCONDITIONALLY --------------
+     * The opposite property to case 2b, and it must be asserted separately
+     * because the two detours are deliberately different.
+     *
+     * At constructor entry the object is raw allocation -- the factory stamps
+     * the vptr in only AFTER the ctor returns. So a vptr filter on the ctor
+     * would reject every object and manufacture precisely the false zero this
+     * probe exists to escape.
+     *
+     * ⚠ The object handed in here carries the OutlineFont vptr, i.e. a value
+     * the update detour is required to reject. The ctor detour must capture it
+     * anyway. Anyone later "tidying up" by sharing one filter between the two
+     * detours breaks this case, which is the point of writing it. */
+    {
+        gt_test_reset();
+        static ULONGLONG raw[4];
+        raw[0] = 0x141101b78ULL;        /* NOT ours -- and captured regardless */
+
+        void *r = gt_test_ctor_body(raw);
+        gt_stats st;
+        gt_get_stats(&st);
+        char d[192];
+        snprintf(d, sizeof d, "ret=%p captured=%p (wanted %p) ctors=%ld "
+                 "(wanted 1)", r, gt_test_last_captured(), (void *)raw,
+                 st.ctors);
+        check("case 9b: the ctor probe counts and captures with NO vptr filter",
+              r == (void *)(ULONG_PTR)0xC0FFEE0011223344ULL &&
+              gt_test_last_captured() == (void *)raw && st.ctors == 1, d);
+    }
+
     /* --- case 10: install REFUSES when the target is not the expected code -
      * ⭐⭐ Reported as a REASON, not a bare FALSE. A test asserting only
      * "install failed" passes with every guard deleted, because MinHook
@@ -309,6 +339,8 @@ int main(void)
  *   return NULL instead of the original's value  -> ONLY case 1 fails
  *   delete the install protection guard          -> ONLY case 9 fails
  *   delete the inline-string sweep               -> ONLY case 6 fails
+ *   filtering the CTOR detour on vptr too        -> ONLY case 9b fails
+ *   ctor count never incremented                 -> ONLY case 9b fails
  *
  * ⭐⭐ THE ONE WORTH READING TWICE is the install guard. With it deleted,
  * gt_install() STILL returns FALSE -- MinHook refuses an unmapped address on

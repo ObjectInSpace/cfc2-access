@@ -245,6 +245,39 @@
  *     addr+1..+4. */
 #define GT_UPDATE_ADDR   0x1402fd6d0ULL
 #define GT_VTABLE_SLOT   13
+
+/* ⭐⭐ THE CONSTRUCTOR -- a BIRTH probe, and a better question than the above.
+ *
+ * Run 5 hooked slot 13 through a real navigation session (the user reached
+ * Select Game; the cursor hook fired 10 times and the mod spoke) and slot 13
+ * ran ZERO times. Slot 13 is unique to this class's instance vtable, has no
+ * direct callers, and is called from 131 generic `call [reg+0x68]` sites, so
+ * it is a normal virtual method of the hierarchy. Zero calls on it therefore
+ * suggests something stronger than "wrong slot": that NO cGUIObjText was ever
+ * INSTANTIATED.
+ *
+ * ⚠ That is a hypothesis, and hooking more update-shaped methods cannot test
+ * it -- every such test confounds "wrong method" with "no objects". The
+ * constructor separates them: 0x1402efc10 has exactly ONE caller (the factory
+ * 0x1402ef980), so hooking it catches EVERY cGUIObjText that is ever built.
+ *   - ctor calls > 0  -> objects exist; slot 13 was simply the wrong method,
+ *                        and we now hold real instance pointers anyway.
+ *   - ctor calls == 0 -> the shell does not use this class for menu text at
+ *                        all, and the whole cGUIObjText route is closed. That
+ *                        is a decisive answer, not another inconclusive run.
+ *
+ * ⭐ Either outcome ends a line of guessing, which is what makes this worth a
+ * launch where another update-method guess would not be.
+ *
+ * ⚠⚠ THE VPTR FILTER MUST NOT RUN ON THE CTOR. At ctor entry the object is raw
+ * allocation: the factory stamps the vptr in AFTER the ctor returns
+ * (`call 0x1402efc10` then `lea rax,[vtable]; mov [rbx],rax`). Filtering on the
+ * vptr here would reject every object and reproduce the same false zero this
+ * probe exists to escape. So the ctor detour records unconditionally, and the
+ * WORKER re-checks the vptr later -- by which time the factory has written it.
+ * Prologue `push rbx; sub rsp,0x20` = 40 53 48 83 ec 20, six bytes over two
+ * instructions, no branch-ins. */
+#define GT_CTOR_ADDR     0x1402efc10ULL
 #define GT_CLASS_SIZE    0x210            /* 528 bytes -- confirmed by the
                                            * factory's own allocation size    */
 
@@ -303,6 +336,17 @@ typedef struct {
      * means we are hooked where this class never goes. */
     LONG  other_class;
     LONG  ours;       /* calls whose object WAS a cGUIObjText */
+
+    /* ⭐⭐ Constructions seen -- the number that makes every other zero here
+     * interpretable. An update hook that never fires is ambiguous: wrong
+     * method, or no objects? This separates them, because the ctor has exactly
+     * one caller and therefore catches every object of the class.
+     *
+     * ⚠ Read it beside `ctor_hooked`. ctors == 0 with ctor_hooked == FALSE
+     * measures nothing at all -- "could not measure" must never look like
+     * "measured zero". */
+    LONG  ctors;
+    BOOL  ctor_hooked;
 } gt_stats;
 
 void gt_get_stats(gt_stats *out);
@@ -335,6 +379,16 @@ void *gt_test_body(void *self, void *arg);
 
 /* What did the detour record? Returns the most recently captured pointer. */
 void *gt_test_last_captured(void);
+
+/* Drive the shipping CONSTRUCTOR detour with a synthetic object.
+ *
+ * ⭐⭐ The property that matters here is the opposite of the update detour's:
+ * the ctor hook must capture UNCONDITIONALLY, with no vptr filter, because at
+ * ctor entry the vptr has not been written yet. A filter here would reject
+ * every object and produce exactly the false zero the probe exists to escape.
+ * So the test hands it an object whose vptr is deliberately NOT ours and
+ * requires it to be captured anyway. */
+void *gt_test_ctor_body(void *self);
 
 /* Run the shipping INSPECTOR over a caller-supplied buffer that stands in for
  * an instance, and report what it found. "text_offset" is set to the offset

@@ -35,6 +35,11 @@ typedef void *(*pfn_update)(void *self, void *arg);
 
 static pfn_update g_real_update;
 
+/* The constructor: `cGUIObjText *ctor(cGUIObjText *this)` -- one argument, and
+ * it returns `this` (`mov rax,rbx` before the epilogue). */
+typedef void *(*pfn_ctor)(void *self);
+static pfn_ctor g_real_ctor;
+
 static volatile LONG g_calls;
 static volatile LONG g_distinct;
 static volatile LONG g_faults;
@@ -49,6 +54,10 @@ static volatile LONG g_other_class;
  * a large g_other_class with g_ours == 0 means we are hooked to something this
  * class never reaches. */
 static volatile LONG g_ours;
+/* ⭐⭐ Constructions seen. THE decisive number: cGUIObjText objects that were
+ * actually built. It answers a question no update-method hook can, because
+ * every such hook confounds "wrong method" with "no objects exist". */
+static volatile LONG g_ctors;
 
 /* The most recently seen instance, published for the worker thread.
  *
@@ -161,6 +170,36 @@ static void *hook_update(void *self, void *arg)
 {
     return detour_body(g_real_update, self, arg,
                        __builtin_return_address(0));
+}
+
+/* The constructor detour -- the BIRTH probe.
+ *
+ * ⚠⚠ NO VPTR FILTER HERE, and that is deliberate rather than an oversight.
+ * At ctor entry the object is raw allocation: the factory writes the vptr only
+ * AFTER this returns. Filtering on it would reject every object and manufacture
+ * exactly the false zero this probe exists to escape.
+ *
+ * ⭐ Safety is unchanged in the part that matters: the detour still
+ * DEREFERENCES NOTHING. It counts, records the pointer, and calls the original.
+ * The worker re-checks the vptr later -- by which time the factory has written
+ * it -- so the identity guarantee is deferred, not dropped.
+ *
+ * ⚠ We do NOT publish to the capture channel before the original runs: at that
+ * moment the object's fields are uninitialised, and a worker poll landing in
+ * between would inspect garbage and report it as a finding. Call through
+ * first, then publish. */
+static void *hook_ctor(void *self)
+{
+    InterlockedIncrement(&g_ctors);
+
+    void *r = g_real_ctor(self);
+
+    InterlockedIncrement(&g_seq);
+    g_last_self   = self;
+    g_last_caller = __builtin_return_address(0);
+    InterlockedIncrement(&g_seq);
+
+    return r;
 }
 
 /* --- the inspector -------------------------------------------------------
@@ -540,6 +579,36 @@ BOOL gt_install(void)
         return FALSE;
     }
 
+    /* ⭐⭐ The CONSTRUCTOR hook -- the birth probe. See the header.
+     *
+     * ⚠ Its failure is NOT fatal to the install: the update hook above is
+     * already live and useful, and a run with one of the two is better than no
+     * run. But it is logged loudly, because the ctor count is the number that
+     * makes a zero interpretable -- without it, "update ran 0 times" cannot be
+     * told apart from "no objects were ever created". */
+    void *c = (void *)(ULONG_PTR)GT_CTOR_ADDR;
+    BYTE cpro[sizeof(GT_PROLOGUE)];
+    if (!mem_copy(cpro, c, sizeof(cpro)) ||
+        memcmp(cpro, GT_PROLOGUE, sizeof(cpro)) != 0) {
+        log_line("gt: ⚠ the ctor at 0x%llx does not carry the expected "
+                 "prologue -- NOT hooking it. The construction count will be "
+                 "absent, so a zero update count cannot be told apart from "
+                 "'no objects exist'.", GT_CTOR_ADDR);
+    } else if (MH_CreateHook(c, (void *)&hook_ctor,
+                             (void **)&g_real_ctor) != MH_OK ||
+               MH_EnableHook(c) != MH_OK) {
+        MH_RemoveHook(c);
+        g_real_ctor = NULL;
+        log_line("gt: ⚠ could not hook the ctor at 0x%llx; construction count "
+                 "will be absent.", GT_CTOR_ADDR);
+    } else {
+        log_line("gt: hooked the cGUIObjText CONSTRUCTOR at 0x%llx. It has "
+                 "exactly ONE caller (the factory 0x%llx), so this counts "
+                 "EVERY object of this class that is ever built -- which is "
+                 "what tells a wrong hook target apart from a class the shell "
+                 "never instantiates.", GT_CTOR_ADDR, GT_FACTORY_ADDR);
+    }
+
     g_installed = TRUE;
     g_why = GT_INSTALL_OK;
     log_line("gt: hooked cGUIObjText's update method at 0x%llx. The detour "
@@ -556,8 +625,20 @@ void gt_remove(void)
     void *t = (void *)(ULONG_PTR)GT_UPDATE_ADDR;
     MH_DisableHook(t);
     MH_RemoveHook(t);
+
+    /* ⚠ Only if it was actually installed. g_real_ctor is the record of that:
+     * the ctor hook is allowed to fail without failing the install, so
+     * unhooking unconditionally would ask MinHook to remove a hook that was
+     * never created. */
+    if (g_real_ctor) {
+        void *c = (void *)(ULONG_PTR)GT_CTOR_ADDR;
+        MH_DisableHook(c);
+        MH_RemoveHook(c);
+        g_real_ctor = NULL;
+    }
+
     g_installed = FALSE;
-    log_line("gt: hook removed.");
+    log_line("gt: hooks removed.");
 }
 
 void gt_get_stats(gt_stats *out)
@@ -570,6 +651,8 @@ void gt_get_stats(gt_stats *out)
     out->wrong_class = InterlockedCompareExchange(&g_wrong_class, 0, 0);
     out->other_class = InterlockedCompareExchange(&g_other_class, 0, 0);
     out->ours        = InterlockedCompareExchange(&g_ours, 0, 0);
+    out->ctors       = InterlockedCompareExchange(&g_ctors, 0, 0);
+    out->ctor_hooked = (g_real_ctor != NULL);
 }
 
 /* --- test seams ----------------------------------------------------------
@@ -597,6 +680,26 @@ void *gt_test_body(void *self, void *arg)
 void *gt_test_last_captured(void)
 {
     return g_last_self;
+}
+
+/* The stand-in "original" ctor. ⛔ It returns a value the TEST recognises
+ * rather than computing a plausible one -- a stand-in that re-derives what the
+ * shipping code derives leaves a broken mechanism indistinguishable from a
+ * working one. */
+static void *fake_ctor(void *self)
+{
+    (void)self;
+    return g_sim_ret;
+}
+
+void *gt_test_ctor_body(void *self)
+{
+    g_sim_ret = (void *)(ULONG_PTR)0xC0FFEE0011223344ULL;
+    pfn_ctor saved = g_real_ctor;
+    g_real_ctor = fake_ctor;
+    void *r = hook_ctor(self);
+    g_real_ctor = saved;
+    return r;
 }
 
 /* Resolve a pointer inside the harness's own buffer. The test builds an object
@@ -630,7 +733,7 @@ BOOL gt_test_inspect(const void *buf, SIZE_T len, int *text_offset)
 void gt_test_reset(void)
 {
     g_calls = g_distinct = g_faults = g_wrong_class = 0;
-    g_other_class = g_ours = 0;
+    g_other_class = g_ours = g_ctors = 0;
     g_seq = 0; g_taken_seq = 0;
     g_last_self = NULL; g_last_caller = NULL;
 }
