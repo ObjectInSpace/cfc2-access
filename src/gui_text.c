@@ -556,7 +556,16 @@ BOOL gt_poll_and_log(void)
  * The prologue is re-checked here at runtime because the exe is Enigma-packed
  * and these addresses hold ciphertext until unpack completes; hooking early
  * would patch encrypted bytes. */
-static const BYTE GT_PROLOGUE[] = { 0x40, 0x53, 0x48, 0x83, 0xec, 0x30 };
+/* ⛔⛔ THREE TARGETS NOW SHARE THIS SHAPE AND DIFFER ONLY IN THE FRAME SIZE:
+ * `push rbx; sub rsp,N`. Reusing one constant across two of them already cost
+ * a run (0x20 vs 0x30), and correcting the vtable then changed this one from
+ * 0x30 to 0x20 as well. So each target gets its OWN bytes, spelled out, and
+ * case 9c pins them against the dump.
+ *
+ * ⭐ The general lesson: a prologue constant belongs to an ADDRESS, not to a
+ * shape. Two functions starting with the same two instructions are still two
+ * functions. */
+static const BYTE GT_PROLOGUE[] = { 0x40, 0x53, 0x48, 0x83, 0xec, 0x20 };
 
 /* ⛔⛔ THE CTOR NEEDS ITS OWN. It is `push rbx; sub rsp,0x20` -- the SAME shape
  * as the update method but a different frame size, so the last byte is 0x20,
@@ -628,14 +637,25 @@ BOOL gt_install(void)
     if (g_installed)
         return TRUE;
 
-    if (!check_target())
-        return FALSE;
-
-    log_line("gt: identity CONFIRMED -- 0x%llx carries the expected prologue "
-             "and sits in cGUIObjText's vtable slot %d, which is what makes "
-             "every captured instance certainly of this class.",
-             GT_UPDATE_ADDR, GT_VTABLE_SLOT);
-
+    /* ⛔⛔ THE DEPENDENCY WAS INVERTED, AND IT COST A RUN.
+     *
+     * The CTOR probe is the load-bearing hook: it is what proved the class is
+     * instantiated (36 objects) and it is what captures the instances we
+     * inspect. The update hook is now OPTIONAL -- five runs established that no
+     * slot of this vtable is a usable per-frame method, and we no longer need
+     * one.
+     *
+     * But install() checked the update target FIRST and returned FALSE on
+     * mismatch, so when GT_VTABLE_ADDR was corrected to the real instance
+     * vtable (0x141056b40) and GT_UPDATE_ADDR still named a slot of the OLD
+     * one, the whole module refused to install -- ctor probe included. The run
+     * produced nothing.
+     *
+     * ⭐ The guard was right to refuse: slot 13 of the new vtable is
+     * 0x1402fd6a0, not 0x1402fd6d0, and hooking the stale address would have
+     * patched a function belonging to another class. The bug was that a
+     * FAILED OPTIONAL check aborted a MANDATORY one. Order the install by what
+     * it depends on, not by what was written first. */
     MH_STATUS st = MH_Initialize();
     if (st != MH_OK && st != MH_ERROR_ALREADY_INITIALIZED) {
         log_line("gt: MH_Initialize failed (%d).", (int)st);
@@ -643,28 +663,59 @@ BOOL gt_install(void)
         return FALSE;
     }
 
+    /* The update hook: attempted, never required. */
     void *t = (void *)(ULONG_PTR)GT_UPDATE_ADDR;
-    if (MH_CreateHook(t, (void *)&hook_update,
-                      (void **)&g_real_update) != MH_OK) {
-        log_line("gt: MH_CreateHook failed.");
-        g_why = GT_INSTALL_MINHOOK_FAILED;
-        return FALSE;
+    if (!check_target()) {
+        log_line("gt: ⚠ the update-method hook was NOT installed (see above). "
+                 "That is survivable: it has never fired in five runs, and the "
+                 "ctor probe below is what actually captures instances.");
+        t = NULL;
+    } else {
+        log_line("gt: identity CONFIRMED -- 0x%llx carries the expected "
+                 "prologue and sits in the instance vtable's slot %d.",
+                 GT_UPDATE_ADDR, GT_VTABLE_SLOT);
     }
-    if (MH_EnableHook(t) != MH_OK) {
-        log_line("gt: MH_EnableHook failed; removing.");
+    if (t && MH_CreateHook(t, (void *)&hook_update,
+                      (void **)&g_real_update) != MH_OK) {
+        log_line("gt: ⚠ MH_CreateHook failed for the update method; "
+                 "continuing without it.");
+        t = NULL;
+    }
+    if (t && MH_EnableHook(t) != MH_OK) {
+        log_line("gt: ⚠ MH_EnableHook failed for the update method; "
+                 "continuing without it.");
         MH_RemoveHook(t);
-        g_why = GT_INSTALL_MINHOOK_FAILED;
+        g_real_update = NULL;
+    }
+
+    /* ⭐⭐ The CONSTRUCTOR hook -- the birth probe, and THE hook this module
+     * now rests on. It proved the class is instantiated (36 objects in the
+     * 17:19 run) and it is what captures the instances the worker inspects.
+     *
+     * ⚠ If THIS fails, the module has nothing: no construction count and no
+     * instances. Unlike the update hook above, a failure here is worth
+     * reporting as a failed install -- see below. */
+    void *c = (void *)(ULONG_PTR)GT_CTOR_ADDR;
+
+    /* ⭐ The ctor gets the SAME protection guard as the update target. It was
+     * missing, and the omission was only visible because case 10 asserts WHICH
+     * layer refuses: with the game unmapped, install fell through to MinHook
+     * (reason 5) instead of reporting BAD_PROTECT (reason 2). A bare
+     * "install failed" assertion would have shown nothing.
+     *
+     * ⚠ This is the guard that matters most for the ctor: it is now the
+     * load-bearing hook, so patching a bad address here breaks everything. */
+    MEMORY_BASIC_INFORMATION cmbi;
+    if (VirtualQuery(c, &cmbi, sizeof(cmbi)) != sizeof(cmbi) ||
+        cmbi.State != MEM_COMMIT ||
+        !(cmbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ |
+                          PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))) {
+        log_line("gt: the ctor at 0x%llx is not committed executable memory -- "
+                 "REFUSING to hook. Nothing was written.", GT_CTOR_ADDR);
+        g_why = GT_INSTALL_BAD_PROTECT;
         return FALSE;
     }
 
-    /* ⭐⭐ The CONSTRUCTOR hook -- the birth probe. See the header.
-     *
-     * ⚠ Its failure is NOT fatal to the install: the update hook above is
-     * already live and useful, and a run with one of the two is better than no
-     * run. But it is logged loudly, because the ctor count is the number that
-     * makes a zero interpretable -- without it, "update ran 0 times" cannot be
-     * told apart from "no objects were ever created". */
-    void *c = (void *)(ULONG_PTR)GT_CTOR_ADDR;
     BYTE cpro[sizeof(GT_CTOR_PROLOGUE)];
     if (!mem_copy(cpro, c, sizeof(cpro)) ||
         memcmp(cpro, GT_CTOR_PROLOGUE, sizeof(cpro)) != 0) {
@@ -697,12 +748,25 @@ BOOL gt_install(void)
                  "never instantiates.", GT_CTOR_ADDR, GT_FACTORY_ADDR);
     }
 
+    /* ⭐ The ctor is the one that must work. Without it there is no census and
+     * no instances, so reporting a successful install would be a lie that
+     * produces a silent, uninterpretable run -- exactly what this project's
+     * rule about "could not measure" exists to prevent. */
+    if (!g_real_ctor) {
+        if (t) { MH_DisableHook(t); MH_RemoveHook(t); g_real_update = NULL; }
+        log_line("gt: ⛔ the ctor probe could not be installed, so this module "
+                 "has no way to reach an instance. Reporting FAILURE rather "
+                 "than a run that would look quiet and mean nothing.");
+        g_why = GT_INSTALL_MINHOOK_FAILED;
+        return FALSE;
+    }
+
     g_installed = TRUE;
     g_why = GT_INSTALL_OK;
-    log_line("gt: hooked cGUIObjText's update method at 0x%llx. The detour "
-             "records the instance pointer and DEREFERENCES NOTHING; all "
-             "reading happens on the worker thread under the fault guard.",
-             GT_UPDATE_ADDR);
+    log_line("gt: ready -- ctor probe live%s. Detours DEREFERENCE NOTHING "
+             "beyond a single guarded vptr read; all inspection happens on the "
+             "worker thread under the fault guard.",
+             t ? " and update hook installed" : " (update hook absent)");
     return TRUE;
 }
 

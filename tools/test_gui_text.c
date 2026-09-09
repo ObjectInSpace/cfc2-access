@@ -311,17 +311,25 @@ int main(void)
         int ul = 0, cl = 0;
         const BYTE *up = gt_test_prologue(0, &ul);
         const BYTE *cp = gt_test_prologue(1, &cl);
-        const BYTE want_u[] = { 0x40, 0x53, 0x48, 0x83, 0xec, 0x30 };
+        /* ⚠ These two are now EQUAL, and that is correct: after the vtable was
+         * fixed, slot 13 of the real instance vtable (0x1402fd6a0) has the
+         * same frame size as the ctor. An earlier version of this case
+         * asserted they must DIFFER -- which was true of the addresses then in
+         * use and became a false requirement the moment one address changed.
+         *
+         * ⭐ So pin the VALUES against the dump, never the relationship
+         * between them. What matters is that each constant matches the bytes
+         * at its own target, not how the two compare. */
+        const BYTE want_u[] = { 0x40, 0x53, 0x48, 0x83, 0xec, 0x20 };
         const BYTE want_c[] = { 0x40, 0x53, 0x48, 0x83, 0xec, 0x20 };
         BOOL ok = up && cp && ul == 6 && cl == 6 &&
-                  memcmp(up, want_u, 6) == 0 && memcmp(cp, want_c, 6) == 0 &&
-                  memcmp(up, cp, 6) != 0;
+                  memcmp(up, want_u, 6) == 0 && memcmp(cp, want_c, 6) == 0;
         char d[192];
         snprintf(d, sizeof d,
                  "update=%02x %02x %02x %02x %02x %02x  ctor=%02x %02x %02x "
                  "%02x %02x %02x", up[0], up[1], up[2], up[3], up[4], up[5],
                  cp[0], cp[1], cp[2], cp[3], cp[4], cp[5]);
-        check("case 9c: update and ctor prologues are pinned AND distinct",
+        check("case 9c: both prologue constants match the dump's bytes",
               ok, d);
     }
 

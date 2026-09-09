@@ -168,7 +168,17 @@
  *   - prologue `push rbx; sub rsp,0x30` = 40 53 48 83 ec 30, six bytes over
  *     two whole instructions; find_callers.py --jmp finds no branch into
  *     addr+1..+4. */
-#define GT_UPDATE_ADDR   0x1402fd6d0ULL
+/* ⚠ Slot 13 of the REAL instance vtable (0x141056b40). The old value
+ * 0x1402fd6d0 was slot 13 of 0x141056c50 -- cGUIObjMessage's -- and left
+ * behind when GT_VTABLE_ADDR was corrected. The install guard caught it and
+ * refused, which cost a run but prevented patching another class's function.
+ *
+ * ⭐ This hook is OPTIONAL now. Five runs showed no slot of this vtable is a
+ * usable per-frame method, and the ctor probe is what actually captures
+ * instances. It is kept only because a per-element method, if this turns out
+ * to be one, would show WHEN a label changes. Its failure must never abort the
+ * ctor probe -- see the ordering note in gt_install(). */
+#define GT_UPDATE_ADDR   0x1402fd6a0ULL
 #define GT_VTABLE_SLOT   13
 
 /* ⭐⭐ THE CONSTRUCTOR -- a BIRTH probe, and a better question than the above.
