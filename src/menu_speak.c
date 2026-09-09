@@ -258,6 +258,9 @@ void menu_speak_log_unknown(const mc_move *m)
         int off = m->new_index - m->min_index;
         int total = gmd_text_count();
         int shown = 0;
+        char batch[1024];
+        size_t used = 0;
+        batch[0] = '\0';
         log_line("mcspeak: [DISCOVERY]   you are on position %d of %d. Runs of "
                  "%d items followed by help text (base -> your item):",
                  off + 1, count, count);
@@ -289,9 +292,24 @@ void menu_speak_log_unknown(const mc_move *m)
 
             if (!gmd_text_by_index(base + off, cur, sizeof(cur)))
                 continue;
-            log_line("mcspeak: [DISCOVERY]     base %-5d -> \"%s\"", base, cur);
+            /* ⛔⛔ BATCHED INTO ONE LINE, NOT ONE LINE PER CANDIDATE.
+             *
+             * log_line() opens, writes and closes the file every call -- which
+             * is deliberate (a crash never loses the log) and perfectly fine at
+             * normal rates. It is ruinous in a burst: ~40 candidate lines took
+             * TWELVE SECONDS in-game, and the mod visibly stopped keeping up
+             * while the user was still navigating.
+             *
+             * The sweep itself is ~19 ms. The cost was entirely the logging, so
+             * the fix belongs here rather than in the logging guarantee. */
+            int k = _snprintf(batch + used, sizeof(batch) - used,
+                              "%s%d:%s", used ? "  " : "", base, cur);
+            if (k > 0 && (size_t)k < sizeof(batch) - used)
+                used += (size_t)k;
             shown++;
         }
+        if (used)
+            log_line("mcspeak: [DISCOVERY]     %s", batch);
         if (!shown)
             log_line("mcspeak: [DISCOVERY]     (none -- this screen's labels "
                      "may not follow the usual item+help layout)");

@@ -427,7 +427,13 @@ static DWORD WINAPI worker(LPVOID param)
             }
         }
         beat++;
-        if (beat <= 3 || beat % 30 == 0)
+        /* ⚠ Every 5 beats (10 s), not every 30 (60 s). A session ended with
+         * the log stopping mid-navigation and the user reporting the mod had
+         * "stopped reading" -- and the heartbeat could not distinguish a dead
+         * worker from a quiet one, because the next beat was 40 s away. A
+         * liveness signal that sparse cannot answer the question it exists
+         * for. */
+        if (beat <= 3 || beat % 5 == 0)
             log_line("heartbeat %d (alive %d s)", beat, beat * 2);
 
         /* Periodic keyboard-state summary: how many times the builder ran and

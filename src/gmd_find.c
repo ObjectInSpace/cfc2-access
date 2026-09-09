@@ -303,7 +303,10 @@ static BOOL verify_label(BYTE *array_base, const gmd_probe *pr, gmd_form form,
 /* 64 KB-aligned deltas to try, cheapest first, before falling back to a scan.
  * The three observed values are all 64 KB multiples. */
 static const SIZE_T g_strings_hints[] = {
-    0x140000, 0x170000, 0x0d0000, 0x30000, 0x100000, 0x200000,
+    /* 0x120000 first: measured as the live blob once the stale one stopped
+     * being picked. The others are earlier observations, kept because the blob
+     * genuinely moves between runs. */
+    0x120000, 0x140000, 0x170000, 0x0d0000, 0x30000, 0x100000, 0x200000,
 };
 #define NSTRING_HINTS (int)(sizeof(g_strings_hints) / \
                             sizeof(g_strings_hints[0]))
@@ -988,9 +991,10 @@ BOOL gmd_text_ready(void)
     for (int h = 0; h < NSTRING_HINTS && best_off < 0; h++) {
         SIZE_T delta = g_strings_hints[h];
         /* Point the accessor at this candidate blob and ask what it is. */
+        /* ⚠ No index build here: gmd_text_language() reads string 0 straight
+         * from the base. Indexing every candidate is what made this crawl. */
         g_text_blob  = r.array_base + delta;
         g_text_count = GMD_LABEL_COUNT;
-        text_index_free();
 
         const char *lang = gmd_text_language();
         if (!lang)
@@ -1033,7 +1037,6 @@ BOOL gmd_text_ready(void)
         for (SIZE_T d = 0x10000; d <= 0x400000; d += 0x10000) {
             g_text_blob  = r.array_base + d;
             g_text_count = GMD_LABEL_COUNT;
-            text_index_free();
             const char *lang = gmd_text_language();
             if (lang && strcmp(lang, want) == 0) {
                 best_off = (int)d;
@@ -1222,10 +1225,27 @@ static const struct { const char *code; const char *idx0; } g_lang_by_idx0[] = {
 };
 #define NLANG_BY_IDX0 (int)(sizeof(g_lang_by_idx0) / sizeof(g_lang_by_idx0[0]))
 
+/* Read index 0 WITHOUT building the offset index.
+ *
+ * ⛔⛔ Building it here cost 25 full rebuilds in one session -- the probing
+ * loop tries a blob, asks its language, and moves on, so a 4 MB indexing pass
+ * per candidate is pure waste. It made a discovery block take TWELVE SECONDS
+ * and the mod visibly stopped keeping up.
+ *
+ * Index 0 is the first string in the blob, so it needs no index at all: it
+ * starts at the blob base. */
+static BOOL read_index0(char *out, unsigned cap)
+{
+    if (!g_text_blob || !out || cap == 0)
+        return FALSE;
+    out[0] = '\0';
+    return read_cstr(g_text_blob, out, cap);
+}
+
 const char *gmd_text_language(void)
 {
     char idx0[128];
-    if (!gmd_text_by_index(0, idx0, sizeof(idx0)) || !idx0[0])
+    if (!read_index0(idx0, sizeof(idx0)) || !idx0[0])
         return NULL;
     for (int i = 0; i < NLANG_BY_IDX0; i++) {
         if (strcmp(idx0, g_lang_by_idx0[i].idx0) == 0)
