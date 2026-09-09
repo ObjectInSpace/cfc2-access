@@ -34,6 +34,14 @@
  * hook reports it. */
 static const int g_select_game_rows[] = { 51, 52, 56 };
 
+/* PC Settings, row 1 (Display): Windowed / Borderless Windowed / Fullscreen.
+ * ⚠ Only the row MEASURED in a run is listed. Resolution (row 0) has a
+ * variable value list that nobody has observed, so it is absent and names
+ * nothing rather than guessing at a count. */
+static const mc_value_set g_pcset_values[] = {
+    { 1, 3, 220 },   /* Display: Windowed / Borderless / Fullscreen -- MEASURED */
+};
+
 /* ⭐⭐ Select Game's VALUE labels, per row, keyed by the LIVE count.
  *
  * ⛔ Row 0 (Game) is deliberately ABSENT: the eight game titles have no clean
@@ -107,6 +115,31 @@ static const mc_screen g_screens[] = {
      * recorded. */
     { 0x1400a20fcULL, 170, 5, "Options", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0,
       NULL, 0, NULL, 0 },
+
+    /* ⭐ PC Settings -- a row/value screen like Select Game.
+     *
+     * ESTABLISHED FROM THE SEQUENCE plus the cursor offsets, both in the
+     * 13:11 run. The user was on "PC Settings, 4 of 5" in the Options list,
+     * confirmed it, and 0x1400a1757 appeared with THREE items at cursor
+     * screen+0x33c -- the second slot of a value-cursor array, i.e. row 1.
+     * 0x1400a1715 is the matching row selector (flat, cursor +0x330).
+     *
+     * ⭐ Row 1's three values are MENU_OP_PC_WINDOW / _BORDERLESS /
+     * _FULL_SCREEN at 220..222 -- the Display setting, whose name sits at
+     * 219. Three values matches the live count exactly.
+     *
+     * ⛔ NO row labels shipped. The rows are Resolution (218) and Display
+     * (219), but the run never moved on the ROW selector, so which row is
+     * which position is not established -- and this file's rule is that a row
+     * exists only when live text showed it. The value row is named because
+     * its count and offset together pin it; the row list is not.
+     *
+     * ⚠ values_off is 0x338, the same array base as Select Game's. Read from
+     * the offsets in the log (row 1 -> +0x33c => base +0x338), not assumed
+     * from the other screen. */
+    { 0x1400a1757ULL, -1, 0, "PC Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x338, NULL, 0, g_pcset_values,
+      (int)(sizeof(g_pcset_values) / sizeof(g_pcset_values[0])) },
 
     /* ⭐ Museum. ESTABLISHED FROM THE NAVIGATION SEQUENCE, not from a lone
      * candidate list. The 12:45 run shows the user on "Museum, 3 of 6", then
@@ -807,18 +840,27 @@ sweep:
          * printed beside each base, and why a person still has to match it to
          * the screen. That comparison is the confirmation; this list is only
          * the shortlist. */
+        /* ⚠ EVERY line carries its caller. The header prints once per screen
+         * now, so without this a later sighting is unattributable -- it sits
+         * under whatever header happened to come before it, and grouping the
+         * log by screen becomes guesswork. A diagnostic whose lines cannot be
+         * attributed is much weaker than it looks. */
         if (used)
-            log_line("mcspeak: [DISCOVERY]   position %d of %d; candidate "
-                     "bases (each shows what item %d would be called -- ⚠ "
-                     "neighbouring bases can be SLIDES of one real run, so "
+            log_line("mcspeak: [DISCOVERY] caller=0x%llx  position %d of %d; "
+                     "candidate bases (each shows what item %d would be called "
+                     "-- ⚠ neighbouring bases can be SLIDES of one real run, so "
                      "match the text to the screen): %s",
+                     (unsigned long long)(ULONG_PTR)m->caller,
                      off + 1, count, off + 1, batch);
         else
-            log_line("mcspeak: [DISCOVERY]   position %d of %d; no candidate "
+            log_line("mcspeak: [DISCOVERY] caller=0x%llx  position %d of %d; "
+                     "no candidate "
                      "run found in the first %d labels. ⚠ This screen's labels "
                      "may simply lack the one-blurb-per-item shape this looks "
                      "for -- absence here is NOT evidence the labels are "
-                     "missing.", off + 1, count, total);
+                     "missing.",
+                     (unsigned long long)(ULONG_PTR)m->caller,
+                     off + 1, count, total);
     }
 
     /* ⭐ Emit a row in the CURRENT shape, including the fields added for
