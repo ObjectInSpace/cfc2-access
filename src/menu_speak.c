@@ -34,6 +34,20 @@
  * hook reports it. */
 static const int g_select_game_rows[] = { 51, 52, 56 };
 
+/* ⛔ NOT NAMEABLE FROM THE GMD -- the Museum GALLERY lists (0x14009a482 and
+ * 0x14009af21, 9 items each, cursor +0x33c, count from +0x340).
+ *
+ * Checked, so nobody repeats it: there is no 9-item run of game names in the
+ * GMD at all, and the confirm handler at 0x14009a990 indexes tables at
+ * 0x12072f8 / 0x1207300 / 0x1207328 / 0x1207350 by the cursor -- resource and
+ * layout ids, not label indices. The nine entries are the eight games plus the
+ * collection, drawn as logos, exactly like Select Game's Game row.
+ *
+ * ⭐ So the route is the ROM table (src/rom_table.h), not a label run -- but
+ * only once something establishes that the Gallery's 0..8 uses the same
+ * ordering as Select Game's 0..7, which nothing yet does. Until then these
+ * speak position only, which is correct. */
+
 /* ⭐⭐ Select Mode, reached from Offline Play -> Select Game.
  *
  * ESTABLISHED FROM THE CODE, not from a candidate list. The main menu's
