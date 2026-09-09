@@ -21,6 +21,7 @@
 #include "gmd_find.h"
 #include "pad_watch.h"
 #include "kbd_state.h"
+#include "gui_text.h"
 #include "menu_cursor.h"
 
 #include <stdio.h>
@@ -264,6 +265,46 @@ static DWORD WINAPI worker(LPVOID param)
         log_line("mc: DISABLED by cfc2_hook.off next to the exe.");
     }
 
+    /* --- The GUI text reader --------------------------------------------
+     * ⭐⭐ The one thing that unblocks most of what is left. ~14 shell screens
+     * speak position only, all for the SAME reason: their labels are assigned
+     * to GUI text elements at RUNTIME, so no GMD or code search can name them.
+     * The control that proved it: the Options screen's labels ARE known (GMD
+     * 170..174) and 170 appears nowhere in its function.
+     *
+     * So let the game hand us an instance instead -- the same move that
+     * cracked sKeyboard. See gui_text.h for why slot 5 of cGUIObjText's vtable
+     * is the target, and for the uniqueness check that makes every captured
+     * instance certainly of this class.
+     *
+     * ⚠⚠ OPT-IN, and deliberately so. This is the riskiest thing in the
+     * project: it reads 528 bytes through a game-supplied pointer. The detour
+     * itself dereferences NOTHING -- all reading is deferred to our worker
+     * thread under the fault guard -- but the read is still UNPROVEN, and an
+     * unproven read on a per-frame path gets a switch until it is proven.
+     *
+     * ⭐ That gate comes OFF once the string offset is known and the read is
+     * targeted. A guard outlives its bug otherwise: the discovery sweep's gate
+     * stayed on for days after the cost that justified it was fixed, keeping
+     * the only screen-naming tool off in every real session.
+     *
+     * Shares cfc2_hook.off, so one file still makes the whole mod read-only. */
+    BOOL gt_on = opt_in_file_present("cfc2_guitext.on");
+    BOOL gt_ok = FALSE;
+    if (unpacked && hook_enabled && gt_on) {
+        gt_ok = gt_install();
+        if (!gt_ok)
+            log_line("gt: install FAILED (reason %d) -- nothing was written to "
+                     "game memory, and no GUI text element is available.",
+                     (int)gt_install_why());
+    } else if (unpacked && gt_on) {
+        log_line("gt: DISABLED by cfc2_hook.off next to the exe.");
+    } else if (unpacked) {
+        log_line("gt: OFF -- create cfc2_guitext.on next to the exe to hook "
+                 "cGUIObjText and log what a live text element contains. "
+                 "This is the step that names the remaining screens.");
+    }
+
     /* ⚠ OPT-IN. The offline tools (disasm.py, find_callers.py,
      * build_riprefs.py, analyze_dump.py) all read this dump, and it is the
      * machinery that cracked sPad, sKeyboard and the cursor chokepoint -- so it
@@ -405,6 +446,15 @@ static DWORD WINAPI worker(LPVOID param)
             if (mc_ok)
                 mc_poll_and_log();
 
+            /* ⭐ Inspect at most one new instance per poll. The hook sees
+             * every text element every frame; dumping them all would bury the
+             * log and cost far more than the finding is worth. One per 100 ms
+             * still walks through the elements on screen quickly, because the
+             * hook keeps only the most recent and the game cycles through
+             * them. */
+            if (gt_ok)
+                gt_poll_and_log();
+
             if (unpacked && pad_enabled) {
                 unsigned dirs = 0;
                 if (GetAsyncKeyState(VK_UP)    & 0x8000) dirs |= PAD_UP;
@@ -448,6 +498,25 @@ static DWORD WINAPI worker(LPVOID param)
                      cap.state ? (cap.offset_ok ? "0x138 CONFIRMED"
                                                 : "⚠ UNEXPECTED")
                                : "(not captured)");
+        }
+
+        /* ⭐⭐ BOTH COUNTS, periodically. "0 instances inspected" is
+         * meaningless on its own: with calls == 0 the hook is not
+         * intercepting and NOTHING can be concluded, which is a different
+         * finding from "inspected elements and none held text". This project's
+         * rule is that "could not measure" must never look like "measured
+         * nothing". */
+        if (gt_ok && (beat == 3 || beat == 10 || beat == 30 ||
+                      beat % 60 == 0)) {
+            gt_stats gs;
+            gt_get_stats(&gs);
+            log_line("gt: update ran %ld time(s); %ld instance(s) inspected; "
+                     "%ld guarded read(s) faulted.%s",
+                     gs.calls, gs.distinct, gs.faults,
+                     gs.calls == 0
+                         ? "  ⚠ calls==0: the hook is NOT intercepting, so "
+                           "nothing here is evidence either way."
+                         : "");
         }
 
         /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning

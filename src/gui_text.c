@@ -1,0 +1,541 @@
+/*
+ * cGUIObjText -- capture a live instance and find where its string lives.
+ * See gui_text.h for the offline derivation this file rests on.
+ */
+
+#include "gui_text.h"
+#include "log.h"
+#include "memsafe.h"
+
+#include "../libs/minhook/include/MinHook.h"
+
+#include <stdio.h>
+#include <string.h>
+
+/* The update method's signature as far as we can tell: a this-call taking one
+ * further argument.
+ *
+ * ⛔⛔ THE SIGNATURE TRAP THIS PROJECT ALREADY PAID FOR. menu_cursor's detour
+ * declared FOUR arguments where the real helper took SIX, so the original read
+ * its 5th and 6th out of stack slots our frame never filled -- and the 5th was
+ * the cursor SFX selector, which the user HEARD change. Ten passing tests
+ * missed it, because each asked what the hook REPORTED and none asked what it
+ * PASSED ON.
+ *
+ * ⭐ Here the reading is different, and safer: 0x1402f9720 uses only rcx and
+ * rdx before its first call (mov rcx,rdx / mov rbx,rdx / mov rdi,rcx at
+ * 0x1402f9750-0x1402f9765), and it never touches r8/r9 or any inbound stack
+ * slot. Two arguments is the whole signature. Verified by reading the
+ * instructions, not by assuming the common case.
+ *
+ * ⚠ The return value is passed through untouched whatever we conclude, so even
+ * if this reading were wrong in some way we have not seen, the game's control
+ * flow does not depend on us. */
+typedef void *(*pfn_update)(void *self, void *arg);
+
+static pfn_update g_real_update;
+
+static volatile LONG g_calls;
+static volatile LONG g_distinct;
+static volatile LONG g_faults;
+
+/* The most recently seen instance, published for the worker thread.
+ *
+ * ⚠ A sequence counter, not a flag: the hook runs on the game's render thread
+ * and the reader on ours. A plain "new data" boolean could be cleared between
+ * the hook's write and the reader's read and lose the capture. The reader
+ * snapshots and compares the sequence either side of its copy; if they differ
+ * the hook wrote during the copy and the snapshot is discarded rather than
+ * reported torn. Same discipline as menu_cursor. */
+static volatile LONG  g_seq;
+static void          *g_last_self;
+static void          *g_last_caller;
+static LONG           g_taken_seq;
+
+static BOOL              g_installed;
+static gt_install_status g_why = GT_INSTALL_NOT_TRIED;
+
+gt_install_status gt_install_why(void) { return g_why; }
+
+/* --- the detour ----------------------------------------------------------
+ *
+ * ⚠⚠ IT DEREFERENCES NOTHING. It records a pointer VALUE and calls the
+ * original. That is the entire body, and it is deliberate: this runs on the
+ * game's threads, and this project has already taken the game down by reading
+ * through a caller-supplied pointer inside a hook. Recording a value cannot
+ * fault. All inspection happens later, on our worker thread, where a fault is
+ * caught by the guard and costs us a log line instead of the process.
+ *
+ * ⚠ The original is called UNCONDITIONALLY and its result returned untouched.
+ */
+static void *detour_body(pfn_update real, void *self, void *arg, void *caller)
+{
+    InterlockedIncrement(&g_calls);
+
+    /* Publish. Bump, write, bump: a reader seeing the same even value either
+     * side of its copy knows the copy was clean. */
+    InterlockedIncrement(&g_seq);
+    g_last_self   = self;
+    g_last_caller = caller;
+    InterlockedIncrement(&g_seq);
+
+    return real(self, arg);
+}
+
+/* ⚠ __builtin_return_address(0) is the GAME's return address: MinHook patches
+ * the target with a jmp and pushes nothing, so the address the CPU pushed for
+ * the call is still the one on the stack. GCC has no _ReturnAddress().
+ *
+ * ⚠ Recorded and compared only, never dereferenced -- unlike a caller-SUPPLIED
+ * pointer, our own return address is trustworthy, but it still buys nothing to
+ * treat it as memory.
+ *
+ * ⛔ NOT normalised to a call site here, unlike menu_cursor. This method is
+ * VTABLE-dispatched (call qword ptr [rax+0x28]), so the byte five back is not
+ * 0xE8 and the "ret - 5" rule menu_cursor uses does not apply. Applying it
+ * anyway would manufacture a plausible-looking address that is not a call
+ * site. The raw value is logged as what it is. */
+static void *hook_update(void *self, void *arg)
+{
+    return detour_body(g_real_update, self, arg,
+                       __builtin_return_address(0));
+}
+
+/* --- the inspector -------------------------------------------------------
+ *
+ * Given the bytes of one instance, say where the string is.
+ *
+ * ⭐⭐ IT REPORTS WHAT IT FOUND, AND SEPARATELY WHETHER IT CONCLUDED ANYTHING.
+ * "no conclusion" is -1, a distinct return value -- not offset 0, and not an
+ * all-zero struct. Those must never look alike (memory:
+ * inconclusive-must-be-a-return-value).
+ *
+ * ⚠ The two candidate offsets are checked FIRST and named as candidates, but
+ * they get no special authority: a candidate that does not resolve to text
+ * loses to any other offset that does. The offline accessors made them worth
+ * looking at; only the live bytes decide.
+ *
+ * `resolve` turns a pointer field's value into readable bytes. In the game it
+ * is a guarded read of foreign memory; in a test it reads the harness's own
+ * buffer. Passing it in is what lets the SHIPPING inspector run in the test
+ * without the test re-deriving what the inspector does. */
+typedef SIZE_T (*pfn_resolve)(void *ctx, ULONGLONG addr, char *out, SIZE_T max);
+
+/* Does this look like text a human would read? Deliberately strict: a run of
+ * printable ASCII, at least 2 characters, NUL-terminated within the window.
+ *
+ * ⚠ Strictness here is safety, not taste. A loose test turns every pointer to
+ * arbitrary bytes into a "string" and buries the real field in noise -- and
+ * this project has twice mistaken a 4-byte coincidence for evidence. */
+static BOOL looks_like_text(const char *s, SIZE_T n, int *out_len)
+{
+    SIZE_T i = 0;
+    while (i < n && s[i] != '\0') {
+        unsigned char c = (unsigned char)s[i];
+        if (c < 0x20 || c > 0x7e)
+            return FALSE;
+        i++;
+    }
+    if (i < 2 || i >= n)        /* too short, or no terminator in the window */
+        return FALSE;
+    if (out_len)
+        *out_len = (int)i;
+    return TRUE;
+}
+
+/* UTF-16 is the other real possibility: the shell is a Japanese-authored
+ * engine and the GMD holds UTF-8, but a widened copy in the element would be
+ * unsurprising. Checked explicitly rather than assumed absent. */
+static BOOL looks_like_wide_text(const char *s, SIZE_T n, int *out_len)
+{
+    SIZE_T i = 0;
+    while (i + 1 < n) {
+        unsigned char lo = (unsigned char)s[i], hi = (unsigned char)s[i + 1];
+        if (lo == 0 && hi == 0)
+            break;
+        if (hi != 0)            /* non-Latin-1: stop claiming, stay strict */
+            return FALSE;
+        if (lo < 0x20 || lo > 0x7e)
+            return FALSE;
+        i += 2;
+    }
+    if (i < 4 || i + 1 >= n)
+        return FALSE;
+    if (out_len)
+        *out_len = (int)(i / 2);
+    return TRUE;
+}
+
+/* The shared inspector body. Returns TRUE if it examined the whole object;
+ * *text_offset gets the winning offset or -1.
+ *
+ * ⭐⭐ IT PRINTS A POSITIVE COUNT OF WHAT IT EXAMINED. "0 candidates" from a
+ * sweep that examined 0 fields and "0 candidates" from one that examined 64
+ * are completely different findings, and a log that cannot tell them apart is
+ * how "0 failed" gets read as "0 checked". */
+static BOOL inspect_body(const void *obj, SIZE_T len,
+                         pfn_resolve resolve, void *ctx,
+                         int *text_offset, BOOL log_it)
+{
+    const unsigned char *b = (const unsigned char *)obj;
+    int    best        = -1;
+    int    best_len    = 0;
+    BOOL   best_wide   = FALSE;
+    BOOL   best_is_cand = FALSE;
+    int    examined    = 0;      /* pointer-shaped fields actually resolved */
+    int    hits        = 0;
+
+    if (text_offset)
+        *text_offset = -1;
+    if (len < 8)
+        return FALSE;
+
+    for (SIZE_T off = 0; off + 8 <= len; off += 8) {
+        ULONGLONG v;
+        memcpy(&v, b + off, 8);
+
+        /* A pointer field worth resolving. Zero and small integers are not
+         * addresses; neither is anything above the user-mode ceiling. */
+        if (v < 0x10000 || v > 0x7fffffffffffULL)
+            continue;
+
+        char buf[128];
+        SIZE_T got = resolve(ctx, v, buf, sizeof(buf));
+        examined++;
+        if (got == 0)
+            continue;
+
+        int  slen = 0;
+        BOOL wide = FALSE;
+        if (looks_like_text(buf, got, &slen)) {
+            wide = FALSE;
+        } else if (looks_like_wide_text(buf, got, &slen)) {
+            wide = TRUE;
+        } else {
+            continue;
+        }
+
+        hits++;
+        BOOL is_cand = (off == GT_CAND_A || off == GT_CAND_B);
+        if (log_it)
+            log_line("gt:   +0x%03x -> 0x%llx  %s\"%.60s\" (%d chars)%s",
+                     (unsigned)off, v, wide ? "L" : "", buf, slen,
+                     is_cand ? "   <- OFFLINE CANDIDATE" : "");
+
+        /* ⭐ A candidate offset wins ties, but never beats a longer string at
+         * another offset. The offline accessors earned these two offsets a
+         * look, not a verdict. */
+        if (best < 0 ||
+            (is_cand && !best_is_cand && slen >= best_len) ||
+            (slen > best_len && (is_cand || !best_is_cand))) {
+            best = (int)off; best_len = slen;
+            best_wide = wide; best_is_cand = is_cand;
+        }
+    }
+
+    /* Also look for the string stored INLINE rather than behind a pointer --
+     * a fixed char array in the object is just as likely as a pointer, and a
+     * sweep that only followed pointers would miss it completely. */
+    for (SIZE_T off = 0; off + 4 <= len; off += 4) {
+        int slen = 0;
+        if (looks_like_text((const char *)b + off, len - off, &slen) &&
+            slen >= 3) {
+            if (log_it)
+                log_line("gt:   +0x%03x INLINE \"%.60s\" (%d chars)",
+                         (unsigned)off, (const char *)b + off, slen);
+            hits++;
+            if (best < 0) { best = (int)off; best_len = slen; }
+            /* Skip past what we just read, so one string is not reported
+             * again at every offset inside itself. */
+            off += (SIZE_T)slen & ~3u;
+        }
+    }
+
+    if (log_it)
+        log_line("gt: examined %d pointer-shaped field(s) in %u bytes; "
+                 "%d resolved to text; conclusion: %s",
+                 examined, (unsigned)len, hits,
+                 best < 0 ? "NONE -- no offset holds readable text"
+                          : "see the winning offset below");
+    if (log_it && best >= 0)
+        log_line("gt: ⭐ best candidate is +0x%03x (%s%d chars)%s",
+                 (unsigned)best, best_wide ? "wide, " : "", best_len,
+                 best_is_cand ? " -- and it is one of the two offsets the "
+                                "offline accessors pointed at"
+                              : " -- ⚠ NOT one of the offline candidates");
+
+    if (text_offset)
+        *text_offset = best;
+    return TRUE;
+}
+
+/* --- resolving a pointer in the live game -------------------------------- */
+
+/* ⚠⚠ EVERY read is VirtualQuery-checked and guarded, EVERY time. A GUI object
+ * is freed when its screen changes; a pointer that passed a check a moment ago
+ * is not a pointer that is still valid. Caching a check here would be exactly
+ * the mistake that killed the game once already. */
+static SIZE_T resolve_live(void *ctx, ULONGLONG addr, char *out, SIZE_T max)
+{
+    (void)ctx;
+    const void *p = (const void *)(ULONG_PTR)addr;
+
+    SIZE_T run = mem_readable_run(p, max);
+    if (run == 0)
+        return 0;
+    if (run > max)
+        run = max;
+
+    /* ⚠ mem_copy is itself guarded, but count a fault so a partial sweep can
+     * never be reported as a complete one. A scan that says "found nothing"
+     * while faults are nonzero was a PARTIAL scan and must say so. */
+    if (!mem_copy(out, p, run)) {
+        InterlockedIncrement(&g_faults);
+        return 0;
+    }
+    return run;
+}
+
+BOOL gt_poll_and_log(void)
+{
+    if (!g_installed)
+        return FALSE;
+
+    /* Snapshot the published capture, discarding a torn read. */
+    LONG  s1 = InterlockedCompareExchange(&g_seq, 0, 0);
+    void *self   = g_last_self;
+    void *caller = g_last_caller;
+    LONG  s2 = InterlockedCompareExchange(&g_seq, 0, 0);
+    if (s1 != s2 || (s1 & 1))
+        return FALSE;                 /* the hook wrote during our copy */
+    if (s1 == g_taken_seq || !self)
+        return FALSE;                 /* nothing new since last time */
+    g_taken_seq = s1;
+
+    /* Read the whole object under the guard, ONCE, then work on our copy.
+     * ⭐ One guarded block for 528 bytes, not one per field: read_cstr once did
+     * a VirtualQuery+setjmp per CHARACTER and cost 172 ms where a block read
+     * cost 3.8. Same lesson, applied before it bites this time. */
+    unsigned char obj[GT_CLASS_SIZE];
+    if (mem_readable_run(self, sizeof(obj)) < sizeof(obj) ||
+        !mem_copy(obj, self, sizeof(obj))) {
+        InterlockedIncrement(&g_faults);
+        log_line("gt: instance %p is no longer fully readable -- skipped. "
+                 "(Expected sometimes: GUI objects are freed on a screen "
+                 "change, which is why the pointer is re-checked every time "
+                 "and never cached.)", self);
+        return FALSE;
+    }
+
+    InterlockedIncrement(&g_distinct);
+
+    ULONGLONG vptr;
+    memcpy(&vptr, obj, 8);
+    log_line("gt: --- cGUIObjText instance %p (called from %p) ---",
+             self, caller);
+    /* ⭐ A POSITIVE identity check on the copy, not just a plausible shape.
+     * If the vptr is not this class's vtable, the object is not what the hook
+     * promised and every offset below would be measured against the wrong
+     * layout -- say so loudly rather than quietly reporting nonsense. */
+    if (vptr != GT_VTABLE_ADDR)
+        log_line("gt: ⚠⚠ vptr is 0x%llx, NOT cGUIObjText's 0x%llx. The hook "
+                 "target was supposed to be unique to this class. Treat every "
+                 "offset below as unattributed.", vptr, GT_VTABLE_ADDR);
+    else
+        log_line("gt: vptr CONFIRMED 0x%llx -- this really is a cGUIObjText.",
+                 vptr);
+
+    int off = -1;
+    inspect_body(obj, sizeof(obj), resolve_live, NULL, &off, TRUE);
+
+    LONG faults = InterlockedCompareExchange(&g_faults, 0, 0);
+    if (faults)
+        log_line("gt: ⚠ %ld guarded read(s) have faulted since install, so "
+                 "this sweep was PARTIAL -- a negative result here is not "
+                 "evidence that no offset holds text.", faults);
+    return TRUE;
+}
+
+/* --- install -------------------------------------------------------------
+ *
+ * The expected first bytes of 0x1402f9720:
+ *     mov [rsp+8], rbx   = 48 89 5c 24 08
+ * FIVE bytes, one whole instruction, so MinHook's patch ends on a clean
+ * boundary. ⭐ And find_callers.py --jmp found zero branches into addr+1..+4,
+ * so nothing can land inside the patch. Both checked offline before this file
+ * was written, and the prologue is checked again here at runtime -- the exe is
+ * Enigma-packed, so these addresses hold ciphertext until unpack completes and
+ * hooking early would patch encrypted bytes. */
+static const BYTE GT_PROLOGUE[] = { 0x48, 0x89, 0x5c, 0x24, 0x08 };
+
+static BOOL check_target(void)
+{
+    void *p = (void *)(ULONG_PTR)GT_UPDATE_ADDR;
+
+    MEMORY_BASIC_INFORMATION mbi;
+    if (VirtualQuery(p, &mbi, sizeof(mbi)) != sizeof(mbi) ||
+        mbi.State != MEM_COMMIT ||
+        !(mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ |
+                         PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))) {
+        log_line("gt: 0x%llx is not committed executable memory -- REFUSING "
+                 "to hook. Nothing was written.", GT_UPDATE_ADDR);
+        g_why = GT_INSTALL_BAD_PROTECT;
+        return FALSE;
+    }
+
+    BYTE got[sizeof(GT_PROLOGUE)];
+    if (!mem_copy(got, p, sizeof(got)) ||
+        memcmp(got, GT_PROLOGUE, sizeof(got)) != 0) {
+        log_line("gt: the bytes at 0x%llx are not the expected prologue "
+                 "(%02x %02x %02x %02x %02x) -- the offline model does NOT "
+                 "match this build. REFUSING.",
+                 GT_UPDATE_ADDR, got[0], got[1], got[2], got[3], got[4]);
+        g_why = GT_INSTALL_BAD_PROLOGUE;
+        return FALSE;
+    }
+
+    /* ⭐⭐ THE UNIQUENESS CLAIM, RE-CHECKED IN THIS PROCESS. The whole reason
+     * no type check is needed in the detour is that this function address sits
+     * in exactly one vtable slot -- cGUIObjText's. That was established from a
+     * dump. Confirm the half of it we can confirm cheaply here: the class's
+     * own vtable really does hold this address in the expected slot. If the
+     * build moved, we would otherwise hook something and attribute its
+     * instances to the wrong class. */
+    ULONGLONG slot = 0;
+    const void *sp = (const void *)(ULONG_PTR)
+                     (GT_VTABLE_ADDR + GT_VTABLE_SLOT * 8);
+    if (!mem_copy(&slot, sp, sizeof(slot)) || slot != GT_UPDATE_ADDR) {
+        log_line("gt: cGUIObjText's vtable slot %d holds 0x%llx, not the "
+                 "expected 0x%llx -- the class layout does not match the "
+                 "offline model. REFUSING.",
+                 GT_VTABLE_SLOT, slot, GT_UPDATE_ADDR);
+        g_why = GT_INSTALL_BAD_VTABLE;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+BOOL gt_install(void)
+{
+    if (g_installed)
+        return TRUE;
+
+    if (!check_target())
+        return FALSE;
+
+    log_line("gt: identity CONFIRMED -- 0x%llx carries the expected prologue "
+             "and sits in cGUIObjText's vtable slot %d, which is what makes "
+             "every captured instance certainly of this class.",
+             GT_UPDATE_ADDR, GT_VTABLE_SLOT);
+
+    MH_STATUS st = MH_Initialize();
+    if (st != MH_OK && st != MH_ERROR_ALREADY_INITIALIZED) {
+        log_line("gt: MH_Initialize failed (%d).", (int)st);
+        g_why = GT_INSTALL_MINHOOK_FAILED;
+        return FALSE;
+    }
+
+    void *t = (void *)(ULONG_PTR)GT_UPDATE_ADDR;
+    if (MH_CreateHook(t, (void *)&hook_update,
+                      (void **)&g_real_update) != MH_OK) {
+        log_line("gt: MH_CreateHook failed.");
+        g_why = GT_INSTALL_MINHOOK_FAILED;
+        return FALSE;
+    }
+    if (MH_EnableHook(t) != MH_OK) {
+        log_line("gt: MH_EnableHook failed; removing.");
+        MH_RemoveHook(t);
+        g_why = GT_INSTALL_MINHOOK_FAILED;
+        return FALSE;
+    }
+
+    g_installed = TRUE;
+    g_why = GT_INSTALL_OK;
+    log_line("gt: hooked cGUIObjText's update method at 0x%llx. The detour "
+             "records the instance pointer and DEREFERENCES NOTHING; all "
+             "reading happens on the worker thread under the fault guard.",
+             GT_UPDATE_ADDR);
+    return TRUE;
+}
+
+void gt_remove(void)
+{
+    if (!g_installed)
+        return;
+    void *t = (void *)(ULONG_PTR)GT_UPDATE_ADDR;
+    MH_DisableHook(t);
+    MH_RemoveHook(t);
+    g_installed = FALSE;
+    log_line("gt: hook removed.");
+}
+
+void gt_get_stats(gt_stats *out)
+{
+    memset(out, 0, sizeof(*out));
+    out->installed = g_installed;
+    out->calls     = InterlockedCompareExchange(&g_calls, 0, 0);
+    out->distinct  = InterlockedCompareExchange(&g_distinct, 0, 0);
+    out->faults    = InterlockedCompareExchange(&g_faults, 0, 0);
+}
+
+/* --- test seams ----------------------------------------------------------
+ *
+ * ⛔⛔ The stand-in returns a value the TEST chose; it does not compute one
+ * plausibly. A stand-in that re-derives what the shipping code derives makes a
+ * broken mechanism and a working one indistinguishable -- this project has
+ * shipped that mistake twice. */
+static void *g_sim_ret;
+
+static void *fake_original(void *self, void *arg)
+{
+    (void)self; (void)arg;
+    return g_sim_ret;
+}
+
+void *gt_test_body(void *self, void *arg)
+{
+    /* A distinctive value the test can recognise, so "passed through" is
+     * provable rather than merely plausible. */
+    g_sim_ret = (void *)(ULONG_PTR)0xABCDEF0012345678ULL;
+    return detour_body(fake_original, self, arg, (void *)0x140001234ULL);
+}
+
+void *gt_test_last_captured(void)
+{
+    return g_last_self;
+}
+
+/* Resolve a pointer inside the harness's own buffer. The test builds an object
+ * whose "pointer" fields hold addresses within a buffer it owns, so the
+ * SHIPPING inspector walks real pointer fields without touching foreign
+ * memory. */
+typedef struct { const unsigned char *base; ULONGLONG lo, hi; } test_ctx;
+
+static SIZE_T resolve_test(void *ctx, ULONGLONG addr, char *out, SIZE_T max)
+{
+    test_ctx *t = (test_ctx *)ctx;
+    if (addr < t->lo || addr >= t->hi)
+        return 0;
+    SIZE_T avail = (SIZE_T)(t->hi - addr);
+    if (avail > max) avail = max;
+    memcpy(out, t->base + (addr - t->lo), avail);
+    return avail;
+}
+
+BOOL gt_test_inspect(const void *buf, SIZE_T len, int *text_offset)
+{
+    /* The harness's buffer stands in for the process's address space: a
+     * pointer field holding `lo + k` resolves to byte k of the buffer. */
+    test_ctx ctx;
+    ctx.base = (const unsigned char *)buf;
+    ctx.lo   = 0x100000ULL;
+    ctx.hi   = ctx.lo + len;
+    return inspect_body(buf, len, resolve_test, &ctx, text_offset, FALSE);
+}
+
+void gt_test_reset(void)
+{
+    g_calls = g_distinct = g_faults = 0;
+    g_seq = 0; g_taken_seq = 0;
+    g_last_self = NULL; g_last_caller = NULL;
+}
