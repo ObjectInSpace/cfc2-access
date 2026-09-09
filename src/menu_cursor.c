@@ -146,20 +146,43 @@ static int detour_body(pfn_move real, void *screen, int *cursor,
     return delta;
 }
 
-/* ⚠ __builtin_return_address(0) is the GAME's call site, not MinHook's: MinHook
- * patches the target with a jmp and pushes nothing, so the return address the
+/* ⚠ __builtin_return_address(0) is the GAME's return address, not MinHook's:
+ * MinHook patches the target with a jmp and pushes nothing, so the address the
  * CPU pushed for `call 0x14007cdc0` is still the one on the stack. The caller
- * trace established this already; GCC has no _ReturnAddress(). */
+ * trace established this; GCC has no _ReturnAddress().
+ *
+ * ⭐⭐ BUT A RETURN ADDRESS IS NOT A CALL SITE -- it points at the instruction
+ * AFTER the call, 5 bytes on for `call rel32`. Shipping the raw value made
+ * every screen unknown: the table held call sites read off the disassembly
+ * (0x14009ba21) while the hook reported returns (0x14009ba26), so nothing ever
+ * matched and every menu fell back to position-only. Measured on all six
+ * screens in the 2026-09-08 run: ret - 5 == a known call site, every time,
+ * and no raw return address was itself a call site.
+ *
+ * So normalise HERE, once, and let `caller` mean the call site -- the thing
+ * that can be looked up in a disassembler. ⚠ Verified, not assumed: the byte
+ * 5 back must actually be 0xE8 (call rel32). If it is not, the frame is not
+ * what we think and the raw value is kept, so a wrong normalisation can never
+ * silently masquerade as a real call site. */
+static void *call_site_of(void *ret)
+{
+    BYTE *p = (BYTE *)ret - 5;
+    BYTE op;
+    if (!mem_copy(&op, p, 1) || op != 0xE8)
+        return ret;                    /* not a call rel32 -- do not rewrite */
+    return p;
+}
+
 static int hook_vert(void *screen, int *cursor, int min, int max)
 {
     return detour_body(g_real_vert, screen, cursor, min, max, TRUE,
-                       __builtin_return_address(0));
+                       call_site_of(__builtin_return_address(0)));
 }
 
 static int hook_horz(void *screen, int *cursor, int min, int max)
 {
     return detour_body(g_real_horz, screen, cursor, min, max, FALSE,
-                       __builtin_return_address(0));
+                       call_site_of(__builtin_return_address(0)));
 }
 
 /* The stand-in "original" used only by mc_test_body(). It writes the new index

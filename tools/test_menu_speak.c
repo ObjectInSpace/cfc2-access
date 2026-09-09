@@ -152,6 +152,26 @@ int main(void)
           "n=%d base=%d count=%d", n, s ? s->base_index : -1,
           s ? s->count : -1);
 
+    /* --- case 8: the table holds CALL SITES, not return addresses ---------
+     * ⭐@@S@ REGRESSION GUARD FOR A BUG THAT SHIPPED. The hook takes
+     * __builtin_return_address(0), which points at the instruction AFTER the
+     * call -- 5 bytes on for `call rel32`. The table was written from a
+     * disassembler (call sites), so nothing ever matched and EVERY screen fell
+     * back to position-only. Confirmed on all six screens of the 2026-09-08
+     * run: every observed return address minus 5 was a known call site, and no
+     * raw return address was itself one.
+     *
+     * The hook now normalises to the call site. This case pins the convention
+     * so the table and the lookup cannot drift apart again: the shipped entry
+     * must be the CALL SITE, and the return address 5 bytes on must NOT match.
+     */
+    check("8. the table key is the call site, not the return address",
+          menu_speak_lookup(MAIN_CALLER) != NULL &&
+          menu_speak_lookup(MAIN_CALLER + 5) == NULL,
+          "call-site=%p  ret-addr=%p",
+          (const void *)menu_speak_lookup(MAIN_CALLER),
+          (const void *)menu_speak_lookup(MAIN_CALLER + 5));
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");

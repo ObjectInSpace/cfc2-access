@@ -152,14 +152,24 @@ void menu_speak_log_unknown(const mc_move *m)
     }
     seen[nseen++] = m->caller;
 
+    int count = m->max_index - m->min_index + 1;
     log_line("mcspeak: [DISCOVERY] unknown screen -- caller=0x%llx  "
-             "items=%d  axis=%s  (screen=%p). To name it: find its label run "
-             "in msg.arc and add { 0x%llx, <base>, %d, \"<name>\" } to "
-             "g_screens in src/menu_speak.c.",
-             (unsigned long long)(ULONG_PTR)m->caller,
-             m->max_index - m->min_index + 1,
-             m->vertical ? "vertical" : "horizontal",
-             m->screen,
-             (unsigned long long)(ULONG_PTR)m->caller,
-             m->max_index - m->min_index + 1);
+             "items=%d  axis=%s  (screen=%p).",
+             (unsigned long long)(ULONG_PTR)m->caller, count,
+             m->vertical ? "vertical" : "horizontal", m->screen);
+
+    /* ⭐ The caller and the item COUNT are everything an offline tool needs to
+     * propose a label run: menu labels sit in contiguous GMD runs, so
+     * tools/find_label_runs.py <count> lists every run of that length that also
+     * has a parallel HELP_ run -- the structural signature of a menu.
+     *
+     * ⚠ The screens do NOT name themselves: there is no identifying constant
+     * near any call site (checked). And matching a caller to a run by COUNT
+     * alone is the guess this design refuses -- two 6-item menus appeared in one
+     * run. So the tool proposes candidates and a person confirms which screen
+     * they were actually in; nothing is ever SPOKEN from a candidate. */
+    log_line("mcspeak: [DISCOVERY]   -> to name it, add "
+             "{ 0x%llx, <base>, %d, \"<name>\" } to g_screens "
+             "(src/menu_speak.c) using tools/find_label_runs.py %d",
+             (unsigned long long)(ULONG_PTR)m->caller, count, count);
 }
