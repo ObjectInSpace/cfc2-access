@@ -24,6 +24,14 @@
  * "mc: [DISCOVERY]" line from the log. It prints the caller and the count.
  * Then find the label run in msg.arc (tools/dump_menu_eng.py) and add it here.
  */
+/* ⭐⭐ Select Game's three row labels, by cursor index.
+ *
+ * GMD 51 "Game", 52 "Game Version", 56 "Player". NOT contiguous -- 53..55 and
+ * 58..61 are those rows' VALUES -- which is precisely why this screen needs a
+ * map and not a base index. Order is the cursor's order, top to bottom, as the
+ * hook reports it. */
+static const int g_select_game_rows[] = { 51, 52, 56 };
+
 static const mc_screen g_screens[] = {
     /* ⛔⛔ REMOVED: { 0x14009ba21, 37, 6, "Main menu" }.
      *
@@ -51,7 +59,8 @@ static const mc_screen g_screens[] = {
      * 0x14009b920), so these are two distinct screens that present the same six
      * choices. Both legitimately map to base 37; neither is a duplicate to be
      * deleted. */
-    { 0x140097a59ULL, 37, 6, "Main menu", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0 },
+    { 0x140097a59ULL, 37, 6, "Main menu", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0,
+      NULL, 0 },
 
     /* ⭐ Options. CONFIRMED 2026-09-08 by live text: standing on position 5 of
      * 5, base 170 read "Credits" (French "Credits"), which is MENU_OP_CREDITS
@@ -62,35 +71,45 @@ static const mc_screen g_screens[] = {
      * been convincing. The item COUNT settles it: this screen has 5 items, the
      * main menu has 6. That is why the count is stored and checked, not merely
      * recorded. */
-    { 0x1400a20fcULL, 170, 5, "Options", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0 },
+    { 0x1400a20fcULL, 170, 5, "Options", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0,
+      NULL, 0 },
 
-    /* --- the per-game settings screen, fn 0x1400b1b10 --------------------
+    /* --- Select Game (from Offline Play), fn 0x1400b1b10 -----------------
      *
-     * ⭐⭐ SHAPE MEASURED, LABELS NOT. Both rows below carry base_index -1 and
-     * are NEVER named: they exist to give the movement its correct FRAMING
-     * ("setting 2 of 3" / "setting 1, value 3 of 8") rather than the bare and
-     * misleading "3 of 8" this screen used to produce.
+     * ⛔⛔ THIS SCREEN WAS MISNAMED "Game settings" AND IT COST A RUN.
+     * I gave `0x1400b1b69` that name in the same session that found the
+     * row/value STRUCTURE, on nothing but its sharing a function with the
+     * value site. The structure was right; the identity was a guess, and it
+     * shipped. The user entered Offline Play and heard "setting 2 of 3" --
+     * a confident claim about the screen that was simply false, and WORSE
+     * than the bare "2 of 3" it replaced.
      *
-     * ⚠ `how` is VERIFIED_LIVE_TEXT for the SHAPE: the 22:46 run walked this
-     * screen and the log's cursor addresses match the disassembly's array
-     * exactly (row 0 -> +0x338, row 1 -> +0x33c, row 2 -> +0x340, 22 movements,
-     * zero exceptions). No LABEL is claimed by either row, so the provenance
-     * rule -- never ship a label that live text has not shown -- is not being
-     * bent here; there is simply no label to ship yet.
+     * ⭐ What it actually is, from the GMD (labels 50..66): GAME_SELECT
+     * "Select Game" at 50, then three ROWS -- GAME_TITLE 51 "Game",
+     * GAME_VERSION 52 "Game Version", PLAYER 56 "Player" -- with each row's
+     * VALUES in the gaps between them (53..55 Japanese/English/Either,
+     * 58..61 P1..P4). The HELP twins at 62, 63 and 66 confirm the grouping.
+     * Row 0 showing EIGHT values matches the collection's eight games.
      *
-     * ⛔ Do NOT give these a base_index until a discovery pass proves one.
-     * Which setting each row names depends on the GAME selected, and the OPT_
-     * family interleaves setting names with their value labels, so any base
-     * that "looks close" will read out a value where a name belongs. */
-    { 0x1400b1b69ULL, -1, 3, "Game settings", MC_VERIFIED_LIVE_TEXT,
-      MC_SETTINGS_ROW, 0 },
-    /* ⚠ count is 0 -- this site's item count is the VALUE count of whichever
-     * row is focused (8, 2 and 2 were all observed at this one call site), so
-     * a fixed expected count would be wrong for two rows out of three. 0 means
-     * "do not check the count", which is safe here precisely BECAUSE the row
-     * never claims a label. */
-    { 0x1400b1bd9ULL, -1, 0, "Game settings", MC_VERIFIED_LIVE_TEXT,
-      MC_SETTINGS_VALUE, 0x338 },
+     * ⭐⭐ 51, 52, 56 is exactly the non-contiguous case: no base+index can
+     * address it. That is what `labels` exists for. */
+    { 0x1400b1b69ULL, -1, 3, "Select Game", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_ROW, 0, g_select_game_rows, 3 },
+
+    /* The value site of the same screen. ⚠ count 0 -- one call site drives all
+     * three rows' value lists, whose lengths differ (8 games; the version and
+     * player lists were both observed at 2, shorter than the 3 and 4 labels
+     * that exist, so the live list is context-dependent). A fixed count would
+     * reject two rows out of three.
+     *
+     * ⛔ NO labels here, deliberately. The row labels are known; the VALUE
+     * labels are not. The eight game titles do not exist as a clean run in the
+     * GMD at all -- the only occurrences are inside achievement descriptions --
+     * so the game names are almost certainly drawn as logo IMAGES. Speaking a
+     * value here would be a guess. It reports the row it belongs to, which the
+     * row label then names, and the value's POSITION. */
+    { 0x1400b1bd9ULL, -1, 0, "Select Game", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x338, NULL, 0 },
 };
 
 #define NSCREENS (int)(sizeof(g_screens) / sizeof(g_screens[0]))
@@ -102,6 +121,23 @@ const mc_screen *menu_speak_row(int i)
     if (i < 0 || i >= NSCREENS)
         return NULL;
     return &g_screens[i];
+}
+
+/* Find the MC_SETTINGS_ROW entry belonging to the same screen as `v`.
+ *
+ * ⭐ Matched on the screen NAME, so the two halves of one screen (the row
+ * selector and the value selector) stay linked through one fact rather than a
+ * second hand-copied address that could drift. */
+const mc_screen *menu_speak_sibling_row(const mc_screen *v)
+{
+    if (!v || !v->name)
+        return NULL;
+    for (int i = 0; i < NSCREENS; i++) {
+        if (g_screens[i].kind == MC_SETTINGS_ROW &&
+            g_screens[i].name && strcmp(g_screens[i].name, v->name) == 0)
+            return &g_screens[i];
+    }
+    return NULL;
 }
 
 const mc_screen *menu_speak_lookup(ULONGLONG caller)
@@ -216,7 +252,30 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
      * they just moved on -- which a bare "3 of 8" did not. */
     if (s->kind == MC_SETTINGS_ROW) {
         out->axis = MC_AXIS_ROW;
-        out->why  = MC_UNNAMED_NO_LABELS;
+        /* ⭐⭐ THE MAP. A settings/select screen's row labels are scattered
+         * through the GMD (Select Game: 51, 52, 56), so the label comes from
+         * an explicit per-index map, never from base+index -- which would land
+         * on a VALUE label in the gaps between them. */
+        if (!s->labels) {
+            out->why = MC_UNNAMED_NO_LABELS;
+            return;
+        }
+        /* ⚠ The map must cover this screen exactly. A map shorter than the
+         * live list would name some rows and silently mis-name the rest, so a
+         * disagreement disables the map rather than indexing part of it. */
+        int idx = m->new_index - m->min_index;
+        if (s->nlabels != out->total || idx < 0 || idx >= s->nlabels) {
+            out->why = MC_UNNAMED_COUNT_MISMATCH;
+            return;
+        }
+        char text[128];
+        if (!gmd_text_by_index(s->labels[idx], text, sizeof(text)) || !text[0]) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        _snprintf(out->item, sizeof(out->item), "%s", text);
+        out->item[sizeof(out->item) - 1] = '\0';
+        out->named = TRUE;
         return;
     }
     if (s->kind == MC_SETTINGS_VALUE) {
@@ -229,6 +288,22 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
             out->row = row;
             out->have_row = TRUE;
             out->why = MC_UNNAMED_NO_LABELS;
+            /* ⭐⭐ Name the ROW this value belongs to, from the SIBLING row
+             * entry's map. "Game Version, English Version" is what a user
+             * needs; "setting 2, value 2 of 2" is not.
+             *
+             * ⚠ The sibling is found by screen NAME, so the two halves of one
+             * screen stay linked without a second hand-maintained address.
+             * The VALUE itself is still not named -- see the table row. */
+            const mc_screen *sib = menu_speak_sibling_row(s);
+            if (sib && sib->labels && row >= 0 && row < sib->nlabels) {
+                char text[128];
+                if (gmd_text_by_index(sib->labels[row], text, sizeof(text)) &&
+                    text[0]) {
+                    _snprintf(out->row_name, sizeof(out->row_name), "%s", text);
+                    out->row_name[sizeof(out->row_name) - 1] = '\0';
+                }
+            }
         } else {
             out->why = MC_UNNAMED_ROW_UNDERIVABLE;
         }
@@ -264,14 +339,21 @@ void menu_speak(const mc_move *m)
      * the focused setting to its third value. Both forms below are true with
      * no label knowledge at all. */
     else if (sp.axis == MC_AXIS_ROW)
-        _snprintf(line, sizeof(line), "setting %d of %d",
-                  sp.position, sp.total);
+        /* ⛔ Unnamed row: say POSITION only. It used to say "setting %d of %d",
+         * which asserts the screen is a settings screen -- and that claim was
+         * WRONG on the first screen it met (Select Game, reached from Offline
+         * Play). A bare position is true whatever the screen turns out to be. */
+        _snprintf(line, sizeof(line), "%d of %d", sp.position, sp.total);
+    else if (sp.axis == MC_AXIS_VALUE && sp.row_name[0])
+        /* ⭐ The useful form: "Game Version, 2 of 2" -- the row NAMED, the
+         * value's position given. The value text itself is not claimed. */
+        _snprintf(line, sizeof(line), "%s, %d of %d",
+                  sp.row_name, sp.position, sp.total);
     else if (sp.axis == MC_AXIS_VALUE && sp.have_row)
-        _snprintf(line, sizeof(line), "setting %d, value %d of %d",
+        _snprintf(line, sizeof(line), "row %d, %d of %d",
                   sp.row + 1, sp.position, sp.total);
     else if (sp.axis == MC_AXIS_VALUE)
-        _snprintf(line, sizeof(line), "value %d of %d",
-                  sp.position, sp.total);
+        _snprintf(line, sizeof(line), "%d of %d", sp.position, sp.total);
     else
         _snprintf(line, sizeof(line), "%d of %d", sp.position, sp.total);
     line[sizeof(line) - 1] = '\0';

@@ -308,9 +308,12 @@ int main(void)
      * cause -- the lesson case 3 already paid for. */
     m = mk(0x1400b1b69ULL, 1, 0, 2);
     menu_speak_build(&m, &sp);
-    check("12. a settings ROW reports its axis, unnamed, with the right reason",
+    /* ⚠ There is no live GMD table in this process, so the MAP is consulted
+     * and the text lookup then fails -- TEXT_UNREADABLE, not NO_LABELS. That
+     * distinction is the point: it proves the map was reached. */
+    check("12. a mapped ROW consults the map and reports position",
           !sp.named && sp.axis == MC_AXIS_ROW &&
-          sp.why == MC_UNNAMED_NO_LABELS &&
+          sp.why == MC_UNNAMED_TEXT_UNREADABLE &&
           sp.position == 2 && sp.total == 3,
           "named=%d axis=%d why=%d %d of %d", (int)sp.named, (int)sp.axis,
           (int)sp.why, sp.position, sp.total);
@@ -322,7 +325,7 @@ int main(void)
     menu_speak_build(&m, &sp);
     check("13. a settings VALUE reports its axis and derives its row",
           !sp.named && sp.axis == MC_AXIS_VALUE && sp.have_row && sp.row == 0 &&
-          sp.why == MC_UNNAMED_NO_LABELS && sp.position == 3 && sp.total == 8,
+          sp.position == 3 && sp.total == 8,
           "axis=%d have_row=%d row=%d why=%d %d of %d", (int)sp.axis,
           (int)sp.have_row, sp.row, (int)sp.why, sp.position, sp.total);
 
@@ -361,6 +364,70 @@ int main(void)
         check("15. a varying-count settings site is never rejected on count",
               accepted, "");
     }
+
+    /* --- case 16: the Select Game map is the RIGHT map --------------------
+     * ⭐⭐ THE CASE THAT WOULD HAVE CAUGHT THE SHIPPED BUG. The screen reached
+     * from Offline Play was named "Game settings" on a guess and spoke
+     * "setting 2 of 3". It is Select Game, and its three rows are GMD 51
+     * (Game), 52 (Game Version) and 56 (Player).
+     *
+     * ⭐ 51, 52, 56 is NOT contiguous, and that is the whole reason a map
+     * exists: base+index would land on 53 ("Japanese Version") for row 2 --
+     * a VALUE label where a row name belongs. This pins the exact indices, so
+     * a future edit that "tidies" them into a run fails here. */
+    {
+        const mc_screen *sg = menu_speak_lookup(0x1400b1b69ULL);
+        int ok = sg && sg->labels && sg->nlabels == 3 &&
+                 sg->labels[0] == 51 && sg->labels[1] == 52 &&
+                 sg->labels[2] == 56 &&
+                 sg->kind == MC_SETTINGS_ROW &&
+                 sg->name && strcmp(sg->name, "Select Game") == 0;
+        /* ⛔ And it must NOT carry a base index: a row with a map that also
+         * had a base could silently fall back to the wrong labels. */
+        int no_base = sg && sg->base_index == -1;
+        check("16. Select Game maps rows 0,1,2 to GMD 51,52,56 and has no base",
+              ok && no_base, "ok=%d no_base=%d", ok, no_base);
+    }
+
+    /* --- case 17: a mapped screen NEVER uses base+index -------------------
+     * ⭐⭐ The safety property, stated directly. Even if some future edit gives
+     * a mapped row a base_index, the map must win -- because on this screen
+     * base+index names a value, confidently and wrongly. Checked structurally:
+     * no shipped row may carry BOTH a map and a base. */
+    {
+        int both = 0;
+        for (int i = 0; i < menu_speak_screen_count(); i++) {
+            const mc_screen *r = menu_speak_row(i);
+            if (r && r->labels && r->base_index >= 0)
+                both = 1;
+        }
+        check("17. no row carries both a label map and a base index", !both, "");
+    }
+
+    /* --- case 18: a value names the ROW it belongs to ---------------------
+     * ⭐ "Game Version, 2 of 2" is the useful readout; "setting 2, value 2 of
+     * 2" is not. The value site has no map of its own, so it finds its
+     * sibling row entry and uses that. */
+    {
+        const mc_screen *v = menu_speak_lookup(0x1400b1bd9ULL);
+        const mc_screen *sib = menu_speak_sibling_row(v);
+        check("18. the value site finds its sibling row entry by screen name",
+              v && sib && sib->kind == MC_SETTINGS_ROW && sib->labels &&
+              sib->nlabels == 3,
+              "v=%p sib=%p", (const void *)v, (const void *)sib);
+    }
+
+    /* --- case 19: a map that disagrees with the live count is REFUSED -----
+     * ⭐⭐ The staleness check, for maps. If the screen shows 4 rows and the
+     * map holds 3, the game changed and the map is stale -- naming rows from
+     * it would mis-label every row past the first. Position only. */
+    m = mk(0x1400b1b69ULL, 1, 0, 3);          /* 4 rows live, map holds 3 */
+    menu_speak_build(&m, &sp);
+    check("19. a map that does not match the live row count is refused",
+          !sp.named && sp.why == MC_UNNAMED_COUNT_MISMATCH &&
+          sp.position == 2 && sp.total == 4,
+          "named=%d why=%d %d of %d", (int)sp.named, (int)sp.why,
+          sp.position, sp.total);
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");

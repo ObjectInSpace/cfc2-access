@@ -110,6 +110,21 @@ typedef struct {
      * 0x338 for fn 0x1400b1b10. ⚠ Read from the DISASSEMBLY of the specific
      * screen, never assumed -- other settings screens index different fields. */
     int       values_off;
+    /* ⭐⭐ THE index -> label MAP. This is what makes a screen whose labels are
+     * NOT a contiguous run addressable at all.
+     *
+     * The Select Game screen's three rows are GMD 51 (Game), 52 (Game Version)
+     * and 56 (Player) -- 51, 52, 56, with each row's VALUES sitting in the gaps
+     * (53..55 are the versions, 58..61 the player numbers). No base plus offset
+     * reaches those three, which is exactly why base_index could not name this
+     * screen and why the mod said "2 of 3" on it.
+     *
+     * ⛔ A row carrying a map must NEVER also fall back to base+index: the
+     * whole point is that base+index lands on a VALUE label here ("English
+     * Version" where "Game Version" belongs). `labels != NULL` therefore
+     * REPLACES the base, and base_index stays -1 on such a row. */
+    const int *labels;     /* GMD index per item, or NULL */
+    int        nlabels;    /* entries in `labels`; must equal `count` */
 } mc_screen;
 
 /* What a movement should say. */
@@ -156,6 +171,8 @@ typedef struct {
     int   row;                 /* MC_AXIS_VALUE: which row, 0-based */
     BOOL  have_row;            /* was `row` successfully derived? */
     char  item[128];           /* the item text, if named */
+    char  row_name[64];        /* MC_AXIS_VALUE: the name of the row this value
+                                * belongs to ("Game Version"), if known */
     char  screen_name[64];     /* the screen, if known */
     int   position;            /* 1-based, for "item 3 of 6" */
     int   total;
@@ -196,6 +213,10 @@ void menu_speak_log_unknown(const mc_move *m);
 #define MC_MAX_PLAUSIBLE_ROWS 64
 BOOL menu_speak_derive_row(const void *screen, const void *cursor,
                            int values_off, int max_row, int *row);
+
+/* The MC_SETTINGS_ROW entry of the same screen as a value entry, or NULL --
+ * so a value can name the row it belongs to. */
+const mc_screen *menu_speak_sibling_row(const mc_screen *v);
 
 /* Test seam: how many screens the table holds, and lookup by caller. */
 int  menu_speak_screen_count(void);
