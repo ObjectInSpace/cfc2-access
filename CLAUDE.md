@@ -81,7 +81,61 @@ before touching that work.
 
 - `src/log.c` — timestamped logging.
 
-## ▶ START HERE (next session)
+## ▶ START HERE (next session): the GUI TEXT READER
+
+**The one thing that unblocks most of what is left.** ~14 shell screens still
+speak position only, and they are blocked on the SAME cause: their labels are
+assigned to GUI text elements at RUNTIME, so no GMD search can name them.
+
+⭐⭐ The control that proves it: the **Options** screen's labels are known (GMD
+170..174), and **index 170 appears nowhere in its function**. A screen whose
+labels we already know does not carry them in its code. So stop looking for
+label ids in screen code -- that route is closed for the whole family.
+
+**What is already established** (memory `cfc2-gui-text-route`):
+- `cGUIObjText` -- 528 bytes (`mov r9d,0x210` at its registration stub
+  `0x14002e800`), vtable **`0x1410563a8`**, verified by its single DTI
+  registration at `0x1422cae28`. `cGUIObjMessage` is 368 bytes.
+- Object layout from ctor `0x1402f0080` / dtor `0x1402f0980`: `+0x54` flags,
+  `+0x58` float, `+0x60` bitfields, and **`+0x70` = first child,
+  `+0x78` = next sibling** -- GUI objects form a TREE.
+- ⛔ The static route is CLOSED, same as sPad: the four references to the DTI
+  slot are one-line `getDTI()` accessors, and these descriptors carry no
+  property table. The layout must come from a LIVE object.
+
+**The next step:** hook a `cGUIObjText` vtable method (fixed address, so no
+memory search) and let the game hand over a real instance, then find the string
+by inspecting it. Same move that cracked `sKeyboard`.
+
+⚠⚠ **This is riskier than anything shipped so far.** It dereferences a tree of
+caller-supplied pointers on the game's own threads, and this project has
+already killed the game once by trusting such a pointer
+(`hooked-function-pointers-are-untrusted`). Build it with the same discipline
+as the existing hooks: identity check before install, `VirtualQuery` on every
+dereference (never cached), the thread-local fault guard, a bounded walk, and
+`cfc2_hook.off` respected. Ship the OFF switch with the experiment.
+
+## Screens named so far (7 rows in `g_screens`)
+Main menu · Options · Museum (992 GALLERY/SOUND) · Select Game (rows +
+the 8 game names from the exe's ROM table) · PC Settings' Display row ·
+Select Mode (3-entry map against a 6-item screen, so it speaks position only
+until items 3..5 are established).
+
+⛔ **Gallery is closed to the GMD**: its 9 items are logos, and its confirm
+indexes resource-id tables. Route is the ROM table, once something proves its
+0..8 ordering matches Select Game's 0..7.
+
+## Tools built for this (all offline, no game launches)
+- `tools/screen_layouts.py` -- names a screen by the GUI layout it loads.
+  ⭐ Has CONTROLS built in and exits non-zero if they fail; a vtable-based
+  widening was tried, "placed" 13 more screens, and FAILED them.
+- `tools/resolve_screens.py` -- intersects a screen's observed positions from a
+  run's log to narrow candidate label runs.
+- `tools/menu_graph.py` -- the cursor dispatch tables. ⚠ 33 tables, 6
+  cursor-indexed, only 2 that actually change screen.
+- `tools/bench_discovery.py` -- measures the sweep against the real blob.
+
+## (older) START HERE
 
 **Working end to end:** the mod speaks menu item names in the game's own
 language. Verified in a clean run (2026-09-08, 22:33): **zero stalls** -- every
