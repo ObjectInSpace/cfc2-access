@@ -78,4 +78,8 @@ void menu_speak_log_unknown(const mc_move *m);
 int  menu_speak_screen_count(void);
 const mc_screen *menu_speak_lookup(ULONGLONG caller);
 
+/* Test-only: row i of the shipped table, or NULL. Lets the suite check the
+ * hand-edited rows for typos and duplicate callers. */
+const mc_screen *menu_speak_row(int i);
+
 #endif /* CFC2_MENU_SPEAK_H */

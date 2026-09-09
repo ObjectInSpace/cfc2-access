@@ -41,11 +41,29 @@ static const mc_screen g_screens[] = {
      * choices. Both legitimately map to base 37; neither is a duplicate to be
      * deleted. */
     { 0x140097a59ULL, 37, 6, "Main menu" },
+
+    /* ⭐ Options. CONFIRMED 2026-09-08 by live text: standing on position 5 of
+     * 5, base 170 read "Credits" (French "Credits"), which is MENU_OP_CREDITS
+     * -- the last of Systeme / Audio / Reseau / Options PC / Credits.
+     *
+     * ⚠ The rival candidate was base 37, whose item 5 is "Options" -- and the
+     * user had just SELECTED Options to get here, so the word alone would have
+     * been convincing. The item COUNT settles it: this screen has 5 items, the
+     * main menu has 6. That is why the count is stored and checked, not merely
+     * recorded. */
+    { 0x1400a20fcULL, 170, 5, "Options" },
 };
 
 #define NSCREENS (int)(sizeof(g_screens) / sizeof(g_screens[0]))
 
 int menu_speak_screen_count(void) { return NSCREENS; }
+
+const mc_screen *menu_speak_row(int i)
+{
+    if (i < 0 || i >= NSCREENS)
+        return NULL;
+    return &g_screens[i];
+}
 
 const mc_screen *menu_speak_lookup(ULONGLONG caller)
 {

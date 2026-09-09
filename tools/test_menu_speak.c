@@ -172,6 +172,33 @@ int main(void)
           (const void *)menu_speak_lookup(MAIN_CALLER),
           (const void *)menu_speak_lookup(MAIN_CALLER + 5));
 
+    /* --- case 9: every shipped row is internally sane --------------------
+     * ⭐ The table is hand-edited after each run now, so the likeliest future
+     * defect is a typo'd row rather than a logic bug. Check what can be checked
+     * without the game: a plausible base, a positive count, a name, and -- the
+     * one that matters -- NO DUPLICATE CALLER. Two rows sharing a caller means
+     * one silently shadows the other, and the shadowed screen would speak
+     * another menu's labels, which is the confident-wrong-name failure.
+     *
+     * ⚠ Two rows MAY share a BASE: the shell has two distinct screens
+     * presenting the same six choices. Duplicate bases are legal, not checked.
+     */
+    int nrows = menu_speak_screen_count();
+    int sane = (nrows >= 1);
+    for (int i = 0; i < nrows; i++) {
+        const mc_screen *a = menu_speak_row(i);
+        if (!a || a->count <= 0 || a->base_index < 0 || !a->name || !a->name[0])
+            sane = 0;
+        for (int j = i + 1; j < nrows; j++) {
+            const mc_screen *b = menu_speak_row(j);
+            if (a && b && a->caller == b->caller)
+                sane = 0;
+        }
+    }
+    check("9. every shipped row is sane and no caller is duplicated",
+          sane, "rows=%d", nrows);
+
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");
