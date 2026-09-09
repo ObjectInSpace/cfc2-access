@@ -201,6 +201,31 @@ int main(void)
               n, n_partial, no_title, not_ready);
     }
 
+
+    /* --- case 9: the CONFIRMED slot order ------------------------------
+     * ⭐⭐ No longer a hypothesis. On 2026-09-09 the user walked all eight
+     * slots of the Select Game row and the predicted titles came out in the
+     * collection's own order: CVS1, CVS2, CFJ, SFA3 Upper, Power Stone,
+     * Power Stone 2, Project Justice, Plasma Sword. Eight of eight in
+     * sequence is not something a wrong mapping produces.
+     *
+     * This pins the JP-side code for every slot, so a future edit to
+     * rom_table_index_for() -- or a game update that reorders the roster --
+     * fails here instead of announcing the wrong game to a blind user. */
+    {
+        static const char *k_expect[8] = {
+            "cvs1", "cvs2", "cfj", "z3u", "pws1", "pws2", "mjus", "stg2"
+        };
+        int ok = 1;
+        for (int g = 0; g < 8; g++) {
+            char c[32] = "";
+            int ri = rom_table_index_for(g, 0);
+            if (ri != 2 * g) { ok = 0; break; }
+            if (!rom_table_code(ri, c, sizeof(c))) { ok = 0; break; }
+            if (strcmp(c, k_expect[g]) != 0) { ok = 0; break; }
+        }
+        check("9. slots 0..7 map to the confirmed game order", ok, "");
+    }
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");

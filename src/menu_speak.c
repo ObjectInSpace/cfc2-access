@@ -370,6 +370,36 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
              * name, which is the right answer: an unrecognised count is a list
              * nobody has measured, and indexing the nearest one would speak a
              * value that is not on the screen. */
+            /* ⭐⭐ ROW 0: THE GAME NAME, from the exe's ROM table.
+             *
+             * CONFIRMED 2026-09-09. The user walked all eight slots and the
+             * predicted titles came out in the collection's own order --
+             * CVS1, CVS2, CFJ, SFA3 Upper, Power Stone, Power Stone 2,
+             * Project Justice, Plasma Sword. Eight of eight, in sequence, is
+             * not a coincidence a wrong mapping could produce.
+             *
+             * ⭐ Speaks the JAPANESE-side title (version 0), which is the
+             * table's first entry for each game. ⚠ For three games the two
+             * regions have DIFFERENT names -- "Capcom Fighting Jam" vs
+             * "Evolution", "Zero 3 Upper" vs "Alpha 3 Upper", "Moero! Justice
+             * Gakuen" vs "Project Justice", "Star Gladiator 2" vs "Plasma
+             * Sword" -- so which one is right depends on the Game Version row
+             * beside it, and reading that row is not yet wired up. The JP-side
+             * name is a true name for the game either way; refining it to
+             * follow the version selection is the obvious next step. */
+            if (row == 0 && rom_table_ready()) {
+                int game = m->new_index - m->min_index;
+                int ri = rom_table_index_for(game, 0);
+                char gt[128];
+                if (ri >= 0 && rom_table_title(ri, gt, sizeof(gt)) && gt[0]) {
+                    _snprintf(out->item, sizeof(out->item), "%s", gt);
+                    out->item[sizeof(out->item) - 1] = '\0';
+                    out->named = TRUE;
+                    out->why = MC_NAMED_OK;
+                }
+                return;
+            }
+
             const mc_value_set *vs = menu_speak_values_for(s, row, out->total);
             if (vs) {
                 int vidx = m->new_index - m->min_index;
@@ -469,27 +499,17 @@ void menu_speak(const mc_move *m)
 }
 
 
-/* Is discovery turned on? Create `cfc2_discover.on` next to the exe.
+/* ⛔ REMOVED: opt_discovery_enabled() and the cfc2_discover.on gate.
  *
- * \u26d4 OFF BY DEFAULT because discovery is a debug aid that runs on the poll
- * thread, and three versions of it have starved the mod during real play. A
- * diagnostic must not be able to degrade the thing it diagnoses in an ordinary
- * session. */
-static BOOL opt_discovery_enabled(void)
-{
-    static int cached = -1;
-    if (cached >= 0)
-        return cached != 0;
-    char path[MAX_PATH];
-    DWORD n = GetModuleFileNameA(NULL, path, MAX_PATH);
-    if (n == 0 || n >= MAX_PATH) { cached = 0; return FALSE; }
-    char *slash = strrchr(path, '\\');
-    if (!slash) { cached = 0; return FALSE; }
-    slash[1] = '\0';
-    strncat(path, "cfc2_discover.on", MAX_PATH - strlen(path) - 1);
-    cached = (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES);
-    return cached != 0;
-}
+ * The gate existed because an early sweep cost 4.8 s on the poll thread. That
+ * cost was the per-byte guarded reader (fixed in 56fa641); the gate outlived
+ * the bug and then did real harm, because with the file absent -- the normal
+ * state -- the only mechanism that can name a screen never ran at all.
+ *
+ * ⭐ The general shape: a guard added for a measured cost must be re-measured
+ * when the cost is fixed, or it silently becomes a feature switch that is
+ * always off. Measure, then delete the guard; do not keep it "just in case",
+ * because a diagnostic nobody runs is a diagnostic that does not exist. */
 
 /* ⭐⭐ THE GAME-NAME PROBE -- LOGGED, NEVER SPOKEN.
  *
@@ -505,12 +525,9 @@ static BOOL opt_discovery_enabled(void)
  * it could never describe the item the user was already sitting on. Confirming
  * the FIRST game meant leaving it and coming back, and the report then named
  * whatever they had moved to. The user pointed out that this measures the
- * wrong thing, and they were right: a probe that cannot observe a resting
- * state cannot answer "what am I on?".
+ * wrong thing, and they were right.
  *
- * ⛔ Still never spoken. A title from an unconfirmed mapping is exactly the
- * confident-wrong-name failure this file exists to prevent. Once a run
- * confirms it, this becomes a value variant like any other. */
+ * ⛔ Still never spoken until the mapping is confirmed. */
 void menu_speak_probe_rest(const mc_move *m)
 {
     if (!m || !m->screen)
@@ -520,7 +537,6 @@ void menu_speak_probe_rest(const mc_move *m)
     if (!s || s->kind != MC_SETTINGS_VALUE)
         return;
 
-    /* Only the GAME row, and only when the row is derivable. */
     int row = 0;
     if (!menu_speak_derive_row(m->screen, m->cursor, s->values_off, 0, &row))
         return;
@@ -631,7 +647,27 @@ void menu_speak_log_unknown(const mc_move *m)
      *     move-list text that can never be a menu.
      *
      * \u26a0 Everything here is LOGGED, NEVER SPOKEN. A candidate is a hypothesis. */
-    if (gmd_text_count() > 0 && opt_discovery_enabled()) {
+    /* ⭐⭐ ON BY DEFAULT, because the cost that justified the gate is GONE.
+     *
+     * This sweep was gated behind cfc2_discover.on after a version of it took
+     * 4.8 SECONDS on the poll thread. That cost was the per-byte guarded
+     * reader, fixed in 56fa641 -- and the gate outlived the bug.
+     *
+     * ⛔ The consequence was worse than the freeze it prevented: with the file
+     * absent (the normal state) discovery NEVER RAN, so a run that visited 21
+     * unnamed screens produced 21 "unknown screen" lines and not one candidate.
+     * The only mechanism that can name a screen was off in every ordinary
+     * session, and coverage could not grow. Three screens named in a week is
+     * the result.
+     *
+     * ⭐ MEASURED, not estimated -- against the real 4165-string blob, on the
+     * shipping code path (tools/bench_discovery.c): 0.10 ms for a 2-item menu,
+     * 0.64 ms for 8 items, 0.82 ms worst case at 40 and 67 items. Under 1 ms
+     * against a 100 ms poll, and it runs ONCE PER SCREEN, not per movement.
+     *
+     * ⚠ I have twice estimated this kind of cost by arithmetic and been wrong
+     * both times. This number came from running it. */
+    if (gmd_text_count() > 0) {
         int off = m->new_index - m->min_index;
         int total = gmd_text_count();
         if (total > 600)
@@ -709,38 +745,19 @@ void menu_speak_log_unknown(const mc_move *m)
                  (unsigned long long)off);
     }
 
-    /* ⭐⭐ THE OPTION-ID ARRAY, when the screen has one.
+    /* ⛔⛔ REMOVED: a dump of screen+0x340 as "option IDs".
      *
-     * Some menus keep a parallel array of option IDs beside the cursor and
-     * dispatch on `[screen + idarray + 4*cursor]` rather than on the cursor
-     * itself -- the post-game-select menu at 0x1400b2729 does exactly that
-     * (`mov edx,[rbx + rcx*4 + 0x340]`, then compares against 1, 2 and 3).
+     * That field IS an option-ID array on caller 0x1400b2729, read off its
+     * machine code. It is NOT one anywhere else, and printing it for every
+     * screen produced exactly what generalising from one sample deserves:
+     * [741845392], [1090385120], [1015004208] -- pointers and padding,
+     * formatted as if they were menu semantics.
      *
-     * ⭐ Those IDs identify the ITEMS in a way the cursor position cannot: the
-     * same three-item menu with a different ID triple is a different menu. And
-     * they survive the case the HELP-twin sweep below cannot handle -- a menu
-     * whose labels are not a contiguous run with a blurb after it, which is
-     * why that sweep found nothing for this screen.
-     *
-     * ⚠ Read through the fault guard and printed as raw numbers only. Nothing
-     * is inferred from them here: they are for a person to match against the
-     * screen, exactly like the candidate bases. */
-    if (m->screen && mem_readable((const char *)m->screen + 0x340,
-                                  (SIZE_T)count * 4)) {
-        int ids[16];
-        int n = (count > 16) ? 16 : count;
-        if (n > 0 && mem_copy(ids, (const char *)m->screen + 0x340,
-                              (SIZE_T)n * 4)) {
-            char b[256]; size_t u = 0; b[0] = '\0';
-            for (int i = 0; i < n; i++) {
-                int k = _snprintf(b + u, sizeof(b) - u, "%s%d",
-                                  u ? " " : "", ids[i]);
-                if (k > 0 && (size_t)k < sizeof(b) - u) u += (size_t)k;
-            }
-            log_line("mcspeak: [DISCOVERY]   option IDs at screen+0x340: [%s]"
-                     "  ⚠ raw values -- if these look like a small set (1 2 3)"
-                     " the menu dispatches on them, and they name the items"
-                     " more reliably than the cursor position does.", b);
-        }
-    }
+     * ⭐ The lesson is this project's oldest one, committed again: a field
+     * offset read out of ONE function's instructions describes that function.
+     * Applying it to 21 other screens is the memory-scanning mistake wearing a
+     * disassembly costume. If a per-screen field is ever wanted again, it must
+     * come from a per-screen TABLE ROW, never from a constant offset applied
+     * everywhere. */
+
 }
