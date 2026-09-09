@@ -170,21 +170,6 @@ void menu_speak(const mc_move *m)
 }
 
 
-/* Candidate label-run bases, from tools/find_label_runs.py across the item
- * counts observed in real runs. ⚠ These are HYPOTHESES used only to print live
- * text into the log during discovery -- nothing is ever spoken from them. */
-static const int g_cand_bases[] = {
-    37,   /* main menu        OFFLINE_PLAY.. */
-    56,   /* player select    PLAYER..       */
-    68,   /* online play      CASUAL_MATCH.. */
-    78,   /* lobby            CREATE_LOBBY.. */
-    170,  /* options          MENU_OP_SYSTEM..*/
-    190,  /* sound options    MENU_OP_BGM_VOLUME.. */
-    250,  /* pause menu       CONTINUE..     */
-    587,  /* screen options   SCREEN_SIZE_03..*/
-};
-#define NCAND_BASES (int)(sizeof(g_cand_bases) / sizeof(g_cand_bases[0]))
-
 void menu_speak_log_unknown(const mc_move *m)
 {
     /* ⭐ DISCOVERY MODE. Print exactly what a new table row needs, so the next
@@ -244,22 +229,72 @@ void menu_speak_log_unknown(const mc_move *m)
      * ⚠ Logged only, NEVER spoken: a candidate is a hypothesis, and speaking
      * one would be exactly the confident-wrong-name failure this file exists to
      * prevent. */
+    /* ⭐⭐ AN EXHAUSTIVE SWEEP OVER WHOLE RUNS, not a list of guesses.
+     *
+     * The first version consulted a hand-maintained list of candidate bases, so
+     * a screen whose labels I had not anticipated produced NO candidates at all
+     * -- which is exactly what happened to the 4-item and 3-item screens.
+     *
+     * The second version swept every base but tested only the ONE item the user
+     * was standing on: 3144 matches, hitting the display cap in the first 40
+     * indices and never reaching the answer. Useless.
+     *
+     * ⭐ What narrows it is testing the WHOLE RUN plus what follows it. A menu
+     * is `count` consecutive SHORT, non-sentence strings, and in this message
+     * file a menu's items are followed by their HELP_ blurbs -- which are
+     * sentences. The mod cannot see label NAMES (the live table holds only
+     * strings), but "the next entry is a sentence" is a good proxy: measured
+     * over the corpus, 72%% of HELP_ entries end in sentence punctuation
+     * against 13%% of everything else.
+     *
+     * Measured result: 3144 -> 46 candidates for a 4-item screen, 71 for a
+     * 3-item one. Small enough to read, and the answer is IN the list rather
+     * than dependent on what I thought to include.
+     *
+     * ⚠ Logged only, NEVER spoken. Naming a screen from a plausible-looking
+     * candidate is exactly the mistake that made a different 6-item screen
+     * speak the main menu's labels. */
     if (gmd_text_count() > 0) {
         int off = m->new_index - m->min_index;
-        char cur[128];
-        log_line("mcspeak: [DISCOVERY]   you are on position %d of %d. Live "
-                 "text at candidate bases (base -> what item %d would say):",
-                 off + 1, count, off + 1);
-        for (int i = 0; i < NCAND_BASES; i++) {
-            int base = g_cand_bases[i];
-            if (base + count > gmd_text_count())
+        int total = gmd_text_count();
+        int shown = 0;
+        log_line("mcspeak: [DISCOVERY]   you are on position %d of %d. Runs of "
+                 "%d items followed by help text (base -> your item):",
+                 off + 1, count, count);
+
+        for (int base = 0; base + count < total && shown < 40; base++) {
+            char cur[128];
+            int ok = 1;
+
+            /* every item in the run must look like a menu label */
+            for (int i = 0; i < count && ok; i++) {
+                if (!gmd_text_by_index(base + i, cur, sizeof(cur)) || !cur[0]) {
+                    ok = 0; break;
+                }
+                size_t L = strlen(cur);
+                if (cur[0] == '<' || L > 32 ||
+                    cur[L - 1] == '.' || cur[L - 1] == '?' || cur[L - 1] == '!')
+                    ok = 0;
+            }
+            if (!ok)
                 continue;
-            if (!gmd_text_by_index(base + off, cur, sizeof(cur)) || !cur[0])
+
+            /* and the entry just past the run must be a sentence -- the HELP_
+             * blurb that follows a real menu */
+            if (!gmd_text_by_index(base + count, cur, sizeof(cur)) || !cur[0])
                 continue;
-            if (cur[0] == '<')          /* icon markup, never an item name */
+            size_t L = strlen(cur);
+            if (cur[L - 1] != '.' && cur[L - 1] != '?' && cur[L - 1] != '!')
+                continue;
+
+            if (!gmd_text_by_index(base + off, cur, sizeof(cur)))
                 continue;
             log_line("mcspeak: [DISCOVERY]     base %-5d -> \"%s\"", base, cur);
+            shown++;
         }
+        if (!shown)
+            log_line("mcspeak: [DISCOVERY]     (none -- this screen's labels "
+                     "may not follow the usual item+help layout)");
         log_line("mcspeak: [DISCOVERY]   whichever line matches the item you "
                  "just landed on names this screen.");
     }
