@@ -174,6 +174,37 @@ its own `g_screens` entry and all four must carry the same `name` so
 `menu_speak_sibling_row` finds the row map. Case 20d asserts all four -- a typo
 on the FOURTH is caught only by checking every one.
 
+### ⭐⭐ THE MUSIC TRACKS ARE NAMED -- from the game's own live text
+
+`gt_numbered_item()` + `MC_NUMBERED_LIVE`. Museum > Music, caller `0x1400b2ebb`.
+**Built and offline-tested; NOT yet heard in-game.**
+
+Track titles are reachable by nothing else: they are **not GMD labels**, so no
+base and no map can name them, and **the caption channel is blind here** -- the
+list's text is set ONCE on entry (5 sets per object, all one move seq) and moving
+the cursor sets **nothing**, so `gt_take_caption` always returns empty. Measured
+in `docs/run-2026-09-10-1343.log`, not assumed. That is the same structural
+reason the consent dialog is unreachable, and it is why this needed a LOOKUP
+rather than a movement-stamped mailbox.
+
+⭐⭐ **The join is the PRINTED NUMBER.** The cursor says "position 2", the game's
+text says `"02. Game Select: Overdrive Blaze"`, and a name is spoken only when
+those two independent sources agree. No match = position only.
+
+⛔⛔ **The fixture scrambles insertion order deliberately.** In both real runs
+insertion order equalled row order, so a lookup returning the Nth entry would
+have passed any faithful fixture and shipped. Sabotage: with the number match
+replaced by insertion order, asking for track 1 returns **"03. Gallery: Swayin'
+Flame"**. ⚠ Half of case 22 still passed under that sabotage (position 4
+coincided with entry 4) -- one assertion would not have caught it.
+
+⚠⚠ `count = 0` on that row ON PURPOSE: a 9-item horizontal strip
+(`0x14009af21`) picks the game FIRST, and each soundtrack is a different length.
+A fixed count would disable the row on every other game.
+
+⭐ `-Wclobbered` (kept from the reverted probe commit) caught a real
+setjmp/longjmp hazard in the first function written after it.
+
 ### ▶ WHERE SCREEN NAMING STANDS (2026-09-10)
 
 **19 rows shipped.** Every caller ever seen in a log is named EXCEPT the two
@@ -455,9 +486,16 @@ the 8 game names from the exe's ROM table) · PC Settings' Display row ·
 Select Mode (3-entry map against a 6-item screen, so it speaks position only
 until items 3..5 are established).
 
-⛔ **Gallery is closed to the GMD**: its 9 items are logos, and its confirm
-indexes resource-id tables. Route is the ROM table, once something proves its
-0..8 ordering matches Select Game's 0..7.
+⛔ **Gallery is closed to the GMD**: its confirm indexes resource-id tables, so
+the message corpus cannot name its contents.
+
+⚠⚠ **BUT "its items are unnumbered logos" WAS NEVER TESTED** -- that was
+extrapolated from the confirm-handler note, which says nothing about whether the
+screen sets text. **Museum > Gallery proper has still not been entered.** The
+instance route now reads live text for screens the GMD cannot reach (the music
+tracks), and the online game-select screen sets game TITLES freely, so the
+premise that Gallery needs a selection signal is unsupported in both directions.
+⭐ Enter it and read the instance set before designing anything for it.
 
 ## Tools built for this (all offline, no game launches)
 - `tools/screen_layouts.py` -- names a screen by the GUI layout it loads.
