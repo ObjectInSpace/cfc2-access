@@ -329,6 +329,26 @@ def strip_hint_stutter(text, translator, game=None):
         # No icons at all: ordinary prose (e.g. a caption like "P1").
         return translator.clean(text, game=game)
 
+    # ⭐ IS THIS A HINT STRIP AT ALL, or ordinary prose with inline icons?
+    #
+    # A hint strip is a run of `<ICON button>Action` pairs, so at least one
+    # icon is followed IMMEDIATELY by its label with no space. Prose puts its
+    # icons inside a sentence, with spaces either side:
+    #     "Press All <ICON C_P> or <ICON C_K> Inputs Simultaneously"
+    # Run through the pair logic, that prose gained a spurious separator
+    # ("punch or; kick") because " or " was read as a joiner between two
+    # buttons rather than as an English word. clean() already handles prose
+    # correctly, so defer to it -- the C translator makes the same distinction
+    # and this is what brought the two into agreement.
+    pair_like = False
+    for j in range(1, len(parts), 2):
+        gap = parts[j + 1] if j + 1 < len(parts) else ""
+        if gap and not gap[:1].isspace():
+            pair_like = True
+            break
+    if not pair_like:
+        return translator.clean(text, game=game)
+
     lead = parts[0].strip()
     hints = []          # [[button words], action]
     i = 1
@@ -342,25 +362,79 @@ def strip_hint_stutter(text, translator, game=None):
         joiner = gap.strip()
         if joiner in ("/", "+") and i + 2 < len(parts):
             # Combination: this icon and the next form ONE hint.
-            hints.append([[name, "or" if joiner == "/" else "plus"], None])
+            #
+            # ⚠ EXTEND the pending hint, never open a new one. A chain like
+            # "<ICON C_K2>/<ICON C_2>+<ICON C_K2>" is a SINGLE hint with three
+            # buttons; appending each time produced "Kick or; down plus Kick",
+            # splitting one input into two. Caught by the parity check.
+            word = "or" if joiner == "/" else "plus"
+            if hints and hints[-1][1] is None:
+                hints[-1][0].extend([name, word])
+            else:
+                hints.append([[name, word], None])
             i += 2
             continue
 
         # Attach to a pending combination, or open a new hint.
+        #
+        # ⚠ Two ADJACENT icons with nothing between them are one hint's
+        # BUTTONS, not two hints. "<ICON BTN_LB><ICON BTN_RB>Change Page" is
+        # "LB RB Change Page"; splitting it gave "LB; RB Change Page", a hint
+        # with no action at all. Found by the C/Python parity check, not by any
+        # hand-picked case.
         if hints and hints[-1][1] is None:
             hints[-1][0].append(name)
         else:
             hints.append([[name], None])
 
+        # An EMPTY gap means the next icon belongs to this same hint's buttons,
+        # so leave the action open and let the next iteration append to it.
+        if gap == "" and i + 2 < len(parts):
+            i += 2
+            continue
+
         action = gap.strip()
         # ⭐ The stutter: drop the action's leading copy of the button name.
-        # Prefix, not equality -- "Cancel Ready" must keep "Ready".
-        if action:
-            low, nlow = action.lower(), name.lower()
-            if low == nlow:
-                action = ""
-            elif low.startswith(nlow) and low[len(nlow):len(nlow) + 1] in (" ", ""):
-                action = action[len(name):].strip()
+        #
+        # ⛔⛔ ONLY WHEN THE HINT HAS A SINGLE BUTTON, and only the duplicated
+        # WORD. Two bugs lived in the version this replaces, both found by the
+        # parity check against the C:
+        #
+        #  1. Whole-string equality DELETED the printed label outright.
+        #     HELP_SPMOVE "<ICON C_SP>Special Move" spoke as "special move" --
+        #     the label was gone, not de-duplicated. Same for STG2's "Kick" and
+        #     "Side Step". That is meaning loss, the exact failure the prefix
+        #     rule exists to prevent, and it slipped in because the icon's
+        #     spoken name and the label differ only in case.
+        #  2. It compared against the LAST button of a combination, so
+        #     "<ICON C_A>/<ICON C_A1><ICON C_A2>" could eat a real label.
+        #
+        # A multi-button hint ("LB or RB", "punch kick") is never the action's
+        # first word, so the stutter test simply does not apply there.
+        # ⛔⛔ AND NEVER STRIP THE WHOLE ACTION AWAY.
+        #
+        # HELP_SPMOVE is "<ICON C_SP>Special Move" and the icon's spoken name
+        # is "special move" -- the same words, differing only in case. A
+        # case-insensitive prefix test therefore consumes the ENTIRE printed
+        # label and the hint speaks as "special move" with the label gone.
+        # For a legend-style string like STG2's, three of four entries lost
+        # their names that way.
+        #
+        # ⭐ The rule is DE-DUPLICATION, not deletion: if removing the leading
+        # copy would leave nothing, there was nothing to de-duplicate -- the
+        # icon and the label are simply the same thing, and the printed label
+        # is the better of the two to speak (it is the game's own wording, in
+        # the game's own case). Keep it and drop the icon instead.
+        if action and len(hints[-1][0]) == 1:
+            nlow = name.lower()
+            low = action.lower()
+            if low.startswith(nlow) and low[len(nlow):len(nlow) + 1] in (" ", ""):
+                rest = action[len(name):].strip()
+                if rest:
+                    action = rest
+                else:
+                    # Identical: speak the printed label alone.
+                    hints[-1][0] = [""]
         hints[-1][1] = action
         i += 2
 
@@ -374,7 +448,12 @@ def strip_hint_stutter(text, translator, game=None):
 
     joined = "; ".join(out)
     if lead:
-        joined = ("%s  %s" % (lead, joined)).strip() if joined else lead
+        # A lead ending in an opening bracket or a joiner takes NO space before
+        # the first hint: "(<ICON C_K2> for ...)" reads "(Kick for ...)".
+        # ⚠ The C translator applies the identical rule; parity is what keeps
+        # the two from drifting on it.
+        sep = "" if lead[-1:] in ("(", "[", "{", "/", "+") else " "
+        joined = (lead + sep + joined) if joined else lead
     joined = re.sub(r"\s+", " ", joined)
     return joined.strip(" ;")
 

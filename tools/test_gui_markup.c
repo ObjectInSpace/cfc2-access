@@ -179,25 +179,53 @@ int main(void)
      * buffer, so an overrun is a crash here rather than a corruption in the
      * game's address space. --- */
     {
-        char big[1024];
-        int  pos = 0;
-        for (int i = 0; i < 200 && pos < (int)sizeof(big) - 40; i++)
-            pos += _snprintf(big + pos, sizeof(big) - pos - 1,
-                             "<SIZE 58><ICON DECIDE></SIZE>Confirm ");
+        /* ⚠ A LONG PROSE RUN, not a long strip.
+         *
+         * The original probe here was 200 repeated hint pairs. It could not
+         * overrun anything, because GM_MAX_PIECES (64) stops the parser long
+         * before the sink fills: a 999-byte input produced 241 bytes of
+         * output. The piece cap was masking the length cap, so this case was
+         * measuring the wrong bound. One long unbroken prose run reaches the
+         * sink directly and is the input that actually exercises it. */
+        char big[600];
+        memset(big, 'x', sizeof(big) - 1);
         big[sizeof(big) - 1] = '\0';
 
-        char small[24];
-        memset(small, 0xAA, sizeof(small));
-        SIZE_T n = gm_speak(big, small, sizeof(small));
+        /* ⛔⛔ THE BUFFER MUST BE WATCHED FROM OUTSIDE ITSELF.
+         *
+         * The first version of this case declared `char small[24]` and checked
+         * only that the RESULT looked sane. With the length cap deleted, it
+         * still PASSED -- the sweep caught it. An overrun writes PAST the
+         * buffer, so nothing inside the buffer can report it; the truncated
+         * result looks correct either way.
+         *
+         * So: put a known-value canary immediately after the output buffer in
+         * one allocation and require it to be untouched. That is what makes
+         * "bounded" an assertion rather than a hope. */
+        struct { char out[24]; char canary[32]; } guard;
+        memset(&guard, 0xAA, sizeof(guard));
+        SIZE_T n = gm_speak(big, guard.out, sizeof(guard.out));
+
+        int canary_ok = 1;
+        for (size_t i = 0; i < sizeof(guard.canary); i++)
+            if ((unsigned char)guard.canary[i] != 0xAA)
+                canary_ok = 0;
+
         g_checked++;
-        if (n >= sizeof(small) || small[sizeof(small) - 1] != '\0' ||
-            strlen(small) != n) {
+        if (!canary_ok) {
+            printf("FAIL  bounded output OVERRAN the buffer "
+                   "(canary clobbered)\n");
+            g_failed++;
+        } else if (n >= sizeof(guard.out) ||
+                   guard.out[sizeof(guard.out) - 1] != '\0' ||
+                   strlen(guard.out) != n) {
             printf("FAIL  bounded output: n=%llu strlen=%llu\n",
-                   (unsigned long long)n, (unsigned long long)strlen(small));
+                   (unsigned long long)n,
+                   (unsigned long long)strlen(guard.out));
             g_failed++;
         } else {
-            printf("ok    bounded output truncates cleanly (%llu bytes)\n",
-                   (unsigned long long)n);
+            printf("ok    bounded output truncates, canary intact (%llu bytes)"
+                   "\n", (unsigned long long)n);
         }
     }
 

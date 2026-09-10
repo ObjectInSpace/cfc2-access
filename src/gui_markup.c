@@ -376,7 +376,11 @@ SIZE_T gm_speak(const char *in, char *out, SIZE_T outsz)
          * fuse with a neighbouring word and never chop the sentence. */
         for (int i = 0; i < n; i++) {
             if (pieces[i].icon) {
-                if (s.len > 0 && out[s.len - 1] != ' ')
+                /* No separator after an opening bracket or a joiner:
+                 * "(<ICON C_K2> for ...)" reads "(Kick for ...)", not
+                 * "( Kick for ...)". The Python oracle applies the same rule;
+                 * parity is what keeps the two from drifting on it. */
+                if (s.len > 0 && strchr(" ([{/+", out[s.len - 1]) == NULL)
                     sink_ch(&s, ' ');
                 sink_str(&s, pieces[i].icon);
                 /* A comma only when another icon follows with nothing but
@@ -424,7 +428,11 @@ SIZE_T gm_speak(const char *in, char *out, SIZE_T outsz)
                 sink_ch(&s, ' ');
             sink_put(&s, t, tl);
         }
-        BOOL had_lead = (s.len > 0);
+        /* A lead ending in an opening bracket takes no separator before the
+         * first hint: "(<ICON C_K2> for ...)" reads "(Kick for ...)", not
+         * "( Kick for ...)". */
+        BOOL had_lead = (s.len > 0) &&
+                        strchr("([{/+", out[s.len - 1]) == NULL;
         BOOL first_hint = TRUE;
 
         int i = first_icon;
@@ -433,6 +441,7 @@ SIZE_T gm_speak(const char *in, char *out, SIZE_T outsz)
 
             /* Gather this hint's button(s): a "/" or "+" gap chains them. */
             char buttons[128];
+            int  button_count = 1;   /* icons in THIS hint, not words */
             buttons[0] = '\0';
             strncpy(buttons, pieces[i].icon, sizeof(buttons) - 1);
             buttons[sizeof(buttons) - 1] = '\0';
@@ -445,10 +454,18 @@ SIZE_T gm_speak(const char *in, char *out, SIZE_T outsz)
                 if (pieces[i + 1].icon) {
                     /* Two icons with nothing between: still one hint's
                      * buttons, joined by a space. */
-                    SIZE_T bl = strlen(buttons);
-                    _snprintf(buttons + bl, sizeof(buttons) - bl - 1, " %s",
-                              pieces[i + 1].icon);
-                    buttons[sizeof(buttons) - 1] = '\0';
+                    /* ⚠ KEY_SUP maps to the EMPTY string -- a deliberately
+                     * suppressed icon. Appending it emitted a stray separator
+                     * ("Start  Confirm"). Skip empties rather than special-
+                     * casing the token, since any future suppressed icon
+                     * behaves the same way. */
+                    if (pieces[i + 1].icon[0] != '\0') {
+                        SIZE_T bl = strlen(buttons);
+                        _snprintf(buttons + bl, sizeof(buttons) - bl - 1,
+                                  bl ? " %s" : "%s", pieces[i + 1].icon);
+                        buttons[sizeof(buttons) - 1] = '\0';
+                        button_count++;
+                    }
                     i++;
                     continue;
                 }
@@ -465,6 +482,7 @@ SIZE_T gm_speak(const char *in, char *out, SIZE_T outsz)
                     _snprintf(buttons + bl, sizeof(buttons) - bl - 1, " %s %s",
                               t[0] == '/' ? "or" : "plus", pieces[i + 2].icon);
                     buttons[sizeof(buttons) - 1] = '\0';
+                    button_count++;
                     i += 2;
                     continue;
                 }
@@ -479,16 +497,31 @@ SIZE_T gm_speak(const char *in, char *out, SIZE_T outsz)
              * name, by PREFIX and only the duplicated word. The button is
              * named after what it does, so "<ICON DECIDE>Confirm" would
              * otherwise speak as "Confirm Confirm". */
-            if (action && action_len > 0) {
-                /* Only a SINGLE-button hint can stutter: a combination
-                 * ("LB or RB") is never the action's first word. */
-                const char *last = strrchr(buttons, ' ');
-                const char *cmp = buttons;
-                if (last == NULL && starts_with_word(action, action_len, cmp)) {
-                    SIZE_T nlen = strlen(cmp);
-                    action += nlen;
-                    action_len -= nlen;
-                    trim(&action, &action_len);
+            /* ⛔ "HAS A SPACE" IS NOT "IS A COMBINATION". The first version
+             * tested strrchr(buttons, ' ') == NULL to mean "single button" --
+             * but plenty of single icons have MULTI-WORD names ("special
+             * move", "Any Attack", "left stick"), so every one of them skipped
+             * the stutter check and spoke twice: "special move Special Move".
+             * Found by the parity check against the Python oracle, not by any
+             * hand-picked case. Count the buttons instead. */
+            if (action && action_len > 0 && button_count == 1) {
+                if (starts_with_word(action, action_len, buttons)) {
+                    SIZE_T nlen = strlen(buttons);
+                    const char *rest = action + nlen;
+                    SIZE_T rest_len = action_len - nlen;
+                    trim(&rest, &rest_len);
+                    if (rest_len > 0) {
+                        action = rest;
+                        action_len = rest_len;
+                    } else {
+                        /* ⭐ DE-DUPLICATION, NOT DELETION. If removing the
+                         * leading copy leaves nothing, the icon and the label
+                         * are the same thing -- speak the PRINTED label alone
+                         * (the game's own wording and case) and drop the icon.
+                         * Stripping the action instead deleted the label
+                         * outright: HELP_SPMOVE spoke as "special move". */
+                        buttons[0] = '\0';
+                    }
                 }
             }
 
@@ -500,7 +533,10 @@ SIZE_T gm_speak(const char *in, char *out, SIZE_T outsz)
 
             sink_str(&s, buttons);
             if (action && action_len > 0) {
-                sink_ch(&s, ' ');
+                /* No separator when the icon was dropped as a duplicate --
+                 * `buttons` is empty and a space would lead the hint. */
+                if (buttons[0] != '\0')
+                    sink_ch(&s, ' ');
                 sink_put(&s, action, action_len);
             }
         }
