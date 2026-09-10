@@ -85,6 +85,55 @@ Identify by ENTRY POINT on the next run, never by shape.
 ### 8. Consent dialog — `0x140087cda` 3h
 ⛔ Sets no item text at all. No pacing fixes it; needs the GUI tree.
 
+## ⭐⭐ ROWS OR VALUES? — what the run actually has to cover
+
+**Rows: yes, every one, slowly. Values: ONE movement per row is enough — you do
+NOT need to step through every value.**
+
+Why one movement suffices. A value list ships as `mc_value_set {row, count,
+first}`, keyed on the **live count**, and a single movement on the value axis
+reports that count outright:
+
+    mcspeak: spoke "Game Version, 2 of 3"
+    mc: horizontal cursor 0 -> 1 (item 2 of 3, range 0..2, ...)
+
+One nudge left-or-right gives `count` (and the row it belongs to). `first` is
+then found in the corpus offline. Stepping through all of them adds nothing the
+first movement did not already establish.
+
+⭐ **But nudge EVERY row that has values**, because `values_off` and the counts
+differ per row and per screen, and a row never nudged contributes nothing.
+
+⚠ **A value list whose values are GENERATED gets no variant at all** — volume
+sliders, Input Delay, resolutions. Those are quoted live from the game's own
+text instead, so extra movements on them are wasted effort.
+
+⭐ **And the count-keying is load-bearing, visibly so.** The 19:13 run shows
+"Game Version, 2 of 3" while the shipped variant is for a count of **2** — so no
+label was spoken, correctly, rather than a wrong one. A value set is only ever
+added from a MEASURED count for exactly this reason.
+
+### ⭐ A CONCRETE EXAMPLE ALREADY WAITING: Select Game's "Game Version"
+The 19:13 run shows it with **3 values**; the shipped variant covers a count of
+**2** (Japanese / English), so nothing is spoken for the third. The header
+predicted exactly this — "Either" is an online-only option — but the run never
+captured the value TEXT, only the position, so the third value cannot be
+confirmed offline and no variant may be added.
+
+▶ On Select Game, nudge Game Version through its values **with ~1 s between
+each** so the value text lands in a caption. That one row is the shortest path
+from "predicted" to "measured".
+
+⚠ This is the ONE place stepping through values earns its keep: when a row's
+live count DISAGREES with the shipped variant, the values themselves are the
+evidence needed. Everywhere else, one nudge.
+
+### So the per-screen recipe is:
+1. Move DOWN through every row, ~1 s dwell on each (this is what captures the
+   row NAMES — the slow part, and the part that cannot be shortened).
+2. On each row that has a value, nudge RIGHT once (and back if you like).
+3. Move on. Do not walk the value lists.
+
 ## ⭐ THE PACING RULE, restated because it decides most of this
 **~1 second of dwell per row.** A screen walked at ~300 ms produces
 position-only lines and looks exactly like a broken mod. This has been
