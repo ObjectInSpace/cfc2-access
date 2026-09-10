@@ -58,9 +58,10 @@ the mapping from *object* to *position*, and the selection state.
   are logos and its confirm indexes resource-id tables
   (`cfc2-gui-layout-finder`), so the GMD cannot name them.
 - **Music files unread** — ⭐ same. Track names are not in the message corpus.
-  ⚠ The one music-screen capture we have is `"0:00 / 0:00"` (a playback timer),
-  so it is NOT yet established that track titles flow through `setText` at all.
-  That is the first thing to measure, not assume.
+  ⚠ *Written before the run:* the one music-screen capture we had was
+  `"0:00 / 0:00"` (a playback timer), so it was NOT established that track
+  titles flow through `setText`. **ANSWERED YES** — see the step 1 result
+  below; all five tracks are captured with names and durations.
 - **The consent dialog** — ⭐ the only route; it sets no item text, so its
   buttons must come from the tree.
 
@@ -108,3 +109,49 @@ channels that agree is the standard this project has settled on.
 
 Each of those is answerable by step 1 or step 2 **before** any speech code is
 written, which is the point of ordering it this way.
+
+
+## ⭐⭐ STEP 1 ANSWERED (2026-09-10, `docs/run-inst.log`): THE ROUTE WORKS
+
+The live instance set contains **real screen content that the GMD cannot
+reach**. On the music player, five track objects with names AND durations:
+
+    000000002C2F7FA0  "01. Title: Take Your Best Shot"      "2:51"
+    000000002C2DE1A0  "02. Game Select: Overdrive Blaze"    "1:39"
+    000000002C303C80  "03. Gallery: Swayin' Flame"          "3:50"
+    000000002C2BF0C0  "04. Credits: Ode to Fighting Mirage" "2:37"
+    000000002C20F110  "05. Result: The Fire's Respite"      "1:55"
+
+⭐ **Byte-identical addresses AND identical order across both reports.** The
+online submenu items and all eight game titles are captured too.
+
+⛔ The deduped `TEXT SET` stream shows only track 01 -- it collapses repeats.
+The instance set holds all five *because it is keyed by object*. That is
+exactly the difference the design was for, and it is now demonstrated rather
+than argued.
+
+### The join is easier than expected
+The music screen's cursor is a **stack local** (`0x06D7FC58` against a screen at
+`0x2C2C0B50`), so no `values_off` arithmetic -- same as Fighter Awards. It does
+not matter: the cursor INDEX arrives as an argument, and the tracks are
+**numbered in their own text** ("01.", "02."), so position is self-evident and
+capture order need not be trusted at all.
+
+Caller `0x1400b2eBB`, 5 items, currently speaking "2 of 5".
+
+### ⚠ What is still NOT established
+Selection state. The one movement in the window changed **no object's text**, so
+the list is static and the highlight lives elsewhere. For a numbered list that
+does not matter -- index + numbered text is enough -- but for Gallery (logos,
+unnumbered) it will.
+
+## ⛔⛔ TWO DEFECTS THE RUN EXPOSED IN THE PROBE ITSELF
+
+1. **The table filled and stayed full: 64 entries, 3600 dropped.** It never
+   forgets, so it accumulates every screen ever visited and the newest screen's
+   objects are the ones that get dropped -- the exact inverse of what is wanted.
+   30 of 64 entries were STALE (freed objects from earlier screens).
+2. **A stale entry holds its slot forever.** Re-validation correctly labels them
+   STALE, but nothing reclaims the slot.
+
+Both must be fixed before step 2, or a longer session measures nothing.

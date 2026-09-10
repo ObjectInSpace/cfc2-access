@@ -719,6 +719,51 @@ int main(void)
               strcmp(t_c, "Music") == 0 && sets_c == 2, d);
     }
 
+    /* --- case 21: the instance table FORGETS the oldest ------------------
+     * ⛔⛔ FROM A REAL RUN. The first version filled all 64 slots and then
+     * dropped 3600 objects -- and the ones dropped were the NEWEST, i.e. the
+     * screen the user was actually on. 30 of 64 entries were stale objects
+     * from screens left long ago. A table that never forgets measures the past.
+     *
+     * ⚠ Asserted on the PROPERTY that matters: after overflowing, the most
+     * RECENT object must still be findable. "It evicted something" is not the
+     * claim; "the current screen survives" is. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG objs[200];
+        int kept_recent = 1;
+
+        /* Fill well past the cap, bumping the move sequence as a real session
+         * does, so evictions have an age to sort on. */
+        for (int i = 0; i < 200; i++) {
+            objs[i] = GT_VTABLE_ADDR;
+            if ((i % 8) == 0)
+                gt_note_focus_move();
+            char s[32];
+            snprintf(s, sizeof s, "Item %d", i);
+            gt_test_settext_body(&objs[i], s, NULL, 0);
+        }
+
+        /* The LAST few objects written must still be present. */
+        for (int i = 195; i < 200; i++) {
+            char got[GT_CAPTION_MAX] = { 0 }, want[32];
+            snprintf(want, sizeof want, "Item %d", i);
+            if (!gt_test_instance_text(&objs[i], got, sizeof got) ||
+                strcmp(got, want) != 0)
+                kept_recent = 0;
+        }
+        /* And the very first must be gone -- otherwise nothing was evicted. */
+        char first[GT_CAPTION_MAX] = { 0 };
+        int first_sets = gt_test_instance_text(&objs[0], first, sizeof first);
+
+        char d[200];
+        snprintf(d, sizeof d, "recent kept=%d, oldest still present=%d (\"%s\")",
+                 kept_recent, first_sets, first);
+        check("case 21: the table forgets the OLDEST, never the newest",
+              kept_recent && first_sets == 0, d);
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",

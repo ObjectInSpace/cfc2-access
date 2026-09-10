@@ -144,7 +144,10 @@ typedef struct {
 static gt_instance   g_inst[GT_INST_MAX];
 static volatile LONG g_inst_count;
 static volatile LONG g_inst_busy;
-static volatile LONG g_inst_dropped;
+/* ⭐ EVICTIONS, not drops. The table now replaces its oldest entry rather than
+ * refusing new ones, so nothing is lost silently -- a high count just means the
+ * session has visited many screens, which is expected. */
+static volatile LONG g_inst_evicted;
 
 #define GT_FOCUS_MAX 48
 /* The header promises callers this size; a mismatch would silently truncate
@@ -409,14 +412,39 @@ static void *settext_body(int which, pfn_settext real, void *self,
                         g_inst[n].sets = 0;
                         InterlockedExchange(&g_inst_count, n + 1);
                         i = n;
+                    } else if (i == n) {
+                        /* ⛔⛔ THE TABLE MUST FORGET. The first run filled all
+                         * 64 slots and then dropped 3600 objects -- and the
+                         * ones dropped were the NEWEST, i.e. the screen the
+                         * user is actually on. 30 of 64 entries were STALE
+                         * objects from screens left long ago.
+                         *
+                         * ⭐ Evict the OLDEST entry by move_seq. A GUI object
+                         * is freed on a screen change, so an entry last
+                         * touched many movements ago is almost certainly dead;
+                         * the current screen's objects are re-set constantly
+                         * and stay. This keeps the table tracking the present
+                         * instead of the past.
+                         *
+                         * ⚠ Cheap linear scan: 64 entries on a render-thread
+                         * hook that already walks the table to find `self`, so
+                         * the cost is the same order as the lookup above. */
+                        LONG oldest = 0;
+                        for (LONG k = 1; k < GT_INST_MAX; k++) {
+                            if (g_inst[k].move_seq < g_inst[oldest].move_seq)
+                                oldest = k;
+                        }
+                        g_inst[oldest].obj = self;
+                        g_inst[oldest].sets = 0;
+                        g_inst[oldest].text[0] = 0;
+                        i = oldest;
+                        InterlockedIncrement(&g_inst_evicted);
                     }
                     if (i < GT_INST_MAX && g_inst[i].obj == self) {
                         memcpy(g_inst[i].text, buf, GT_TEXT_MAX - 1);
                         g_inst[i].text[GT_TEXT_MAX - 1] = 0;
                         g_inst[i].move_seq = g_move_seq;
                         g_inst[i].sets++;
-                    } else if (i == n) {
-                        InterlockedIncrement(&g_inst_dropped);
                     }
                     InterlockedExchange(&g_inst_busy, 0);
                 }
@@ -807,7 +835,7 @@ void gt_instance_report(void)
         return;
     }
     n = g_inst_count;
-    dropped = g_inst_dropped;
+    dropped = g_inst_evicted;
 
     log_line("gt: === INSTANCE SET: %ld live text object(s), %ld dropped "
              "(table full) ===", n, dropped);
@@ -1524,7 +1552,7 @@ void gt_test_reset(void)
     /* ⚠ The focus channel too. A case that inherits the previous case's
      * records would assert against evidence it did not produce -- and would
      * PASS while testing nothing, which is the worst shape of green. */
-    g_inst_count = 0; g_inst_dropped = 0; g_inst_busy = 0;
+    g_inst_count = 0; g_inst_evicted = 0; g_inst_busy = 0;
     for (int i = 0; i < GT_INST_MAX; i++) {
         g_inst[i].obj = NULL; g_inst[i].text[0] = 0;
         g_inst[i].move_seq = 0; g_inst[i].sets = 0;
