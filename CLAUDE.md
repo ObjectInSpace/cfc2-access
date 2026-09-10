@@ -109,6 +109,26 @@ screen at caller `0x14009BA21` produced none at all (setText froze at 306
 across its 7 movements). So the caption channel SUPPLEMENTS cursor+GMD; it does
 not replace it. Do not build anything that assumes every row has one.
 
+### ⭐⭐ ONLINE PLAY IS NAMED (23:13 run) -- and a caller serves TWO screens
+
+`0x14009ba21` shipped as "Select Mode" (3 items) and is **also Online Play**
+(6 items). Across two runs it appeared **15 times, always at 6, never at 3**.
+The generic cursor helper is shared, so **a call site is NOT a unique screen
+identity** -- `menu_speak_lookup_n(caller, count)` now discriminates.
+
+⚠⚠ This is the exact caller a GUESSED row was once shipped for. The reason that
+guess failed is now visible: it really is two screens.
+
+Online Play's map is **non-contiguous** -- `{68, 69, 70, 71, 1076, 1078}`, rows
+5-6 sitting ~1000 labels from rows 1-4. No base could have named it, and
+`name_screens.py` correctly reported ⛔ SIGHTINGS DISAGREE rather than picking
+one. Every label came from a caption the game set on that row.
+
+⭐ `tools/test_screen_maps.py` validates every map against the real corpus --
+something the C suite CANNOT do (no live GMD in the test process, so it can
+only check that the map path is taken). It rejects any entry that is a `HELP_`
+description, carries markup, or is blank.
+
 ### ▶ NEXT: name the remaining screens as a CLASS
 `docs/naming-screens-generally.md` and `tools/name_screens.py`.
 
