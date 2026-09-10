@@ -81,7 +81,58 @@ before touching that work.
 
 - `src/log.c` — timestamped logging.
 
-## ▶ START HERE (next session): the GUI text reader WORKS -- now use it
+## ▶▶ START HERE: DEPLOYED AND WAITING FOR ONE RUN
+
+Items 1-4 of the plan are built, tested offline and **deployed**. The mod now
+speaks the focused row's own description after its name:
+
+    "Offline Play, 1 of 6. Play offline."
+
+**Nothing to press.** Launch, walk the menus, then read `CFC2Access.log`.
+
+### What the run answers -- item 4's OPEN question
+Do per-ROW captions actually flow through `setText` as the cursor moves? The
+corpus proves the strings EXIST and are distinct; it does **not** prove the
+game sets one per row change (the 21:19 run saw 6 distinct strings from 324
+calls). Look for `gt: === FOCUS RECORD` at beats 10/30/60:
+
+- **A DIFFERENT prose string under each successive `[move N]`** -> captions DO
+  track the cursor. The feature works and the channel is real.
+- **The same few strings repeating across many move numbers** -> they do NOT.
+  That is a clean NO, not a failure: the cursor+GMD channel stays the only
+  item-name source, and the caption code should then be reconsidered.
+- **`⚠ focus recorder INCONCLUSIVE`** -> the cursor hook never notified the
+  recorder. Nothing can be concluded; fix that before reading anything else.
+
+Also check `mcspeak:` lines for `caption AMBIGUOUS` / `caption not in the
+corpus` -- both are the guards refusing to speak, which is correct behaviour,
+but a flood of them means the captured strings are not what we think.
+
+⚠ **A wrong description is indistinguishable from a right one to a blind user.**
+If a caption is ever spoken for the WRONG row, that is a stop-everything bug --
+case 13 in `run_gt_test.ps1` is what guards it offline.
+
+### The offline suites for all of this
+- `.\tools\run_gm_test.ps1` -- markup -> speech (18 cases)
+- `.\tools\run_pi_test.ps1` -- captured text -> GMD label (18 cases)
+- `.\tools\run_gt_test.ps1` -- includes the focus channel (cases 12-18)
+- `python tools\check_markup_parity.py` -- C vs the Python oracle, 239/239
+- Sabotage sweeps: `sabotage_gm.ps1`, `sabotage_pi.ps1`, `sabotage_focus.ps1`
+- ⚠ Run **all 12** `run_*_test.ps1` after any shared-header change: two runners
+  were left un-buildable by this work, and that looks exactly like passing.
+
+### ⭐⭐ What items 1-2 corrected about the plan
+- `<FONT>` occurs in the live captures and in **NO** GMD string (0 of 58310,
+  all 14 languages). The live tag vocabulary is a **superset** of the file's.
+- The help captions are **PER-ROW, not per-screen**. "Choose the game you want
+  to play." is the help for the row `GAME_TITLE`, whose siblings are
+  `HELP_GAME_VERSION` and `HELP_PLAYER`. So it identifies a ROW and implies the
+  screen only by membership -- do not speak it as a screen name.
+- `HELP_<LABEL>` as a rule holds for only **8 of 14** known item labels, so the
+  join is by exact TEXT, never by name. Details in
+  `docs/screen-id-from-prompt-text.md`.
+
+## (older) the GUI text reader WORKS -- now use it
 
 **SOLVED 2026-09-09.** The mod captures the shell's live on-screen text.
 Verified in-game: **324 calls, 324 strings, 0 faults.** Detail in memory
