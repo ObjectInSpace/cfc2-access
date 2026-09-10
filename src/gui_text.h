@@ -202,6 +202,31 @@
  * 32-bit value in edx, so it is NOT a char* for every class that shares this
  * slot. The vptr filter is what makes reading rdx safe, and it is why that
  * filter is kept even though this target is far better than the last five. */
+/* ⭐⭐⭐ IT WORKS -- confirmed live 2026-09-09 21:19.
+ *   324 calls, 324 strings captured, 0 faults, and the overload is named:
+ *   cGUIObjText SLOT 25 (0x1402f0d80). Slot 26 never fires; nor does either
+ *   cGUIObjMessage overload. Hooking one and guessing would have been wrong
+ *   FOUR ways out of four.
+ *
+ * Captured verbatim:
+ *   "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+ *   "Choose the game you want to play.  <SIZE 58><ICON BTN_START></SIZE>
+ *    Training <SIZE 58><ICON BTN_X></SIZE>Game Settings ... Back"
+ *   "P1"
+ *
+ * ⭐ So the shell's text is UTF-8 with inline engine MARKUP: <FONT n>, <SIZE n>
+ * and <ICON NAME> tags, exactly matching the ICON token vocabulary already
+ * catalogued in the GMD corpus. Speaking these raw would read tag soup to the
+ * user; they need stripping, and the ICON names need mapping to spoken words
+ * ("DECIDE" -> the confirm button). That is the next piece of work and it is
+ * ordinary string handling, not reverse engineering.
+ *
+ * ⚠ Note what the strings ARE: whole help/prompt STRIPS, not per-item labels.
+ * A menu row's own caption may come from elsewhere. That is a question for the
+ * next run, not an assumption to bake in here.
+ *
+ */
+
 /* ⛔⛔ THERE ARE FOUR setText FUNCTIONS, NOT ONE, AND I HOOKED ONE OF THEM.
  *
  * The run of 2026-09-09 20:42 said so plainly: 53 objects CONSTRUCTED and
