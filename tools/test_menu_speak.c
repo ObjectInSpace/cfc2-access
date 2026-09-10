@@ -307,6 +307,54 @@ int main(void)
               on && !menu_speak_discovery_enabled(), "");
     }
 
+    /* --- case 9d: is_value_shaped -- the ONLY guard on unverified speech ---
+     * ⭐⭐ On a value axis the mod speaks the captured string WITHOUT matching
+     * it to the corpus, because identification is impossible there ("Off"
+     * occurs 22 times in the GMD; "1024x768" is generated and occurs zero
+     * times). This predicate is what keeps prose and button strips out of that
+     * path, so its NEGATIVES carry the weight.
+     *
+     * ⚠ Real strings from the run of 2026-09-10, both sides. */
+    {
+        static const char *const VALUES[] = {
+            "Off", "On", "1024x768", "English [en]", "Original",
+            "Agree", "Any", "2+", "Borderless Windowed",
+        };
+        static const char *const NOT_VALUES[] = {
+            /* captions -- prose, and they end in a period */
+            "Adjust the volume of background music.",
+            "Change the resolution.",
+            "Play offline.",
+            /* a button strip -- markup */
+            "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back",
+            /* degenerate */
+            "", " ", "\r\n",
+            /* ⛔ EACH GUARD NEEDS A CASE ONLY IT REJECTS. Sabotage showed the
+             * length and markup checks could both be deleted with this suite
+             * still green -- every negative above also ends in a period, so
+             * the punctuation check alone was carrying them. These three end
+             * in no punctuation, so exactly one guard stands between each of
+             * them and the user's ear. */
+            /* long, no punctuation -> only the length cap rejects it */
+            "Set the multiplayer input delay for online matches and lobbies",
+            /* markup, no punctuation, and SHORT enough to pass the length cap
+             * -> only the markup check rejects it. ⚠ The first attempt here
+             * was 41 chars and the cap caught it first, so the markup guard
+             * stayed untested and the sabotage sweep said so. */
+            "<ICON BTN_X>Settings",
+            /* multi-line, no punctuation -> only the newline check rejects it */
+            "Windowed\r\nBorderless",
+        };
+        int bad = 0;
+        for (size_t i = 0; i < sizeof VALUES / sizeof VALUES[0]; i++)
+            if (!menu_speak_test_value_shaped(VALUES[i])) bad++;
+        for (size_t i = 0; i < sizeof NOT_VALUES / sizeof NOT_VALUES[0]; i++)
+            if (menu_speak_test_value_shaped(NOT_VALUES[i])) bad++;
+        check("9d. value-shaped text is admitted, prose and strips are not",
+              !bad && !menu_speak_test_value_shaped(NULL),
+              "%d misclassified", bad);
+    }
+
     /* --- case 9b: the SHARED CALLER is resolved by item count -------------
      * ⭐⭐ 0x14009ba21 serves two screens. The count is what tells them apart,
      * and this asserts the lookup actually uses it -- otherwise case 9's

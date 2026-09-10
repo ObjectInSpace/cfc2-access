@@ -723,6 +723,49 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
     out->named = TRUE;
 }
 
+/* Does this captured string look like a SETTING VALUE rather than prose?
+ *
+ * ⭐ Deliberately strict. This is the one place a string is spoken WITHOUT
+ * corpus verification, so the shape test is what stops a help sentence or a
+ * button strip being read out as if it were a value.
+ *
+ * A value is short, single-line, carries no markup, and does not end in
+ * sentence punctuation -- "Off", "1024x768", "English [en]", "Original".
+ * A caption ("Adjust the volume of background music.") fails on both length
+ * and the terminal period. */
+static BOOL is_value_shaped(const char *s)
+{
+    if (!s || !*s)
+        return FALSE;
+
+    size_t n = strlen(s);
+    if (n > 40)                       /* a sentence, not a value */
+        return FALSE;
+    if (strchr(s, '<'))               /* markup: a strip, not a value */
+        return FALSE;
+    if (strchr(s, '\r') || strchr(s, '\n'))
+        return FALSE;
+
+    char last = s[n - 1];
+    if (last == '.' || last == '?' || last == '!')
+        return FALSE;                 /* prose */
+
+    /* Require at least one printable, non-space character. */
+    for (const char *p = s; *p; p++) {
+        if (!isspace((unsigned char)*p))
+            return TRUE;
+    }
+    return FALSE;
+}
+
+/* Test seam: this predicate is the ONLY guard on speaking a string the corpus
+ * has not verified, so it is exercised directly rather than through a movement
+ * the offline harness cannot stage. */
+BOOL menu_speak_test_value_shaped(const char *s)
+{
+    return is_value_shaped(s);
+}
+
 void menu_speak(const mc_move *m)
 {
     mc_speech sp;
@@ -799,6 +842,44 @@ void menu_speak(const mc_move *m)
                     size_t used = strlen(line);
                     _snprintf(line + used, sizeof(line) - used - 1,
                               ". %s", spoken);
+                    line[sizeof(line) - 1] = '\0';
+                }
+            } else if (!sp.named && sp.axis == MC_AXIS_VALUE &&
+                       is_value_shaped(cap)) {
+                /* ⭐⭐ ON A VALUE AXIS, THE CAPTURED TEXT *IS* THE VALUE.
+                 *
+                 * Changing a setting made the mod say "row 1, 11 of 21" while
+                 * the game was displaying "Off" -- the one word that matters.
+                 * The corpus check was refusing it, and refusing it was wrong
+                 * HERE for a reason that does not apply to captions:
+                 *
+                 *  - "Off" occurs 22 times in the GMD and "On" 18 times, so
+                 *    prompt_identify can never resolve them -- and it does not
+                 *    need to. We are not claiming WHICH label it is; we are
+                 *    repeating the word the game just put on screen.
+                 *  - "1024x768" is not in the corpus AT ALL. Resolutions are
+                 *    generated from the display mode, so a corpus test can
+                 *    never admit them, however many runs we do.
+                 *
+                 * ⚠ THE SAFETY ARGUMENT IS DIFFERENT FROM THE CAPTION ONE, and
+                 * that is why this branch is narrow. A caption is a CLAIM about
+                 * which row you are on, so it must be corpus-verified. A value
+                 * is a QUOTE of what the game displayed in response to the
+                 * movement we are announcing. The failure mode of a wrong quote
+                 * is repeating a stale string, not naming the wrong setting.
+                 *
+                 * ⛔ Guarded four ways: only on MC_AXIS_VALUE (a horizontal
+                 * move that changes a setting), only when the item is NOT
+                 * already named, only for value-SHAPED text (short, single
+                 * line, no markup -- see is_value_shaped), and only for a
+                 * caption stamped with THIS movement, which gt_take_caption
+                 * already enforces. */
+                char spoken[GM_OUT_MAX];
+                gm_speak(cap, spoken, sizeof(spoken));
+                if (spoken[0] && !gm_has_residue(spoken)) {
+                    size_t used = strlen(line);
+                    _snprintf(line + used, sizeof(line) - used - 1,
+                              ", %s", spoken);
                     line[sizeof(line) - 1] = '\0';
                 }
             } else if (id.result == PROMPT_ID_AMBIGUOUS) {

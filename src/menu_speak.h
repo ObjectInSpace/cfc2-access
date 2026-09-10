@@ -298,6 +298,15 @@ void menu_speak_set_discovery(BOOL on);
  * produces. (memory: harness-supplies-the-mechanism) */
 BOOL menu_speak_discovery_enabled(void);
 
+/* Test seam: does a captured string look like a SETTING VALUE?
+ *
+ * ⚠ On a value axis the mod speaks the captured text WITHOUT corpus
+ * verification -- "Off" occurs 22 times in the GMD and "1024x768" not at all,
+ * so identification is impossible and unnecessary: it is a QUOTE of what the
+ * game displayed, not a CLAIM about which row you are on. This predicate is
+ * the only thing keeping prose or a button strip out of that path. */
+BOOL menu_speak_test_value_shaped(const char *s);
+
 /* Test-only: row i of the shipped table, or NULL. Lets the suite check the
  * hand-edited rows for typos and duplicate callers. */
 const mc_screen *menu_speak_row(int i);
