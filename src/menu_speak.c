@@ -152,6 +152,51 @@ static const int g_pc_settings_rows[] = { 218, 219, 1090, 168 };
  * The evidence was already in the log; the rule was wrong. */
 static const int g_sound_settings_rows[] = { 190, 191, 192, 193, 194, 168 };
 
+/* ⭐⭐ NETWORK SETTINGS (Options > Network), 5 rows. Established 2026-09-10
+ * from the game's OWN caption at every position, and corroborated a second way
+ * by the VALUE COUNT of each row:
+ *
+ *   pos 1  idx 202  MENU_OP_MIC          "Adjust your microphone settings."   2 values
+ *   pos 2  idx 206  MENU_OP_CHAT_VOLUME  "Adjust the volume of voice chat."  11 values
+ *   pos 3  idx 208  MENU_OP_FRAME_DELAY  "Set the multiplayer input delay..." 11 values
+ *   pos 4  idx 211  CONNECT_STR          "Select a connection strength."      5 values
+ *   pos 5  idx 168  MENU_OP_DEFAULT      "Reset to default settings."         none
+ *
+ * ⭐ The second source is what makes this more than a caption reading: the row
+ * selector's own index and the derived value-slot index agreed on EVERY move
+ * in the run (values_off 0x35c, slot = base + 4*row). Microphone having 2
+ * values and Connection Strength having 5 is exactly what those labels
+ * predict, and Default having no slot at all is what an ACTION row should do.
+ *
+ * ⛔ Not a contiguous run -- Default sits at 168, ~40 labels before the rest. */
+static const int g_network_settings_rows[] = { 202, 206, 208, 211, 168 };
+
+/* Network Settings VALUE labels, keyed by the LIVE count.
+ *
+ * ⛔ Only the two rows whose values are a real GMD run are listed:
+ *   row 0 Microphone         -> MENU_OP_DISABLE 203 / MENU_OP_ENABLE 204
+ *   row 3 Connection Strength -> CONNECT_STR_00..04 212..216 (Any/2+/3+/4+/5)
+ * Rows 1-2 (Voice Chat Volume, Input Delay) show ELEVEN values each: those are
+ * generated numbers, not labels, and there is no run to point at. They name
+ * nothing here and are spoken by the live-caption quote path instead, which is
+ * the correct division -- a quote of what the game drew, not a claim about a
+ * label that does not exist. */
+static const mc_value_set g_network_values[] = {
+    { 0, 2, 203 },   /* Microphone: Off / On                    -- MEASURED */
+    { 3, 5, 212 },   /* Connection Strength: Any/2+/3+/4+/5      -- MEASURED */
+};
+
+/* Sound Settings VALUE labels.
+ *
+ * ⛔ Only row 4 (Challenger Jingle) has a nameable list: MENU_OP_HERE_SE_00
+ * "Original" / _01 "Remix" at 195-196, and the run measured exactly 2 values
+ * there. Rows 0-3 are the four volume sliders -- 10 generated steps each, no
+ * labels -- and row 5 (Default) has no value slot at all, which the run
+ * confirms by never producing one for it. */
+static const mc_value_set g_sound_values[] = {
+    { 4, 2, 195 },   /* Challenger Jingle: Original / Remix      -- MEASURED */
+};
+
 /* ⚠⚠ CANDIDATE ONLY -- NOT REFERENCED BY ANY SHIPPED ROW.
  *
  * The 3-item horizontal screen at caller 0x1400b2729 loads the layout
@@ -277,13 +322,75 @@ static const mc_screen g_screens[] = {
       MC_LIST, 0, g_online_play_rows, 6, NULL, 0 },
 
     /* ⭐ PC Settings -- 4 rows, every one named by its own live caption.
-     * See g_pc_settings_rows for why no base works here. */
+     * See g_pc_settings_rows for why no base works here.
+     *
+     * ⚠ DERIVED FROM A RUN, NOT YET HEARD BACK. Both this row and Sound
+     * Settings below were built from the captions in the 2026-09-10 log and
+     * shipped without a confirming run -- the user chose to verify later. The
+     * per-position evidence is as strong as any row here, but "spoke the right
+     * thing on screen" is a separate claim from "the map matches the corpus",
+     * and only the second has been checked. If a row here ever reads wrong,
+     * suspect the POSITION ORDER first: the labels are certain, their order is
+     * what a run would confirm. */
+    /* ⭐⭐ MC_SETTINGS_ROW, not MC_LIST. This is the ROW half of a settings
+     * screen -- 0x1400a1757 below is its VALUE half, and the two are linked by
+     * this identical `name` string (menu_speak_sibling_row). Being the row
+     * half is what lets the value site say "Display, Windowed, 1 of 3" instead
+     * of a bare position. */
     { 0x1400a1715ULL, -1, 4, "PC Settings", MC_VERIFIED_LIVE_TEXT,
-      MC_LIST, 0, g_pc_settings_rows, 4, NULL, 0 },
+      MC_SETTINGS_ROW, 0, g_pc_settings_rows, 4, NULL, 0 },
 
-    /* ⭐ Sound Settings -- 6 rows, every one named by its own live caption. */
+    /* ⭐ Sound Settings -- 6 rows, every one named by its own live caption,
+     * and the row ORDER corroborated by the value-slot arithmetic: the row
+     * selector's index and (cursor - screen - 0x358)/4 agreed on every move.
+     *
+     * ⚠ Same ⚠ as PC Settings above: derived from a run, not yet heard back. */
     { 0x1400a2729ULL, -1, 6, "Sound Settings", MC_VERIFIED_LIVE_TEXT,
-      MC_LIST, 0, g_sound_settings_rows, 6, NULL, 0 },
+      MC_SETTINGS_ROW, 0, g_sound_settings_rows, 6, NULL, 0 },
+
+    /* ⭐ Sound Settings -- the VALUE half.
+     *
+     * ⚠ values_off is 0x358, NOT the 0x338 that PC Settings and Select Game
+     * use. Read from this screen's own offsets in the log (row 0 -> +0x358,
+     * row 4 -> +0x368), which is exactly why the header insists this be read
+     * per screen and never copied. */
+    { 0x1400a2771ULL, -1, 0, "Sound Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x358, NULL, 0, g_sound_values,
+      (int)(sizeof(g_sound_values) / sizeof(g_sound_values[0])) },
+
+    /* ⭐⭐ NETWORK SETTINGS -- the ROW half. See g_network_settings_rows. */
+    { 0x14009f48eULL, -1, 5, "Network Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_ROW, 0, g_network_settings_rows, 5, NULL, 0 },
+
+    /* ⭐⭐ NETWORK SETTINGS -- the VALUE half.
+     *
+     * ⚠ values_off 0x35c, and note this screen's ROW cursor is at +0x334
+     * rather than the +0x330 the others use -- two more reasons never to
+     * assume one settings screen's offsets apply to another. */
+    { 0x14009f4c1ULL, -1, 0, "Network Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x35c, NULL, 0, g_network_values,
+      (int)(sizeof(g_network_values) / sizeof(g_network_values[0])) },
+
+    /* ⚠⚠ CONTROLS (caller 0x1400a33b8, 6 rows) IS DELIBERATELY ABSENT.
+     *
+     * Its shape is fully measured -- values_off 0x338, and the row selector's
+     * index agreed with (cursor - screen - 0x338)/4 on every move, giving
+     * value counts 14 / 6 / 7 / 6 / 2 for rows 0-4 and none for row 5.
+     *
+     * ⛔ But only ONE of six rows has ever been NAMED: position 4,
+     * MENU_OP_COIN_BTN (551). `nlabels` must equal the live count, so a
+     * 1-of-6 map cannot ship -- it would be refused and name nothing, exactly
+     * like Select Mode's 3-entry map on a 6-item screen.
+     *
+     * ⭐ The blocker is RUN SPEED, not the corpus rules. The run walked this
+     * screen at ~300 ms per row and the game's caption does not arrive before
+     * the next movement; the one row that produced a caption is the one that
+     * was paused on. One slow pass (~1 s per row) completes it.
+     *
+     * ⚠ Strong hypotheses, recorded but NOT shipped: row 0 is Language
+     * (MENU_OP_LANGUAGE 180 -- LANG_NAME_* is exactly 14 labels, matching row
+     * 0's 14 values) and row 2 may be MENU_OP_START_BTN 549. Neither has been
+     * shown on screen at that position. */
 
     /* ⭐ PC Settings -- a row/value screen like Select Game.
      *

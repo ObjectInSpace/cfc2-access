@@ -595,6 +595,69 @@ int main(void)
               (const void *)game, (const void *)ver3, (const void *)ply7);
     }
 
+    /* --- case 20b: the three settings screens are wired correctly --------
+     * ⭐⭐ Each is a ROW half and a VALUE half linked by an identical `name`
+     * string (menu_speak_sibling_row). If that link breaks, the value site
+     * still speaks a value but loses the row name -- "Windowed, 1 of 3"
+     * instead of "Display, Windowed, 1 of 3" -- which is a silent degradation
+     * a count check would never catch.
+     *
+     * ⚠ values_off is asserted per screen because all three DIFFER (0x338 /
+     * 0x358 / 0x35c). Copying one screen's offset to another is the mistake
+     * the header warns about, and it would derive the wrong ROW. */
+    {
+        const mc_screen *pcr = menu_speak_lookup_n(0x1400a1715ULL, 4);
+        const mc_screen *pcv = menu_speak_lookup(0x1400a1757ULL);
+        const mc_screen *sdr = menu_speak_lookup_n(0x1400a2729ULL, 6);
+        const mc_screen *sdv = menu_speak_lookup(0x1400a2771ULL);
+        const mc_screen *ntr = menu_speak_lookup_n(0x14009f48eULL, 5);
+        const mc_screen *ntv = menu_speak_lookup(0x14009f4c1ULL);
+
+        int ok = pcr && pcv && sdr && sdv && ntr && ntv;
+        /* Both halves present, correctly typed, and linked by name. */
+        ok = ok && pcr->kind == MC_SETTINGS_ROW && pcv->kind == MC_SETTINGS_VALUE
+                && sdr->kind == MC_SETTINGS_ROW && sdv->kind == MC_SETTINGS_VALUE
+                && ntr->kind == MC_SETTINGS_ROW && ntv->kind == MC_SETTINGS_VALUE;
+        ok = ok && menu_speak_sibling_row(pcv) == pcr
+                && menu_speak_sibling_row(sdv) == sdr
+                && menu_speak_sibling_row(ntv) == ntr;
+        /* Each screen's OWN offset. */
+        ok = ok && pcv->values_off == 0x338
+                && sdv->values_off == 0x358
+                && ntv->values_off == 0x35c;
+        check("20b. settings screens: both halves, linked by name, own offsets",
+              ok, "pc=%p/%p snd=%p/%p net=%p/%p",
+              (const void *)pcr, (const void *)pcv, (const void *)sdr,
+              (const void *)sdv, (const void *)ntr, (const void *)ntv);
+    }
+
+    /* --- case 20c: the new value variants match on their MEASURED count ---
+     * ⛔ And an UNMEASURED count must refuse, not borrow the nearest list.
+     * The volume rows show 10-11 generated steps with no labels at all; if a
+     * lookup ever returned a variant for those, it would read a neighbouring
+     * setting's words as if they were volume levels. */
+    {
+        const mc_screen *ntv = menu_speak_lookup(0x14009f4c1ULL);
+        const mc_screen *sdv = menu_speak_lookup(0x1400a2771ULL);
+        const mc_value_set *mic  = menu_speak_values_for(ntv, 0, 2);
+        const mc_value_set *conn = menu_speak_values_for(ntv, 3, 5);
+        const mc_value_set *jing = menu_speak_values_for(sdv, 4, 2);
+        /* Measured-but-unlabelled rows must name nothing. */
+        const mc_value_set *chat = menu_speak_values_for(ntv, 1, 11);
+        const mc_value_set *dly  = menu_speak_values_for(ntv, 2, 11);
+        const mc_value_set *vol  = menu_speak_values_for(sdv, 0, 10);
+        /* Default rows have no value slot at all. */
+        const mc_value_set *dflt = menu_speak_values_for(sdv, 5, 2);
+        check("20c. new value variants match measured counts; the rest refuse",
+              mic && mic->first == 203 && conn && conn->first == 212 &&
+              jing && jing->first == 195 &&
+              chat == NULL && dly == NULL && vol == NULL && dflt == NULL,
+              "mic=%p conn=%p jing=%p chat=%p dly=%p vol=%p dflt=%p",
+              (const void *)mic, (const void *)conn, (const void *)jing,
+              (const void *)chat, (const void *)dly, (const void *)vol,
+              (const void *)dflt);
+    }
+
     /* --- case 21: row 0's values are never named ------------------------
      * ⛔ Row 0 must have NO GMD value variant. The eight game titles have no
      * clean run in the GMD, so any base that "looks close" names something

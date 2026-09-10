@@ -45,6 +45,10 @@ EXPECTED = {
     "g_pc_settings_rows": [
         "Resolution", "Display", "VSync", "Default",
     ],
+    "g_network_settings_rows": [
+        "Microphone", "Voice Chat Volume", "Input Delay",
+        "Connection Strength", "Default",
+    ],
     "g_sound_settings_rows": [
         "Music Volume", "Sound Effects Volume", "Announcer Volume",
         "Game Volume", "Challenger Jingle", "Default",
@@ -55,6 +59,33 @@ EXPECTED = {
     "g_game_options_candidate": [
         "Game Settings", "Controller Settings", "Display & Sound Settings",
     ],
+}
+
+# ⭐⭐ VALUE SETS GET THE SAME TREATMENT AS ROW MAPS -- they did not before.
+#
+# An `mc_value_set` is `{row, count, first}`: the values for one row of a
+# settings screen are `count` consecutive GMD labels starting at `first`.
+# Nothing validated their CONTENTS, so a wrong `first` would have spoken the
+# wrong words for a setting with no test catching it -- the same class of bug
+# the row-map check exists to prevent, on the other half of the same screens.
+#
+# Keyed by array name -> {(row, count): [expected value texts in order]}.
+EXPECTED_VALUES = {
+    "g_pcset_values": {
+        (1, 3): ["Windowed", "Borderless Windowed", "Fullscreen"],
+    },
+    "g_network_values": {
+        (0, 2): ["Off", "On"],
+        (3, 5): ["Any", "2+", "3+", "4+", "5"],
+    },
+    "g_sound_values": {
+        (4, 2): ["Original", "Remix"],
+    },
+    "g_select_game_values": {
+        (1, 2): ["Japanese Version", "English Version"],
+        (2, 2): ["P1", "P2"],
+        (2, 4): ["P1", "P2", "P3", "P4"],
+    },
 }
 
 
@@ -121,6 +152,71 @@ def main():
             if got != want:
                 print("        got  : %s" % got)
                 print("        want : %s" % want)
+            failed += 1
+
+    # --- VALUE SETS -------------------------------------------------------
+    # `static const mc_value_set g_x[] = { { row, count, first }, ... };`
+    print()
+    vsets = dict(re.findall(
+        r"static const mc_value_set (g_\w+)\[\]\s*=\s*\{(.*?)\n\};",
+        src, re.S))
+    if not vsets:
+        sys.exit("no mc_value_set tables found -- did the declaration style "
+                 "change? (this check silently passing would be worse than "
+                 "no check)")
+    print("value sets found: %s" % ", ".join(sorted(vsets)))
+    print()
+
+    for name, body in sorted(vsets.items()):
+        want = EXPECTED_VALUES.get(name)
+        checked += 1
+        if want is None:
+            print("FAIL  %s has no expectation here -- add one so a new value "
+                  "set cannot ship unchecked" % name)
+            failed += 1
+            continue
+
+        # Strip comments so a `/* 3 values */` note is not read as data.
+        clean = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+        entries = re.findall(r"\{\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}", clean)
+        bad = []
+        seen = {}
+        for row, count, first in ((int(a), int(b), int(c))
+                                  for a, b, c in entries):
+            texts = []
+            for k in range(count):
+                i = first + k
+                if not (0 <= i < len(labels)):
+                    bad.append("row %d: index %d out of range" % (row, i))
+                    texts.append("<OUT OF RANGE>")
+                    continue
+                lab = labels[i]
+                txt = table[lab]
+                texts.append(txt)
+                # ⛔ A value must be an item-shaped label, exactly as a row is.
+                if lab.startswith("HELP_"):
+                    bad.append("row %d: index %d is %s -- a DESCRIPTION"
+                               % (row, i, lab))
+                if "<" in txt:
+                    bad.append("row %d: index %d carries MARKUP (%s)"
+                               % (row, i, lab))
+                if not txt.strip():
+                    bad.append("row %d: index %d is blank (%s)" % (row, i, lab))
+            seen[(row, count)] = texts
+
+        if seen == want and not bad:
+            print("ok    %-22s %s" % (name, "; ".join(
+                "row %d x%d: %s" % (r, c, " | ".join(v))
+                for (r, c), v in sorted(seen.items()))))
+        else:
+            print("FAIL  %s" % name)
+            for b in bad:
+                print("        %s" % b)
+            if seen != want:
+                for k in sorted(set(seen) | set(want)):
+                    if seen.get(k) != want.get(k):
+                        print("        row %d x%d: got %s want %s"
+                              % (k[0], k[1], seen.get(k), want.get(k)))
             failed += 1
 
     print()
