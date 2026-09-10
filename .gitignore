@@ -1,6 +1,12 @@
 build/
 *.o
 *.log
+# ...but the logs that are TEST DATA are committed. tools/test_name_screens.py
+# reproduces two VERIFIED bases from a real run, and checks the refusal path
+# against a synthetic one; a suite whose inputs are gitignored passes only on
+# the machine that happened to produce them.
+!docs/run-*.log
+!tools/fixtures/*.log
 tools/__pycache__/
 data/text_*.json
 # Dumps of the unpacked game image: large, and game-owned code.
