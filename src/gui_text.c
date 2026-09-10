@@ -911,8 +911,20 @@ void gt_instance_report(void)
         /* ⭐ A POSITIVE count of what was examined, and of what is still a
          * valid object -- "0 live" from 64 entries and from none are entirely
          * different findings. */
+        /* ⭐ STALE COUNT IS NOW A HEALTH READING, not just a description. The
+         * table reclaims dead slots on insert, so a full table still carrying
+         * many stale entries means reclaim is not keeping up (or is broken) --
+         * and the numbered-item lookup depends on this table holding the
+         * CURRENT screen. Saying so in the log is what makes the next run able
+         * to answer it without another code change. */
         log_line("gt: of %ld object(s): %ld still LIVE, %ld stale; current "
                  "move seq %ld.", n, live, stale, seq);
+        if (n >= GT_INST_MAX)
+            log_line("gt: ⚠ the table is FULL (%ld slots, %ld eviction(s) so "
+                     "far). %ld stale entr%s present -- dead slots are "
+                     "reclaimed before live ones, so a large stale count here "
+                     "means reclaim is not keeping up.",
+                     n, dropped, stale, stale == 1 ? "y" : "ies");
         log_line("gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per "
                  "menu row of the screen you are on, the instance route works "
                  "and item names can come from here for ANY screen -- Gallery, "
