@@ -148,6 +148,23 @@ static const int g_mode_select_rows[] = { 4105, 4106, 4107 };
  * (The gap 68,69,?,71 also predicts 70, but a prediction is not why it ships.) */
 static const int g_online_play_rows[] = { 68, 69, 70, 71, 1076, 1078 };
 
+/* ⭐⭐ THE LOBBY MENU (Online Play > Custom Match), caller 0x140083e09, 3 items.
+ * Established 2026-09-10 from the 17:32 run -- EVERY position named by the
+ * game's own caption on that row, 7 sightings, no gaps:
+ *
+ *   pos 1  'Select game rules and create your own lobby.' -> CREATE_LOBBY   78
+ *   pos 2  'Select game rules and join another player's.' -> JOIN_LOBBY     79
+ *   pos 3  "Search for another player's lobby by ID."     -> SEARCH_LOBBY_ID 80
+ *
+ * ⭐ A contiguous run, so base 78 would also reach it -- but the map is what
+ * the evidence actually supports, and a map cannot drift onto a neighbouring
+ * label if the run is ever reordered. Same standard as every other row here.
+ *
+ * ⚠ This is the 78-80 "lobby" cluster predicted in docs/naming-screens-
+ * generally.md. ⭐ The prediction is NOT why it ships -- each position was
+ * independently confirmed by its own caption; the cluster merely agrees. */
+static const int g_lobby_rows[] = { 78, 79, 80 };
+
 /* ⭐⭐ PC SETTINGS (Options > PC Settings), 4 rows. Established 2026-09-10 from
  * the game's OWN caption on EVERY position -- not one sighting extrapolated:
  *
@@ -410,6 +427,11 @@ static const mc_screen g_screens[] = {
      * at positions 5 and 6. */
     { 0x14009ba21ULL, -1, 6, "Online Play", MC_VERIFIED_LIVE_TEXT,
       MC_LIST, 0, g_online_play_rows, 6, NULL, 0 },
+
+    /* ⭐⭐ The LOBBY menu (Online Play > Custom Match). See g_lobby_rows: all
+     * three positions named by their own captions across 7 sightings. */
+    { 0x140083e09ULL, -1, 3, "Lobby", MC_VERIFIED_LIVE_TEXT,
+      MC_LIST, 0, g_lobby_rows, 3, NULL, 0 },
 
     /* ⭐⭐ THE MUSIC PLAYER'S TRACK LIST (Museum > Music, after choosing a game).
      *

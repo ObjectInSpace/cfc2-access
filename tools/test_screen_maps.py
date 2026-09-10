@@ -39,6 +39,11 @@ EXPECTED = {
     "g_mode_select_rows": [
         "Arcade Mode", "Versus Mode", "Training Mode",
     ],
+    # Online Play > Custom Match. Every position confirmed by its own caption
+    # in the 2026-09-10 17:32 run (7 sightings, no unverified gaps).
+    "g_lobby_rows": [
+        "Create Lobby", "Join Lobby", "Search Lobby ID",
+    ],
     "g_select_game_rows": [
         "Game", "Game Version", "Player",
     ],
