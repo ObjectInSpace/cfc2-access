@@ -202,7 +202,43 @@
  * 32-bit value in edx, so it is NOT a char* for every class that shares this
  * slot. The vptr filter is what makes reading rdx safe, and it is why that
  * filter is kept even though this target is far better than the last five. */
-#define GT_SETTEXT_ADDR  0x1402f0b50ULL
+/* ⛔⛔ THERE ARE FOUR setText FUNCTIONS, NOT ONE, AND I HOOKED ONE OF THEM.
+ *
+ * The run of 2026-09-09 20:42 said so plainly: 53 objects CONSTRUCTED and
+ * setText ran ZERO times. The class was right; the overload was not.
+ *
+ * All four write the same field (+0xd0) and share an identical prologue and
+ * signature. They sit at slots 25 and 26 of TWO different classes:
+ *
+ *     cGUIObjText    vtable 0x141056b40   slot 25 = 0x1402f0d80
+ *                                         slot 26 = 0x1402f0b50   <- hooked
+ *     cGUIObjMessage vtable 0x141056c50   slot 25 = 0x1402f0e50
+ *                                         slot 26 = 0x1402f0c40
+ *
+ * ⭐ And cGUIObjMessage is if anything the MORE likely holder of menu label
+ * text -- its factory (0x1402ef930) allocates 0x1e0 bytes and stamps
+ * 0x141056c50, the vtable I spent two runs misattributing to cGUIObjText.
+ *
+ * ⚠ THE MISTAKE, AND IT IS THE SAME ONE AGAIN: I found A writer, confirmed it
+ * was real, and stopped -- without asking whether it was the ONLY one. The
+ * offline evidence for four was there the whole time: my own +0xd0 scan listed
+ * SIX writers, and I followed exactly one of them.
+ *
+ * ⭐ So hook all four and let the run say which fires. Four hooks cost nothing
+ * extra -- the vptr filter already discriminates, and each carries its own
+ * counter, so the log names the overload the shell actually uses instead of
+ * leaving another guess to be paid for with a launch. */
+#define GT_SETTEXT_COUNT 4
+#define GT_SETTEXT_A     0x1402f0d80ULL   /* cGUIObjText    slot 25 */
+#define GT_SETTEXT_B     0x1402f0b50ULL   /* cGUIObjText    slot 26 */
+#define GT_SETTEXT_C     0x1402f0e50ULL   /* cGUIObjMessage slot 25 */
+#define GT_SETTEXT_D     0x1402f0c40ULL   /* cGUIObjMessage slot 26 */
+
+/* cGUIObjMessage's instance vtable, so its objects pass the filter too. Its
+ * factory 0x1402ef930 allocates 0x1e0 and stamps this. */
+#define GT_VTABLE_MSG    0x141056c50ULL
+
+#define GT_SETTEXT_ADDR  GT_SETTEXT_B
 #define GT_SETTEXT_SLOT  26
 
 /* ⚠ Slot 13 of the REAL instance vtable (0x141056b40). The old value
@@ -330,6 +366,11 @@ typedef struct {
      * different faults you are looking at: 0 calls means the hook never fired;
      * many calls with 0 texts means the vptr filter rejected them all. */
     LONG  settext_calls;
+
+    /* ⭐ Per-overload counts, in the order cGUIObjText.25, .26,
+     * cGUIObjMessage.25, .26. The previous run could only say "setText ran 0
+     * times" because one of four was hooked; this says WHICH fires. */
+    LONG  settext_each[GT_SETTEXT_COUNT];
 } gt_stats;
 
 void gt_get_stats(gt_stats *out);

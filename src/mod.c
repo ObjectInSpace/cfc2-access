@@ -568,6 +568,16 @@ static DWORD WINAPI worker(LPVOID param)
                            "for objects the vptr filter rejects, or the string "
                            "argument is unreadable. NOT a class problem."
                          : "");
+
+            /* ⭐ WHICH overload. Printed whenever any of them has fired, so a
+             * nonzero total can never leave the reader guessing which of the
+             * four the shell actually uses -- the exact gap that made the
+             * previous run unreadable. */
+            if (gs.settext_calls > 0)
+                log_line("gt:   by overload: cGUIObjText.25=%ld .26=%ld  "
+                         "cGUIObjMessage.25=%ld .26=%ld",
+                         gs.settext_each[0], gs.settext_each[1],
+                         gs.settext_each[2], gs.settext_each[3]);
         }
 
         /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning

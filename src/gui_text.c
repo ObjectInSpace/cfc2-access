@@ -231,22 +231,33 @@ static void *hook_update(void *self, void *arg)
  * here even though the target is right. */
 typedef void *(*pfn_settext)(void *self, const char *s, int a, int b,
                              int c, int d);
-static pfn_settext g_real_settext;
+static pfn_settext g_real_settext_n[GT_SETTEXT_COUNT];   /* the four reals */
+/* ⭐ Per-overload counts. One number per hook, so the log names WHICH of the
+ * four the shell uses instead of leaving it to another run to find out. The
+ * previous run could not answer that, because only one of four was hooked. */
+static volatile LONG g_settext_each[GT_SETTEXT_COUNT];
 
-static void *hook_settext(void *self, const char *s, int a, int b,
-                          int c, int d)
+static void *settext_body(int which, pfn_settext real, void *self,
+                          const char *s, int a, int b, int c, int d)
 {
     InterlockedIncrement(&g_settext_calls);
+    InterlockedIncrement(&g_settext_each[which]);
 
     /* Identify the object before trusting `s`. Two layers, as everywhere in
-     * this file: ask the memory manager, then guard the read. */
+     * this file: ask the memory manager, then guard the read.
+     *
+     * ⭐ BOTH classes are accepted. cGUIObjText and cGUIObjMessage each have
+     * these two overloads, and cGUIObjMessage is if anything the more likely
+     * holder of menu label text. Accepting one and not the other would repeat
+     * the mistake that produced "setText ran 0 times". */
     ULONGLONG vptr = 0;
     BOOL faulted = FALSE;
     BOOL ours = FALSE;
     if (self && !((ULONG_PTR)self & 7u) &&
         mem_readable_run(self, sizeof(vptr)) >= sizeof(vptr)) {
         MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)self);
-        ours = !faulted && vptr == GT_VTABLE_ADDR;
+        ours = !faulted &&
+               (vptr == GT_VTABLE_ADDR || vptr == GT_VTABLE_MSG);
     }
 
     if (ours && s) {
@@ -298,8 +309,32 @@ static void *hook_settext(void *self, const char *s, int a, int b,
         InterlockedIncrement(&g_other_class);
     }
 
-    return g_real_settext(self, s, a, b, c, d);
+    return real(self, s, a, b, c, d);
 }
+
+/* Four thin detours over one body. ⭐ Each passes its own index so the log can
+ * name WHICH overload the shell actually uses -- the question the previous run
+ * could not answer, because only one of the four was hooked. */
+static void *hook_settext_0(void *self, const char *s, int a, int b, int c, int d)
+{ return settext_body(0, g_real_settext_n[0], self, s, a, b, c, d); }
+static void *hook_settext_1(void *self, const char *s, int a, int b, int c, int d)
+{ return settext_body(1, g_real_settext_n[1], self, s, a, b, c, d); }
+static void *hook_settext_2(void *self, const char *s, int a, int b, int c, int d)
+{ return settext_body(2, g_real_settext_n[2], self, s, a, b, c, d); }
+static void *hook_settext_3(void *self, const char *s, int a, int b, int c, int d)
+{ return settext_body(3, g_real_settext_n[3], self, s, a, b, c, d); }
+
+static void *const GT_SETTEXT_HOOKS[GT_SETTEXT_COUNT] = {
+    (void *)&hook_settext_0, (void *)&hook_settext_1,
+    (void *)&hook_settext_2, (void *)&hook_settext_3
+};
+static const ULONGLONG GT_SETTEXT_ADDRS[GT_SETTEXT_COUNT] = {
+    GT_SETTEXT_A, GT_SETTEXT_B, GT_SETTEXT_C, GT_SETTEXT_D
+};
+static const char *const GT_SETTEXT_NAMES[GT_SETTEXT_COUNT] = {
+    "cGUIObjText.25", "cGUIObjText.26",
+    "cGUIObjMessage.25", "cGUIObjMessage.26"
+};
 
 static void *hook_ctor(void *self)
 {
@@ -826,43 +861,65 @@ BOOL gt_install(void)
      * `setText(this, const char *s, ...)`: the string arrives as an ARGUMENT,
      * so there is nothing to guess and nothing to wait for. See the header for
      * how it was derived, and why the vptr filter is still required. */
-    void *x = (void *)(ULONG_PTR)GT_SETTEXT_ADDR;
+    /* ⭐⭐ ALL FOUR OVERLOADS. The previous run hooked one and reported
+     * "setText ran 0 times" -- the class was right, the overload was not. All
+     * four write +0xd0 and share this prologue; two belong to cGUIObjText and
+     * two to cGUIObjMessage. Hooking one and guessing is what cost that run. */
     static const BYTE SETTEXT_PROLOGUE[] = { 0x48, 0x89, 0x5c, 0x24, 0x08 };
-    MEMORY_BASIC_INFORMATION xmbi;
-    BYTE xpro[sizeof(SETTEXT_PROLOGUE)];
-    if (VirtualQuery(x, &xmbi, sizeof(xmbi)) != sizeof(xmbi) ||
-        xmbi.State != MEM_COMMIT ||
-        !(xmbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ |
-                          PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))) {
-        log_line("gt: the text setter at 0x%llx is not committed executable "
-                 "memory -- REFUSING. Nothing was written.", GT_SETTEXT_ADDR);
-        g_why = GT_INSTALL_BAD_PROTECT;
-        return FALSE;
+    int settext_installed = 0;
+    for (int i = 0; i < GT_SETTEXT_COUNT; i++) {
+        void *x = (void *)(ULONG_PTR)GT_SETTEXT_ADDRS[i];
+        MEMORY_BASIC_INFORMATION xmbi;
+        BYTE xpro[sizeof(SETTEXT_PROLOGUE)];
+
+        if (VirtualQuery(x, &xmbi, sizeof(xmbi)) != sizeof(xmbi) ||
+            xmbi.State != MEM_COMMIT ||
+            !(xmbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ |
+                              PAGE_EXECUTE_READWRITE |
+                              PAGE_EXECUTE_WRITECOPY))) {
+            log_line("gt: ⚠ %s at 0x%llx is not committed executable memory -- "
+                     "skipped.", GT_SETTEXT_NAMES[i], GT_SETTEXT_ADDRS[i]);
+            continue;
+        }
+        if (!mem_copy(xpro, x, sizeof(xpro)) ||
+            memcmp(xpro, SETTEXT_PROLOGUE, sizeof(xpro)) != 0) {
+            log_line("gt: ⚠ %s at 0x%llx carries %02x %02x %02x %02x %02x, not "
+                     "the expected %02x %02x %02x %02x %02x -- skipped.",
+                     GT_SETTEXT_NAMES[i], GT_SETTEXT_ADDRS[i],
+                     xpro[0], xpro[1], xpro[2], xpro[3], xpro[4],
+                     SETTEXT_PROLOGUE[0], SETTEXT_PROLOGUE[1],
+                     SETTEXT_PROLOGUE[2], SETTEXT_PROLOGUE[3],
+                     SETTEXT_PROLOGUE[4]);
+            continue;
+        }
+        if (MH_CreateHook(x, GT_SETTEXT_HOOKS[i],
+                          (void **)&g_real_settext_n[i]) != MH_OK ||
+            MH_EnableHook(x) != MH_OK) {
+            MH_RemoveHook(x);
+            g_real_settext_n[i] = NULL;
+            log_line("gt: ⚠ could not hook %s at 0x%llx -- skipped.",
+                     GT_SETTEXT_NAMES[i], GT_SETTEXT_ADDRS[i]);
+            continue;
+        }
+        settext_installed++;
     }
-    if (!mem_copy(xpro, x, sizeof(xpro)) ||
-        memcmp(xpro, SETTEXT_PROLOGUE, sizeof(xpro)) != 0) {
-        log_line("gt: the text setter at 0x%llx carries %02x %02x %02x %02x "
-                 "%02x, not the expected %02x %02x %02x %02x %02x -- the "
-                 "offline model does NOT match this build. REFUSING.",
-                 GT_SETTEXT_ADDR, xpro[0], xpro[1], xpro[2], xpro[3], xpro[4],
-                 SETTEXT_PROLOGUE[0], SETTEXT_PROLOGUE[1], SETTEXT_PROLOGUE[2],
-                 SETTEXT_PROLOGUE[3], SETTEXT_PROLOGUE[4]);
-        g_why = GT_INSTALL_BAD_PROLOGUE;
-        return FALSE;
-    }
-    if (MH_CreateHook(x, (void *)&hook_settext,
-                      (void **)&g_real_settext) != MH_OK ||
-        MH_EnableHook(x) != MH_OK) {
-        MH_RemoveHook(x);
-        g_real_settext = NULL;
-        log_line("gt: ⛔ could not hook the text setter at 0x%llx.",
-                 GT_SETTEXT_ADDR);
+
+    /* ⚠ A PARTIAL install is reported, not silently accepted: if only some of
+     * the four are live, a zero from the others means nothing. */
+    if (settext_installed == 0) {
+        log_line("gt: ⛔ none of the %d setText overloads could be hooked.",
+                 GT_SETTEXT_COUNT);
         g_why = GT_INSTALL_MINHOOK_FAILED;
         return FALSE;
     }
-    log_line("gt: hooked the TEXT SETTER at 0x%llx (instance vtable slot %d). "
-             "The label arrives as an ARGUMENT -- no offset to guess, no object "
-             "to wait for.", GT_SETTEXT_ADDR, GT_SETTEXT_SLOT);
+    log_line("gt: hooked %d of %d setText overloads (cGUIObjText slots 25/26, "
+             "cGUIObjMessage slots 25/26). Each carries its own counter, so "
+             "the log will name WHICH one the shell uses.%s",
+             settext_installed, GT_SETTEXT_COUNT,
+             settext_installed < GT_SETTEXT_COUNT
+                 ? "  ⚠ PARTIAL -- a zero from a skipped overload measures "
+                   "nothing."
+                 : "");
 
     /* ⭐ The ctor is the one that must work. Without it there is no census and
      * no instances, so reporting a successful install would be a lie that
@@ -904,11 +961,13 @@ void gt_remove(void)
         MH_RemoveHook(c);
         g_real_ctor = NULL;
     }
-    if (g_real_settext) {
-        void *x = (void *)(ULONG_PTR)GT_SETTEXT_ADDR;
+    for (int i = 0; i < GT_SETTEXT_COUNT; i++) {
+        if (!g_real_settext_n[i])
+            continue;
+        void *x = (void *)(ULONG_PTR)GT_SETTEXT_ADDRS[i];
         MH_DisableHook(x);
         MH_RemoveHook(x);
-        g_real_settext = NULL;
+        g_real_settext_n[i] = NULL;
     }
 
     g_installed = FALSE;
@@ -929,6 +988,9 @@ void gt_get_stats(gt_stats *out)
     out->ctor_hooked = (g_real_ctor != NULL);
     out->with_text   = InterlockedCompareExchange(&g_with_text, 0, 0);
     out->settext_calls = InterlockedCompareExchange(&g_settext_calls, 0, 0);
+    for (int i = 0; i < GT_SETTEXT_COUNT; i++)
+        out->settext_each[i] =
+            InterlockedCompareExchange(&g_settext_each[i], 0, 0);
 }
 
 /* --- test seams ----------------------------------------------------------
@@ -995,11 +1057,15 @@ static void *fake_ctor(void *self)
 
 void *gt_test_settext_body(void *self, const char *s, char *out, int outlen)
 {
+    /* ⭐ Drives the SHIPPING shared body via overload 1 (cGUIObjText slot 26).
+     * All four detours are one-line wrappers over settext_body(), so exercising
+     * one exercises the mechanism; the per-overload counters are what the LIVE
+     * run distinguishes, and no offline test can tell which the game calls. */
     g_sim_ret = (void *)(ULONG_PTR)0xFEEDFACE00112233ULL;
-    pfn_settext saved = g_real_settext;
-    g_real_settext = (pfn_settext)fake_settext;
-    void *r = hook_settext(self, s, 1, 2, 3, 4);
-    g_real_settext = saved;
+    pfn_settext saved = g_real_settext_n[1];
+    g_real_settext_n[1] = (pfn_settext)fake_settext;
+    void *r = settext_body(1, g_real_settext_n[1], self, s, 1, 2, 3, 4);
+    g_real_settext_n[1] = saved;
     if (out && outlen > 0) {
         strncpy(out, g_text_buf, (size_t)outlen - 1);
         out[outlen - 1] = 0;
@@ -1071,6 +1137,7 @@ void gt_test_reset(void)
     g_calls = g_distinct = g_faults = g_wrong_class = 0;
     g_other_class = g_ours = g_ctors = g_with_text = 0;
     g_settext_calls = 0; g_text_ready = 0; g_text_busy = 0;
+    for (int i = 0; i < GT_SETTEXT_COUNT; i++) g_settext_each[i] = 0;
     g_text_last[0] = 0;
     g_text_self = NULL; g_text_buf[0] = 0;
     g_ring_next = 0; g_sweep_at = 0;
