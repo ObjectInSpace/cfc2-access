@@ -154,24 +154,37 @@ claim about a label that does not exist.
 did before -- a wrong `first` would have spoken the wrong words for a setting
 with no test catching it.
 
-### ▶ NEXT RUN: one SLOW pass finishes Options > System
+### ⭐⭐ OPTIONS > SYSTEM IS NAMED (all 6 rows) -- the slow pass worked
 
-⚠⚠ **PAUSE ~1 SECOND ON EACH ROW.** Options > **System** (`0x1400a33b8`, 6
-rows -- ⛔ I earlier mislabelled this screen "Controls"; the log shows the mod
-spoke "System, 1 of 5" immediately before it appeared) yielded
-only 1 of 6 names last run purely because it was walked at **~300 ms per row** --
-the game's caption does not arrive before the next movement, so the mod says
-position only. The single row that worked is the one that was paused on.
-This is a property of the caption channel, not a System-screen quirk: any screen
-walked quickly produces position-only lines and looks like a bug.
+    1  180  Language          2  547  Menu Button    3  549  Start Button
+    4  551  Coin Button       5  182  Data Collection 6  168  Default
 
-Its shape is already measured (`values_off` 0x338; value counts 14/6/7/6/2 for
-rows 0-4, none for row 5). Strong but UNSHIPPED hypotheses: row 0 = Language
-(`LANG_NAME_*` is exactly 14 labels, matching row 0's 14 values), row 2 =
-`MENU_OP_START_BTN`. Neither has been seen on screen at that position.
+Values named where a run exists: the 14 display languages, and Decline/Agree.
+Button rows are controller glyphs, not label runs -- the live-caption quote
+path speaks those.
 
-Also still unconfirmed by ear: the PC/Sound/Network row maps themselves were
-derived from logs, never heard back.
+⚠⚠ **THE PREVIOUS RUN GOT 1 OF 6 WITH IDENTICAL CODE**, because it was walked
+at ~300 ms per row. **A caption needs ~1 s of dwell or it never arrives.**
+Remember this before concluding a screen "has no captions" -- it is a property
+of the channel, not a bug.
+
+⭐ NEW SHAPE: **four** value callers drive this one screen (0x1400a3431,
+0x1400a3538, 0x1400a3578, 0x1400a34a8), sharing values_off 0x338. Each needs
+its own `g_screens` entry and all four must carry the same `name` so
+`menu_speak_sibling_row` finds the row map. Case 20d asserts all four -- a typo
+on the FOURTH is caught only by checking every one.
+
+### ⚠ THE ONE REMAINING SCREEN NEEDS A DIFFERENT CHANNEL
+
+Caller `0x140087cda`, 3 items, the data-sharing consent dialog (reached by
+confirming System > Data Collection). ⛔ **It sets no item text at all** -- only
+its button strip -- so the caption channel can never name it, however slowly it
+is walked.
+
+⚠ SYS_WINDOW_YES2/NO2/PP (29-31: Agree / Decline / Privacy Policy) fit the
+count and the category exactly. **Not shipped** -- that is the shape of guess
+that already mislabelled two screens here. It needs the GUI tree or the
+dialog's own construction.
 
 ### ⛔⛔ THE ACTUAL FIX: the DISCOVERY sweep is OFF by default
 

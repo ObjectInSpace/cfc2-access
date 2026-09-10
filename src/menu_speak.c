@@ -450,6 +450,29 @@ static const mc_screen g_screens[] = {
       MC_SETTINGS_VALUE, 0x35c, NULL, 0, g_network_values,
       (int)(sizeof(g_network_values) / sizeof(g_network_values[0])) },
 
+    /* ⚠⚠ UNNAMED, DELIBERATELY: caller 0x140087cda, 3 items, horizontal.
+     *
+     * Reached from System > Data Collection: the user confirmed that row and
+     * this caller appeared on a NEW screen object -- so it is the data-sharing
+     * consent dialog.
+     *
+     * ⛔ IT SETS NO ITEM TEXT AT ALL. While it was live the only setText was
+     * its button strip ("Confirm / Back"); its three buttons come from layout
+     * data. So the caption channel cannot reach this screen and no amount of
+     * slow walking will name it.
+     *
+     * ⚠ The tempting fit: SYS_WINDOW_YES2 29 "Agree", SYS_WINDOW_NO2 30
+     * "Decline", SYS_WINDOW_PP 31 "Privacy Policy" -- three contiguous labels,
+     * matching the count, and exactly what a data-sharing dialog offers.
+     * ⛔ NOT SHIPPED. That is a hypothesis fitting the COUNT and the CATEGORY,
+     * which is the shape of guess that already put the wrong labels on two
+     * screens here (g_game_options_candidate, and calling this same System
+     * screen "Controls"). Nothing has shown these three on screen.
+     *
+     * ⭐ To settle it, something other than the caption channel is needed --
+     * the GUI tree, or the dialog's own construction. Until then it speaks
+     * position, which is true. */
+
     /* ⭐⭐ OPTIONS > SYSTEM -- the ROW half. See g_system_settings_rows.
      *
      * ⛔ I called this screen "Controls" in earlier notes. It is Options >
