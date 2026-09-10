@@ -10,6 +10,19 @@
 #include "log.h"
 #include "gui_text.h"     /* the live caption channel */
 #include "gui_markup.h"   /* markup -> speech */
+
+/* Discovery-sweep string classification -- see the sweep in
+ * menu_speak_log_unknown(). Each string is judged ONCE and the window test
+ * becomes array arithmetic.
+ *
+ * ⚠ The ceiling is a fixed array, not an allocation, because this runs on the
+ * poll thread and a failed HeapAlloc there is a worse outcome than a bounded
+ * table. The shipped GMD holds 4165 strings; 8192 leaves headroom without
+ * pretending the number is unbounded, and the classification loop clamps to it
+ * rather than writing past the end. */
+#define GMD_MAX_STRINGS 8192
+#define CLS_ITEM  0x01   /* short, no markup, no terminal punctuation */
+#define CLS_BLURB 0x02   /* ends in . ? ! -- a HELP-style sentence     */
 #include "prompt_id.h"    /* which label produced a captured string */
 
 #include <stdio.h>
@@ -1119,22 +1132,106 @@ sweep:
         size_t used = 0;
         int strict = 1;
 
+        /* ⛔⛔ A WALL-CLOCK BUDGET, because every COST ESTIMATE for this sweep
+         * has been wrong -- three times now, all in this direction.
+         *
+         *   - "~1100 bases x 5 lookups"      -> 4.8 s in-game (v3).
+         *   - "one guarded read per byte"    -> 8 s in-game.
+         *   - "under 1 ms, measured"         -> ⛔ 37 SECONDS in-game, on the
+         *     Music screen (9 items) in the run of 2026-09-09 23:13. The user
+         *     heard the mod stop reading and had to navigate blind.
+         *
+         * ⚠ That last one is the important one: it WAS measured, on the real
+         * blob, on the shipping path -- and the benchmark still understated it
+         * by orders of magnitude, because the bench's blob is one clean
+         * allocation while the game's sits on a heap with different page
+         * boundaries, and because the benchmark had drifted from the code (it
+         * still capped at 600 bases and never ran the relaxed second pass).
+         *
+         * ⭐ So stop predicting the cost and MEASURE IT AS IT RUNS. A budget
+         * cannot be wrong about the machine it is running on. The sweep gives
+         * up at 25 ms -- a quarter of the poll interval -- and SAYS it gave up,
+         * because a shortlist truncated by time is a different finding from a
+         * shortlist that is genuinely short.
+         * (memory: measure-dont-predict, budget-cap-what-you-encounter) */
+        LARGE_INTEGER freq, t0;
+        QueryPerformanceFrequency(&freq);
+        QueryPerformanceCounter(&t0);
+        const double BUDGET_MS = 25.0;
+        int timed_out = 0;
+        int bases_examined = 0;
+
+        /* ⭐⭐ CLASSIFY EACH STRING ONCE, not once per window it appears in.
+         *
+         * The sweep asks two yes/no questions of every string: is it
+         * ITEM-shaped (short, no markup, no terminal punctuation) and is it
+         * BLURB-shaped (ends in . ? !). Both depend only on the string, not on
+         * the base -- but the old loop re-read string i once for every window
+         * containing it, so each of 4165 strings was read up to `count` times.
+         * At count=67 that is ~280,000 guarded reads to answer 8330 questions.
+         *
+         * ⭐ One pass answers them all: 4165 reads, then the window test is
+         * pure array arithmetic. That is what makes a full sweep affordable
+         * rather than something the time budget has to cut off at 20%.
+         *
+         * ⚠ The classification is EXACTLY the old predicate, moved -- not a
+         * relaxed version of it. A cheaper filter that admits different
+         * candidates would be a behaviour change wearing a performance
+         * change's clothes. */
+        static unsigned char cls[GMD_MAX_STRINGS];
+        static int cls_valid;
+        static int cls_total;
+        if (!cls_valid || cls_total != total) {
+            int n = total < GMD_MAX_STRINGS ? total : GMD_MAX_STRINGS;
+            for (int i = 0; i < n; i++) {
+                char s[128];
+                unsigned char f = 0;
+                if (gmd_text_by_index(i, s, sizeof(s)) && s[0]) {
+                    size_t L = strlen(s);
+                    char last = s[L - 1];
+                    int terminal = (last == '.' || last == '?' || last == '!');
+                    if (s[0] != '<' && L <= 32 && !terminal)
+                        f |= CLS_ITEM;
+                    if (terminal)
+                        f |= CLS_BLURB;
+                }
+                cls[i] = f;
+            }
+            cls_total = total;
+            cls_valid = 1;
+            log_line("mcspeak: [DISCOVERY] classified %d strings once; "
+                     "the sweep is now array arithmetic.", n);
+        }
+
+        /* ⚠ Sweep only what was CLASSIFIED. If the table ever exceeds the
+         * ceiling, `total` would run past the end of `cls`. Clamping here (and
+         * reporting `swept` below) keeps the bound and the claim honest. */
+        int swept = total < GMD_MAX_STRINGS ? total : GMD_MAX_STRINGS;
+
     again:
         shown = 0;
         used = 0;
         batch[0] = 0;
 
-        for (int base = 0; base + count < total && shown < 8; base++) {
+        for (int base = 0; base + count < swept && shown < 8; base++) {
+            /* Check the clock every 64 bases: often enough to stop promptly,
+             * rare enough that the check itself is not the cost. */
+            if ((base & 63) == 0) {
+                LARGE_INTEGER now;
+                QueryPerformanceCounter(&now);
+                double ms = (now.QuadPart - t0.QuadPart) * 1000.0 /
+                            (double)freq.QuadPart;
+                if (ms > BUDGET_MS) {
+                    timed_out = 1;
+                    break;
+                }
+            }
+            bases_examined++;
             char cur[128];
             int ok = 1;
-            for (int i = 0; i < count && ok; i++) {
-                if (!gmd_text_by_index(base + i, cur, sizeof(cur)) || !cur[0]) {
-                    ok = 0; break;
-                }
-                size_t L = strlen(cur);
-                if (cur[0] == '<' || L > 32 ||
-                    cur[L - 1] == '.' || cur[L - 1] == '?' || cur[L - 1] == '!')
-                    ok = 0;
+            /* The item run: `count` consecutive ITEM-shaped strings. */
+            for (int i = 0; i < count; i++) {
+                if (!(cls[base + i] & CLS_ITEM)) { ok = 0; break; }
             }
             if (!ok)
                 continue;
@@ -1173,15 +1270,10 @@ sweep:
              * re-run relaxed, ONE trailing sentence is enough. See the
              * two-pass logic below for why both exist. */
             int need = strict ? count : 1;
-            for (int i = 0; i < need && ok; i++) {
-                if (!gmd_text_by_index(base + count + i, cur, sizeof(cur)) ||
-                    !cur[0]) {
-                    ok = 0; break;
-                }
-                size_t HL = strlen(cur);
-                if (cur[HL - 1] != '.' && cur[HL - 1] != '?' &&
-                    cur[HL - 1] != '!')
-                    ok = 0;
+            if (base + count + need > swept)
+                continue;
+            for (int i = 0; i < need; i++) {
+                if (!(cls[base + count + i] & CLS_BLURB)) { ok = 0; break; }
             }
             if (!ok)
                 continue;
@@ -1213,10 +1305,29 @@ sweep:
         /* ⭐ Back off rather than report a shortlist that may exclude the
          * answer. Fewer than two survivors means the strict rule was too
          * sharp for this screen's labels. */
-        if (strict && shown < 2) {
+        /* ⚠ Do NOT re-run relaxed after a timeout. The budget is for the whole
+         * discovery event, not per pass -- and a strict pass that ran out of
+         * time has not established that strict "found too little", only that it
+         * did not finish. Backing off there would double the stall AND report a
+         * weaker list on false grounds. */
+        if (strict && shown < 2 && !timed_out) {
             strict = 0;
             goto again;
         }
+
+        /* ⭐ A TRUNCATED SWEEP MUST SAY SO. "3 candidates from 1200 of 4165
+         * bases" and "3 candidates from all 4165" are different findings, and
+         * a reader who cannot tell them apart may conclude the answer is not in
+         * the table when the sweep simply never reached it.
+         * (memory: probe-zero-checked-looks-like-zero-failed) */
+        if (timed_out)
+            log_line("mcspeak: [DISCOVERY] ⚠ caller=0x%llx  sweep STOPPED at "
+                     "the %.0f ms budget after %d of %d bases -- the list below "
+                     "is PARTIAL. Absence from it is NOT evidence. (This budget "
+                     "exists because an unbounded sweep stalled a live run for "
+                     "37 seconds.)",
+                     (unsigned long long)(ULONG_PTR)m->caller,
+                     BUDGET_MS, bases_examined, total);
 
         if (used)
             log_line("mcspeak: [DISCOVERY] caller=0x%llx  position %d of %d; "
@@ -1225,19 +1336,24 @@ sweep:
                      "run, so match the text to the screen): %s",
                      (unsigned long long)(ULONG_PTR)m->caller,
                      off + 1, count,
-                     strict ? "[strict: one blurb per item]"
+                     timed_out ? "[PARTIAL: sweep hit its time budget]"
+                     : strict ? "[strict: one blurb per item]"
                             : "[RELAXED: strict found <2, list is longer and "
                               "weaker]",
                      off + 1, batch);
         else
+            /* ⚠ Report the count ACTUALLY EXAMINED, not `total`. Saying "no
+             * candidate in the first 4165 labels" after a sweep that stopped
+             * at 1200 is a false claim about coverage, and this project has
+             * already shipped a "0 failed" that meant "0 checked". */
             log_line("mcspeak: [DISCOVERY] caller=0x%llx  position %d of %d; "
-                     "no candidate "
-                     "run found in the first %d labels. ⚠ This screen's labels "
-                     "may simply lack the one-blurb-per-item shape this looks "
-                     "for -- absence here is NOT evidence the labels are "
-                     "missing.",
+                     "no candidate run found in %d of %d labels%s. ⚠ This "
+                     "screen's labels may simply lack the one-blurb-per-item "
+                     "shape this looks for -- absence here is NOT evidence the "
+                     "labels are missing.",
                      (unsigned long long)(ULONG_PTR)m->caller,
-                     off + 1, count, total);
+                     off + 1, count, bases_examined, total,
+                     timed_out ? " (sweep hit its time budget)" : "");
     }
 
     /* ⭐ Emit a row in the CURRENT shape, including the fields added for
