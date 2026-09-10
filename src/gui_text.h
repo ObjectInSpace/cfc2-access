@@ -453,6 +453,23 @@ BOOL gt_take_caption(char *out, int outlen);
  * notified us. */
 void gt_focus_report(void);
 
+/* ⭐⭐ Log the LIVE INSTANCE SET: every cGUIObjText the hook has seen, keyed by
+ * OBJECT, with its latest text and whether the pointer is still a valid object.
+ *
+ * Step 1 of docs/gui-instance-route.md. The question: does the live set contain
+ * one text per menu row, and can the focused one be told apart? If so, item
+ * names can come from the instance tree for ANY screen -- including Gallery,
+ * the music list and the consent dialog, which neither the GMD nor the caption
+ * channel can reach.
+ *
+ * ⛔ NOT route 3 again. That anchored on the name POOL (file data, static by
+ * design, closed on a clean negative). This anchors on a pointer the game hands
+ * us in setText -- an object it CONSTRUCTED. Route 3's closing note says the
+ * root must come from "the GUI system's own instance list"; this is that list.
+ *
+ * ⚠ LOGGED, NEVER SPOKEN. A live object set is not yet a row->text mapping. */
+void gt_instance_report(void);
+
 /* --- test seams ----------------------------------------------------------
  * ⭐⭐ The stand-in must NOT re-derive what the shipping code derives. A
  * harness that recomputes the mechanism under test leaves the suite green with
@@ -512,6 +529,11 @@ void gt_test_focus_enable(void);
 /* Test-only: perform the window clear that gt_focus_report() does, so the
  * "recorder does not go blind when full" case can run offline. */
 void gt_test_focus_clear(void);
+
+/* Test seams for the instance set: how many objects, and what does one say?
+ * ⚠ Asserting the LOG TEXT instead would test the formatter, not the table. */
+int gt_test_instance_count(void);
+int gt_test_instance_text(void *obj, char *out, int outlen);
 
 /* ⭐⭐ Is item 4's measurement CONCLUSIVE? Returns FALSE when the cursor side
  * never notified the recorder -- in which case every record carries sequence 0

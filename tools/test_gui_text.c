@@ -679,6 +679,46 @@ int main(void)
               r_full == 48 && got && strcmp(cap, "Play offline.") == 0, d);
     }
 
+    /* --- case 20: the INSTANCE SET is keyed by OBJECT, not by string -------
+     * ⭐⭐ This is what makes it a different measurement from the focus record.
+     * The transcript collapses repeats and keeps no identity; a screen reader
+     * needs "what does each live element currently say?", which only an
+     * object-keyed table answers.
+     *
+     * ⚠ Asserted on the SHAPE: three objects setting text repeatedly must
+     * yield three entries, each holding its LATEST string -- not nine entries,
+     * and not the first value. Getting either wrong makes the whole route's
+     * measurement unreadable. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG a[4], b[4], c[4];
+        a[0] = b[0] = c[0] = GT_VTABLE_ADDR;
+
+        /* Three rows, each written twice -- the second write wins. */
+        gt_test_settext_body(a, "Offline Play", NULL, 0);
+        gt_test_settext_body(b, "Online Play", NULL, 0);
+        gt_test_settext_body(c, "Museum", NULL, 0);
+        gt_test_settext_body(a, "Offline Play", NULL, 0);
+        gt_test_settext_body(b, "Online Play", NULL, 0);
+        gt_test_settext_body(c, "Music", NULL, 0);      /* c CHANGED */
+
+        int n = gt_test_instance_count();
+        /* ⚠ GT_CAPTION_MAX, not GT_TEXT_MAX: the latter is private to the .c
+         * and a compile-time check keeps the two equal. */
+        char t_a[GT_CAPTION_MAX] = { 0 }, t_c[GT_CAPTION_MAX] = { 0 };
+        int sets_a = gt_test_instance_text(a, t_a, sizeof t_a);
+        int sets_c = gt_test_instance_text(c, t_c, sizeof t_c);
+
+        char d[220];
+        snprintf(d, sizeof d,
+                 "objects=%d a=\"%s\"(%d sets) c=\"%s\"(%d sets)",
+                 n, t_a, sets_a, t_c, sets_c);
+        check("case 20: instance set keyed by object, holding the LATEST text",
+              n == 3 && strcmp(t_a, "Offline Play") == 0 && sets_a == 2 &&
+              strcmp(t_c, "Music") == 0 && sets_c == 2, d);
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",

@@ -109,6 +109,43 @@ static char           g_text_last[GT_TEXT_MAX];  /* dedupe: last logged */
  * wrapping, so the earliest evidence after a movement is what survives, and
  * `g_focus_dropped` counts what did not fit. A recorder that silently wraps
  * would show a full buffer whether or not anything was missed. */
+/* ⭐⭐ THE INSTANCE SET -- step 1 of the GUI-instance route
+ * (docs/gui-instance-route.md).
+ *
+ * THE QUESTION: does the set of LIVE cGUIObjText objects contain one text per
+ * menu row, and can the FOCUSED one be told apart? If yes, item names come
+ * from the instance tree for ANY screen -- including Gallery, the music list
+ * and the consent dialog, none of which the GMD or the caption channel can
+ * reach.
+ *
+ * ⛔ WHY THIS IS NOT ROUTE 3 AGAIN. Route 3 anchored on the name POOL, which is
+ * file data parsed out of menu.arc; everything within one hop of it was static
+ * by design and it closed on a clean negative (1789 objects, 0 changes). This
+ * anchors on a pointer the game hands us in setText -- an object it
+ * CONSTRUCTED. Route 3's own closing note says the root must come from "the
+ * GUI system's own instance list, not the layout data". This is that list.
+ *
+ * ⚠ LOGGED ONLY, NOTHING SPOKEN. A set of live objects is not yet a mapping
+ * from row to text: 126 objects are alive in an ordinary session and only some
+ * belong to the current screen. Route 3's lesson is that a reachable,
+ * identifiable structure is not automatically live state, so this measures
+ * before anything is built on it.
+ *
+ * ⚠ Pointers are NOT owned. A GUI object is freed on a screen change, so every
+ * read re-validates the pointer AND the vptr -- the same discipline that caught
+ * a freed-and-reallocated object during the setText hunt. */
+#define GT_INST_MAX 64
+typedef struct {
+    void *obj;
+    char  text[GT_TEXT_MAX];
+    LONG  move_seq;      /* movement current when this text was last set */
+    LONG  sets;          /* how many times setText hit this object */
+} gt_instance;
+static gt_instance   g_inst[GT_INST_MAX];
+static volatile LONG g_inst_count;
+static volatile LONG g_inst_busy;
+static volatile LONG g_inst_dropped;
+
 #define GT_FOCUS_MAX 48
 /* The header promises callers this size; a mismatch would silently truncate
  * captions. Caught at COMPILE time rather than by a comment asking nicely. */
@@ -350,6 +387,39 @@ static void *settext_body(int which, pfn_settext real, void *self,
                     InterlockedExchange(&g_text_busy, 0);
                 }
                 InterlockedIncrement(&g_with_text);
+
+                /* ⭐⭐ THE INSTANCE SET: one entry per OBJECT, latest text.
+                 *
+                 * Distinct from the focus record below, which is an ordered
+                 * TRANSCRIPT of distinct strings. This is keyed by object, so
+                 * it answers "what does each live element currently say?" --
+                 * the question a screen reader needs and the transcript cannot
+                 * answer, because it collapses repeats and keeps no identity.
+                 *
+                 * ⚠ Same try-lock discipline as everything else in this hook:
+                 * never block the render thread, drop rather than wait. */
+                if (InterlockedCompareExchange(&g_inst_busy, 1, 0) == 0) {
+                    LONG n = g_inst_count, i;
+                    for (i = 0; i < n; i++) {
+                        if (g_inst[i].obj == self)
+                            break;
+                    }
+                    if (i == n && n < GT_INST_MAX) {
+                        g_inst[n].obj = self;
+                        g_inst[n].sets = 0;
+                        InterlockedExchange(&g_inst_count, n + 1);
+                        i = n;
+                    }
+                    if (i < GT_INST_MAX && g_inst[i].obj == self) {
+                        memcpy(g_inst[i].text, buf, GT_TEXT_MAX - 1);
+                        g_inst[i].text[GT_TEXT_MAX - 1] = 0;
+                        g_inst[i].move_seq = g_move_seq;
+                        g_inst[i].sets++;
+                    } else if (i == n) {
+                        InterlockedIncrement(&g_inst_dropped);
+                    }
+                    InterlockedExchange(&g_inst_busy, 0);
+                }
 
                 /* ⭐ THE FOCUS RECORD -- a separate, ordered channel. See the
                  * block comment at g_focus. Same discipline as the mailbox: a
@@ -721,6 +791,64 @@ BOOL gt_focus_conclusive(long *records, long *moves)
     /* ⭐ Conclusive only if the cursor side actually notified us. Records
      * without movements cannot answer "do captions track the cursor?" at all. */
     return g_move_notifications > 0;
+}
+
+void gt_instance_report(void)
+{
+    LONG n, dropped;
+
+    if (!g_installed) {
+        log_line("gt: instance set: the hook is not installed; NOTHING was "
+                 "measured.");
+        return;
+    }
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0) {
+        log_line("gt: instance set busy; report skipped this poll.");
+        return;
+    }
+    n = g_inst_count;
+    dropped = g_inst_dropped;
+
+    log_line("gt: === INSTANCE SET: %ld live text object(s), %ld dropped "
+             "(table full) ===", n, dropped);
+
+    {
+        LONG live = 0, stale = 0;
+        LONG seq = g_move_seq;
+        for (LONG i = 0; i < n; i++) {
+            /* ⚠ Re-validate every time. The pointer is not owned and a GUI
+             * object is freed on a screen change; a vptr check is what catches
+             * a freed-and-reallocated slot. */
+            ULONGLONG vptr = 0;
+            BOOL faulted = FALSE;
+            BOOL ours = FALSE;
+            void *o = g_inst[i].obj;
+            if (o && !((ULONG_PTR)o & 7u) &&
+                mem_readable_run(o, sizeof(vptr)) >= sizeof(vptr)) {
+                MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)o);
+                ours = !faulted &&
+                       (vptr == GT_VTABLE_ADDR || vptr == GT_VTABLE_MSG);
+            }
+            if (ours) live++; else stale++;
+
+            log_line("gt:   %p %s [move %ld, %ld set(s)] \"%.70s\"",
+                     o, ours ? "LIVE " : "STALE",
+                     g_inst[i].move_seq, g_inst[i].sets, g_inst[i].text);
+        }
+        /* ⭐ A POSITIVE count of what was examined, and of what is still a
+         * valid object -- "0 live" from 64 entries and from none are entirely
+         * different findings. */
+        log_line("gt: of %ld object(s): %ld still LIVE, %ld stale; current "
+                 "move seq %ld.", n, live, stale, seq);
+        log_line("gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per "
+                 "menu row of the screen you are on, the instance route works "
+                 "and item names can come from here for ANY screen -- Gallery, "
+                 "the music list and the consent dialog included. If the live "
+                 "set is dominated by objects from OTHER screens, the next "
+                 "question is how the game marks the current one. ⚠ Nothing "
+                 "here is spoken; this is a measurement.");
+    }
+    InterlockedExchange(&g_inst_busy, 0);
 }
 
 void gt_focus_report(void)
@@ -1358,6 +1486,29 @@ BOOL gt_test_inspect(const void *buf, SIZE_T len, int *text_offset)
     return inspect_body(buf, len, resolve_test, &ctx, text_offset, FALSE);
 }
 
+/* Test seams for the instance set. The table is static and object-keyed, so a
+ * test must be able to ask "how many objects?" and "what does THIS one say?" --
+ * asserting the log text instead would test the formatter, not the table. */
+int gt_test_instance_count(void)
+{
+    return (int)g_inst_count;
+}
+
+int gt_test_instance_text(void *obj, char *out, int outlen)
+{
+    if (out && outlen > 0) out[0] = 0;
+    for (LONG i = 0; i < g_inst_count; i++) {
+        if (g_inst[i].obj != obj)
+            continue;
+        if (out && outlen > 0) {
+            strncpy(out, g_inst[i].text, (size_t)outlen - 1);
+            out[outlen - 1] = 0;
+        }
+        return (int)g_inst[i].sets;
+    }
+    return 0;
+}
+
 void gt_test_reset(void)
 {
     g_calls = g_distinct = g_faults = g_wrong_class = 0;
@@ -1373,6 +1524,11 @@ void gt_test_reset(void)
     /* ⚠ The focus channel too. A case that inherits the previous case's
      * records would assert against evidence it did not produce -- and would
      * PASS while testing nothing, which is the worst shape of green. */
+    g_inst_count = 0; g_inst_dropped = 0; g_inst_busy = 0;
+    for (int i = 0; i < GT_INST_MAX; i++) {
+        g_inst[i].obj = NULL; g_inst[i].text[0] = 0;
+        g_inst[i].move_seq = 0; g_inst[i].sets = 0;
+    }
     g_focus_count = 0; g_focus_dropped = 0; g_focus_busy = 0;
     g_move_seq = 0; g_move_notifications = 0;
     for (int i = 0; i < GT_FOCUS_MAX; i++) {

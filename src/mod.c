@@ -625,6 +625,13 @@ static DWORD WINAPI worker(LPVOID param)
         if (gt_ok && (beat == 10 || beat % 5 == 0))
             gt_focus_report();
 
+        /* ⭐⭐ The INSTANCE SET -- step 1 of the GUI-instance route. Logged
+         * only, never spoken; see gt_instance_report(). Same cadence as the
+         * focus record so one run carries both, and on the slow beats only
+         * because it prints one line per live object. */
+        if (gt_ok && (beat == 10 || beat % 5 == 0))
+            gt_instance_report();
+
         /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning
          * 1.3 GB, and it duplicated work: gmd_text_ready() already calls
          * gmd_find(), caches the resolved table, and is itself retried by this
