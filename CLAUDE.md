@@ -101,6 +101,29 @@ names the winner rather than leaving it to a guess.
      Training <SIZE 58><ICON BTN_X></SIZE>Game Settings ... Back"
     "P1"
 
+### ⛔⛔ READ THIS FIRST: `docs/rethink-after-gui-text.md`
+Reading the shell's text collapses the chain of inference the speech path was
+built on, so it is worth an architectural look. **But the evidence does NOT
+support "we can read menu items now, delete the table."**
+
+Measured from the 21:19 run: the captured strings are title prompts, button-hint
+strips and captions -- **NOT item labels**. In the same seconds the cursor hook
+correctly spoke "Offline Play, 1 of 6" and "Game, Capcom vs. SNK 2..., 2 of 8",
+names appearing in NONE of the captures. 324 calls yielded only 4 distinct
+objects, and 3 of 6 captures coincided with no cursor movement at all.
+
+⭐ So: TWO COMPLEMENTARY CHANNELS, not a replacement.
+- cursor + GMD answers "which ITEM am I on?"  (keep it; it is verified)
+- setText answers "what does this SCREEN say?"  (new capability)
+
+The new channel is strongest exactly where the old is weakest -- **screen
+identity**. "Choose the game you want to play." names Select Game outright,
+with no caller table and no plausible-but-wrong match. That is the real blocker
+on the ~14 unnamed screens.
+
+⛔ Do NOT delete `g_screens`. Do NOT join setText strings to cursor indices by
+timing (3 of 6 captures had no cursor move). Do NOT speak raw markup.
+
 ### ▶ THE NEXT WORK -- ordinary string handling, not reverse engineering
 1. **Strip the markup.** `<FONT n>`, `<SIZE n>`, `<ICON NAME>` tags must not
    reach the user as tag soup.
