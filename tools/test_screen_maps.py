@@ -42,6 +42,13 @@ EXPECTED = {
     "g_select_game_rows": [
         "Game", "Game Version", "Player",
     ],
+    "g_pc_settings_rows": [
+        "Resolution", "Display", "VSync", "Default",
+    ],
+    "g_sound_settings_rows": [
+        "Music Volume", "Sound Effects Volume", "Announcer Volume",
+        "Game Volume", "Challenger Jingle", "Default",
+    ],
     # ⚠ Declared in the source as a CANDIDATE and referenced by no shipped row.
     # Checked anyway: an unreferenced map is exactly what gets wired up later
     # by someone who assumes it was validated when it was written.

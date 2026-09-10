@@ -131,10 +131,32 @@ def build_caption_index(table):
         stem = k[5:]
         # The stem may name the item directly, or with a MENU_ prefix; both
         # forms occur (OFFLINE_PLAY, but MENU_OP_SYSTEM for HELP_OP_SYSTEM).
+        hit = None
         for cand in (stem, "MENU_" + stem):
             if cand in idx:
-                by_text[table[k]].add((cand, idx[cand]))
+                hit = (cand, idx[cand])
                 break
+
+        # ⭐ THE HELP LABEL IS SOMETIMES ABBREVIATED. Measured in the corpus:
+        #     HELP_OP_BGM_VOL   -> MENU_OP_BGM_VOLUME
+        #     HELP_OP_SE_VOL    -> MENU_OP_SE_VOLUME
+        #     HELP_OP_CHAT_VOL  -> MENU_OP_CHAT_VOLUME
+        # Four sound rows lost their names to this, and no amount of extra
+        # play would have fixed it -- the join rule was wrong, not the
+        # evidence.
+        #
+        # ⛔ ONLY when the prefix matches EXACTLY ONE item. Several matches is
+        # an ambiguity, not a lead, and picking one is the guess this whole
+        # tool exists to avoid. HELP_OP_NETWORK stays unresolved on purpose:
+        # its item is MENU_OP_NET, which no prefix of the stem reaches.
+        if hit is None:
+            pref = "MENU_" + stem
+            cands = [k2 for k2 in labels if k2.startswith(pref)]
+            if len(cands) == 1:
+                hit = (cands[0], idx[cands[0]])
+
+        if hit is not None:
+            by_text[table[k]].add(hit)
 
     out = {}
     for text, hits in by_text.items():

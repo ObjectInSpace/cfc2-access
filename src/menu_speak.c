@@ -118,6 +118,40 @@ static const int g_mode_select_rows[] = { 4105, 4106, 4107 };
  * (The gap 68,69,?,71 also predicts 70, but a prediction is not why it ships.) */
 static const int g_online_play_rows[] = { 68, 69, 70, 71, 1076, 1078 };
 
+/* ⭐⭐ PC SETTINGS (Options > PC Settings), 4 rows. Established 2026-09-10 from
+ * the game's OWN caption on EVERY position -- not one sighting extrapolated:
+ *
+ *   pos 1  idx  218  MENU_OP_PC_RESO   "Change the resolution."
+ *   pos 2  idx  219  MENU_OP_PC_DISP   "Change the display mode."
+ *   pos 3  idx 1090  MENU_OP_PC_VSYNC  "Adjust vertical sync settings."
+ *   pos 4  idx  168  MENU_OP_DEFAULT   "Reset to default settings."
+ *
+ * ⛔ NOT a contiguous run, and the near-miss is instructive: base 218 fits
+ * positions 1-2 and then reads "Windowed" / "Borderless Windowed" -- the
+ * VALUES of the Display setting, not rows. A value label is short, unmarked
+ * and unpunctuated, so it passes every shape test a base validator can apply.
+ * Only a caption per position rules it out. VSync sits ~870 labels away. */
+static const int g_pc_settings_rows[] = { 218, 219, 1090, 168 };
+
+/* ⭐⭐ SOUND SETTINGS (Options > Music), 6 rows. Same standard -- every
+ * position carries its own caption:
+ *
+ *   1  190  MENU_OP_BGM_VOLUME    "Adjust the volume of background music."
+ *   2  191  MENU_OP_SE_VOLUME     "Adjust the volume of sound effects."
+ *   3  192  MENU_OP_VOICE_VOLUME  "Adjust the volume of lines spoken by..."
+ *   4  193  MENU_OP_GAME_VOLUME   "Adjust the overall volume within each..."
+ *   5  194  MENU_OP_HERE_SE       "Set the type of music jingle that plays..."
+ *   6  168  MENU_OP_DEFAULT       "Reset to default settings."
+ *
+ * ⚠ Rows 1-5 ARE contiguous (190..194) but row 6 is at 168, so a base still
+ * cannot address the screen. "Default" being the last row of several settings
+ * screens is why it keeps appearing far from its siblings.
+ *
+ * ⚠ Four of these six were unnameable until the caption join learned that the
+ * HELP label is sometimes ABBREVIATED: HELP_OP_BGM_VOL -> MENU_OP_BGM_VOLUME.
+ * The evidence was already in the log; the rule was wrong. */
+static const int g_sound_settings_rows[] = { 190, 191, 192, 193, 194, 168 };
+
 /* ⚠⚠ CANDIDATE ONLY -- NOT REFERENCED BY ANY SHIPPED ROW.
  *
  * The 3-item horizontal screen at caller 0x1400b2729 loads the layout
@@ -241,6 +275,15 @@ static const mc_screen g_screens[] = {
      * at positions 5 and 6. */
     { 0x14009ba21ULL, -1, 6, "Online Play", MC_VERIFIED_LIVE_TEXT,
       MC_LIST, 0, g_online_play_rows, 6, NULL, 0 },
+
+    /* ⭐ PC Settings -- 4 rows, every one named by its own live caption.
+     * See g_pc_settings_rows for why no base works here. */
+    { 0x1400a1715ULL, -1, 4, "PC Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_LIST, 0, g_pc_settings_rows, 4, NULL, 0 },
+
+    /* ⭐ Sound Settings -- 6 rows, every one named by its own live caption. */
+    { 0x1400a2729ULL, -1, 6, "Sound Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_LIST, 0, g_sound_settings_rows, 6, NULL, 0 },
 
     /* ⭐ PC Settings -- a row/value screen like Select Game.
      *
