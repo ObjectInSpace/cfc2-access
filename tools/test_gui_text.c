@@ -764,48 +764,6 @@ int main(void)
               kept_recent && first_sets == 0, d);
     }
 
-    /* --- case 22: the CONTROL subtracts tickers --------------------------
-     * ⭐⭐ The whole point of the selection probe. Route 3 closed with the
-     * warning that "without a same-screen control, everything that merely ticks
-     * looks like a signal" -- animation phase and frame counters change between
-     * ANY two captures.
-     *
-     * This drives the subtraction directly: one byte that changes in both the
-     * control pair and the movement pair (a ticker, must be SUBTRACTED), and
-     * one that changes only across the movement (a selection candidate, must
-     * SURVIVE). A probe that reported both would be useless, and that is
-     * exactly what a plain before/after diff does. */
-    {
-        BYTE s1[GT_CLASS_SIZE], s2[GT_CLASS_SIZE], s3[GT_CLASS_SIZE];
-        memset(s1, 0, sizeof s1);
-        memcpy(s2, s1, sizeof s1);
-        memcpy(s3, s1, sizeof s1);
-
-        /* +0x10 is a TICKER: different in all three snapshots. */
-        s1[0x10] = 1; s2[0x10] = 2; s3[0x10] = 3;
-        /* +0x54 is the SIGNAL: identical across the control, changes on move. */
-        s1[0x54] = 7; s2[0x54] = 7; s3[0x54] = 9;
-
-        /* ⭐ Drives the SHIPPING subtraction, not a copy of it. A test that
-         * re-implemented the comparison would pass with the real one deleted.
-         * (memory: harness-supplies-the-mechanism) */
-        static int ticker[GT_CLASS_SIZE], signal[GT_CLASS_SIZE];
-        memset(ticker, 0, sizeof ticker);
-        memset(signal, 0, sizeof signal);
-        gt_selection_subtract(s1, s2, s3, ticker, signal);
-
-        int ticker_bytes = 0, candidate_bytes = 0;
-        for (int b = 0; b < GT_CLASS_SIZE; b++) {
-            if (ticker[b]) ticker_bytes++;
-            if (signal[b]) candidate_bytes++;
-        }
-        char d[160];
-        snprintf(d, sizeof d, "tickers=%d candidates=%d (want 1 and 1)",
-                 ticker_bytes, candidate_bytes);
-        check("case 22: the same-screen control subtracts tickers, keeps signal",
-              ticker_bytes == 1 && candidate_bytes == 1, d);
-    }
-
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",

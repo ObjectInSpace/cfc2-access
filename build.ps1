@@ -20,12 +20,12 @@ $minhookSrc = @(
 
 New-Item -ItemType Directory -Force -Path "$root\build" | Out-Null
 
-# ⭐⭐ -Wclobbered EARNS ITS PLACE HERE. This project uses setjmp/longjmp for its
+# ⭐⭐ -Wclobbered EARNS ITS PLACE. This project uses setjmp/longjmp for its
 # fault guard, and a non-volatile local modified between setjmp and the fault is
 # INDETERMINATE afterwards. That exact omission crashed the process once (the
-# "validated span" fast path in gmd_find.c) and was caught a second time, before
-# it ever ran, only because a TEST runner happened to use this flag. The shipping
-# build had no such protection until now.
+# "validated span" fast path in gmd_find.c), and was caught a second time before
+# it ever ran only because a TEST runner happened to use this flag -- the
+# shipping build had no such protection. It compiles clean under it today.
 & $gcc -shared -O2 -Wall -Wextra -Wclobbered -municode `
     -o "$root\build\dinput8.dll" `
     "$root\src\dinput8_proxy.c" "$root\src\mod.c" "$root\src\speech.c" `
