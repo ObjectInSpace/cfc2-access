@@ -340,6 +340,43 @@ int main(void)
               st.other_class == 1, d);
     }
 
+    /* --- case 9f: ⛔⛔ THE HIGH-FREQUENCY CASE THAT BROKE THE FIRST DESIGN --
+     * The first version published through a seq-bracket, copied from
+     * menu_cursor. That channel ticks a few times per keypress; THIS one fired
+     * 167,081 times in four minutes (~650/s) while the reader polls at 10 Hz.
+     * The reader therefore sampled the sequence mid-write almost every time,
+     * discarded the snapshot, and logged NOTHING -- 616 captured strings, zero
+     * lines. The counters said it worked; the log was empty.
+     *
+     * ⭐ The lesson is about copying a pattern across a frequency difference of
+     * four orders of magnitude, and this case pins the fix: after MANY rapid
+     * sets, the reader must still be able to take the LATEST value.
+     *
+     * ⚠ Asserted on the last value specifically, not merely "something was
+     * read" -- a mailbox that hands back a stale entry would pass the weaker
+     * form and be useless in exactly the way the original was. */
+    {
+        gt_test_reset();
+        static ULONGLONG obj[4];
+        obj[0] = GT_VTABLE_ADDR;
+        char got[64] = { 0 };
+        for (int i = 0; i < 500; i++) {
+            char s[32];
+            snprintf(s, sizeof s, "LABEL %d", i);
+            gt_test_settext_body(obj, s, NULL, 0);
+        }
+        /* Drain: the mailbox holds one slot, so this is the most recent set
+         * that the writer managed to publish. */
+        gt_test_take_text(got, sizeof got);
+        gt_stats st;
+        gt_get_stats(&st);
+        char d[192];
+        snprintf(d, sizeof d, "took=\"%s\" (wanted \"LABEL 499\") calls=%ld",
+                 got, st.settext_calls);
+        check("case 9f: 500 rapid sets still deliver the LATEST to the reader",
+              strcmp(got, "LABEL 499") == 0 && st.settext_calls == 500, d);
+    }
+
     /* --- case 9c: ⛔⛔ THE TWO PROLOGUE CONSTANTS ARE NOT THE SAME ---------
      * A run was spent on this. The ctor check reused the update method's
      * prologue constant, and the two differ in ONE byte -- both are
@@ -437,6 +474,11 @@ int main(void)
  *   ctor reuses the update method's prologue     -> ONLY case 9c fails
  *   setter never copies the string               -> ONLY case 9d fails
  *   vptr filter removed from the setter          -> ONLY case 9e fails
+ *   writer leaves the busy flag held             -> ONLY case 9f fails, IN
+ *                                                   SECONDS. Before the spin
+ *                                                   bound it HUNG the suite --
+ *                                                   which in-game is a frozen
+ *                                                   mod, not a missed line.
  *                                                   (in-game this would read
  *                                                    an integer as a char*)
  *                                                   (the real bug, replayed)

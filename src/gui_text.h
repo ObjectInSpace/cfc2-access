@@ -379,6 +379,11 @@ void *gt_test_ctor_body(void *self);
  * Returns the value the stand-in original returned, to prove pass-through. */
 void *gt_test_settext_body(void *self, const char *s, char *out, int outlen);
 
+/* Drain the text mailbox the way the worker does. Returns TRUE if it held
+ * something. ⭐ Exists so a test can prove the READER side works under load --
+ * the half that failed silently in the first live run. */
+BOOL gt_test_take_text(char *out, int outlen);
+
 /* Run the shipping INSPECTOR over a caller-supplied buffer that stands in for
  * an instance, and report what it found. "text_offset" is set to the offset
  * the inspector believes holds the string, or -1 if it reached no conclusion.

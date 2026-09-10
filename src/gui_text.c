@@ -78,8 +78,9 @@ static volatile LONG  g_settext_calls;
 #define GT_TEXT_MAX 256
 static char           g_text_buf[GT_TEXT_MAX];
 static void          *g_text_self;
-static volatile LONG  g_text_seq;
-static LONG           g_text_taken;
+static volatile LONG  g_text_ready;   /* mailbox full */
+static volatile LONG  g_text_busy;    /* claim flag over g_text_buf */
+static char           g_text_last[GT_TEXT_MAX];  /* dedupe: last logged */
 
 /* The most recently seen instance, published for the worker thread.
  *
@@ -259,11 +260,35 @@ static void *hook_settext(void *self, const char *s, int a, int b,
             MEM_GUARDED(f2, memcpy(buf, s, run));
             if (!f2) {
                 buf[run < sizeof(buf) ? run : sizeof(buf) - 1] = '\0';
-                InterlockedIncrement(&g_text_seq);
-                g_text_self = self;
-                strncpy(g_text_buf, buf, sizeof(g_text_buf) - 1);
-                g_text_buf[sizeof(g_text_buf) - 1] = '\0';
-                InterlockedIncrement(&g_text_seq);
+
+                /* ⛔⛔ A SEQ-BRACKET IS THE WRONG TOOL AT THIS FREQUENCY, and
+                 * the first live run proved it: the setter fires ~650 times a
+                 * SECOND (167,081 calls in ~4 minutes), while the worker polls
+                 * every 100 ms. The sequence therefore advanced by hundreds
+                 * between polls and the reader almost always sampled it
+                 * mid-write (odd), so it discarded every snapshot. 616 strings
+                 * were captured and NOT ONE was ever logged.
+                 *
+                 * ⭐ The bracket works for menu_cursor because that channel
+                 * ticks a few times per keypress. Copying a pattern across a
+                 * frequency difference of four orders of magnitude is what
+                 * broke it. A publisher this hot needs a lock the reader can
+                 * actually win, not an optimistic retry.
+                 *
+                 * So: a one-slot mailbox with a claim flag. The hook fills it
+                 * only when it is EMPTY and never blocks; the worker drains it.
+                 * Dropping intermediate strings is correct here -- the same
+                 * label is set hundreds of times a second and we want distinct
+                 * sightings, not a transcript. */
+                if (InterlockedCompareExchange(&g_text_busy, 1, 0) == 0) {
+                    g_text_self = self;
+                    strncpy(g_text_buf, buf, sizeof(g_text_buf) - 1);
+                    g_text_buf[sizeof(g_text_buf) - 1] = 0;
+                    /* Publish LAST: the reader tests this, so it must not see
+                     * a full flag over a half-written buffer. */
+                    InterlockedExchange(&g_text_ready, 1);
+                    InterlockedExchange(&g_text_busy, 0);
+                }
                 InterlockedIncrement(&g_with_text);
             } else {
                 InterlockedIncrement(&g_faults);
@@ -485,6 +510,13 @@ static BOOL inspect_body(const void *obj, SIZE_T len,
  * is freed when its screen changes; a pointer that passed a check a moment ago
  * is not a pointer that is still valid. Caching a check here would be exactly
  * the mistake that killed the game once already. */
+/* ⚠ Now referenced only by the test seam: the shipping code no longer searches
+ * an object for its string, because setText hands it to us. Kept because
+ * gt_test_inspect() still exercises the inspector, and because if a FUTURE
+ * class has to be cracked the same way, this is the machinery to reuse -- with
+ * the caveat that six runs showed searching is the slow route and finding the
+ * writer is the fast one. */
+__attribute__((unused))
 static SIZE_T resolve_live(void *ctx, ULONGLONG addr, char *out, SIZE_T max)
 {
     (void)ctx;
@@ -522,122 +554,63 @@ BOOL gt_poll_and_log(void)
      * ⚠ Logged on OUR thread, never in the detour. The hook copies bytes and
      * returns; formatting and file I/O on the game's render thread is how the
      * discovery sweep starved the mod three times. */
-    LONG t1 = InterlockedCompareExchange(&g_text_seq, 0, 0);
-    if (t1 != g_text_taken && !(t1 & 1)) {
+    if (InterlockedCompareExchange(&g_text_ready, 0, 1) == 1) {
         char  copy[GT_TEXT_MAX];
-        void *who = g_text_self;
+        void *who;
+        /* Take the same claim flag the writer uses, so a hook running right now
+         * cannot overwrite the buffer mid-copy.
+         *
+         * ⛔⛔ BOUNDED, NEVER AN UNBOUNDED SPIN. This was `while (cas != 0);`
+         * with no limit. The writer is the GAME'S render thread: if it is
+         * descheduled while holding the flag, this loop spins on OUR worker
+         * forever and the whole mod freezes -- the same failure mode that
+         * starved this mod three times before. It surfaced when a sabotage test
+         * left the flag held and HUNG the suite; a hang is how an unbounded
+         * wait announces itself, and I would rather it announced itself here.
+         *
+         * ⭐ So bound it and give up. Losing one sighting costs nothing -- the
+         * same label is set hundreds of times a second and the next poll gets
+         * it. A missed log line is invisible; a frozen mod is not. */
+        int spins = 0;
+        while (InterlockedCompareExchange(&g_text_busy, 1, 0) != 0) {
+            if (++spins > 1000) {
+                /* Put the flag back so the value is not lost for good. */
+                InterlockedExchange(&g_text_ready, 1);
+                return FALSE;
+            }
+        }
+        who = g_text_self;
         strncpy(copy, g_text_buf, sizeof(copy) - 1);
-        copy[sizeof(copy) - 1] = '\0';
-        LONG t2 = InterlockedCompareExchange(&g_text_seq, 0, 0);
-        if (t1 == t2) {
-            g_text_taken = t1;
-            log_line("gt: ⭐ TEXT SET on %p: \"%s\"", who, copy);
+        copy[sizeof(copy) - 1] = 0;
+        InterlockedExchange(&g_text_busy, 0);
+
+        /* ⭐ Log only DISTINCT strings. The same label is set hundreds of
+         * times a second; printing every sighting would bury the log and tell
+         * us nothing a single line does not. The count in the stats line is
+         * what carries the volume. */
+        if (strcmp(copy, g_text_last) != 0) {
+            strncpy(g_text_last, copy, sizeof(g_text_last) - 1);
+            g_text_last[sizeof(g_text_last) - 1] = 0;
+            log_line("gt: * TEXT SET on %p: \"%s\"", who, copy);
             return TRUE;
         }
     }
 
-    /* ⭐⭐ SWEEP THE RING, oldest first -- do not inspect at capture time.
+    /* ⛔⛔ THE RING SWEEP IS GONE -- the setter replaced it.
      *
-     * The object is empty when the ctor returns (it zeroes +0x1f8 and +0x200
-     * itself), so a capture-time read is guaranteed to find nothing and would
-     * report a confident negative about objects that had not been filled yet.
-     * Re-reading a remembered instance on a later poll is the whole fix.
+     * It existed to guess WHICH OFFSET held the string, by re-reading captured
+     * objects until one looked populated. That question is answered: the text
+     * arrives as an ARGUMENT to setText, so there is nothing to search for.
      *
-     * ⚠ ONE object per poll. The ring holds 32 and the worker runs every
-     * 100 ms; inspecting all of them per poll would put a 32x528-byte guarded
-     * read on a timer for the life of the session, for no extra information.
-     * Bounded work per tick is the same discipline the discovery sweep needed
-     * after it starved the mod three times. */
-    LONG made = InterlockedCompareExchange(&g_ring_next, 0, 0);
-    if (made == 0)
-        return FALSE;                 /* nothing constructed yet */
-
-    LONG have = made < GT_RING_SIZE ? made : GT_RING_SIZE;
-    if (g_sweep_at >= have)
-        g_sweep_at = 0;               /* wrap and re-examine: they get FILLED */
-    void *self   = g_ring[g_sweep_at];
-    void *caller = g_last_caller;
-    g_sweep_at++;
-    if (!self)
-        return FALSE;
-
-    /* Read the whole object under the guard, ONCE, then work on our copy.
-     * ⭐ One guarded block for 528 bytes, not one per field: read_cstr once did
-     * a VirtualQuery+setjmp per CHARACTER and cost 172 ms where a block read
-     * cost 3.8. Same lesson, applied before it bites this time. */
-    unsigned char obj[GT_CLASS_SIZE];
-    if (mem_readable_run(self, sizeof(obj)) < sizeof(obj) ||
-        !mem_copy(obj, self, sizeof(obj))) {
-        InterlockedIncrement(&g_faults);
-        log_line("gt: instance %p is no longer fully readable -- skipped. "
-                 "(Expected sometimes: GUI objects are freed on a screen "
-                 "change, which is why the pointer is re-checked every time "
-                 "and never cached.)", self);
-        return FALSE;
-    }
-
-    InterlockedIncrement(&g_distinct);
-
-    ULONGLONG vptr;
-    memcpy(&vptr, obj, 8);
-    /* ⭐ A POSITIVE identity check on the copy, not just a plausible shape.
-     * If the vptr is not this class's vtable, the object is not what the hook
-     * promised and every offset below would be measured against the wrong
-     * layout -- say so loudly rather than quietly reporting nonsense. */
-    if (vptr != GT_VTABLE_ADDR) {
-        /* ⛔⛔ REFUSE, do not merely warn. This started as a warning followed
-         * by the full dump, and the first live run showed why that is wrong:
-         * the object was an nGUI::OutlineFont and the dump was 41 lines of
-         * Adobe glyph names, with BOTH "candidate" offsets holding
-         * plausible-looking strings. Nothing there was a menu label, and a
-         * reader skimming for an offset could easily have taken one.
-         *
-         * ⭐ If the code prints a warning, something must FAIL on it -- this
-         * project's own rule. So the wrong class produces a diagnosis and NO
-         * offsets at all, which is the honest output: we did not measure
-         * cGUIObjText, so we have nothing to say about its layout. */
-        InterlockedIncrement(&g_wrong_class);
-        log_line("gt: ⛔ vptr is 0x%llx%s, NOT cGUIObjText's 0x%llx -- this "
-                 "object is NOT the class we hooked for. REFUSING to dump its "
-                 "offsets: they would describe the wrong layout. Fix the hook "
-                 "target; a shared helper reached by a direct call receives "
-                 "its callers' own objects.", vptr,
-                 vptr == GT_VTABLE2_ADDR ? " (nGUI::OutlineFont)" : "",
-                 GT_VTABLE_ADDR);
-        return FALSE;
-    }
-    /* ⭐⭐ INSPECT QUIETLY FIRST, then log only if there is something to say.
+     * ⛔ And it was actively harmful in the run of 2026-09-09 19:35. It printed
+     * a REFUSAL line for every foreign object it swept -- about ten a second,
+     * 1235 in all -- burying the log it was meant to inform. A diagnostic that
+     * fires continuously is noise, not evidence.
      *
-     * ⛔ The ring is re-swept continuously, because an object that is empty now
-     * gets FILLED later -- that is the entire point. So an unconditional dump
-     * would reprint every empty object every 100 ms and bury the one sighting
-     * that matters. Run the inspector silently; log the full detail only when
-     * it actually concludes an offset.
-     *
-     * ⚠ Silence here therefore means "swept, nothing had text yet", which is
-     * NOT the same as "not swept". The counts in mod.c's report carry that
-     * distinction -- swept vs. with-text -- so quiet is never mistaken for
-     * idle. */
-    int off = -1;
-    inspect_body(obj, sizeof(obj), resolve_live, NULL, &off, FALSE);
-    if (off < 0)
-        return FALSE;
-
-    InterlockedIncrement(&g_with_text);
-    log_line("gt: --- cGUIObjText instance %p (ctor caller %p) ---",
-             self, caller);
-    log_line("gt: vptr CONFIRMED 0x%llx -- this really is a cGUIObjText.",
-             vptr);
-
-    /* Re-run with logging now that we know it is worth reading. */
-    inspect_body(obj, sizeof(obj), resolve_live, NULL, &off, TRUE);
-
-    LONG faults = InterlockedCompareExchange(&g_faults, 0, 0);
-    if (faults)
-        log_line("gt: ⚠ %ld guarded read(s) have faulted since install, so "
-                 "this sweep was PARTIAL -- a negative result here is not "
-                 "evidence that no offset holds text.", faults);
-    return TRUE;
+     * ⚠ Its counters (g_distinct, g_with_text, g_wrong_class) are kept and
+     * still reported, so a reader comparing runs does not find them silently
+     * missing. They simply stop moving. */
+    return FALSE;
 }
 
 /* --- install -------------------------------------------------------------
@@ -1034,6 +1007,27 @@ void *gt_test_settext_body(void *self, const char *s, char *out, int outlen)
     return r;
 }
 
+BOOL gt_test_take_text(char *out, int outlen)
+{
+    if (InterlockedCompareExchange(&g_text_ready, 0, 1) != 1)
+        return FALSE;
+    /* ⚠ Bounded, for the same reason as the shipping reader above: a test that
+     * hangs looks exactly like a test that is slow, and one already did. */
+    int spins = 0;
+    while (InterlockedCompareExchange(&g_text_busy, 1, 0) != 0) {
+        if (++spins > 1000) {
+            InterlockedExchange(&g_text_ready, 1);
+            return FALSE;
+        }
+    }
+    if (out && outlen > 0) {
+        strncpy(out, g_text_buf, (size_t)outlen - 1);
+        out[outlen - 1] = 0;
+    }
+    InterlockedExchange(&g_text_busy, 0);
+    return TRUE;
+}
+
 void *gt_test_ctor_body(void *self)
 {
     g_sim_ret = (void *)(ULONG_PTR)0xC0FFEE0011223344ULL;
@@ -1076,7 +1070,8 @@ void gt_test_reset(void)
 {
     g_calls = g_distinct = g_faults = g_wrong_class = 0;
     g_other_class = g_ours = g_ctors = g_with_text = 0;
-    g_settext_calls = 0; g_text_seq = 0; g_text_taken = 0;
+    g_settext_calls = 0; g_text_ready = 0; g_text_busy = 0;
+    g_text_last[0] = 0;
     g_text_self = NULL; g_text_buf[0] = 0;
     g_ring_next = 0; g_sweep_at = 0;
     for (int i = 0; i < GT_RING_SIZE; i++) g_ring[i] = NULL;
