@@ -130,7 +130,7 @@ whether the map belongs to the SCREEN.
 
 ### ⭐⭐ THE OPTIONS SUBMENUS ARE SETTINGS SCREENS (2026-09-10)
 
-Network / Sound / PC Settings / Controls are each a **row selector + value
+System / Music (Sound) / Network / PC Settings are each a **row selector + value
 selectors** sharing one screen object -- `MC_SETTINGS_ROW` + `MC_SETTINGS_VALUE`,
 the shape Select Game already used. They were unnamed only for want of evidence.
 
@@ -154,13 +154,15 @@ claim about a label that does not exist.
 did before -- a wrong `first` would have spoken the wrong words for a setting
 with no test catching it.
 
-### ▶ NEXT RUN: one SLOW pass finishes Controls
+### ▶ NEXT RUN: one SLOW pass finishes Options > System
 
-⚠⚠ **PAUSE ~1 SECOND ON EACH ROW.** Controls (`0x1400a33b8`, 6 rows) yielded
+⚠⚠ **PAUSE ~1 SECOND ON EACH ROW.** Options > **System** (`0x1400a33b8`, 6
+rows -- ⛔ I earlier mislabelled this screen "Controls"; the log shows the mod
+spoke "System, 1 of 5" immediately before it appeared) yielded
 only 1 of 6 names last run purely because it was walked at **~300 ms per row** --
 the game's caption does not arrive before the next movement, so the mod says
 position only. The single row that worked is the one that was paused on.
-This is a property of the caption channel, not a Controls quirk: any screen
+This is a property of the caption channel, not a System-screen quirk: any screen
 walked quickly produces position-only lines and looks like a bug.
 
 Its shape is already measured (`values_off` 0x338; value counts 14/6/7/6/2 for

@@ -412,7 +412,17 @@ static const mc_screen g_screens[] = {
       MC_SETTINGS_VALUE, 0x35c, NULL, 0, g_network_values,
       (int)(sizeof(g_network_values) / sizeof(g_network_values[0])) },
 
-    /* ⚠⚠ CONTROLS (caller 0x1400a33b8, 6 rows) IS DELIBERATELY ABSENT.
+    /* ⚠⚠ SYSTEM (caller 0x1400a33b8, 6 rows) IS DELIBERATELY ABSENT.
+     *
+     * ⛔ I called this screen "Controls" in earlier notes. It is Options >
+     * SYSTEM, and the log settles it in two lines: the mod spoke
+     * "System, 1 of 5" on the Options list, the user confirmed, and this
+     * caller appeared. Options' five rows are System / Music / Network / PC
+     * Settings / Credits (GMD 170..174) -- Music, Network and PC Settings are
+     * all named already, so System was the only submenu left, and naming it
+     * "Controls" was a guess I never checked against the navigation.
+     * ⭐ The screen a caller belongs to is proved by what the user SELECTED to
+     * reach it, and that is in every log for free.
      *
      * Its shape is fully measured -- values_off 0x338, and the row selector's
      * index agreed with (cursor - screen - 0x338)/4 on every move, giving
