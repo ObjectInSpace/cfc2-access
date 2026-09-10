@@ -109,6 +109,25 @@ screen at caller `0x14009BA21` produced none at all (setText froze at 306
 across its 7 movements). So the caption channel SUPPLEMENTS cursor+GMD; it does
 not replace it. Do not build anything that assumes every row has one.
 
+### ⭐⭐ THE STRIP AFTER CHOOSING A GAME = ARCADE / VERSUS / TRAINING
+
+Caller `0x1400b2729`, 3 items, horizontal -- the screen reached after picking a
+game. Now named, from the game's own live text (position 3 "Training Mode",
+position 1 "Arcade Mode"). Position 2 ships on being bracketed by two confirmed
+endpoints plus the ascending option-id setup, which is weaker and is flagged.
+
+⛔⛔ **This killed `g_game_options_candidate`**, a hypothesis held for days:
+"Game Settings / Controller Settings / Display & Sound Settings", reasoned from
+the layout name `11_option/option_2`. It fit the count, the category and the
+non-contiguity -- and was about a different screen. Its own comment had named
+the flaw ("the layout name proves the screen is an options screen, not which
+labels it draws") and I still nearly wired it up.
+
+⚠ Deleted rather than commented out: `tools/test_screen_maps.py` scrapes by
+regex and does **not** skip comments, so it was reporting `ok` for a disproven
+array. Validation confirms a map matches the CORPUS; it says nothing about
+whether the map belongs to the SCREEN.
+
 ### ⭐⭐ THE OPTIONS SUBMENUS ARE SETTINGS SCREENS (2026-09-10)
 
 Network / Sound / PC Settings / Controls are each a **row selector + value
