@@ -689,6 +689,47 @@ int main(void)
               (const void *)rowmap, linked);
     }
 
+    /* --- case 20e: a SCREEN caption is not repeated on every row ---------
+     * ⛔⛔ Fighter Awards sets ONE caption -- "View all of your challenges." --
+     * for all 40 grid positions and all 7 list rows. Once ACHIEVEMENT_*_NAME
+     * entered the prompt table so achievement titles could be spoken, that
+     * static sentence started resolving too, and would have been appended to
+     * every movement.
+     *
+     * ⚠ Driven as a SEQUENCE because the suppressor keeps state. The first
+     * sighting on a screen must SPEAK (it is new information on arrival); an
+     * identical repeat must be suppressed; a screen change must re-arm; and a
+     * screen with genuinely per-row captions must be unaffected. */
+    {
+        const char *AW = "View all of your challenges.";
+        int ok = 1;
+        /* Arrive on Fighter Awards: first sighting speaks. */
+        ok &= (menu_speak_test_caption_repeat(AW, "Fighter Awards") == FALSE);
+        /* Every later row on the SAME screen repeats it -- suppress. */
+        for (int i = 0; i < 5; i++)
+            ok &= (menu_speak_test_caption_repeat(AW, "Fighter Awards") == TRUE);
+        /* A different screen re-arms, even with the same words. */
+        ok &= (menu_speak_test_caption_repeat(AW, "Museum") == FALSE);
+        /* ⭐ A screen with REAL per-row captions is untouched: consecutive
+         * rows differ, so none is suppressed. */
+        ok &= (menu_speak_test_caption_repeat("Play offline.", "Main menu")
+               == FALSE);
+        ok &= (menu_speak_test_caption_repeat("Play online using a network "
+                                              "connection.", "Main menu")
+               == FALSE);
+        ok &= (menu_speak_test_caption_repeat("Browse various art galleries.",
+                                              "Main menu") == FALSE);
+        /* ...but going back to a row you just left still repeats -> suppress,
+         * which is correct: the user just heard it. */
+        ok &= (menu_speak_test_caption_repeat("Browse various art galleries.",
+                                              "Main menu") == TRUE);
+        /* Empty is never spoken. */
+        ok &= (menu_speak_test_caption_repeat("", "Main menu") == TRUE);
+        ok &= (menu_speak_test_caption_repeat(NULL, "Main menu") == TRUE);
+        check("20e. a static SCREEN caption is not repeated on every row",
+              ok, "");
+    }
+
     /* --- case 21: row 0's values are never named ------------------------
      * ⛔ Row 0 must have NO GMD value variant. The eight game titles have no
      * clean run in the GMD, so any base that "looks close" names something

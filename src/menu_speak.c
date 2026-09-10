@@ -986,6 +986,64 @@ BOOL menu_speak_test_value_shaped(const char *s)
     return is_value_shaped(s);
 }
 
+/* ⛔⛔ IS THIS CAPTION THE SCREEN'S, NOT THE ROW'S?
+ *
+ * A per-row caption is the whole point of the channel. A caption that does NOT
+ * change as the cursor moves is describing the SCREEN, and repeating it after
+ * every movement is pure noise -- worse on a long list, where the user hears
+ * the same sentence 40 times while trying to scan.
+ *
+ * ⚠ MEASURED, not hypothetical. Fighter Awards sets "View all of your
+ * challenges." and nothing else: eight different rows across two lists, one
+ * caption. Once ACHIEVEMENT_*_NAME entered the prompt table (so the achievement
+ * titles could be spoken), that static sentence started resolving too and would
+ * have been appended to all 40 grid positions.
+ *
+ * ⭐ gt_take_caption already refuses markup STRIPS on exactly this reasoning --
+ * "the strip describes the screen and does not change per row". The principle
+ * was right and the test was too narrow: it keyed on markup, and this one is
+ * plain prose. So test the PROPERTY directly -- did it change? -- rather than a
+ * proxy for it.
+ *
+ * The rule: the FIRST sighting on a screen is spoken (it is genuinely new
+ * information on arrival), and an identical repeat is suppressed until either
+ * the caption or the screen changes. A screen with real per-row captions is
+ * unaffected, because consecutive rows differ. */
+static BOOL caption_is_stale_repeat(const char *cap, const char *screen_name)
+{
+    static char last_cap[GT_CAPTION_MAX];
+    static char last_screen[64];
+
+    if (!cap || !*cap)
+        return TRUE;
+
+    /* A change of screen always re-arms: arriving somewhere new, the caption is
+     * information even if the words happen to match. */
+    const char *scr = screen_name ? screen_name : "";
+    if (strcmp(scr, last_screen) != 0) {
+        strncpy(last_screen, scr, sizeof(last_screen) - 1);
+        last_screen[sizeof(last_screen) - 1] = '\0';
+        strncpy(last_cap, cap, sizeof(last_cap) - 1);
+        last_cap[sizeof(last_cap) - 1] = '\0';
+        return FALSE;                      /* first sighting here -- speak it */
+    }
+
+    if (strcmp(cap, last_cap) == 0)
+        return TRUE;                       /* unchanged -- the screen's, not
+                                              this row's */
+
+    strncpy(last_cap, cap, sizeof(last_cap) - 1);
+    last_cap[sizeof(last_cap) - 1] = '\0';
+    return FALSE;
+}
+
+/* Test seam: the suppressor keeps static state, so a test must be able to
+ * drive it as a sequence rather than one call at a time. */
+BOOL menu_speak_test_caption_repeat(const char *cap, const char *screen_name)
+{
+    return caption_is_stale_repeat(cap, screen_name);
+}
+
 void menu_speak(const mc_move *m)
 {
     mc_speech sp;
@@ -1053,7 +1111,8 @@ void menu_speak(const mc_move *m)
      * worst case is silence, never a caption belonging to another row. */
     {
         char cap[GT_CAPTION_MAX];
-        if (gt_take_caption(cap, (int)sizeof(cap))) {
+        if (gt_take_caption(cap, (int)sizeof(cap)) &&
+            !caption_is_stale_repeat(cap, sp.screen_name)) {
             prompt_id id = prompt_identify(cap);
             if (id.result == PROMPT_ID_FOUND) {
                 char spoken[GM_OUT_MAX];

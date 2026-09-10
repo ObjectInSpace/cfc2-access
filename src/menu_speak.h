@@ -307,6 +307,13 @@ BOOL menu_speak_discovery_enabled(void);
  * the only thing keeping prose or a button strip out of that path. */
 BOOL menu_speak_test_value_shaped(const char *s);
 
+/* Test seam: would this caption be suppressed as the SCREEN's rather than the
+ * row's? A caption that does not change as the cursor moves describes the
+ * screen, and repeating it after every movement is noise -- Fighter Awards sets
+ * one sentence for all 40 grid positions. Keeps static state, so drive it as a
+ * SEQUENCE. */
+BOOL menu_speak_test_caption_repeat(const char *cap, const char *screen_name);
+
 /* Test-only: row i of the shipped table, or NULL. Lets the suite check the
  * hand-edited rows for typos and duplicate callers. */
 const mc_screen *menu_speak_row(int i);
