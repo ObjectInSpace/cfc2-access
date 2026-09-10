@@ -109,6 +109,27 @@ screen at caller `0x14009BA21` produced none at all (setText froze at 306
 across its 7 movements). So the caption channel SUPPLEMENTS cursor+GMD; it does
 not replace it. Do not build anything that assumes every row has one.
 
+### ⛔⛔ THE ACTUAL FIX: the DISCOVERY sweep is OFF by default
+
+Two rounds went into making that sweep fast. The right answer was that **it is a
+development aid and does not need to run during play at all.** It now requires
+`cfc2_discover.on` next to the exe.
+
+Why it went off, all measured:
+- stalled live sessions **twice** (37 s, then 11.9 s) with speech dead;
+- produced **one** candidate list ever -- three wrong answers;
+- named **zero** shipped `g_screens` rows (all cite live text, the
+  disassembly, or the caption channel);
+- its premise is gone: the caption channel names screens now, and named Online
+  Play. Use `tools/name_screens.py`.
+
+⚠ Unknown screens are STILL LOGGED with it off, so a run still records which
+screens are unnamed. Only the candidate hunt is gated.
+
+⭐ The lesson worth carrying: **a stall in the user's speech is a broken mod; a
+diagnostic that does not run is an inconvenience to the developer.** Ask whether
+the expensive thing needs to run at all before making it cheap.
+
 ### ⚠ THE STALL, ROUND 2 -- and a crash I nearly shipped
 
 The 37 s fix MOVED the stall rather than removing it: the classification pass
