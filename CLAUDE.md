@@ -81,36 +81,52 @@ before touching that work.
 
 - `src/log.c` — timestamped logging.
 
-## ▶▶ START HERE: DEPLOYED AND WAITING FOR ONE RUN
+## ▶▶ START HERE: items 1-4 DONE and VERIFIED IN-GAME
 
-Items 1-4 of the plan are built, tested offline and **deployed**. The mod now
-speaks the focused row's own description after its name:
+Run 2026-09-09 22:50 (`docs/run-2026-09-09-2250.log`). Clean: 306 setText
+calls, **0 faults**, no crash. The mod speaks the focused row's own
+description after its name:
 
-    "Offline Play, 1 of 6. Play offline."
+    spoke "Offline Play, 1 of 6. Play offline."
+    spoke "Game, 1 of 3. Choose the game you want to play."
 
-**Nothing to press.** Launch, walk the menus, then read `CFC2Access.log`.
+### ⭐⭐ Item 4 is ANSWERED: per-row captions DO flow through setText
 
-### What the run answers -- item 4's OPEN question
-Do per-ROW captions actually flow through `setText` as the cursor moves? The
-corpus proves the strings EXIST and are distinct; it does **not** prove the
-game sets one per row change (the 21:19 run saw 6 distinct strings from 324
-calls). Look for `gt: === FOCUS RECORD` at beats 10/30/60:
+    [move 0] PROSE "Play offline."
+    [move 1] PROSE "Play online using a network connection."
+    [move 2] PROSE "Play offline."
 
-- **A DIFFERENT prose string under each successive `[move N]`** -> captions DO
-  track the cursor. The feature works and the channel is real.
-- **The same few strings repeating across many move numbers** -> they do NOT.
-  That is a clean NO, not a failure: the cursor+GMD channel stays the only
-  item-name source, and the caption code should then be reconsidered.
-- **`⚠ focus recorder INCONCLUSIVE`** -> the cursor hook never notified the
-  recorder. Nothing can be concluded; fix that before reading anything else.
+A different prose caption under each successive move number, each matching the
+row moved to. **0 wrong-row captions in 22 movements.**
 
-Also check `mcspeak:` lines for `caption AMBIGUOUS` / `caption not in the
-corpus` -- both are the guards refusing to speak, which is correct behaviour,
-but a flood of them means the captured strings are not what we think.
+⭐ Both guards fired correctly in the wild: `"Choose a game version."` was
+refused as AMBIGUOUS (the collision predicted offline), and `"P1"` was refused
+as not-in-corpus -- that one is a player VALUE label, and without the corpus
+check it would have been announced as the Game row's description.
+
+⚠ **Captions are NOT universal -- only 4 of 18 spoken lines carried one.** The
+screen at caller `0x14009BA21` produced none at all (setText froze at 306
+across its 7 movements). So the caption channel SUPPLEMENTS cursor+GMD; it does
+not replace it. Do not build anything that assumes every row has one.
+
+### ⚠ The next question, if this line of work continues
+Which screens have captions and which do not, and why. `0x14009BA21` is a
+6-item screen that also fails the "Select Mode" row check (`expects 3 items but
+this one has 6`), so it is unnamed AND caption-less -- the worst case for a
+user, and the obvious next target.
 
 ⚠ **A wrong description is indistinguishable from a right one to a blind user.**
 If a caption is ever spoken for the WRONG row, that is a stop-everything bug --
-case 13 in `run_gt_test.ps1` is what guards it offline.
+case 13 in `run_gt_test.ps1` guards it offline.
+
+### ⛔ Two instrumentation defects the run exposed (fixed, worth remembering)
+- **Beats 10/30/60 missed the run.** The session ended after beat 15, so ONE
+  report fired, covering 2 of 22 movements. Now every 5 beats. ⭐ Pick a report
+  cadence the user's ACTUAL session can reach -- this project had already been
+  bitten identically by the caller trace's schedule.
+- **The recorder went blind at its 48-record cap** and never recovered; the run
+  missed it only by ending early. The report now clears its window; case 19
+  proves the recorder returns nothing without that.
 
 ### The offline suites for all of this
 - `.\tools\run_gm_test.ps1` -- markup -> speech (18 cases)
