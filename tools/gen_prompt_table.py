@@ -98,7 +98,27 @@ def main():
     # captions and hint strips. Other labels (move names, rosters) are item
     # DATA and are already reachable by index.
     def is_prompt(label):
-        return label.startswith(("HELP_", "HB_"))
+        # HELP_/HB_ are the per-row captions and button strips.
+        if label.startswith(("HELP_", "HB_")):
+            return True
+        # ⭐⭐ ACHIEVEMENT NAMES ARE ITEM LABELS, and the Fighter Awards screen
+        # hands them to us as live text on every cursor move:
+        #     "The Year We Made Contact"  = ACHIEVEMENT_07_NAME
+        #     "Fighting Game Fans Rejoice!" = ACHIEVEMENT_01_NAME
+        # 40 of them, matching that screen's 40-item horizontal list exactly.
+        #
+        # ⛔ They were being REFUSED and logged as "caption not in the corpus",
+        # so the mod threw away the one thing that names those rows. That
+        # screen's captions do not track the cursor at all (the same
+        # "View all of your challenges." arrives at every position), so this is
+        # the ONLY route to a name there.
+        #
+        # ⚠ Included because they are unambiguous item names verified against
+        # the shipped corpus -- the same standard every other entry meets --
+        # not because the screen needs rescuing.
+        if label.startswith("ACHIEVEMENT_") and label.endswith("_NAME"):
+            return True
+        return False
 
     # index every prompt string by its exact text
     by_text = collections.defaultdict(set)

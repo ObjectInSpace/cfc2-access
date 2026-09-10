@@ -46,6 +46,10 @@ import collections
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gmd import iter_gmds, parse_gmd  # noqa: E402
+# ⭐ Reuse the generator's platform-suffix rule rather than restating it: the
+# two must agree about which labels are the same screen, and a second copy is a
+# second thing to drift.
+from gen_prompt_table import canonical  # noqa: E402
 
 DEFAULT_GAME_DIR = (r"C:\Program Files (x86)\Steam\steamapps\common"
                     r"\CAPCOM FIGHTING COLLECTION 2")
@@ -97,10 +101,27 @@ def build_caption_index(table):
     # the 22:50 log contains no ambiguous caption, so the log-driven cases were
     # all green while this was broken. The mod's own prompt_id already refuses
     # this exact string; the two must agree.
+    # ⭐ COLLAPSE PLATFORM VARIANTS BEFORE COUNTING CLAIMANTS.
+    #
+    # HELP_OP_MENU_BTN / _PS4 / _XBO / _NX are FOUR labels carrying the same
+    # text for the SAME row -- they differ only by which controller glyph the
+    # screen draws. Counting them as four claimants made the caption look
+    # shared and dropped it, so the Options > System submenu lost a row name it
+    # could have had. gen_prompt_table.py already collapses these; this did
+    # not, and the two must agree.
+    #
+    # ⚠ The count is over CANONICAL names, so genuinely different screens
+    # sharing a text (HELP_OPTION / HELP_OP_SYSTEM) are still dropped.
     claimants = collections.Counter()
     for k in labels:
         if k.startswith("HELP_") and "<" not in table[k]:
-            claimants[table[k]] += 1
+            claimants[table[k]] = 0
+    seen_canon = collections.defaultdict(set)
+    for k in labels:
+        if k.startswith("HELP_") and "<" not in table[k]:
+            seen_canon[table[k]].add(canonical(k))
+    for text, names in seen_canon.items():
+        claimants[text] = len(names)
 
     for k in labels:
         if not k.startswith("HELP_") or "<" in table[k]:
@@ -117,8 +138,22 @@ def build_caption_index(table):
 
     out = {}
     for text, hits in by_text.items():
-        if len(hits) == 1:
-            out[text] = next(iter(hits))
+        # ⚠ COLLAPSE THE RESOLVED ITEMS TOO, for the same reason as the
+        # claimants above: HELP_OP_MENU_BTN{,_PS4,_XBO,_NX} resolve to
+        # MENU_OP_MENU_BTN{,_PS4,_XBO,_NX} -- four labels, ONE row, differing
+        # only by controller glyph. Counting them as four distinct items
+        # dropped the caption at the last step even after the claimant fix.
+        #
+        # ⭐ Keep the BASE variant's index (the shortest canonical name), which
+        # is the form a screen without a platform suffix uses.
+        by_canon = {}
+        for lab, i in hits:
+            by_canon.setdefault(canonical(lab), []).append((lab, i))
+        if len(by_canon) != 1:
+            continue                    # genuinely different items -- drop
+        group = next(iter(by_canon.values()))
+        lab, i = min(group, key=lambda p: (len(p[0]), p[0]))
+        out[text] = (lab, i)
     return out
 
 
@@ -196,16 +231,77 @@ def main():
             print("   ⚠ NO base derived: no sighting paired to an item.")
         elif len(bases) == 1:
             base, n = bases.most_common(1)[0]
+            labels = list(table.keys())
+            total = seen[0][1]
+
+            # ⭐⭐ VALIDATE THE WHOLE RUN, not just the sighted position.
+            #
+            # ⛔ Two sightings AGREED on base 546 for the Options > System
+            # submenu and the base was still WRONG: that screen's rows
+            # interleave with their own help text (547, 549, 551 -- stride 2),
+            # so position 1 would have spoken raw markup and position 3 a
+            # HELP_ description. Agreement is not correctness when both
+            # sightings are the SAME caption at the same position.
+            #
+            # A base is only usable if EVERY position it implies looks like a
+            # menu item -- no markup, no terminal punctuation, not a HELP_
+            # label. That is the same predicate the discovery sweep uses, and
+            # it is what separates "a real run" from "a coincidence at one
+            # index".
+            bad = []
+            for p in range(total):
+                j = base + p
+                if not (0 <= j < len(labels)):
+                    bad.append((p + 1, "<out of range>"))
+                    continue
+                lab, txt = labels[j], table[labels[j]]
+                if lab.startswith("HELP_"):
+                    bad.append((p + 1, "%s is a DESCRIPTION" % lab))
+                elif "<" in txt:
+                    bad.append((p + 1, "%s carries MARKUP" % lab))
+                elif not txt.strip():
+                    bad.append((p + 1, "%s is blank" % lab))
+
+            if bad:
+                print("   ⛔ base %d REJECTED -- it does not describe a "
+                      "contiguous run of menu items:" % base)
+                for p, why in bad[:6]:
+                    print("        position %d: %s" % (p, why))
+                print("      This screen needs a label MAP (rows interleaved "
+                      "with their own help text, like Select Game), or more "
+                      "sightings at other positions. Do NOT ship this base.")
+                print()
+                continue
+
             mark = "⭐ CONSISTENT" if n > 1 else "⚠ single sighting -- a LEAD"
             print("   => base %d  (%s across %d sighting(s))" % (base, mark, n))
             # Show what the whole screen would say, for eyeball comparison.
-            labels = list(table.keys())
-            total = seen[0][1]
             print("      it would speak:")
             for p in range(total):
                 j = base + p
                 if 0 <= j < len(labels):
                     print("        %d: %s" % (p + 1, table[labels[j]][:44]))
+
+            # ⚠⚠ THE CHECK ABOVE CANNOT SEE A VALUE LABEL.
+            #
+            # "Windowed" and "Borderless Windowed" are item-shaped in every way
+            # -- short, no markup, no punctuation -- but they are the VALUES of
+            # the Display setting, not rows of the screen. base 218 on PC
+            # Settings passes validation and is still wrong past position 2.
+            #
+            # ⭐ So the only positions this evidence actually establishes are
+            # the ones a caption was SEEN at. Say which those are, so the base
+            # is not read as verified for the whole screen.
+            sighted = sorted({p for p, _, txt in seen if captions.get(txt)})
+            unsighted = [p for p in range(1, total + 1) if p not in sighted]
+            if unsighted:
+                print("      ⚠ ONLY position(s) %s are established by a "
+                      "caption. %s unverified -- a VALUE label ('Windowed') is "
+                      "item-shaped and passes the check above, so visit those "
+                      "positions before shipping this."
+                      % (", ".join(map(str, sighted)),
+                         "Position(s) " + ", ".join(map(str, unsighted)) +
+                         " are"))
         else:
             # ⛔ Never average. Disagreement means the model is wrong here.
             print("   ⛔ SIGHTINGS DISAGREE: bases %s. This screen is NOT a "
