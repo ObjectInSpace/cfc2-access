@@ -509,6 +509,10 @@ void gt_test_reset(void);
  * test it either. */
 void gt_test_focus_enable(void);
 
+/* Test-only: perform the window clear that gt_focus_report() does, so the
+ * "recorder does not go blind when full" case can run offline. */
+void gt_test_focus_clear(void);
+
 /* ⭐⭐ Is item 4's measurement CONCLUSIVE? Returns FALSE when the cursor side
  * never notified the recorder -- in which case every record carries sequence 0
  * and "no captions tracked the cursor" is indistinguishable from "the cursor

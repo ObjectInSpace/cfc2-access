@@ -639,6 +639,46 @@ int main(void)
               !conc0 && r0 == 1 && m0 == 0 && conc1 && m1 == 1, d);
     }
 
+    /* --- case 19: the recorder does not go blind when full ---------------
+     * ⛔ FROM A REAL RUN. GT_FOCUS_MAX records, then nothing: every later
+     * screen silently missing. The 22:50 session did not hit the cap only
+     * because it ended after 40 s. The report clears its window, so the
+     * recorder must accept new records afterwards.
+     *
+     * ⚠ Asserted by overfilling and then checking a NEW string still lands --
+     * "dropped > 0" alone would pass with a permanently dead recorder. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG obj[4];
+        obj[0] = GT_VTABLE_ADDR;
+        gt_note_focus_move();
+
+        /* Overfill: distinct strings so none are deduped. */
+        for (int i = 0; i < 80; i++) {
+            char s[48];
+            snprintf(s, sizeof s, "Caption number %d.", i);
+            gt_test_settext_body(obj, s, NULL, 0);
+        }
+        long r_full = -1, m_full = -1;
+        gt_focus_conclusive(&r_full, &m_full);
+
+        /* Simulate what the report does: clear the window. */
+        gt_test_focus_clear();
+
+        gt_note_focus_move();
+        gt_test_settext_body(obj, "Play offline.", NULL, 0);
+        char cap[GT_CAPTION_MAX] = { 0 };
+        BOOL got = gt_take_caption(cap, (int)sizeof cap);
+
+        char d[220];
+        snprintf(d, sizeof d,
+                 "at cap: records=%ld (max %d); after clear: got=%d cap=\"%s\"",
+                 r_full, 48, got, cap);
+        check("case 19: the recorder accepts records again after a report",
+              r_full == 48 && got && strcmp(cap, "Play offline.") == 0, d);
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",

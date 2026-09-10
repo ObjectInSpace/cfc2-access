@@ -669,6 +669,11 @@ void gt_note_focus_move(void)
 static BOOL g_focus_test_mode;
 void gt_test_focus_enable(void) { g_focus_test_mode = TRUE; }
 
+/* Test-only: the window clear that gt_focus_report() performs, without needing
+ * a real install to reach it. ⚠ It clears the same field by the same rule, so
+ * the test drives the shipping behaviour rather than a copy of it. */
+void gt_test_focus_clear(void) { g_focus_count = 0; }
+
 BOOL gt_take_caption(char *out, int outlen)
 {
     BOOL got = FALSE;
@@ -771,6 +776,20 @@ void gt_focus_report(void)
          * that saw 40 strings is distinguishable from one that saw none. */
         log_line("gt: of %ld string(s): %ld arrived after a cursor movement, "
                  "%ld were prose captions.", n, with_move, prose);
+        /* ⭐ CLEAR THE WINDOW after reporting it.
+         *
+         * ⛔ Without this the recorder fills to GT_FOCUS_MAX and goes blind for
+         * the rest of the session -- every later screen silently missing, with
+         * only `dropped` to hint at it. The 22:50 run did not hit the cap, but
+         * only because it ended after 40 s; case 19 shows the recorder returns
+         * NOTHING once full. Each report therefore covers the window SINCE THE
+         * LAST ONE, which also reads better than an ever-growing transcript.
+         *
+         * ⚠ The move sequence and the notification COUNT are deliberately NOT
+         * reset: the sequence must keep advancing or a stale caption from
+         * before the clear could match the reader's seq, and the count is the
+         * liveness evidence for the whole session. */
+        g_focus_count = 0;
         log_line("gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped "
                  "with each successive move number = per-row captions DO flow "
                  "through setText. The same few strings repeating across many "

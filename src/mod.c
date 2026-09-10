@@ -589,7 +589,25 @@ static DWORD WINAPI worker(LPVOID param)
          * the exact failure the retired ring sweep caused (1235 refusal lines
          * in one run). It also refuses to conclude when the cursor side never
          * notified it; see gt_focus_report(). */
-        if (gt_ok && (beat == 10 || beat == 30 || beat % 60 == 0))
+        /* ⛔ BEATS 10/30/60 MISSED THE RUN. The 22:50 session ended after beat
+         * 15, so exactly ONE report fired -- at beat 10, covering 2 of the 22
+         * movements the user actually made. The screens of interest were never
+         * dumped, and `0 dropped` was measured while only 16 strings existed,
+         * so it said nothing about the later ones.
+         *
+         * ⭐ This is the same shape as the caller trace's old schedule, which
+         * a real run outran in exactly the same way. Report on a cadence the
+         * user's actual play can reach: every 5 beats (10 s) once there is
+         * something to say, plus the early one. A repeat costs a few lines and
+         * a missed report costs a launch. */
+        /* ⚠⚠ ORDERING DEPENDENCY: this CLEARS the focus window, and
+         * mc_poll_and_log() above is what consumes a caption to speak it. That
+         * call must stay EARLIER in the loop than this one -- reversing them
+         * would let a report discard the caption for a movement that has not
+         * been spoken yet, which reads as "captions randomly stop working".
+         * They are ~150 lines apart, so the dependency is stated here rather
+         * than left to be noticed. */
+        if (gt_ok && (beat == 10 || beat % 5 == 0))
             gt_focus_report();
 
         /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning
