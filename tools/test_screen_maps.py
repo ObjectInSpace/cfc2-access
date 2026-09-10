@@ -53,12 +53,15 @@ EXPECTED = {
         "Music Volume", "Sound Effects Volume", "Announcer Volume",
         "Game Volume", "Challenger Jingle", "Default",
     ],
-    # ⚠ Declared in the source as a CANDIDATE and referenced by no shipped row.
-    # Checked anyway: an unreferenced map is exactly what gets wired up later
-    # by someone who assumes it was validated when it was written.
-    "g_game_options_candidate": [
-        "Game Settings", "Controller Settings", "Display & Sound Settings",
-    ],
+    # ⛔ g_game_options_candidate was REMOVED 2026-09-10 -- the live text
+    # proved that screen is Arcade / Versus / Training, not the three settings
+    # categories it guessed. Its entry is gone from here too.
+    #
+    # ⚠ A lesson worth keeping: this tool scrapes by regex and does NOT skip
+    # comments, so it was happily "validating" that array while it sat
+    # commented out -- which made a disproven guess look endorsed. Validation
+    # confirms a map matches the CORPUS; it says nothing about whether the map
+    # belongs to the screen.
 }
 
 # ⭐⭐ VALUE SETS GET THE SAME TREATMENT AS ROW MAPS -- they did not before.

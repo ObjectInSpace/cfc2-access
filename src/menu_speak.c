@@ -88,6 +88,28 @@ static const int g_select_game_rows[] = { 51, 52, 56 };
  * ⚠⚠ 0x14009ba21 is the exact caller a GUESSED row was once shipped for, which
  * made a different 6-item screen read out the main menu's labels. That is why
  * nothing here is inferred from item count or from base 37 being "close". */
+/* ⭐⭐ AND THE RUN THAT NOTE WAS WAITING FOR ARRIVED -- at a DIFFERENT CALLER.
+ *
+ * 2026-09-10: caller 0x1400b2729, the 3-item horizontal strip reached after
+ * choosing a game, sets its own item text live:
+ *     position 3 -> "Training Mode"   (MODE_TRAINING 4107)
+ *     position 1 -> "Arcade Mode"     (MODE_ARCADE   4105)
+ * Both read straight off `gt: * TEXT SET` lines stamped with that movement, so
+ * this map's first and last entries are confirmed BY THE GAME at the exact
+ * positions it claims. The same array now serves that caller at 3 items.
+ *
+ * ⚠ Position 2 ("Versus Mode", 4106) was never visited and its text has never
+ * appeared. It is shipped on two facts, not on plausibility: it is BRACKETED
+ * by two confirmed endpoints one index apart, and the setup code at
+ * 0x1400b2460 builds the option-id array in ascending order. That is weaker
+ * than the endpoints and is said so here.
+ *
+ * ⛔⛔ I ALSO HAD THIS SCREEN WRONG FOR DAYS. g_game_options_candidate below
+ * guessed it was Game Settings / Controller Settings / Display & Sound
+ * Settings, reasoned from the layout name `11_option/option_2`. The live text
+ * says Arcade / Versus / Training. The layout name proved the screen was an
+ * OPTIONS screen and told us nothing about which labels it draws -- exactly
+ * the gap that comment warned about, and I still nearly shipped it. */
 static const int g_mode_select_rows[] = { 4105, 4106, 4107 };
 
 /* ⭐⭐ ONLINE PLAY -- established 2026-09-09 (23:13 run) from the game's OWN
@@ -197,24 +219,24 @@ static const mc_value_set g_sound_values[] = {
     { 4, 2, 195 },   /* Challenger Jingle: Original / Remix      -- MEASURED */
 };
 
-/* ⚠⚠ CANDIDATE ONLY -- NOT REFERENCED BY ANY SHIPPED ROW.
+/* ⛔⛔ KILLED 2026-09-10: g_game_options_candidate = { 225, 226, 574 }.
  *
- * The 3-item horizontal screen at caller 0x1400b2729 loads the layout
- * `ui_menu	_option\option_2` (the lea at 0x1400b28fe is inside the same
- * function, 0x1400b26a0), so it is an OPTIONS screen -- the per-game options
- * strip reached after choosing a game. The three settings categories in the
- * GMD are MENU_OP_GAME_SETTING 225, PAD_SETTING 226 and
- * DISPLAY_SOUND_SETTINGS 574: "Game Settings", "Controller Settings",
- * "Display & Sound Settings". Three of them, matching the live count, and
- * non-contiguous, which is why a base cannot address them.
+ * It proposed that caller 0x1400b2729 -- the 3-item strip after choosing a
+ * game -- was "Game Settings / Controller Settings / Display & Sound
+ * Settings", reasoned from the layout name `11_option/option_2`. Three labels,
+ * matching the live count, non-contiguous, all very plausible.
  *
- * ⛔ It FITS but it is not PROVEN. Nothing has shown these three labels on
- * that screen -- the layout name proves the screen is an options screen, not
- * which labels it draws, and the order is assumed. This project shipped a row
- * on exactly this quality of reasoning once and it spoke another menu's
- * labels. Left here so the next run's log can confirm or kill it in one look;
- * wire it to a row only after that. */
-/* static const int g_game_options_candidate[] = { 225, 226, 574 }; */
+ * ⭐ THE LIVE TEXT SAYS ARCADE / VERSUS / TRAINING. That caller now ships
+ * with g_mode_select_rows instead, confirmed at positions 1 and 3 by the
+ * game's own `TEXT SET` lines.
+ *
+ * ⭐⭐ Its own comment named the flaw exactly -- "the layout name proves the
+ * screen is an options screen, not which labels it draws" -- and I still spent
+ * days believing it and nearly wired it up. A hypothesis that fits the COUNT
+ * and the CATEGORY can still be about a different screen entirely. Deleted
+ * rather than left commented out: a plausible array sitting in the file is an
+ * invitation, and tools/test_screen_maps.py validated it by regex even while
+ * commented, which made it look endorsed. */
 
 /* PC Settings, row 1 (Display): Windowed / Borderless Windowed / Fullscreen.
  * ⚠ Only the row MEASURED in a run is listed. Resolution (row 0) has a
@@ -303,6 +325,25 @@ static const mc_screen g_screens[] = {
      * established. See the comment on g_mode_select_rows. */
     { 0x14009ba21ULL, -1, 3, "Select Mode", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_ROW, 0, g_mode_select_rows, 3, NULL, 0 },
+
+    /* ⭐⭐ THE MODE STRIP after choosing a game -- the screen the user asked
+     * about ("the setting when you select a game from online/offline play").
+     *
+     * Arcade / Versus / Training, 3 items, horizontal. Positions 1 and 3 were
+     * confirmed by the game's OWN live text in the 2026-09-10 00:53 run; see
+     * the note on g_mode_select_rows, including the weaker basis for position
+     * 2 and the wrong guess this replaces.
+     *
+     * ⚠ MC_LIST, not MC_SETTINGS_ROW: this strip has no value selector. Its
+     * three items are destinations, and confirming one enters a mode rather
+     * than changing a setting -- the dispatch at 0x1400b27b2 sends 1, 2 and 3
+     * to three different places. There is no sibling half to link to.
+     *
+     * ⚠ Same labels as the "Select Mode" row above, deliberately. Two callers
+     * present the same three modes; menu_speak_lookup_n keys on caller+count,
+     * so both rows coexist and neither shadows the other. */
+    { 0x1400b2729ULL, -1, 3, "Select Mode", MC_VERIFIED_LIVE_TEXT,
+      MC_LIST, 0, g_mode_select_rows, 3, NULL, 0 },
 
     /* ⭐⭐ Online Play -- SAME CALLER as the row above, six items instead of
      * three. See g_online_play_rows for the per-row evidence, and
