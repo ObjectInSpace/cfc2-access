@@ -109,11 +109,32 @@ screen at caller `0x14009BA21` produced none at all (setText froze at 306
 across its 7 movements). So the caption channel SUPPLEMENTS cursor+GMD; it does
 not replace it. Do not build anything that assumes every row has one.
 
-### ⚠ The next question, if this line of work continues
-Which screens have captions and which do not, and why. `0x14009BA21` is a
-6-item screen that also fails the "Select Mode" row check (`expects 3 items but
-this one has 6`), so it is unnamed AND caption-less -- the worst case for a
-user, and the obvious next target.
+### ▶ NEXT: name the remaining screens as a CLASS
+`docs/naming-screens-generally.md` and `tools/name_screens.py`.
+
+⭐⭐ A caption gives the item's GMD INDEX directly (stem pairing:
+`HELP_OFFLINE_PLAY` -> `OFFLINE_PLAY` -> 37), and the log gives the position.
+Subtract and you have the screen's base -- **no candidate shortlist, no
+per-screen offline investigation.** Reproduces the two already-verified bases
+(main menu 37, Select Game 51) from log evidence alone. 112 usable captions.
+
+**The procedure:** play the unnamed screens moving the cursor **twice on each**
+(two sightings turn a LEAD into a CONSISTENT base), then
+`python tools\name_screens.py <log>` and read the per-screen verdict. It
+reports CONSISTENT / single-sighting LEAD / ⛔ SIGHTINGS DISAGREE (needs a label
+MAP, do not pick one) / no base derived.
+
+⚠ Still ends in a human comparison -- every `g_screens` row needs
+`MC_VERIFIED_LIVE_TEXT`. This supplies evidence for a base, not permission to
+skip looking.
+
+**9 candidate screens** are reachable this way, notably **68-72 Online Play**
+(Casual/Ranked/Custom Match, Leaderboard, Online Options) -- the screen the
+22:50 run sat on -- and **250-256** the 7-item pause menu.
+
+⚠ `0x14009BA21` produced NO captions at all, and also fails the "Select Mode"
+row check (`expects 3 items but this one has 6`). Caption-less screens need the
+old route (`tools/resolve_screens.py`) or a different idea.
 
 ⚠ **A wrong description is indistinguishable from a right one to a blind user.**
 If a caption is ever spoken for the WRONG row, that is a stop-everything bug --
