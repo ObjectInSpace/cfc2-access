@@ -239,6 +239,9 @@ static const mc_value_set g_network_values[] = {
  * walked quickly yields position-only lines and looks like a mod bug. */
 static const int g_system_settings_rows[] = { 180, 547, 549, 551, 182, 168 };
 
+/* ⛔ g_consent_dialog_rows was REMOVED: the labels were a guess and the
+ * screen is back to speaking position. See the note in g_screens. */
+
 /* System VALUE labels.
  *
  * ⛔ Only the two rows with a real GMD run:
@@ -450,28 +453,23 @@ static const mc_screen g_screens[] = {
       MC_SETTINGS_VALUE, 0x35c, NULL, 0, g_network_values,
       (int)(sizeof(g_network_values) / sizeof(g_network_values[0])) },
 
-    /* ⚠⚠ UNNAMED, DELIBERATELY: caller 0x140087cda, 3 items, horizontal.
+    /* ⛔⛔ THE CONSENT DIALOG (0x140087cda, 3 items) IS NOT NAMED -- REVERTED.
      *
-     * Reached from System > Data Collection: the user confirmed that row and
-     * this caller appeared on a NEW screen object -- so it is the data-sharing
-     * consent dialog.
+     * I shipped SYS_WINDOW_YES2/NO2/PP ("Agree / Decline / Privacy Policy")
+     * here after the user approved doing so, then the user said they were "not
+     * confident about the data collection options you chose". They were right
+     * to doubt it and I was wrong to ship it.
      *
-     * ⛔ IT SETS NO ITEM TEXT AT ALL. While it was live the only setText was
-     * its button strip ("Confirm / Back"); its three buttons come from layout
-     * data. So the caption channel cannot reach this screen and no amount of
-     * slow walking will name it.
+     * ⚠ The screen sets NO item text -- its buttons come from layout data --
+     * so nothing has ever shown these three words on it, and the ORDER was pure
+     * assumption. Approval to ship a guess does not make the guess true; it
+     * only means the user accepted my risk assessment, and my assessment was
+     * that this is the exact "fits the count and the category" reasoning that
+     * has already mislabelled two screens in this project.
      *
-     * ⚠ The tempting fit: SYS_WINDOW_YES2 29 "Agree", SYS_WINDOW_NO2 30
-     * "Decline", SYS_WINDOW_PP 31 "Privacy Policy" -- three contiguous labels,
-     * matching the count, and exactly what a data-sharing dialog offers.
-     * ⛔ NOT SHIPPED. That is a hypothesis fitting the COUNT and the CATEGORY,
-     * which is the shape of guess that already put the wrong labels on two
-     * screens here (g_game_options_candidate, and calling this same System
-     * screen "Controls"). Nothing has shown these three on screen.
-     *
-     * ⭐ To settle it, something other than the caption channel is needed --
-     * the GUI tree, or the dialog's own construction. Until then it speaks
-     * position, which is true. */
+     * ⭐ A rare one-time dialog reading "1 of 3" is a small loss. Three
+     * confident wrong words on a PRIVACY choice is not. Reverted to position
+     * until the GUI tree can read the buttons. */
 
     /* ⭐⭐ OPTIONS > SYSTEM -- the ROW half. See g_system_settings_rows.
      *
@@ -871,7 +869,24 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
              * beside it, and reading that row is not yet wired up. The JP-side
              * name is a true name for the game either way; refining it to
              * follow the version selection is the obvious next step. */
-            if (row == 0 && rom_table_ready()) {
+            /* ⛔⛔ SCOPED TO SELECT GAME. This branch says "row 0 of a settings
+             * screen is the game list" -- which was true when Select Game was
+             * the ONLY MC_SETTINGS_VALUE screen, and became false the moment PC
+             * Settings, Sound, Network and System joined it. Row 0 there is
+             * Resolution / Music Volume / Microphone / Language, and this read
+             * out GAME TITLES for all of them: the user heard "Power Stone,
+             * 5 of 21" while changing screen resolution.
+             *
+             * ⭐⭐ A latent bug my own conversion made reachable. The condition
+             * described a POSITION (`row == 0`) when what it meant was an
+             * IDENTITY (this screen's game list), and a position is only an
+             * identity while there is exactly one screen. Nothing failed at the
+             * time it was written; it failed when the world grew around it.
+             *
+             * ⚠ Keyed on the CALLER, not the name: `name` links the two halves
+             * of a settings screen and several screens deliberately share one,
+             * so it is not a unique key here. */
+            if (row == 0 && s->caller == 0x1400b1bd9ULL && rom_table_ready()) {
                 int game = m->new_index - m->min_index;
                 int ri = rom_table_index_for(game, 0);
                 char gt[128];
@@ -1114,7 +1129,38 @@ void menu_speak(const mc_move *m)
         if (gt_take_caption(cap, (int)sizeof(cap)) &&
             !caption_is_stale_repeat(cap, sp.screen_name)) {
             prompt_id id = prompt_identify(cap);
-            if (id.result == PROMPT_ID_FOUND) {
+            if (id.result == PROMPT_ID_FOUND && !sp.named && id.label &&
+                strncmp(id.label, "ACHIEVEMENT_", 12) == 0) {
+                /* ⭐⭐ AN ACHIEVEMENT TITLE *IS* THE ITEM NAME, so it LEADS
+                 * rather than being appended as a description.
+                 *
+                 * Fighter Awards has no row labels to find: its 7-item list is
+                 * a scrolling window over the 40 achievements, and its 40-item
+                 * grid is the same set. The rows ARE achievements, and the game
+                 * hands us each one's title as live text on every movement
+                 * ("The Year We Made Contact", "Teamwork Makes the Dream
+                 * Work"). Appending that after a bare position -- "3 of 7. The
+                 * Year We Made Contact" -- puts the one word that matters last.
+                 *
+                 * ⚠ Its cursor is a STACK LOCAL (0x06DAFC50 against a screen at
+                 * 0x2BE0B650 -- every other screen's cursor is in the 0x2B-0x2C
+                 * heap range), so no values_off arithmetic can address this
+                 * screen and no label map can be built for it. This channel is
+                 * the only route, which is why it gets a rule of its own.
+                 *
+                 * ⛔ NARROW ON PURPOSE: only when the corpus positively
+                 * identifies the string as an ACHIEVEMENT_* label, and only
+                 * when the item is not already named. This is not "speak any
+                 * caption as a name" -- that would let a help sentence become
+                 * an item name, which is the substitution this file exists to
+                 * prevent. */
+                char spoken[GM_OUT_MAX];
+                gm_speak(cap, spoken, sizeof(spoken));
+                if (spoken[0] && !gm_has_residue(spoken))
+                    _snprintf(line, sizeof(line), "%s, %d of %d",
+                              spoken, sp.position, sp.total);
+                line[sizeof(line) - 1] = '\0';
+            } else if (id.result == PROMPT_ID_FOUND) {
                 char spoken[GM_OUT_MAX];
                 gm_speak(cap, spoken, sizeof(spoken));
                 if (spoken[0] && !gm_has_residue(spoken)) {

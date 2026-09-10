@@ -53,6 +53,8 @@ EXPECTED = {
         "Language", "Menu Button", "Start Button", "Coin Button",
         "Data Collection", "Default",
     ],
+    # ⛔ g_consent_dialog_rows removed: those labels were a guess and the
+    # screen speaks position again.
     "g_sound_settings_rows": [
         "Music Volume", "Sound Effects Volume", "Announcer Volume",
         "Game Volume", "Challenger Jingle", "Default",

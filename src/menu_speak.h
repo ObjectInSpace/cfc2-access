@@ -84,6 +84,19 @@
  * the user was standing on. VERIFIED_LIVE_TEXT is the only value that ships. */
 typedef enum {
     MC_VERIFIED_LIVE_TEXT = 1,  /* a discovery block matched the real item */
+
+
+    /* ⛔ MC_USER_ACCEPTED_UNPROVEN was added and REMOVED on 2026-09-10.
+     *
+     * It existed for one row -- the consent dialog -- shipped with guessed
+     * labels after the user approved doing so. The user then said they were
+     * not confident in those labels, and they were right: the screen sets no
+     * item text, so nothing had ever shown those words on it.
+     *
+     * ⭐ Kept as a note because the temptation will recur: an escape hatch
+     * for "unproven but probably right" is exactly how VERIFIED_LIVE_TEXT
+     * stops meaning anything. If it is needed again, the question to answer
+     * first is what would DISPROVE the guess -- not who approved it. */
 } mc_verified;
 
 /* What SHAPE of list a call site drives.

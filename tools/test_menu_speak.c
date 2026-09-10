@@ -250,6 +250,13 @@ int main(void)
         /* ⭐⭐ Provenance. A row justified by plausibility rather than by a
          * live-text discovery block shipped once and made a different screen
          * speak the main menu's labels. Only VERIFIED_LIVE_TEXT may ship. */
+        /* ⭐⭐ Provenance. A row justified by plausibility rather than by a
+         * live-text discovery block shipped once and made a different screen
+         * speak the main menu's labels. Only VERIFIED_LIVE_TEXT may ship.
+         *
+         * ⚠ An MC_USER_ACCEPTED_UNPROVEN escape hatch was added for the
+         * consent dialog and removed the same day -- see menu_speak.h. The
+         * rule is back to having exactly one acceptable answer. */
         if (a && a->how != MC_VERIFIED_LIVE_TEXT)
             sane = 0;
         /* ⭐⭐ TWO ROWS MAY SHARE A CALLER -- BUT ONLY IF THE COUNT TELLS THEM
@@ -728,6 +735,41 @@ int main(void)
         ok &= (menu_speak_test_caption_repeat(NULL, "Main menu") == TRUE);
         check("20e. a static SCREEN caption is not repeated on every row",
               ok, "");
+    }
+
+    /* --- case 20f: the ROM-table branch is SELECT GAME's alone -----------
+     * ⛔⛔ THE BUG THIS EXISTS FOR, reported by the user: changing screen
+     * resolution said "Power Stone, 5 of 21". A branch reading "row 0 of a
+     * settings screen is the game list" was true when Select Game was the ONLY
+     * such screen, and became false when PC Settings, Sound, Network and System
+     * joined it -- their row 0 is Resolution / Music Volume / Microphone /
+     * Language, and all four read out GAME TITLES.
+     *
+     * ⭐ The condition described a POSITION when it meant an IDENTITY. Nothing
+     * failed when it was written; it failed when the world grew around it, and
+     * NO TEST NOTICED -- the suite was green while seven screens were wrong.
+     *
+     * ⚠ Asserted structurally, because the offline harness has no ROM table and
+     * no live GMD: exactly ONE MC_SETTINGS_VALUE row may be the game list, and
+     * it must be Select Game's. If another value screen is ever added, this
+     * fails unless its row 0 is deliberately considered. */
+    {
+        int value_sites = 0;
+        int game_list_sites = 0;
+        for (int i = 0; i < nrows; i++) {
+            const mc_screen *r = menu_speak_row(i);
+            if (!r || r->kind != MC_SETTINGS_VALUE)
+                continue;
+            value_sites++;
+            if (r->caller == 0x1400b1bd9ULL)
+                game_list_sites++;
+        }
+        /* Several value sites exist; only one is the game list. If that count
+         * is ever not 1, the branch has either lost its screen or gained one. */
+        check("20f. exactly one value site is the ROM game list",
+              value_sites >= 5 && game_list_sites == 1,
+              "value sites=%d game-list sites=%d", value_sites,
+              game_list_sites);
     }
 
     /* --- case 21: row 0's values are never named ------------------------
