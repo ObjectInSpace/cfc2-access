@@ -136,6 +136,9 @@ typedef enum {
     MC_GAME_STRIP
 } mc_kind;
 
+/* ⭐ A mapped screen's row whose label is NOT established. See `labels`. */
+#define MC_LABEL_UNKNOWN (-1)
+
 typedef struct {
     ULONGLONG caller;      /* the cursor-helper call site inside this screen */
     int       base_index;  /* GMD index of item 0 */
@@ -161,7 +164,18 @@ typedef struct {
      * whole point is that base+index lands on a VALUE label here ("English
      * Version" where "Game Version" belongs). `labels != NULL` therefore
      * REPLACES the base, and base_index stays -1 on such a row. */
-    const int *labels;     /* GMD index per item, or NULL */
+    /* GMD index per item, or NULL.
+     *
+     * ⭐⭐ An entry may be MC_LABEL_UNKNOWN, meaning "this screen is mapped but
+     * THIS row is not established". Without it a map must be all-or-nothing,
+     * and a screen where 5 of 6 rows are proven would have to speak position
+     * for all six -- discarding evidence that exists to avoid claiming evidence
+     * that does not.
+     *
+     * ⚠ It is NOT a licence to leave gaps casually. The unknown row still says
+     * its position, exactly as an unmapped screen does; the sentinel only stops
+     * one unknown row from silencing its five proven neighbours. */
+    const int *labels;
     int        nlabels;    /* entries in `labels`; must equal `count` */
     /* ⭐⭐ VALUE labels, for MC_SETTINGS_VALUE: one variant per row, chosen by
      * the row's LIVE count. See mc_value_set. NULL when the values cannot be

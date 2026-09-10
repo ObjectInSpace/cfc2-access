@@ -165,6 +165,42 @@ static const int g_online_play_rows[] = { 68, 69, 70, 71, 1076, 1078 };
  * independently confirmed by its own caption; the cluster merely agrees. */
 static const int g_lobby_rows[] = { 78, 79, 80 };
 
+/* ⭐⭐ JOIN LOBBY'S SEARCH FILTERS (0x14008e799 rows / 0x14008e813 values),
+ * 6 rows. Established 2026-09-10 (19:45 run) -- FIVE of the six named by the
+ * game's own caption on that row, each resolving uniquely:
+ *
+ *   pos 1  'Choose the game you want to play.'          -> GAME_TITLE     51
+ *   pos 2  ⛔ NO CAPTION EVER ARRIVED                    -> UNKNOWN
+ *   pos 3  'Turn cross-region matchmaking on or off.'   -> LOBBY_AREA     84
+ *   pos 4  'Choose a lobby comment.'                    -> LOBBY_TITLE    93
+ *   pos 5  'Turn event mode on or off.'                 -> LOBBY_EVENT   106
+ *   pos 6  'Turn one-button special moves on or off.'   -> LOBBY_SPMOVE   88
+ *
+ * ⚠ WILDLY non-contiguous (51, 84, 93, 106, 88) -- no base could ever reach
+ * these, which is exactly why name_screens.py reported SIGHTINGS DISAGREE. That
+ * verdict is the tool working, not a failure.
+ *
+ * ⛔ Position 2 is MC_LABEL_UNKNOWN and stays that way. It has 3 values and
+ * produced no caption across the whole run. The LOBBY_* family contains
+ * plausible fillers -- Number of Players, Victory Condition, Game Start
+ * Privilege -- and picking one because it "fits a 3-value row" is precisely the
+ * reasoning that mislabelled two screens here. It speaks its position. */
+static const int g_lobby_filter_rows[] = {
+    51, MC_LABEL_UNKNOWN, 84, 93, 106, 88
+};
+
+/* ⛔ NO VALUE VARIANTS FOR THIS SCREEN, deliberately.
+ *
+ * The per-row value COUNTS are measured from the 19:45 run, via
+ * (cursor - screen - 0x33c)/4:  row0=9  row1=3  row2=2  row3=9  row4=2  row5=3.
+ * But a variant needs `first` -- the GMD index the value list STARTS at -- and
+ * no run has shown the value TEXT for any of these rows.
+ *
+ * ⚠ A count alone is not a value set. Row 0's nine values are presumably the
+ * game list and rows 2/4 are presumably On/Off, and "presumably" is what
+ * g_game_options_candidate was made of. The live-quote path already speaks
+ * these values from the game's own text, so nothing is lost by waiting. */
+
 /* ⭐⭐ PC SETTINGS (Options > PC Settings), 4 rows. Established 2026-09-10 from
  * the game's OWN caption on EVERY position -- not one sighting extrapolated:
  *
@@ -453,6 +489,22 @@ static const mc_screen g_screens[] = {
      * 9-item horizontal choosers, different behaviour, separate evidence. */
     { 0x14009a482ULL, -1, 0, "Gallery", MC_VERIFIED_LIVE_TEXT,
       MC_GAME_STRIP, 0, NULL, 0, NULL, 0 },
+
+    /* ⭐⭐ JOIN LOBBY > search filters. Two call sites, one screen object:
+     * the vertical ROW selector and the horizontal VALUE selector.
+     *
+     * ⚠ values_off = 0x33c and the row cursor is +0x334 -- BOTH read from this
+     * screen's own log offsets (screen 0x2C3FEEF0, row cursor 0x2C3FF224, value
+     * cursors 0x2C3FF22C..0x2C3FF240 at 4-byte stride). Every settings screen
+     * here has different offsets; none may be copied from another.
+     *
+     * ⛔ The VALUE row carries no `values` variants -- see the note above
+     * g_lobby_filter_rows. It still names the ROW via the sibling link, which
+     * is the useful half ("Cross-region Matchmaking, 2 of 2"). */
+    { 0x14008e799ULL, -1, 6, "Lobby Filters", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_ROW, 0, g_lobby_filter_rows, 6, NULL, 0 },
+    { 0x14008e813ULL, -1, 0, "Lobby Filters", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x33c, NULL, 0, NULL, 0 },
 
     /* ⭐⭐ The LOBBY menu (Online Play > Custom Match). See g_lobby_rows: all
      * three positions named by their own captions across 7 sightings. */
@@ -929,6 +981,13 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
             out->why = MC_UNNAMED_COUNT_MISMATCH;
             return;
         }
+        /* ⭐ A mapped screen may still have an unestablished row. Say its
+         * position, exactly as an unmapped screen does, rather than letting one
+         * unknown row silence its proven neighbours. */
+        if (s->labels[idx] == MC_LABEL_UNKNOWN) {
+            out->why = MC_UNNAMED_NO_LABELS;
+            return;
+        }
         char text[128];
         if (!gmd_text_by_index(s->labels[idx], text, sizeof(text)) || !text[0]) {
             out->why = MC_UNNAMED_TEXT_UNREADABLE;
@@ -1062,6 +1121,12 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
             return;
         }
         gmd_index = s->labels[i];
+        /* ⭐ An unestablished row in an otherwise-mapped screen: position only,
+         * never a neighbour's label. See MC_LABEL_UNKNOWN. */
+        if (gmd_index == MC_LABEL_UNKNOWN) {
+            out->why = MC_UNNAMED_NO_LABELS;
+            return;
+        }
     } else if (s->base_index >= 0) {
         gmd_index = s->base_index + (m->new_index - m->min_index);
     } else {

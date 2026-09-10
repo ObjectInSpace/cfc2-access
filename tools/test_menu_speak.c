@@ -834,6 +834,37 @@ int main(void)
               (int)mn.game_strip, (int)lb.game_strip);
     }
 
+    /* --- case 23: an UNKNOWN row in a mapped screen speaks POSITION ---------
+     * ⭐⭐ Join Lobby's filters have 5 of 6 rows established. Without
+     * MC_LABEL_UNKNOWN a map must be all-or-nothing, so one unproven row would
+     * force all six to speak position -- discarding evidence that exists to
+     * avoid claiming evidence that does not.
+     *
+     * ⚠ BOTH halves asserted. The unknown row must NOT be named (the failure
+     * that matters: naming it would speak a neighbour's label or garbage), and
+     * its neighbours MUST still be named (otherwise the sentinel has silently
+     * disabled the whole map and the test would pass on a broken screen). */
+    {
+        mc_speech u, k;
+        mc_move um = mk(0x14008e799ULL, 1, 0, 5);   /* position 2 -- unknown */
+        menu_speak_build(&um, &u);
+        mc_move km = mk(0x14008e799ULL, 2, 0, 5);   /* position 3 -- known   */
+        menu_speak_build(&km, &k);
+
+        /* ⚠ The GMD is not live in this process, so a KNOWN row cannot resolve
+         * its text here -- it reports TEXT_UNREADABLE. That is a different
+         * reason from NO_LABELS, and the distinction is the whole assertion:
+         * the unknown row declines because it has no label, the known row
+         * because there is no live table to read. */
+        check("23. an unknown mapped row declines for NO_LABELS, not by "
+              "naming, while a known row reaches the text lookup",
+              !u.named && u.why == MC_UNNAMED_NO_LABELS &&
+              u.position == 2 && u.total == 6 &&
+              !k.named && k.why == MC_UNNAMED_TEXT_UNREADABLE,
+              "unknown: named=%d why=%d pos=%d; known: named=%d why=%d",
+              (int)u.named, (int)u.why, u.position, (int)k.named, (int)k.why);
+    }
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");

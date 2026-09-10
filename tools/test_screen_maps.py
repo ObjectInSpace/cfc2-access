@@ -44,6 +44,14 @@ EXPECTED = {
     "g_lobby_rows": [
         "Create Lobby", "Join Lobby", "Search Lobby ID",
     ],
+    # Join Lobby > search filters. Five of six named by their own captions in
+    # the 19:45 run; position 2 never produced one and is MC_LABEL_UNKNOWN.
+    # ⚠ The <UNKNOWN> slot is listed so the other five stay pinned to their
+    # POSITIONS -- dropping it would silently shift rows 3-6 up by one.
+    "g_lobby_filter_rows": [
+        "Game", "<UNKNOWN>", "Cross-region Matchmaking", "Comment",
+        "Event Mode", "One-button Special Moves",
+    ],
     "g_select_game_rows": [
         "Game", "Game Version", "Player",
     ],
@@ -140,7 +148,16 @@ def main():
     print()
 
     for name, body in sorted(maps.items()):
-        idxs = [int(x) for x in re.findall(r"\d+", body)]
+        # ⚠⚠ Parse entries IN ORDER, keeping MC_LABEL_UNKNOWN as a real element.
+        # A bare `\d+` scan silently DROPS the sentinel, which would turn a
+        # 6-row map into a 5-element list and check the wrong rows against the
+        # wrong positions -- while still printing "ok". Strip comments first so
+        # an index mentioned in a /* ... */ note is never mistaken for an entry.
+        clean = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+        idxs = []
+        for tok in re.findall(r"MC_LABEL_UNKNOWN|-?\d+", clean):
+            idxs.append(None if tok in ("MC_LABEL_UNKNOWN", "-1")
+                        else int(tok))
         want = EXPECTED.get(name)
 
         checked += 1
@@ -153,6 +170,12 @@ def main():
         got = []
         bad = []
         for i in idxs:
+            # ⭐ An UNESTABLISHED row. It is a real position that speaks its
+            # number, so it must occupy a slot in the expectation too -- that is
+            # what keeps the remaining rows aligned to their positions.
+            if i is None:
+                got.append("<UNKNOWN>")
+                continue
             if not (0 <= i < len(labels)):
                 bad.append("index %d out of range" % i)
                 got.append("<OUT OF RANGE>")
