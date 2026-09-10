@@ -215,6 +215,44 @@ static const mc_value_set g_network_values[] = {
  * there. Rows 0-3 are the four volume sliders -- 10 generated steps each, no
  * labels -- and row 5 (Default) has no value slot at all, which the run
  * confirms by never producing one for it. */
+/* ⭐⭐ OPTIONS > SYSTEM, 6 rows. Established 2026-09-10 from the game's OWN
+ * caption at EVERY position -- the run that finally did a slow pass:
+ *
+ *   pos 1  idx 180  MENU_OP_LANGUAGE   "Choose the display language..."   14 values
+ *   pos 2  idx 547  MENU_OP_MENU_BTN   "Change the button used to open..." 6 values
+ *   pos 3  idx 549  MENU_OP_START_BTN  "Change the start button..."        6 values
+ *   pos 4  idx 551  MENU_OP_COIN_BTN   "Change the coin button..."         6 values
+ *   pos 5  idx 182  DATA_UPLOAD        "Change data sharing settings."     2 values
+ *   pos 6  idx 168  MENU_OP_DEFAULT    "Reset to default settings."        none
+ *
+ * ⭐ Corroborated a second way on every move: the row selector's index and
+ * (cursor - screen - 0x338)/4 agreed, and row 0 having FOURTEEN values matches
+ * LANG_NAME_* being exactly 14 labels. Default having no value slot is what an
+ * ACTION row should do.
+ *
+ * ⛔ Scattered across 168..551 -- no base can address this screen, and
+ * name_screens.py correctly refused to propose one.
+ *
+ * ⚠ THE EARLIER RUN GOT ONLY 1 OF 6 ROWS, and nothing about the code changed
+ * in between. It was walked at ~300 ms per row and the game's caption does not
+ * arrive before the next movement; this run paused on each row. A screen
+ * walked quickly yields position-only lines and looks like a mod bug. */
+static const int g_system_settings_rows[] = { 180, 547, 549, 551, 182, 168 };
+
+/* System VALUE labels.
+ *
+ * ⛔ Only the two rows with a real GMD run:
+ *   row 0 Language  -> LANG_NAME_* 0..13, a contiguous 14 starting at index 0
+ *                      (Japanese, English, French ... Arabic)
+ *   row 4 Data Collection -> DATA_UPLOAD_00 "Decline" / _01 "Agree" at 183-184
+ * Rows 1-3 are the button bindings (6-7 values each): those are controller
+ * glyphs, not label runs, so they name nothing here and the live-caption quote
+ * path speaks them. Row 5 (Default) has no value slot at all. */
+static const mc_value_set g_system_values[] = {
+    { 0, 14, 0   },   /* Language: Japanese .. Arabic        -- MEASURED */
+    { 4, 2,  183 },   /* Data Collection: Decline / Agree    -- MEASURED */
+};
+
 static const mc_value_set g_sound_values[] = {
     { 4, 2, 195 },   /* Challenger Jingle: Original / Remix      -- MEASURED */
 };
@@ -412,36 +450,37 @@ static const mc_screen g_screens[] = {
       MC_SETTINGS_VALUE, 0x35c, NULL, 0, g_network_values,
       (int)(sizeof(g_network_values) / sizeof(g_network_values[0])) },
 
-    /* ⚠⚠ SYSTEM (caller 0x1400a33b8, 6 rows) IS DELIBERATELY ABSENT.
+    /* ⭐⭐ OPTIONS > SYSTEM -- the ROW half. See g_system_settings_rows.
      *
      * ⛔ I called this screen "Controls" in earlier notes. It is Options >
      * SYSTEM, and the log settles it in two lines: the mod spoke
      * "System, 1 of 5" on the Options list, the user confirmed, and this
-     * caller appeared. Options' five rows are System / Music / Network / PC
-     * Settings / Credits (GMD 170..174) -- Music, Network and PC Settings are
-     * all named already, so System was the only submenu left, and naming it
-     * "Controls" was a guess I never checked against the navigation.
-     * ⭐ The screen a caller belongs to is proved by what the user SELECTED to
-     * reach it, and that is in every log for free.
+     * caller appeared. ⭐ The screen a caller belongs to is proved by what the
+     * user SELECTED to reach it, and that is in every log for free -- I named
+     * it from its CONTENTS (rows that look like button bindings) instead, and
+     * was wrong. */
+    { 0x1400a33b8ULL, -1, 6, "System Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_ROW, 0, g_system_settings_rows, 6, NULL, 0 },
+
+    /* ⭐⭐ OPTIONS > SYSTEM -- the VALUE half.
      *
-     * Its shape is fully measured -- values_off 0x338, and the row selector's
-     * index agreed with (cursor - screen - 0x338)/4 on every move, giving
-     * value counts 14 / 6 / 7 / 6 / 2 for rows 0-4 and none for row 5.
-     *
-     * ⛔ But only ONE of six rows has ever been NAMED: position 4,
-     * MENU_OP_COIN_BTN (551). `nlabels` must equal the live count, so a
-     * 1-of-6 map cannot ship -- it would be refused and name nothing, exactly
-     * like Select Mode's 3-entry map on a 6-item screen.
-     *
-     * ⭐ The blocker is RUN SPEED, not the corpus rules. The run walked this
-     * screen at ~300 ms per row and the game's caption does not arrive before
-     * the next movement; the one row that produced a caption is the one that
-     * was paused on. One slow pass (~1 s per row) completes it.
-     *
-     * ⚠ Strong hypotheses, recorded but NOT shipped: row 0 is Language
-     * (MENU_OP_LANGUAGE 180 -- LANG_NAME_* is exactly 14 labels, matching row
-     * 0's 14 values) and row 2 may be MENU_OP_START_BTN 549. Neither has been
-     * shown on screen at that position. */
+     * ⚠ FOUR callers drive this screen's values, one per row group
+     * (0x1400a3431 row 0, 0x1400a3538 rows 1 and 3, 0x1400a3578 row 2,
+     * 0x1400a34a8 row 4). They share values_off 0x338, so each gets its own
+     * row here and menu_speak_derive_row sorts out which row it is. All four
+     * carry the same `name` so the sibling link finds the row map above. */
+    { 0x1400a3431ULL, -1, 0, "System Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x338, NULL, 0, g_system_values,
+      (int)(sizeof(g_system_values) / sizeof(g_system_values[0])) },
+    { 0x1400a3538ULL, -1, 0, "System Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x338, NULL, 0, g_system_values,
+      (int)(sizeof(g_system_values) / sizeof(g_system_values[0])) },
+    { 0x1400a3578ULL, -1, 0, "System Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x338, NULL, 0, g_system_values,
+      (int)(sizeof(g_system_values) / sizeof(g_system_values[0])) },
+    { 0x1400a34a8ULL, -1, 0, "System Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x338, NULL, 0, g_system_values,
+      (int)(sizeof(g_system_values) / sizeof(g_system_values[0])) },
 
     /* ⭐ PC Settings -- a row/value screen like Select Game.
      *

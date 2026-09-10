@@ -49,6 +49,10 @@ EXPECTED = {
         "Microphone", "Voice Chat Volume", "Input Delay",
         "Connection Strength", "Default",
     ],
+    "g_system_settings_rows": [
+        "Language", "Menu Button", "Start Button", "Coin Button",
+        "Data Collection", "Default",
+    ],
     "g_sound_settings_rows": [
         "Music Volume", "Sound Effects Volume", "Announcer Volume",
         "Game Volume", "Challenger Jingle", "Default",
@@ -83,6 +87,18 @@ EXPECTED_VALUES = {
     },
     "g_sound_values": {
         (4, 2): ["Original", "Remix"],
+    },
+    "g_system_values": {
+        # Row 0 is the 14 display languages, a contiguous run from index 0.
+        (0, 14): [
+            "Japanese [jp]", "English [en]", "French [fr]", "Italian [it]",
+            "German [de]", "Spanish (Spain) [es-ES]",
+            "Spanish (Mexico) [es-MX]", "Korean [ko]", "Polish [pl]",
+            "Portuguese (Brazil) [pt-BR]", "Russian [ru]",
+            "Traditional Chinese [zh-TW]", "Simplified Chinese [zh-CN]",
+            "Arabic [ar]",
+        ],
+        (4, 2): ["Decline", "Agree"],
     },
     "g_select_game_values": {
         (1, 2): ["Japanese Version", "English Version"],

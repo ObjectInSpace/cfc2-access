@@ -658,6 +658,37 @@ int main(void)
               (const void *)dflt);
     }
 
+    /* --- case 20d: System's FOUR value callers all link to one row map ----
+     * ⭐⭐ New shape: this screen's values are driven by four separate callers
+     * (one per row group) that share `values_off` and the screen object. Each
+     * needs its own g_screens entry, and all four must carry the SAME name so
+     * menu_speak_sibling_row finds the row map -- otherwise a value move names
+     * the value but loses the row ("Agree, 2 of 2" instead of "Data
+     * Collection, Agree, 2 of 2"), a silent degradation nothing else catches.
+     *
+     * ⚠ Also asserts the row map is reachable from every one of them, not just
+     * the first: a name typo on the fourth would be invisible to a test that
+     * only checked one. */
+    {
+        static const ULONGLONG VC[] = {
+            0x1400a3431ULL, 0x1400a3538ULL, 0x1400a3578ULL, 0x1400a34a8ULL
+        };
+        const mc_screen *rowmap = menu_speak_lookup_n(0x1400a33b8ULL, 6);
+        int ok = rowmap && rowmap->kind == MC_SETTINGS_ROW &&
+                 rowmap->nlabels == 6 && rowmap->labels &&
+                 rowmap->labels[0] == 180 && rowmap->labels[5] == 168;
+        int linked = 0;
+        for (size_t i = 0; i < sizeof VC / sizeof VC[0]; i++) {
+            const mc_screen *v = menu_speak_lookup(VC[i]);
+            if (v && v->kind == MC_SETTINGS_VALUE && v->values_off == 0x338 &&
+                menu_speak_sibling_row(v) == rowmap)
+                linked++;
+        }
+        check("20d. System: 4 value callers all link to the one row map",
+              ok && linked == 4, "rowmap=%p linked=%d of 4",
+              (const void *)rowmap, linked);
+    }
+
     /* --- case 21: row 0's values are never named ------------------------
      * ⛔ Row 0 must have NO GMD value variant. The eight game titles have no
      * clean run in the GMD, so any base that "looks close" names something

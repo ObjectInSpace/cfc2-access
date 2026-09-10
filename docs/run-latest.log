@@ -1,0 +1,467 @@
+[01:49:15.798] === CFC2 Access -- Phase 1.3: unpacked image dump ===
+[01:49:15.798] worker thread started, pid=21636
+[01:49:15.851] speech: ready, backend=NVDA
+[01:49:15.852] image [t0]: base=0000000140000000, 10 readable sections
+[01:49:15.853] image [t0]:   rva=0x1000     size=16625664  code distinct=256/256 prot=0x80   packed
+[01:49:15.853] image [t0]:   rva=0xfdc000   size=2072576   code distinct=256/256 prot=0x80   packed
+[01:49:15.853] image [t0]:   rva=0x11d6000  size=28758016  code distinct=256/256 prot=0x80   packed
+[01:49:15.853] image [t0]:   rva=0x2d43000  size=745472    code distinct=1/256 prot=0x80   UNPACKED
+[01:49:15.853] image [t0]:   rva=0x2df9000  size=4096      code distinct=256/256 prot=0x80   packed
+[01:49:15.853] image [t0]:   rva=0x2dfa000  size=270336    code distinct=1/256 prot=0x80   UNPACKED
+[01:49:15.853] image [t0]:   rva=0x2e3c000  size=233472    code distinct=256/256 prot=0x80   packed
+[01:49:15.853] image [t0]:   rva=0x2e75000  size=270336    data distinct=254/256 prot=0x2    
+[01:49:15.853] image [t0]:   rva=0x2eb7000  size=13451264  code distinct=85/256 prot=0x40   UNPACKED
+[01:49:15.854] image [t0]:   rva=0x3b8b000  size=3952640   code distinct=256/256 prot=0x40   packed
+[01:49:16.375] image: unpacked after 515 ms -- section rva=0x1000 distinct=233/256 prot=0x20
+[01:49:16.375] image [unpacked]: base=0000000140000000, 10 readable sections
+[01:49:16.376] image [unpacked]:   rva=0x1000     size=16625664  code distinct=233/256 prot=0x20   UNPACKED
+[01:49:16.376] image [unpacked]:   rva=0xfdc000   size=2072576   data distinct=195/256 prot=0x2    
+[01:49:16.376] image [unpacked]:   rva=0x11d6000  size=28758016  data distinct=35/256 prot=0x4    
+[01:49:16.376] image [unpacked]:   rva=0x2d43000  size=745472    data distinct=1/256 prot=0x2    
+[01:49:16.376] image [unpacked]:   rva=0x2df9000  size=4096      data distinct=255/256 prot=0x2    
+[01:49:16.376] image [unpacked]:   rva=0x2dfa000  size=270336    data distinct=1/256 prot=0x2    
+[01:49:16.377] image [unpacked]:   rva=0x2e3c000  size=233472    code distinct=234/256 prot=0x20   UNPACKED
+[01:49:16.377] image [unpacked]:   rva=0x2e75000  size=270336    data distinct=254/256 prot=0x2    
+[01:49:16.377] image [unpacked]:   rva=0x2eb7000  size=13451264  code distinct=85/256 prot=0x40   UNPACKED
+[01:49:16.377] image [unpacked]:   rva=0x3b8b000  size=3952640   code distinct=256/256 prot=0x40   packed
+[01:49:16.377] probe: VirtualProtect OK (target 0000000140001000, old prot 0x20) -- detours should be installable
+[01:49:16.378] kbd: identity CONFIRMED in this process -- vtable+0x30 -> 0x140253220 and the class name reads "sKeyboard".
+[01:49:16.410] kbd: hooked the sKeyboard state builder at 0x140253750. It receives rcx=the instance and rdx=the state bitmap, so the instance pointer arrives as an ARGUMENT -- no memory search.
+[01:49:16.410] mc: identity CONFIRMED in this process -- both cursor helpers carry the expected prologue.
+[01:49:16.515] mc: hooked both menu cursor helpers -- vertical 0x14007cdc0, horizontal 0x14007c9f0. The screen object and the cursor pointer arrive as ARGUMENTS, so there is no memory search.
+[01:49:16.516] gt: identity CONFIRMED -- 0x1402fd6a0 carries the expected prologue and sits in the instance vtable's slot 13.
+[01:49:16.607] gt: hooked the cGUIObjText CONSTRUCTOR at 0x1402efc10. It has exactly ONE caller (the factory 0x1402ef980), so this counts EVERY object of this class that is ever built -- which is what tells a wrong hook target apart from a class the shell never instantiates.
+[01:49:16.793] gt: hooked 4 of 4 setText overloads (cGUIObjText slots 25/26, cGUIObjMessage slots 25/26). Each carries its own counter, so the log will name WHICH one the shell uses.
+[01:49:16.793] gt: ready -- ctor probe live and update hook installed. Detours DEREFERENCE NOTHING beyond a single guarded vptr read; all inspection happens on the worker thread under the fault guard.
+[01:49:16.793] dump: SKIPPED -- image never unpacked. Any dump taken now would be ciphertext that silently looks like a valid file.
+[01:49:16.794] phase 1.3 result: speech=YES protect=YES unpacked=YES sections_dumped=0
+[01:49:16.794] pad: OFF -- cfc2_pad.on is absent. sPad is inert for the shell (Kind=0, update never runs); create that file only for in-game work.
+[01:49:16.895] kbd: ⛔ the builder has not run yet -- no state has been captured, so nothing can be concluded about key state.
+[01:49:16.895] memsafe: fault guard armed (self-test passed)
+[01:49:16.895] gmdfind: excluding own stack 00000000029B0000..0000000002BB0000 and own module 00007FF99BD70000..00007FF99BDB1000
+[01:49:18.328] gmdfind: walked 2340 regions; scanned 582 private (1616920 KB) in 1438 ms; 1 candidate(s); guard absorbed 0 fault(s)
+[01:49:18.328] gmdfind:  candidate 0: array_base=000000003B7000A0 form=LIVE_TABLE probes=64/64 geometry=2016/2016 pairs pad=0xcdcdcdcd region=000000003B450000+524288KB
+[01:49:18.332] gmdfind: ⭐ CLOSED LOOP -- followed labelOffset to "STATS_PWS2_06_NAME", re-hashed those bytes, hashes MATCH the entry. This is the GMD label array.
+[01:49:18.337] gmdfind: string blob was NOT at the usual +0x140000 -- found at +0x170000 this run (it moves)
+[01:49:18.337] gmdfind: ⭐⭐ TEXT RESOLVED (live) -- "LANG_NAME_JAPANESE" = "Japonais [jp]", via a pointer at entry+0x170000. We can READ the shell's messages. (matched shipped variant 2 of 4, a non-English locale)
+[01:49:18.343] gmdtext:   blob at entries+0x170000 is "fre"
+[01:49:18.348] gmdtext:   blob at entries+0x100000 is "eng"  <== matches config.ini
+[01:49:18.348] gmdtext: ⭐⭐ blob resolved at entries+0x100000; 4165 messages readable. Table language: eng (matches config.ini).
+[01:49:18.349] mc: the cursor helpers have not run yet -- nothing can be concluded about menu movement.
+[01:49:18.449] kbd: CAPTURED instance=0000000029178990 state=0000000029178AC8 after 90 builder calls.
+[01:49:18.449] kbd: ⭐⭐ state - instance == 0x138, exactly as the disassembly predicted. The offline model is CONFIRMED in live memory.
+[01:49:18.450] kbd: down=[(none)]  pressed=[(none)]  released=[(none)]  (engine Trg=[(none)])
+[01:49:20.176] kbd: down=[0x12 0xa4]  pressed=[0x12 0xa4]  released=[(none)]  (engine Trg=[(none)])
+[01:49:20.277] kbd: down=[(none)]  pressed=[(none)]  released=[0x12 0xa4]  (engine Trg=[(none)])
+[01:49:20.278] heartbeat 1 (alive 2 s)
+[01:49:20.278] gt: 2 CONSTRUCTED; setText ran 0 time(s), 0 string(s) captured; 0 guarded read(s) faulted.  ⛔ Objects exist but setText NEVER RAN: the class is right and 0x1402f0b50 is not how its text is assigned. Find the other writer.
+[01:49:22.307] heartbeat 2 (alive 4 s)
+[01:49:22.714] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:49:22.916] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:49:23.120] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[0x26])
+[01:49:23.323] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[01:49:23.831] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[01:49:24.035] kbd: down=[0x25 0x26]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[01:49:24.137] kbd: down=[0x25 0x26 0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:49:24.238] kbd: down=[0x27]  pressed=[(none)]  released=[0x25 0x26]  (engine Trg=[(none)])
+[01:49:24.340] kbd: down=[0x27 0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:49:24.340] heartbeat 3 (alive 6 s)
+[01:49:24.340] kbd: builder ran 347 times; instance=0000000029178990 state=0000000029178AC8 offset=0x138 CONFIRMED
+[01:49:24.340] gt: 2 CONSTRUCTED; setText ran 0 time(s), 0 string(s) captured; 0 guarded read(s) faulted.  ⛔ Objects exist but setText NEVER RAN: the class is right and 0x1402f0b50 is not how its text is assigned. Find the other writer.
+[01:49:24.442] kbd: down=[0x25 0x27]  pressed=[0x25]  released=[0x28]  (engine Trg=[(none)])
+[01:49:24.544] kbd: down=[(none)]  pressed=[(none)]  released=[0x25 0x27]  (engine Trg=[(none)])
+[01:49:24.646] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[01:49:24.748] kbd: down=[0x25]  pressed=[0x25]  released=[0x26]  (engine Trg=[(none)])
+[01:49:24.849] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:49:25.661] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[01:49:25.864] kbd: down=[0x25]  pressed=[0x25]  released=[0x26]  (engine Trg=[0x25])
+[01:49:25.967] kbd: down=[0x26]  pressed=[0x26]  released=[0x25]  (engine Trg=[(none)])
+[01:49:26.069] kbd: down=[0x25 0x26]  pressed=[0x25]  released=[(none)]  (engine Trg=[0x25])
+[01:49:26.170] kbd: down=[0x25 0x27]  pressed=[0x27]  released=[0x26]  (engine Trg=[(none)])
+[01:49:26.274] kbd: down=[0x25]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[01:49:26.374] kbd: down=[0x27]  pressed=[0x27]  released=[0x25]  (engine Trg=[(none)])
+[01:49:26.577] kbd: down=[0x25]  pressed=[0x25]  released=[0x27]  (engine Trg=[(none)])
+[01:49:26.781] kbd: down=[0x25 0x26 0x27 0x28]  pressed=[0x26 0x27 0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:49:26.984] kbd: down=[0x25]  pressed=[(none)]  released=[0x26 0x27 0x28]  (engine Trg=[(none)])
+[01:49:27.084] kbd: down=[0x25 0x26 0x28]  pressed=[0x26 0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:49:27.187] kbd: down=[0x25 0x26 0x27 0x28]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:49:27.389] kbd: down=[(none)]  pressed=[(none)]  released=[0x25 0x26 0x27 0x28]  (engine Trg=[(none)])
+[01:49:28.100] kbd: down=[0x25 0x26]  pressed=[0x25 0x26]  released=[(none)]  (engine Trg=[0x25])
+[01:49:28.204] kbd: down=[0x26]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:49:28.407] heartbeat 5 (alive 10 s)
+[01:49:28.407] gt: ⚠ focus recorder INCONCLUSIVE -- 0 string(s) recorded but the cursor hook never notified us (0 movements). Nothing can be concluded about per-row captions.
+[01:49:28.508] kbd: down=[0x25 0x26]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[01:49:28.610] kbd: down=[(none)]  pressed=[(none)]  released=[0x25 0x26]  (engine Trg=[(none)])
+[01:49:28.711] kbd: down=[0x26 0x27]  pressed=[0x26 0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:49:28.814] kbd: down=[0x25 0x26 0x27]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[01:49:28.916] kbd: down=[0x25]  pressed=[(none)]  released=[0x26 0x27]  (engine Trg=[(none)])
+[01:49:29.018] kbd: down=[0x25 0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:49:29.120] kbd: down=[0x27 0x28]  pressed=[0x28]  released=[0x25]  (engine Trg=[(none)])
+[01:49:29.221] kbd: down=[0x25 0x28]  pressed=[0x25]  released=[0x27]  (engine Trg=[(none)])
+[01:49:29.324] kbd: down=[0x25]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:49:29.425] gt: * TEXT SET on 000000002BEF11D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[01:49:29.527] kbd: down=[0x25 0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[01:49:29.630] kbd: down=[0x26]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:49:29.732] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[01:49:29.935] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[0x0d])
+[01:49:30.139] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[01:49:30.445] gt: 3 CONSTRUCTED; setText ran 65 time(s), 65 string(s) captured; 0 guarded read(s) faulted.
+[01:49:30.445] gt:   by overload: cGUIObjText.25=65 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:30.851] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[01:49:31.055] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[01:49:32.477] gt: 5 CONSTRUCTED; setText ran 188 time(s), 188 string(s) captured; 0 guarded read(s) faulted.
+[01:49:32.477] gt:   by overload: cGUIObjText.25=188 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:33.392] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:33.697] mc: the helpers ARE running (6 calls so far). The hook is live.
+[01:49:34.001] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[0x26])
+[01:49:34.034] gmdtext: blob region: base=000000003B800000 size=520512 KB state=0x1000 protect=0x4 type=0x20000
+[01:49:34.034] gmdtext: ⭐ indexed 4165 string offsets in one pass; blob spans 000000003B8000A0..000000003B81A0A0 (106496 bytes) and is validated ONCE -- per-string reads no longer call VirtualQuery.
+[01:49:34.036] mcspeak: spoke "Quit, 6 of 6. Exit the application."
+[01:49:34.036] mc: vertical   cursor 0 -> 5  (item 6 of 6, range 0..5, step -1)  caller=0000000140097A59 screen=000000002BEDA1A0 cursor=000000002BEDA4D0
+[01:49:34.240] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[01:49:34.544] gt: 26 CONSTRUCTED; setText ran 240 time(s), 240 string(s) captured; 0 guarded read(s) faulted.
+[01:49:34.544] gt:   by overload: cGUIObjText.25=240 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:34.646] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[01:49:34.648] mcspeak: caption AMBIGUOUS, not spoken: "Change various in-game settings."
+[01:49:34.648] mcspeak: spoke "Options, 5 of 6"
+[01:49:34.649] mc: vertical   cursor 5 -> 4  (item 5 of 6, range 0..5, step -1)  caller=0000000140097A59 screen=000000002BEDA1A0 cursor=000000002BEDA4D0
+[01:49:34.751] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[01:49:35.462] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[01:49:35.564] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[01:49:35.868] gt: * TEXT SET on 000000002BED61E0: "Credits"
+[01:49:36.579] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:49:36.581] mcspeak: spoke "Music, 2 of 5. Change various sound-related settings."
+[01:49:36.581] mc: vertical   cursor 0 -> 1  (item 2 of 5, range 0..4, step +1)  caller=00000001400A20FC screen=000000002BF1E350 cursor=000000002BF1E680
+[01:49:36.581] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:36.582] gt: 43 CONSTRUCTED; setText ran 256 time(s), 256 string(s) captured; 0 guarded read(s) faulted.
+[01:49:36.582] gt:   by overload: cGUIObjText.25=256 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:36.784] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:49:37.193] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[0x26])
+[01:49:37.195] mcspeak: caption not in the corpus, not spoken: "Credits"
+[01:49:37.195] mcspeak: spoke "System, 1 of 5"
+[01:49:37.196] mc: vertical   cursor 1 -> 0  (item 1 of 5, range 0..4, step -1)  caller=00000001400A20FC screen=000000002BF1E350 cursor=000000002BF1E680
+[01:49:37.196] gt: * TEXT SET on 000000002BEBB390: "Change various in-game settings."
+[01:49:37.298] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:37.399] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[01:49:37.907] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[01:49:38.009] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[01:49:38.213] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:38.415] mcspeak: [DISCOVERY] unknown screen -- caller=0x1400a3431  items=14  axis=horizontal  (screen=000000002C327F90).
+[01:49:38.415] mcspeak: [DISCOVERY] candidate sweep is OFF (create cfc2_discover.on next to the exe to enable it). Unknown screens are still logged; naming is better served by the caption channel -- see tools/name_screens.py.
+[01:49:38.619] heartbeat 10 (alive 20 s)
+[01:49:38.619] kbd: builder ran 1204 times; instance=0000000029178990 state=0000000029178AC8 offset=0x138 CONFIRMED
+[01:49:38.619] gt: 122 CONSTRUCTED; setText ran 284 time(s), 284 string(s) captured; 0 guarded read(s) faulted.
+[01:49:38.619] gt:   by overload: cGUIObjText.25=284 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:38.619] gt: === FOCUS RECORD: 48 distinct string(s) across 4 cursor movement(s), 10 dropped (buffer full) ===
+[01:49:38.620] gt:   [move 0] strip 000000002BEF11D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[01:49:38.620] gt:   [move 0] PROSE 000000002BEB8340: "Now loading..."
+[01:49:38.620] gt:   [move 0] strip 000000002BEF11D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[01:49:38.620] gt:   [move 0] strip 000000002BEA5700: "<FONT 2>Main Menu</FONT>"
+[01:49:38.620] gt:   [move 0] PROSE 000000002BF186D0: "Offline Play"
+[01:49:38.620] gt:   [move 0] PROSE 000000002BEF2320: "Online Play"
+[01:49:38.620] gt:   [move 0] PROSE 000000002BED75F0: "Museum"
+[01:49:38.620] gt:   [move 0] PROSE 000000002C3A14C0: "Fighter Awards"
+[01:49:38.620] gt:   [move 0] PROSE 000000002BEB8FC0: "Options"
+[01:49:38.620] gt:   [move 0] PROSE 000000002C327DF0: "Quit"
+[01:49:38.620] gt:   [move 0] PROSE 000000002BEBB390: "Play offline."
+[01:49:38.620] gt:   [move 0] strip 000000002BEF6DC0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:38.620] gt:   [move 1] PROSE 000000002BEBB390: "Exit the application."
+[01:49:38.622] gt:   [move 1] strip 000000002BEF6DC0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:38.622] gt:   [move 2] PROSE 000000002BEBB390: "Change various in-game settings."
+[01:49:38.622] gt:   [move 2] strip 000000002BEF6DC0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:38.622] gt:   [move 2] PROSE 000000002BEB9390: "Options"
+[01:49:38.622] gt:   [move 2] PROSE 000000002C322A30: "System"
+[01:49:38.622] gt:   [move 2] PROSE 000000002BEA70D0: "Music"
+[01:49:38.622] gt:   [move 2] PROSE 000000002BF18A80: "Network"
+[01:49:38.622] gt:   [move 2] PROSE 000000002BEF7510: "PC Settings"
+[01:49:38.623] gt:   [move 2] PROSE 000000002BED61E0: "Credits"
+[01:49:38.623] gt:   [move 3] PROSE 000000002BEB9390: "Options"
+[01:49:38.623] gt:   [move 3] PROSE 000000002C322A30: "System"
+[01:49:38.623] gt:   [move 3] PROSE 000000002BEA70D0: "Music"
+[01:49:38.623] gt:   [move 3] PROSE 000000002BF18A80: "Network"
+[01:49:38.623] gt:   [move 3] PROSE 000000002BEF7510: "PC Settings"
+[01:49:38.623] gt:   [move 3] PROSE 000000002BED61E0: "Credits"
+[01:49:38.623] gt:   [move 3] PROSE 000000002BEBB390: "Change various sound-related settings."
+[01:49:38.624] gt:   [move 3] strip 000000002BEF6DC0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:38.624] gt:   [move 4] PROSE 000000002BEB9390: "Options"
+[01:49:38.624] gt:   [move 4] PROSE 000000002C322A30: "System"
+[01:49:38.624] gt:   [move 4] PROSE 000000002BEA70D0: "Music"
+[01:49:38.624] gt:   [move 4] PROSE 000000002BF18A80: "Network"
+[01:49:38.624] gt:   [move 4] PROSE 000000002BEF7510: "PC Settings"
+[01:49:38.624] gt:   [move 4] PROSE 000000002BED61E0: "Credits"
+[01:49:38.624] gt:   [move 4] PROSE 000000002BEBB390: "Change various in-game settings."
+[01:49:38.625] gt:   [move 4] strip 000000002BEF6DC0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:38.625] gt:   [move 4] PROSE 000000002BEB9390: "Options"
+[01:49:38.625] gt:   [move 4] PROSE 000000002C322A30: "System"
+[01:49:38.625] gt:   [move 4] PROSE 000000002BEA70D0: "Music"
+[01:49:38.625] gt:   [move 4] PROSE 000000002BF18A80: "Network"
+[01:49:38.625] gt:   [move 4] PROSE 000000002BEF7510: "PC Settings"
+[01:49:38.625] gt:   [move 4] PROSE 000000002BED61E0: "Credits"
+[01:49:38.625] gt:   [move 4] PROSE 000000002C3AFDB0: "System"
+[01:49:38.625] gt:   [move 4] PROSE 000000002BF1D240: "Language"
+[01:49:38.626] gt:   [move 4] PROSE 000000002BEBD540: "Menu Button"
+[01:49:38.626] gt:   [move 4] PROSE 000000002BEFD520: "Start Button"
+[01:49:38.626] gt: of 48 string(s): 36 arrived after a cursor movement, 40 were prose captions.
+[01:49:38.626] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[01:49:39.134] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:49:39.134] mcspeak: [DISCOVERY] unknown screen -- caller=0x1400a3538  items=6  axis=horizontal  (screen=000000002C327F90).
+[01:49:39.134] mcspeak: spoke "2 of 6. Change the button used to open the in-game menu."
+[01:49:39.135] mcspeak: [DISCOVERY] unknown screen -- caller=0x1400a33b8  items=6  axis=vertical  (screen=000000002C327F90).
+[01:49:39.135] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=00000001400A33B8 screen=000000002C327F90 cursor=000000002C3282C0
+[01:49:39.135] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON BTN_X></SIZE> Change Long Press Time <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:39.238] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:49:40.557] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[01:49:40.557] mcspeak: spoke "1 of 6. Choose the display language for system messages."
+[01:49:40.558] mc: vertical   cursor 1 -> 0  (item 1 of 6, range 0..5, step -1)  caller=00000001400A33B8 screen=000000002C327F90 cursor=000000002C3282C0
+[01:49:40.558] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:40.659] gt: 122 CONSTRUCTED; setText ran 298 time(s), 298 string(s) captured; 0 guarded read(s) faulted.
+[01:49:40.659] gt:   by overload: cGUIObjText.25=298 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:40.761] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[01:49:42.690] gt: 122 CONSTRUCTED; setText ran 298 time(s), 298 string(s) captured; 0 guarded read(s) faulted.
+[01:49:42.690] gt:   by overload: cGUIObjText.25=298 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:42.790] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:49:42.792] mcspeak: caption not in the corpus, not spoken: "Agree"
+[01:49:42.792] mcspeak: spoke "3 of 14"
+[01:49:42.792] mc: horizontal cursor 1 -> 2  (item 3 of 14, range 0..13, step +1)  caller=00000001400A3431 screen=000000002C327F90 cursor=000000002C3282C8
+[01:49:42.792] gt: * TEXT SET on 000000002C398AE0: "Agree"
+[01:49:42.895] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[01:49:43.503] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[0x25])
+[01:49:43.503] mcspeak: caption not in the corpus, not spoken: "Agree"
+[01:49:43.503] mcspeak: spoke "2 of 14"
+[01:49:43.504] mc: horizontal cursor 2 -> 1  (item 2 of 14, range 0..13, step -1)  caller=00000001400A3431 screen=000000002C327F90 cursor=000000002C3282C8
+[01:49:43.707] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:49:44.418] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:49:44.418] mcspeak: spoke "2 of 6. Change the button used to open the in-game menu."
+[01:49:44.419] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=00000001400A33B8 screen=000000002C327F90 cursor=000000002C3282C0
+[01:49:44.419] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON BTN_X></SIZE> Change Long Press Time <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:44.520] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:49:44.725] gt: 122 CONSTRUCTED; setText ran 315 time(s), 315 string(s) captured; 0 guarded read(s) faulted.
+[01:49:44.725] gt:   by overload: cGUIObjText.25=315 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:45.741] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:49:45.741] mcspeak: caption not in the corpus, not spoken: "Agree"
+[01:49:45.741] mcspeak: spoke "2 of 6"
+[01:49:45.741] mc: horizontal cursor 1 -> 2  (item 2 of 6, range 1..6, step +1)  caller=00000001400A3538 screen=000000002C327F90 cursor=000000002C3282CC
+[01:49:45.742] gt: * TEXT SET on 000000002C398AE0: "Agree"
+[01:49:45.843] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[01:49:46.248] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[01:49:46.248] mcspeak: caption not in the corpus, not spoken: "Agree"
+[01:49:46.248] mcspeak: spoke "1 of 6"
+[01:49:46.248] mc: horizontal cursor 2 -> 1  (item 1 of 6, range 1..6, step -1)  caller=00000001400A3538 screen=000000002C327F90 cursor=000000002C3282CC
+[01:49:46.351] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:49:46.757] gt: 122 CONSTRUCTED; setText ran 325 time(s), 325 string(s) captured; 0 guarded read(s) faulted.
+[01:49:46.757] gt:   by overload: cGUIObjText.25=325 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:46.960] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:49:46.960] mcspeak: spoke "3 of 6. Change the start button for each game."
+[01:49:46.960] mc: vertical   cursor 1 -> 2  (item 3 of 6, range 0..5, step +1)  caller=00000001400A33B8 screen=000000002C327F90 cursor=000000002C3282C0
+[01:49:46.960] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:47.063] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:49:48.384] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:49:48.384] mcspeak: spoke "3 of 7"
+[01:49:48.384] mcspeak: [DISCOVERY] unknown screen -- caller=0x1400a3578  items=7  axis=horizontal  (screen=000000002C327F90).
+[01:49:48.385] mc: horizontal cursor 1 -> 2  (item 3 of 7, range 0..6, step +1)  caller=00000001400A3578 screen=000000002C327F90 cursor=000000002C3282D0
+[01:49:48.385] gt: * TEXT SET on 000000002C398AE0: "Agree"
+[01:49:48.487] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[01:49:48.792] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[01:49:48.792] mcspeak: spoke "1 of 7"
+[01:49:48.793] mc: horizontal cursor 1 -> 0  (item 1 of 7, range 0..6, step -1)  caller=00000001400A3578 screen=000000002C327F90 cursor=000000002C3282D0
+[01:49:48.793] heartbeat 15 (alive 30 s)
+[01:49:48.793] gt: 122 CONSTRUCTED; setText ran 342 time(s), 342 string(s) captured; 0 guarded read(s) faulted.
+[01:49:48.793] gt:   by overload: cGUIObjText.25=342 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:48.793] gt: === FOCUS RECORD: 48 distinct string(s) across 16 cursor movement(s), 20 dropped (buffer full) ===
+[01:49:48.793] gt:   [move 5] PROSE 000000002BEBCBE0: "English [en]"
+[01:49:48.794] gt:   [move 5] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_SELECT></SIZE>"
+[01:49:48.794] gt:   [move 5] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:48.794] gt:   [move 5] strip 000000002C3C05B0: "<SIZE 58><ICON RSB></SIZE>"
+[01:49:48.794] gt:   [move 5] PROSE 000000002C398AE0: "Agree"
+[01:49:48.794] gt:   [move 5] PROSE 000000002BEBB390: "Change the button used to open the in-game menu."
+[01:49:48.794] gt:   [move 5] strip 000000002BEF6DC0: "<SIZE 58><ICON BTN_X></SIZE> Change Long Press Time <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:48.794] gt:   [move 6] PROSE 000000002BEBCBE0: "English [en]"
+[01:49:48.794] gt:   [move 6] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_SELECT></SIZE>"
+[01:49:48.795] gt:   [move 6] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:48.795] gt:   [move 6] strip 000000002C3C05B0: "<SIZE 58><ICON RSB></SIZE>"
+[01:49:48.795] gt:   [move 6] PROSE 000000002C398AE0: "Agree"
+[01:49:48.795] gt:   [move 6] PROSE 000000002BEBB390: "Choose the display language for system messages."
+[01:49:48.795] gt:   [move 6] strip 000000002BEF6DC0: "<SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:48.796] gt:   [move 7] PROSE 000000002BEBCBE0: "French [fr]"
+[01:49:48.796] gt:   [move 7] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_SELECT></SIZE>"
+[01:49:48.796] gt:   [move 7] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:48.796] gt:   [move 7] strip 000000002C3C05B0: "<SIZE 58><ICON RSB></SIZE>"
+[01:49:48.796] gt:   [move 7] PROSE 000000002C398AE0: "Agree"
+[01:49:48.796] gt:   [move 8] PROSE 000000002BEBCBE0: "English [en]"
+[01:49:48.796] gt:   [move 8] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_SELECT></SIZE>"
+[01:49:48.797] gt:   [move 8] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:48.797] gt:   [move 8] strip 000000002C3C05B0: "<SIZE 58><ICON RSB></SIZE>"
+[01:49:48.797] gt:   [move 8] PROSE 000000002C398AE0: "Agree"
+[01:49:48.797] gt:   [move 9] PROSE 000000002BEBCBE0: "English [en]"
+[01:49:48.797] gt:   [move 9] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_SELECT></SIZE>"
+[01:49:48.797] gt:   [move 9] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:48.797] gt:   [move 9] strip 000000002C3C05B0: "<SIZE 58><ICON RSB></SIZE>"
+[01:49:48.797] gt:   [move 9] PROSE 000000002C398AE0: "Agree"
+[01:49:48.797] gt:   [move 9] PROSE 000000002BEBB390: "Change the button used to open the in-game menu."
+[01:49:48.798] gt:   [move 9] strip 000000002BEF6DC0: "<SIZE 58><ICON BTN_X></SIZE> Change Long Press Time <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:48.798] gt:   [move 10] PROSE 000000002BEBCBE0: "English [en]"
+[01:49:48.798] gt:   [move 10] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_LB></SIZE>"
+[01:49:48.798] gt:   [move 10] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:48.798] gt:   [move 10] strip 000000002C3C05B0: "<SIZE 58><ICON RSB></SIZE>"
+[01:49:48.798] gt:   [move 10] PROSE 000000002C398AE0: "Agree"
+[01:49:48.798] gt:   [move 11] PROSE 000000002BEBCBE0: "English [en]"
+[01:49:48.798] gt:   [move 11] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_SELECT></SIZE>"
+[01:49:48.798] gt:   [move 11] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:48.799] gt:   [move 11] strip 000000002C3C05B0: "<SIZE 58><ICON RSB></SIZE>"
+[01:49:48.799] gt:   [move 11] PROSE 000000002C398AE0: "Agree"
+[01:49:48.799] gt:   [move 12] PROSE 000000002BEBCBE0: "English [en]"
+[01:49:48.799] gt:   [move 12] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_SELECT></SIZE>"
+[01:49:48.799] gt:   [move 12] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:48.799] gt:   [move 12] strip 000000002C3C05B0: "<SIZE 58><ICON RSB></SIZE>"
+[01:49:48.799] gt:   [move 12] PROSE 000000002C398AE0: "Agree"
+[01:49:48.799] gt:   [move 12] PROSE 000000002BEBB390: "Change the start button for each game."
+[01:49:48.799] gt:   [move 12] strip 000000002BEF6DC0: "<SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:48.800] gt: of 48 string(s): 48 arrived after a cursor movement, 20 were prose captions.
+[01:49:48.800] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[01:49:48.901] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:49:49.409] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:49:49.409] mcspeak: spoke "4 of 6. Change the coin button for each game. (Restarts the match in training mode.)"
+[01:49:49.409] mc: vertical   cursor 2 -> 3  (item 4 of 6, range 0..5, step +1)  caller=00000001400A33B8 screen=000000002C327F90 cursor=000000002C3282C0
+[01:49:49.409] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:49.612] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:49:50.830] gt: 122 CONSTRUCTED; setText ran 349 time(s), 349 string(s) captured; 0 guarded read(s) faulted.
+[01:49:50.830] gt:   by overload: cGUIObjText.25=349 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:51.338] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:49:51.338] mcspeak: caption not in the corpus, not spoken: "Agree"
+[01:49:51.338] mcspeak: spoke "1 of 6"
+[01:49:51.338] mc: horizontal cursor 7 -> 2  (item 1 of 6, range 2..7, step +1)  caller=00000001400A3538 screen=000000002C327F90 cursor=000000002C3282D4
+[01:49:51.339] gt: * TEXT SET on 000000002C398AE0: "Agree"
+[01:49:51.441] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[01:49:51.644] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[0x25])
+[01:49:51.644] mcspeak: caption not in the corpus, not spoken: "Agree"
+[01:49:51.645] mcspeak: spoke "6 of 6"
+[01:49:51.645] mc: horizontal cursor 2 -> 7  (item 6 of 6, range 2..7, step -1)  caller=00000001400A3538 screen=000000002C327F90 cursor=000000002C3282D4
+[01:49:51.848] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:49:52.355] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:49:52.355] mcspeak: [DISCOVERY] unknown screen -- caller=0x1400a34a8  items=2  axis=horizontal  (screen=000000002C327F90).
+[01:49:52.355] mcspeak: spoke "5 of 6. Change data sharing settings."
+[01:49:52.355] mc: vertical   cursor 3 -> 4  (item 5 of 6, range 0..5, step +1)  caller=00000001400A33B8 screen=000000002C327F90 cursor=000000002C3282C0
+[01:49:52.356] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:52.559] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:49:52.865] gt: 122 CONSTRUCTED; setText ran 366 time(s), 366 string(s) captured; 0 guarded read(s) faulted.
+[01:49:52.865] gt:   by overload: cGUIObjText.25=366 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:53.676] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[0x27])
+[01:49:53.676] mcspeak: spoke "1 of 2"
+[01:49:53.676] mc: horizontal cursor 1 -> 0  (item 1 of 2, range 0..1, step +1)  caller=00000001400A34A8 screen=000000002C327F90 cursor=000000002C3282D8
+[01:49:53.779] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:53.880] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[01:49:53.880] mcspeak: [DISCOVERY] unknown screen -- caller=0x140087cda  items=3  axis=horizontal  (screen=000000002C406EE0).
+[01:49:53.981] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[0x25])
+[01:49:53.982] mcspeak: spoke "1 of 3"
+[01:49:53.982] mc: horizontal cursor 1 -> 0  (item 1 of 3, range 0..2, step -1)  caller=0000000140087CDA screen=000000002C406EE0 cursor=000000002C407220
+[01:49:54.186] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:49:54.390] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[01:49:54.593] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:49:54.897] gt: 126 CONSTRUCTED; setText ran 372 time(s), 372 string(s) captured; 0 guarded read(s) faulted.
+[01:49:54.897] gt:   by overload: cGUIObjText.25=372 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:55.100] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[0x25])
+[01:49:55.100] mcspeak: spoke "3 of 3"
+[01:49:55.100] mc: horizontal cursor 0 -> 2  (item 3 of 3, range 0..2, step -1)  caller=0000000140087CDA screen=000000002C406EE0 cursor=000000002C407220
+[01:49:55.305] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:49:55.609] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[01:49:55.609] mcspeak: spoke "2 of 3"
+[01:49:55.609] mc: horizontal cursor 2 -> 1  (item 2 of 3, range 0..2, step -1)  caller=0000000140087CDA screen=000000002C406EE0 cursor=000000002C407220
+[01:49:55.712] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:49:56.017] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[0x25])
+[01:49:56.017] mcspeak: spoke "1 of 3"
+[01:49:56.017] mc: horizontal cursor 1 -> 0  (item 1 of 3, range 0..2, step -1)  caller=0000000140087CDA screen=000000002C406EE0 cursor=000000002C407220
+[01:49:56.221] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:49:56.526] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:49:56.526] mcspeak: spoke "2 of 3"
+[01:49:56.526] mc: horizontal cursor 0 -> 1  (item 2 of 3, range 0..2, step +1)  caller=0000000140087CDA screen=000000002C406EE0 cursor=000000002C407220
+[01:49:56.629] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[01:49:56.831] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:49:56.933] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:49:56.933] gt: 126 CONSTRUCTED; setText ran 372 time(s), 372 string(s) captured; 0 guarded read(s) faulted.
+[01:49:56.933] gt:   by overload: cGUIObjText.25=372 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:57.036] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[01:49:57.239] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[01:49:57.544] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:49:57.646] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:49:57.748] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:49:57.748] mcspeak: spoke "3 of 3"
+[01:49:57.748] mc: horizontal cursor 1 -> 2  (item 3 of 3, range 0..2, step +1)  caller=0000000140087CDA screen=000000002C406EE0 cursor=000000002C407220
+[01:49:57.850] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[01:49:58.560] kbd: down=[0x1b]  pressed=[0x1b]  released=[(none)]  (engine Trg=[(none)])
+[01:49:58.661] kbd: down=[(none)]  pressed=[(none)]  released=[0x1b]  (engine Trg=[(none)])
+[01:49:58.763] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:58.966] heartbeat 20 (alive 40 s)
+[01:49:58.966] gt: 126 CONSTRUCTED; setText ran 379 time(s), 379 string(s) captured; 0 guarded read(s) faulted.
+[01:49:58.966] gt:   by overload: cGUIObjText.25=379 .26=0  cGUIObjMessage.25=0 .26=0
+[01:49:58.966] gt: === FOCUS RECORD: 37 distinct string(s) across 27 cursor movement(s), 20 dropped (buffer full) ===
+[01:49:58.966] gt:   [move 17] PROSE 000000002BEBCBE0: "English [en]"
+[01:49:58.967] gt:   [move 17] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_SELECT></SIZE>"
+[01:49:58.967] gt:   [move 17] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:58.967] gt:   [move 17] strip 000000002C3C05B0: "<SIZE 58><ICON RSB></SIZE>"
+[01:49:58.967] gt:   [move 17] PROSE 000000002C398AE0: "Agree"
+[01:49:58.967] gt:   [move 17] PROSE 000000002BEBB390: "Change the coin button for each game. (Restarts the match in training mode.)"
+[01:49:58.967] gt:   [move 17] strip 000000002BEF6DC0: "<SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:58.968] gt:   [move 18] PROSE 000000002BEBCBE0: "English [en]"
+[01:49:58.968] gt:   [move 18] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_SELECT></SIZE>"
+[01:49:58.968] gt:   [move 18] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:58.968] gt:   [move 18] strip 000000002C3C05B0: "<SIZE 58><ICON BTN_LB></SIZE>"
+[01:49:58.968] gt:   [move 18] PROSE 000000002C398AE0: "Agree"
+[01:49:58.968] gt:   [move 19] PROSE 000000002BEBCBE0: "English [en]"
+[01:49:58.968] gt:   [move 19] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_SELECT></SIZE>"
+[01:49:58.968] gt:   [move 19] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:58.969] gt:   [move 19] strip 000000002C3C05B0: "<SIZE 58><ICON RSB></SIZE>"
+[01:49:58.969] gt:   [move 19] PROSE 000000002C398AE0: "Agree"
+[01:49:58.969] gt:   [move 20] PROSE 000000002BEBCBE0: "English [en]"
+[01:49:58.969] gt:   [move 20] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_SELECT></SIZE>"
+[01:49:58.969] gt:   [move 20] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:58.969] gt:   [move 20] strip 000000002C3C05B0: "<SIZE 58><ICON RSB></SIZE>"
+[01:49:58.969] gt:   [move 20] PROSE 000000002C398AE0: "Agree"
+[01:49:58.970] gt:   [move 20] PROSE 000000002BEBB390: "Change data sharing settings."
+[01:49:58.970] gt:   [move 20] strip 000000002BEF6DC0: "<SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:58.970] gt:   [move 21] PROSE 000000002C3F8310: "
+Data processing for the purpose of analysis
+
+Capcom Co., Ltd. (“We”, ”Us”, or �"
+[01:49:58.970] gt:   [move 21] PROSE 000000002C420850: "Privacy Policy"
+[01:49:58.970] gt:   [move 21] PROSE 000000002C440280: "Agree"
+[01:49:58.970] gt:   [move 21] PROSE 000000002C3714D0: "Decline"
+[01:49:58.970] gt:   [move 21] PROSE 000000002BEBB390: " "
+[01:49:58.971] gt:   [move 21] strip 000000002BEF6DC0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:58.971] gt:   [move 27] PROSE 000000002BEBCBE0: "English [en]"
+[01:49:58.971] gt:   [move 27] strip 000000002BEFCBC0: "<SIZE 58><ICON BTN_SELECT></SIZE>"
+[01:49:58.971] gt:   [move 27] strip 000000002C32B6C0: "<SIZE 58><ICON BTN_START></SIZE>"
+[01:49:58.971] gt:   [move 27] strip 000000002C3C05B0: "<SIZE 58><ICON RSB></SIZE>"
+[01:49:58.971] gt:   [move 27] PROSE 000000002C398AE0: "Agree"
+[01:49:58.971] gt:   [move 27] PROSE 000000002BEBB390: "Change data sharing settings."
+[01:49:58.971] gt:   [move 27] strip 000000002BEF6DC0: "<SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:58.972] gt: of 37 string(s): 37 arrived after a cursor movement, 18 were prose captions.
+[01:49:58.972] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[01:49:59.074] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[01:49:59.074] mcspeak: caption not in the corpus, not spoken: "Agree"
+[01:49:59.074] mcspeak: spoke "6 of 6"
+[01:49:59.075] mc: vertical   cursor 4 -> 5  (item 6 of 6, range 0..5, step +1)  caller=00000001400A33B8 screen=000000002C327F90 cursor=000000002C3282C0
+[01:49:59.075] gt: * TEXT SET on 000000002C398AE0: "Agree"
+[01:49:59.178] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:59.279] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:49:59.786] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[01:49:59.786] mcspeak: spoke "5 of 6. Change data sharing settings."
+[01:49:59.786] mc: vertical   cursor 5 -> 4  (item 5 of 6, range 0..5, step -1)  caller=00000001400A33B8 screen=000000002C327F90 cursor=000000002C3282C0
+[01:49:59.786] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON CANCEL></SIZE>Back"
+[01:49:59.888] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[01:50:01.004] gt: 126 CONSTRUCTED; setText ran 393 time(s), 393 string(s) captured; 0 guarded read(s) faulted.
+[01:50:01.004] gt:   by overload: cGUIObjText.25=393 .26=0  cGUIObjMessage.25=0 .26=0
+[01:50:01.208] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:50:01.208] mcspeak: spoke "6 of 6. Reset to default settings."
+[01:50:01.208] mc: vertical   cursor 4 -> 5  (item 6 of 6, range 0..5, step +1)  caller=00000001400A33B8 screen=000000002C327F90 cursor=000000002C3282C0
+[01:50:01.209] gt: * TEXT SET on 000000002BEF6DC0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:50:01.310] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:50:02.427] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:50:02.630] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[01:50:02.732] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[01:50:02.834] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:50:03.037] gt: 126 CONSTRUCTED; setText ran 400 time(s), 400 string(s) captured; 0 guarded read(s) faulted.
+[01:50:03.037] gt:   by overload: cGUIObjText.25=400 .26=0  cGUIObjMessage.25=0 .26=0
+[01:50:05.066] gt: 126 CONSTRUCTED; setText ran 400 time(s), 400 string(s) captured; 0 guarded read(s) faulted.
+[01:50:05.066] gt:   by overload: cGUIObjText.25=400 .26=0  cGUIObjMessage.25=0 .26=0
+[01:50:05.876] kbd: down=[0x12 0xa4]  pressed=[0x12 0xa4]  released=[(none)]  (engine Trg=[0x12 0xa4])
+[01:50:06.181] kbd: down=[0x12 0x73 0xa4]  pressed=[0x73]  released=[(none)]  (engine Trg=[(none)])
