@@ -80,6 +80,18 @@ int rom_table_index_for(int game, int version);
  * would compare against whatever sits at those addresses. */
 BOOL rom_table_has_title(const char *s);
 
+/* ⭐⭐ Is `s` the COLLECTION's own title -- the ninth entry of a game strip?
+ *
+ * A game-title strip has nine items and the ROM table holds eight games:
+ * position 1 is the collection itself, which no ROM list can corroborate. It
+ * was refused three times in the 2026-09-10 19:13 run.
+ *
+ * ⚠ The string is the exe's own version-resource ProductName, not one invented
+ * here, and the compare is case-insensitive because the shell draws it in title
+ * case. ⛔ It appears as live text all over the shell, so the caller must still
+ * gate on the screen being a declared game strip. */
+BOOL rom_table_is_collection_title(const char *s);
+
 /* Is the table where we think it is? Checks that record 0's code is "cvs1"
  * and that the index table's first pointer targets it -- a positive identity
  * check, not merely a readable address. */

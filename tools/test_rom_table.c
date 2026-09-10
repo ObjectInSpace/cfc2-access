@@ -321,6 +321,43 @@ int main(void)
               matched, ready, matched_after);
     }
 
+    /* --- 14: the COLLECTION title is recognised, and nothing else is -------
+     * ⛔ FROM THE 19:13 RUN. Gallery's position 1 was refused three times --
+     * "caption not in the corpus" then "1 of 9" -- because the collection is
+     * not a ROM and the ROM table cannot corroborate it. Nine strip entries,
+     * eight games.
+     *
+     * ⚠ The NEGATIVES carry the weight here. This string appears as live text
+     * throughout the shell (28 sightings in that one run, including a title-bar
+     * object), so a predicate that was loose about it would let unrelated
+     * chrome become an item name. Near-misses and the individual game titles
+     * must all be refused.
+     *
+     * ⚠ It is deliberately INDEPENDENT of the ROM table: no redirect, no
+     * synthetic records. The collection title is not in that table at all,
+     * which is the entire reason this predicate exists. */
+    {
+        int yes_exact = rom_table_is_collection_title(
+                            "CAPCOM FIGHTING COLLECTION 2");
+        int yes_title = rom_table_is_collection_title(
+                            "Capcom Fighting Collection 2");
+        int no_near   = rom_table_is_collection_title(
+                            "Capcom Fighting Collection");
+        int no_suffix = rom_table_is_collection_title(
+                            "Capcom Fighting Collection 2 ");
+        int no_game   = rom_table_is_collection_title(
+                            "Capcom Fighting Evolution");
+        int no_empty  = rom_table_is_collection_title("");
+        int no_null   = rom_table_is_collection_title(NULL);
+
+        check("14. the collection title matches; near-misses do NOT",
+              yes_exact && yes_title && !no_near && !no_suffix && !no_game &&
+              !no_empty && !no_null,
+              "exact=%d title=%d near=%d suffix=%d game=%d empty=%d null=%d",
+              yes_exact, yes_title, no_near, no_suffix, no_game, no_empty,
+              no_null);
+    }
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");

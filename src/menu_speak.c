@@ -1293,7 +1293,8 @@ void menu_speak(const mc_move *m)
                     line[sizeof(line) - 1] = '\0';
                 }
             } else if (!sp.named && sp.game_strip &&
-                       rom_table_has_title(cap)) {
+                       (rom_table_has_title(cap) ||
+                        rom_table_is_collection_title(cap))) {
                 /* ⭐⭐ A GAME-TITLE STRIP: the caption IS the item name.
                  *
                  * Museum > Gallery draws the full arcade title on each
