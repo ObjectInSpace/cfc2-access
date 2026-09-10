@@ -50,8 +50,16 @@
  * hook reports it. */
 static const int g_select_game_rows[] = { 51, 52, 56 };
 
-/* ⛔ NOT NAMEABLE FROM THE GMD -- the Museum GALLERY lists (0x14009a482 and
- * 0x14009af21, 9 items each, cursor +0x33c, count from +0x340).
+/* ⛔ NOT NAMEABLE FROM THE GMD -- the Museum media-chooser strips (0x14009a482
+ * and 0x14009af21, 9 items each, cursor +0x33c, count from +0x340).
+ *
+ * ⚠ CORRECTED 2026-09-10: this note used to call BOTH of these "the Gallery
+ * lists". The 13:43 run settles 0x14009af21 -- the spoken trail is
+ * "Museum, 3 of 6" -> "Music, 2 of 2" -> this strip, so it is the chooser under
+ * MUSIC, and confirming an entry opens that game's track list (0x1400b2ebb).
+ * 0x14009a482 is presumably Gallery's equivalent, but NOTHING has entered
+ * Gallery, so that is an expectation and not a finding. The two share a shape
+ * and a confirm handler; they are not the same screen.
  *
  * Checked, so nobody repeats it: there is no 9-item run of game names in the
  * GMD at all, and the confirm handler at 0x14009a990 indexes tables at
