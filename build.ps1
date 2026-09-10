@@ -20,7 +20,13 @@ $minhookSrc = @(
 
 New-Item -ItemType Directory -Force -Path "$root\build" | Out-Null
 
-& $gcc -shared -O2 -Wall -Wextra -municode `
+# ⭐⭐ -Wclobbered EARNS ITS PLACE HERE. This project uses setjmp/longjmp for its
+# fault guard, and a non-volatile local modified between setjmp and the fault is
+# INDETERMINATE afterwards. That exact omission crashed the process once (the
+# "validated span" fast path in gmd_find.c) and was caught a second time, before
+# it ever ran, only because a TEST runner happened to use this flag. The shipping
+# build had no such protection until now.
+& $gcc -shared -O2 -Wall -Wextra -Wclobbered -municode `
     -o "$root\build\dinput8.dll" `
     "$root\src\dinput8_proxy.c" "$root\src\mod.c" "$root\src\speech.c" `
     "$root\src\log.c" "$root\src\image.c" "$root\src\gmd_find.c" `

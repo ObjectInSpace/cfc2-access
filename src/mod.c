@@ -49,6 +49,17 @@ static volatile LONG g_quit;
 /* ONE hotkey: F7 takes a capture. There is nothing else to drive, because
  * the mod makes no decisions -- see the header of pad_watch.h. */
 #define PAD_DUMP_HOTKEY      VK_F7
+
+/* ⭐ The selection probe's arm key. F6: ordinary, not a toggle, absent from the
+ * game's 70-entry KB_* binding table, and adjacent to the F5 that was verified
+ * working in-game during the route-3 work.
+ *
+ * ⚠ That history is worth not repeating: Scroll Lock was chosen once on the
+ * reasoning "avoid anything the game can bind", and it never registered at all
+ * because the OS handles TOGGLE keys specially -- two runs lost. The real
+ * hazard was VK aliasing (NumLock-off numpad keys ARE the arrow VKs), not
+ * presence in a config table. Prefer the ordinary choice. */
+#define SEL_PROBE_HOTKEY     VK_F6
 #define PAD_DUMP_HOTKEY_NAME "F7"
 
 /* Was `vk` pressed since the last check? Edge-triggered, so holding the key
@@ -631,6 +642,22 @@ static DWORD WINAPI worker(LPVOID param)
          * because it prints one line per live object. */
         if (gt_ok && (beat == 10 || beat % 5 == 0))
             gt_instance_report();
+
+        /* ⭐⭐ The SELECTION probe (step 2). F6 arms it; the three snapshots
+         * are then taken on successive polls, ~2 s apart, so the user has time
+         * to hold still for the control and then move one item.
+         *
+         * ⚠ LOG AND SPEAK ON ENTRY. Route 3 lost a diagnostic round because a
+         * hotkey bought 15 s of silence and "user quit early" was
+         * indistinguishable from "stalled". Never let a hotkey buy silence. */
+        if (gt_ok && key_pressed(SEL_PROBE_HOTKEY)) {
+            speech_say(L"Selection probe armed. Hold still.", TRUE);
+            gt_selection_arm();
+        }
+        /* One snapshot per ~10 beats (about 2 s apart at a 100 ms poll with a
+         * 2 s beat) so the steps are humanly separable. */
+        if (gt_ok && (beat % 2 == 0))
+            gt_selection_poll();
 
         /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning
          * 1.3 GB, and it duplicated work: gmd_text_ready() already calls

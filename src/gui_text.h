@@ -470,6 +470,33 @@ void gt_focus_report(void);
  * ⚠ LOGGED, NEVER SPOKEN. A live object set is not yet a row->text mapping. */
 void gt_instance_report(void);
 
+/* ---- The SELECTION probe: step 2 of docs/gui-instance-route.md -----------
+ *
+ * THE QUESTION: when the cursor moves, does anything inside a cGUIObjText say
+ * "I am the selected one"? Step 1 gave each row a stable object with correct
+ * text; what is missing is which one is FOCUSED. A numbered list (music tracks)
+ * does not need it, but Gallery's unnumbered logos do.
+ *
+ * ⛔⛔ THE SAME-SCREEN CONTROL IS THE DESIGN, and it is route 3's parting
+ * lesson: "without it, everything that merely ticks looks like a signal." Three
+ * snapshots -- one pair with NO movement (the control), one pair across a
+ * movement (the signal). Bytes that change in both are animation or timers and
+ * are SUBTRACTED. A plain before/after diff would have been worthless.
+ *
+ * Usage: press F6, hold still, then move ONE item when the log says to. */
+void gt_selection_arm(void);
+
+/* Take the next snapshot, or -- on the third -- print the subtracted result.
+ * Idle and free when not armed. Runs on the worker thread, never in a detour. */
+void gt_selection_poll(void);
+
+/* The subtraction itself, exposed so a test drives the SHIPPING code rather
+ * than a copy. `a`->`b` is the control (no movement), `b`->`c` the signal (one
+ * movement); a byte differing in the control is a ticker and never becomes a
+ * candidate. Accumulates so several objects vote. */
+void gt_selection_subtract(const BYTE *a, const BYTE *b, const BYTE *c,
+                           int *ticker, int *signal);
+
 /* --- test seams ----------------------------------------------------------
  * ⭐⭐ The stand-in must NOT re-derive what the shipping code derives. A
  * harness that recomputes the mechanism under test leaves the suite green with
