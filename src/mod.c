@@ -537,31 +537,36 @@ static DWORD WINAPI worker(LPVOID param)
             gt_last_calls = gs.calls;
             gt_last_ctors = gs.ctors;
             gt_last_text  = gs.with_text;
-            log_line("gt: %ld cGUIObjText CONSTRUCTED%s; %ld object-read(s) "
-                     "swept, %ld held TEXT; update ran %ld time(s); %ld "
-                     "guarded read(s) faulted; %ld of the WRONG CLASS; %ld "
-                     "ours, %ld other classes.%s%s%s",
+            /* ⛔⛔ THE SETTER'S COUNT WAS COLLECTED AND NEVER PRINTED, and it
+             * cost a run. The line below was built around the retired ring
+             * sweep, so a run could report "0 held TEXT" while saying nothing
+             * about whether the text hook had fired even once -- which is the
+             * one number that separates "never called" from "called and
+             * filtered". Adding a stat to the struct is not adding it to the
+             * REPORT; this project's own rule is that a count nobody prints is
+             * a count nobody has. */
+            log_line("gt: %ld CONSTRUCTED%s; setText ran %ld time(s), %ld "
+                     "string(s) captured; %ld guarded read(s) faulted.%s%s%s",
                      gs.ctors,
                      gs.ctor_hooked ? "" : " (⚠ CTOR NOT HOOKED -- this zero "
                                            "measures nothing)",
-                     gs.distinct, gs.with_text,
-                     gs.calls, gs.faults, gs.wrong_class,
-                     gs.ours, gs.other_class,
-                     /* ⭐⭐ The decisive reading, stated in the log so it does
+                     gs.settext_calls, gs.with_text, gs.faults,
+                     /* ⭐⭐ The decisive readings, stated in the log so they do
                       * not have to be reconstructed later from raw counts. */
                      (gs.ctor_hooked && gs.ctors == 0)
                          ? "  ⛔⛔ ZERO CONSTRUCTED: the shell never builds this "
-                           "class. The whole cGUIObjText route is CLOSED -- "
-                           "this is a decisive answer, not a missed hook."
+                           "class. The cGUIObjText route is CLOSED -- decisive, "
+                           "not a missed hook."
                          : "",
-                     (gs.ctor_hooked && gs.ctors > 0 && gs.calls == 0)
-                         ? "  ⭐ Objects EXIST but slot 13 never ran: the class "
-                           "is right and the update method is wrong. Instance "
-                           "pointers were still captured at construction."
+                     (gs.ctors > 0 && gs.settext_calls == 0)
+                         ? "  ⛔ Objects exist but setText NEVER RAN: the class "
+                           "is right and 0x1402f0b50 is not how its text is "
+                           "assigned. Find the other writer."
                          : "",
-                     (gs.calls > 0 && gs.ours == 0)
-                         ? "  ⛔ calls>0 but NONE were ours: this method runs, "
-                           "but cGUIObjText never reaches it."
+                     (gs.settext_calls > 0 && gs.with_text == 0)
+                         ? "  ⛔ setText ran but captured NOTHING: it is firing "
+                           "for objects the vptr filter rejects, or the string "
+                           "argument is unreadable. NOT a class problem."
                          : "");
         }
 
