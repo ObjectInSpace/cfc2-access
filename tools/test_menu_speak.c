@@ -223,8 +223,22 @@ int main(void)
          * discovery pass proves its labels; a base here would be the exact
          * confident-wrong-name failure. */
         else if (a->kind == MC_LIST) {
-            if (a->count <= 0 || a->base_index < 0)
+            /* ⭐ A flat list needs EITHER a base OR a label map -- and never
+             * both. Online Play is a plain vertical menu whose items are
+             * 68,69,70,71,1076,1078, so a base cannot address it; its row
+             * carries `labels` and base_index -1.
+             *
+             * ⛔ "Both" must stay illegal: a map exists precisely because
+             * base+index would land on the wrong string, so a row offering a
+             * fallback base would reintroduce the bug the map prevents. */
+            if (a->count <= 0)
                 sane = 0;
+            if (a->labels) {
+                if (a->base_index != -1 || a->nlabels != a->count)
+                    sane = 0;
+            } else if (a->base_index < 0) {
+                sane = 0;
+            }
         } else {
             if (a->base_index != -1)
                 sane = 0;             /* a settings row must claim NO label */
@@ -238,14 +252,58 @@ int main(void)
          * speak the main menu's labels. Only VERIFIED_LIVE_TEXT may ship. */
         if (a && a->how != MC_VERIFIED_LIVE_TEXT)
             sane = 0;
+        /* ⭐⭐ TWO ROWS MAY SHARE A CALLER -- BUT ONLY IF THE COUNT TELLS THEM
+         * APART. Measured: 0x14009ba21 is "Select Mode" at 3 items AND the
+         * Online Play menu at 6; the generic cursor helper is shared, so a
+         * call site is not a unique screen identity.
+         *
+         * ⛔ This LOOSENS nothing that matters. If two rows shared a caller
+         * AND a count, menu_speak_lookup_n() could not choose between them and
+         * would silently return the first -- the same class of bug as the
+         * guessed row, arriving by a different door. That stays illegal. */
         for (int j = i + 1; j < nrows; j++) {
             const mc_screen *b = menu_speak_row(j);
-            if (a && b && a->caller == b->caller)
+            if (!a || !b || a->caller != b->caller)
+                continue;
+            if (a->count <= 0 || b->count <= 0 || a->count == b->count)
                 sane = 0;
         }
     }
-    check("9. every row is verified by live text, sane, and unique",
-          sane, "rows=%d", nrows);
+    check("9. every row is verified, sane, and distinguishable "
+          "(caller+count unique)", sane, "rows=%d", nrows);
+
+    /* --- case 9b: the SHARED CALLER is resolved by item count -------------
+     * ⭐⭐ 0x14009ba21 serves two screens. The count is what tells them apart,
+     * and this asserts the lookup actually uses it -- otherwise case 9's
+     * loosened uniqueness rule would be permission without a mechanism.
+     *
+     * ⚠ Asserted on the NAMES, not merely on "two different pointers": a
+     * lookup that returned the wrong row for each count would still return
+     * two distinct pointers and pass a weaker form. */
+    {
+        const mc_screen *three = menu_speak_lookup_n(0x14009ba21ULL, 3);
+        const mc_screen *six   = menu_speak_lookup_n(0x14009ba21ULL, 6);
+        int ok = three && six && three != six &&
+                 strcmp(three->name, "Select Mode") == 0 &&
+                 strcmp(six->name, "Online Play") == 0 &&
+                 six->labels && six->nlabels == 6 &&
+                 /* the map's first and last entries, from the run's captions */
+                 six->labels[0] == 68 && six->labels[5] == 1078;
+        check("9b. a shared caller resolves by item count", ok,
+              "3->%s  6->%s",
+              three ? three->name : "(none)", six ? six->name : "(none)");
+    }
+
+    /* --- case 9c: an UNKNOWN count still yields a row, not nothing --------
+     * ⚠ A count we have never seen must fall back to the caller match rather
+     * than returning NULL -- the screen is then refused by the count guard in
+     * menu_speak_build(), which reports WHY. Returning NULL here would collapse
+     * "unknown screen" and "known screen, unexpected count" into one outcome. */
+    {
+        const mc_screen *odd = menu_speak_lookup_n(0x14009ba21ULL, 99);
+        check("9c. an unseen count falls back to the caller match",
+              odd != NULL, "got %s", odd ? odd->name : "(none)");
+    }
 
 
 

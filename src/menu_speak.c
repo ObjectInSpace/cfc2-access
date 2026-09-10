@@ -77,6 +77,34 @@ static const int g_select_game_rows[] = { 51, 52, 56 };
  * nothing here is inferred from item count or from base 37 being "close". */
 static const int g_mode_select_rows[] = { 4105, 4106, 4107 };
 
+/* ⭐⭐ ONLINE PLAY -- established 2026-09-09 (23:13 run) from the game's OWN
+ * captions, one per row. Not inferred, not from item count, not from a
+ * contiguous run.
+ *
+ * Each row was named by the caption the shell set while the cursor stood on
+ * it, matched to its item by stem (HELP_CASUAL_MATCH -> CASUAL_MATCH):
+ *
+ *   pos 1  idx   68  CASUAL_MATCH       "Play a friendly match against other players."
+ *   pos 2  idx   69  RANK_MATCH         "Test your skills in a competitive match..."
+ *   pos 3  idx   70  CUSTOM_MATCH       "Create your own lobby with your own game rules..."
+ *   pos 4  idx   71  RANK_LEADERBOARD   "View leaderboards based on the League Points..."
+ *   pos 5  idx 1076  SCORE_ATTACK       "Compete for high scores under set rules."
+ *   pos 6  idx 1078  SCORE_LEADERBOARD  "View High Score Challenge leaderboards."
+ *
+ * ⭐⭐ IT IS NOT A CONTIGUOUS RUN, which is why no base could ever have named
+ * it: rows 1-4 come from 68..71 but rows 5-6 come from 1076/1078, ~1000 labels
+ * away. tools/name_screens.py reported ⛔ SIGHTINGS DISAGREE and refused to
+ * pick a base -- correctly. A "close-looking" base would have spoken
+ * HELP_ strings as item names at positions 5 and 6.
+ *
+ * ⚠ Row 3's caption arrived too late to be spoken with its movement, so the
+ * log's spoken line says only "3 of 6". It is established anyway, from the
+ * FOCUS RECORD, which captured "Create your own lobby..." under that
+ * movement's own sequence number -- and independently from the game setting
+ * the literal string "Custom Match". Two sources, neither of them arithmetic.
+ * (The gap 68,69,?,71 also predicts 70, but a prediction is not why it ships.) */
+static const int g_online_play_rows[] = { 68, 69, 70, 71, 1076, 1078 };
+
 /* ⚠⚠ CANDIDATE ONLY -- NOT REFERENCED BY ANY SHIPPED ROW.
  *
  * The 3-item horizontal screen at caller 0x1400b2729 loads the layout
@@ -183,6 +211,23 @@ static const mc_screen g_screens[] = {
      * established. See the comment on g_mode_select_rows. */
     { 0x14009ba21ULL, -1, 3, "Select Mode", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_ROW, 0, g_mode_select_rows, 3, NULL, 0 },
+
+    /* ⭐⭐ Online Play -- SAME CALLER as the row above, six items instead of
+     * three. See g_online_play_rows for the per-row evidence, and
+     * menu_speak_lookup_n() for why the count is now part of the key.
+     *
+     * ⚠⚠ THIS IS THE CALLER A GUESSED ROW WAS ONCE SHIPPED FOR, and the reason
+     * that guess was wrong is visible right here: the caller genuinely serves
+     * more than one screen, so "the only 6-item vertical screen we have seen"
+     * was never going to be a safe inference. What makes THIS row different is
+     * not more confidence -- it is that every one of its six labels came from a
+     * caption the game itself set on that row.
+     *
+     * MC_LIST with a label MAP: labels != NULL replaces base_index, and
+     * base_index stays -1 so no base+offset fallback can reach a HELP_ string
+     * at positions 5 and 6. */
+    { 0x14009ba21ULL, -1, 6, "Online Play", MC_VERIFIED_LIVE_TEXT,
+      MC_LIST, 0, g_online_play_rows, 6, NULL, 0 },
 
     /* ⭐ PC Settings -- a row/value screen like Select Game.
      *
@@ -328,6 +373,42 @@ const mc_screen *menu_speak_lookup(ULONGLONG caller)
     return NULL;
 }
 
+/* ⭐⭐ ONE CALLER CAN SERVE SEVERAL SCREENS, so the caller alone is no longer a
+ * sufficient key -- MEASURED, not anticipated.
+ *
+ * 0x14009ba21 shipped as "Select Mode" (3 items: Arcade / Versus / Training).
+ * Across the runs of 2026-09-09 22:50 and 23:13 it appeared FIFTEEN times and
+ * was a SIX-item screen every single time -- the Online Play menu, identified
+ * from the game's own captions. The generic cursor helper is shared, so the
+ * same call site drives more than one menu.
+ *
+ * ⚠ The count guard already kept this SAFE: a row whose count disagrees is
+ * refused and the mod speaks position only. What it could not do is let the
+ * OTHER screen be named, because this lookup returned the first caller match
+ * and menu_speak_build then rejected it.
+ *
+ * ⭐ So match on caller AND live item count. A row with count <= 0 (a map-only
+ * row that deliberately names nothing yet) still matches on caller alone, so
+ * nothing that worked before changes.
+ *
+ * ⛔ This does NOT relax any verification rule. Both rows for a shared caller
+ * must still be MC_VERIFIED_LIVE_TEXT; the count is a DISCRIMINATOR between
+ * verified rows, never a reason to admit an unverified one. */
+const mc_screen *menu_speak_lookup_n(ULONGLONG caller, int item_count)
+{
+    const mc_screen *caller_only = NULL;
+
+    for (int i = 0; i < NSCREENS; i++) {
+        if (g_screens[i].caller != caller)
+            continue;
+        if (g_screens[i].count > 0 && g_screens[i].count == item_count)
+            return &g_screens[i];          /* exact: caller AND count agree */
+        if (caller_only == NULL)
+            caller_only = &g_screens[i];   /* fall back to the first match */
+    }
+    return caller_only;
+}
+
 /* ⭐⭐ THE ROW DERIVATION -- see the header for why this is arithmetic and not
  * remembered state.
  *
@@ -388,7 +469,11 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
     out->position = m->new_index - m->min_index + 1;
     out->total    = m->max_index - m->min_index + 1;
 
-    const mc_screen *s = menu_speak_lookup((ULONGLONG)(ULONG_PTR)m->caller);
+    /* ⭐ Count-aware: one caller can serve several screens (0x14009ba21 is both
+     * "Select Mode" at 3 items and the Online Play menu at 6). See
+     * menu_speak_lookup_n(). */
+    const mc_screen *s = menu_speak_lookup_n((ULONGLONG)(ULONG_PTR)m->caller,
+                                             out->total);
     if (!s) {
         out->why = MC_UNNAMED_SCREEN_UNKNOWN;
         return;                        /* unknown screen -> position only */
@@ -544,9 +629,35 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
         return;
     }
 
+    /* ⭐⭐ A FLAT LIST MAY ALSO NEED A MAP. Until Online Play, every MC_LIST
+     * screen was a contiguous run and only settings screens carried `labels`.
+     * Online Play is a plain vertical menu whose six items are 68,69,70,71 and
+     * then 1076,1078 -- ~1000 labels away. So `labels` is honoured here too.
+     *
+     * ⛔ A map REPLACES the base; it never falls back to base+index. That is
+     * the whole point: on this screen a "close" base would read HELP_ strings
+     * out as item names at positions 5 and 6. The header states the same rule
+     * for settings screens and it applies identically here. */
+    int gmd_index;
+    if (s->labels) {
+        int i = m->new_index - m->min_index;
+        if (s->nlabels != out->total || i < 0 || i >= s->nlabels) {
+            /* The map does not describe this screen -- refuse it rather than
+             * index outside it. */
+            out->why = MC_UNNAMED_COUNT_MISMATCH;
+            return;
+        }
+        gmd_index = s->labels[i];
+    } else if (s->base_index >= 0) {
+        gmd_index = s->base_index + (m->new_index - m->min_index);
+    } else {
+        /* No map and no base: nothing to name with. */
+        out->why = MC_UNNAMED_NO_LABELS;
+        return;
+    }
+
     char text[128];
-    if (!gmd_text_by_index(s->base_index + (m->new_index - m->min_index),
-                           text, sizeof(text)) || !text[0]) {
+    if (!gmd_text_by_index(gmd_index, text, sizeof(text)) || !text[0]) {
         out->why = MC_UNNAMED_TEXT_UNREADABLE;
         return;                        /* could not read -> position only */
     }
@@ -780,7 +891,9 @@ void menu_speak_probe_rest(const mc_move *m)
 
     probe_option_ids(m);
 
-    const mc_screen *s = menu_speak_lookup((ULONGLONG)(ULONG_PTR)m->caller);
+    const mc_screen *s =
+        menu_speak_lookup_n((ULONGLONG)(ULONG_PTR)m->caller,
+                            m->max_index - m->min_index + 1);
     if (!s || s->kind != MC_SETTINGS_VALUE)
         return;
 

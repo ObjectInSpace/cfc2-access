@@ -260,6 +260,22 @@ const mc_screen *menu_speak_sibling_row(const mc_screen *v);
 int  menu_speak_screen_count(void);
 const mc_screen *menu_speak_lookup(ULONGLONG caller);
 
+/* ⭐⭐ Look a screen up by caller AND live item count.
+ *
+ * ONE CALLER CAN SERVE SEVERAL SCREENS -- measured, not anticipated.
+ * 0x14009ba21 ships as "Select Mode" (3 items) and is ALSO the Online Play
+ * menu (6 items); across two runs it appeared 15 times, always at 6. The
+ * generic cursor helper is shared between menus, so the call site is not a
+ * unique screen identity.
+ *
+ * A row with count > 0 matches only when the live count agrees. A row with
+ * count <= 0 (a deliberately unnamed map-only row) still matches on caller
+ * alone, so existing behaviour is unchanged.
+ *
+ * ⛔ The count DISCRIMINATES between verified rows; it never admits an
+ * unverified one. Every row still needs MC_VERIFIED_LIVE_TEXT. */
+const mc_screen *menu_speak_lookup_n(ULONGLONG caller, int item_count);
+
 /* Test-only: row i of the shipped table, or NULL. Lets the suite check the
  * hand-edited rows for typos and duplicate callers. */
 const mc_screen *menu_speak_row(int i);
