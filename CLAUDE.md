@@ -81,84 +81,66 @@ before touching that work.
 
 - `src/log.c` — timestamped logging.
 
-## ▶ START HERE (next session): the GUI text route needs a NEW KIND of target
+## ▶ START HERE (next session): the GUI text reader WORKS -- now use it
 
-**The reader is built, tested and deployed. It has been RUN FOUR TIMES and
-every hook target was wrong.** `src/gui_text.c`, commits 107676b..e4a46ed.
-Full detail in memory `cfc2-gui-text-reader-built`.
+**SOLVED 2026-09-09.** The mod captures the shell's live on-screen text.
+Verified in-game: **324 calls, 324 strings, 0 faults.** Detail in memory
+`cfc2-gui-text-reader-built`.
 
-⛔⛔ **Do not try another slot of cGUIObjText's vtable.** All 28 are accounted
-for: four are unique+callerless (factory, destructor, getDTI stub, deleting
-destructor), thirteen are shared across 214-4196 vtables, and the rest are
-tiny accessors too short to patch. **The class exposes no hookable per-frame
-method.** That is a property of the class, not a failure to look harder.
+**The hook:** `0x1402f0d80` = `setText(cGUIObjText *this, const char *s, ...)`,
+**instance vtable `0x141056b40`, SLOT 25**. The text arrives as an ARGUMENT.
 
-### ⭐⭐ The three questions, in order -- each one bought with a game launch
-Before hooking ANY vtable slot in this engine:
+⚠ There are FOUR near-identical setText overloads across two classes and only
+this one fires. All four are hooked, each with its own counter, so the log
+names the winner rather than leaving it to a guess.
 
-1. Is the address in exactly one vtable?
-   ⛔ Run 1: slot 5 passed and was still wrong. It is a **shared helper** that
-   three sites reach by direct `call rel32`, so they pass their OWN `this`. It
-   handed us an `nGUI::OutlineFont` and 41 Adobe glyph names. "Unique to the
-   class" is the wrong question; **"reached only through the class's vtable"**
-   needs the caller count too.
-2. Does it have zero direct callers?
-   ⛔ Run 2: slot 1 passed 1 and 2 and was still wrong. It is the class
-   **factory** -- so it is called on the DTI descriptor, not an element. One
-   distinct pointer across 61 calls, whose "text" was the GUI class names.
-3. ⭐⭐ **Is it an INSTANCE method** -- does it run per element, per frame, on
-   objects already built? A ctor, a dtor and a factory all pass 1 and 2 and
-   none hands over a live populated element.
+**What it captures** -- UTF-8 with inline engine markup:
 
-### ⭐ And the check that decides class membership: is the vtable REGISTERED?
-Run 4 hooked what I had read as cGUIObjText's "second vtable" (`0x141056480`,
-the address its factory stores). Searching every data section for it:
+    "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+    "Choose the game you want to play.  <SIZE 58><ICON BTN_START></SIZE>
+     Training <SIZE 58><ICON BTN_X></SIZE>Game Settings ... Back"
+    "P1"
 
-    0x1410563a8 -> referenced once, DTI slot 0x1422cae28  (cGUIObjText)
-    0x141056480 -> referenced NOWHERE
+### ▶ THE NEXT WORK -- ordinary string handling, not reverse engineering
+1. **Strip the markup.** `<FONT n>`, `<SIZE n>`, `<ICON NAME>` tags must not
+   reach the user as tag soup.
+2. **Map the ICON tokens to spoken words** (`DECIDE` -> the confirm button,
+   `BTN_START` -> Start, ...). The token vocabulary is already catalogued --
+   see memory `cfc2-text-corpus`, 132 ICON tokens.
+3. ⚠ **Establish what these strings ARE before wiring them to speech.** The
+   captures so far are whole help/prompt STRIPS, not per-item labels. Whether a
+   menu row's own caption comes through the same path is an OPEN QUESTION. Do
+   not assume it and build a join on top of the assumption -- that is the shape
+   of the bug that made a screen speak another screen's labels.
 
-Class names here are a **packed string pool with vtables interleaved**, so an
-unregistered address next to a known vtable is just a different class's table
-sitting nearby. ⭐⭐ **Adjacency in a pool is not class membership.**
+### ⭐⭐ THE LESSON THAT COST THE MOST RUNS
+**Hook ALL candidates and let the run name the winner** (memory:
+`hook-all-candidates-let-the-run-decide`). I hooked the best-looking of four
+overloads and got "setText ran 0 times" -- indistinguishable from "no such
+mechanism". Hooking one and guessing would have been wrong 4 ways out of 4.
 
-### ▶ The next route -- different in kind, not another slot
-⭐⭐ **Catch the element being FILLED, not drawn.** Something copies a GMD
-string into an element, and that writer takes the element and the message as
-ARGUMENTS -- the shape that has worked 4/4 here (sPad, sKeyboard, the GMD
-table, the cursor chokepoint) and that scanning has failed at every time. Find
-the call taking an `rGUIMessage` and an element.
+And underneath four earlier failed runs: **the vtable was off by one DTI
+record.** The DTI table is 0x38-byte stride where `+0x00` is a class's vtable
+and `+0x08` is a name pointer belonging to its NEIGHBOUR -- so `0x1410563a8`
+is cGUIObjRoot's, not cGUIObjText's. ⭐ `tools/dti_table.py` walks it correctly;
+use it rather than reading names off adjacency.
 
-⚠ **Cheap check first:** `cGUIObjMessage` (0x170 bytes, registration stub
-`0x14002e850`) may be the class that actually holds menu label text, with
-cGUIObjText being the free-text/font half. **Nothing in four runs has shown a
-cGUIObjText carrying a menu label.** ⛔ Resolve its vtable from its DTI
-reference, NOT from what follows its name in the pool.
+⭐⭐ **When a DERIVED value and a MEASURED one disagree, the measurement is the
+fact.** Five disassembly readings each looked sound and each was wrong.
 
-### What is proven good and stays
-- **The vptr filter** -- run 3: 10 calls in, 10 correctly classified, 0 faults,
-  0 leaks. Tested offline (case 2b) and live. It makes any future shared-helper
-  hook usable.
-- **The refusal** -- a foreign vptr RETURNS instead of warning above a full
-  dump. Run 1 printed 41 glyph-name lines under a warning, and both "candidate"
-  offsets held plausible strings. Two candidates both hitting is not
-  corroboration; it is what a dense pointer array looks like from outside.
-  ⭐ If the code prints a warning, something must FAIL on it.
-- ⚠⚠ **The vptr read needs BOTH layers** -- `mem_readable_run()` then
-  `MEM_GUARDED`. With only the guard, the offline suite died 0xC0000005 on a
-  synthetic pointer: a vectored handler cannot save a fault it cannot unwind.
-  Same pairing as `menu_cursor`'s `cursor_is_safe()`, same reason.
-- Switch: `cfc2_guitext.on` (absent = off). Respects `cfc2_hook.off`.
+### ⚠ And half the wasted runs were my own plumbing, not the target
+- a seq-bracket copied from a channel ticking a few times per keypress onto one
+  firing 650/second: 616 strings captured, **zero logged**;
+- an unbounded spin-lock on the worker thread (a frozen mod, not a missed line);
+- a stat collected and never printed, so a run could not say whether the hook
+  had fired at all. **A count nobody prints is a count nobody has.**
 
 ### The test: `.\tools\run_gt_test.ps1`
 un_gt_test.ps1`
-Thirteen offline cases; each mechanism sabotaged and seen to fail.
-⭐ Case 5 (no text -> **-1**) and case 2b (another class's object is filtered,
-and "still the previous capture" rather than merely "not theirs") carry the
-weight.
-⚠ A green run is NOT evidence the live read is safe -- the test path never
-touches foreign memory.
-⛔ Run it with PowerShell directly. Via some shells a crashing suite reported
-exit 0 with no output; the real result was 0xC0000005.
+18 cases, every mechanism sabotage-verified.
+⚠ Run it through PowerShell directly -- via some shells a crashing suite
+reported exit 0 with no output.
+Switch: `cfc2_guitext.on` (absent = off). Respects `cfc2_hook.off`.
 
 ## Screens named so far (7 rows in `g_screens`)
 Main menu · Options · Museum (992 GALLERY/SOUND) · Select Game (rows +
