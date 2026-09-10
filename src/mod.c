@@ -23,6 +23,7 @@
 #include "kbd_state.h"
 #include "gui_text.h"
 #include "menu_cursor.h"
+#include "menu_speak.h"   /* menu_speak_set_discovery() */
 
 #include <stdio.h>
 
@@ -289,6 +290,20 @@ static DWORD WINAPI worker(LPVOID param)
      * the only screen-naming tool off in every real session.
      *
      * Shares cfc2_hook.off, so one file still makes the whole mod read-only. */
+    /* ⛔ The DISCOVERY candidate sweep: a development aid, OFF by default.
+     * It stalled the user's session twice (37 s, then 11.9 s) and has named
+     * zero shipped screens. Unknown screens are still logged without it.
+     * See menu_speak_set_discovery(). */
+    {
+        BOOL disc_on = opt_in_file_present("cfc2_discover.on");
+        menu_speak_set_discovery(disc_on);
+        if (disc_on)
+            log_line("mcspeak: ⚠ cfc2_discover.on present -- the DISCOVERY "
+                     "candidate sweep is ENABLED. It runs on the poll thread "
+                     "and has stalled sessions before; remove the file when "
+                     "you are done naming a screen.");
+    }
+
     BOOL gt_on = opt_in_file_present("cfc2_guitext.on");
     BOOL gt_ok = FALSE;
     if (unpacked && hook_enabled && gt_on) {

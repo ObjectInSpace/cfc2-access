@@ -276,6 +276,28 @@ const mc_screen *menu_speak_lookup(ULONGLONG caller);
  * unverified one. Every row still needs MC_VERIFIED_LIVE_TEXT. */
 const mc_screen *menu_speak_lookup_n(ULONGLONG caller, int item_count);
 
+/* Enable the DISCOVERY candidate sweep. OFF by default.
+ *
+ * ⛔ It is a development aid, not a user feature, and it stalled a live session
+ * twice (37 s, then 11.9 s) while having named exactly ZERO shipped screens --
+ * every g_screens row cites live text, the disassembly, or the caption
+ * channel. Unknown screens are still LOGGED when it is off; only the expensive
+ * candidate hunt is gated.
+ *
+ * ⭐ For naming screens, prefer the caption channel: tools/name_screens.py
+ * reproduces three independently verified bases from an ordinary run's log. */
+void menu_speak_set_discovery(BOOL on);
+
+/* Is the sweep currently enabled? Exists so the suite can assert the DEFAULT
+ * directly.
+ *
+ * ⚠ Asserting it by TIMING menu_speak_log_unknown() looked reasonable and was
+ * vacuous: the offline harness has no live GMD, so the sweep exits early on
+ * `gmd_text_count() > 0` whatever the gate says, and the case passed with the
+ * gate deleted. Test the state, not a side effect that another guard also
+ * produces. (memory: harness-supplies-the-mechanism) */
+BOOL menu_speak_discovery_enabled(void);
+
 /* Test-only: row i of the shipped table, or NULL. Lets the suite check the
  * hand-edited rows for typos and duplicate callers. */
 const mc_screen *menu_speak_row(int i);

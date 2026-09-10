@@ -793,17 +793,49 @@ void menu_speak(const mc_move *m)
 }
 
 
-/* ⛔ REMOVED: opt_discovery_enabled() and the cfc2_discover.on gate.
+/* ⭐⭐ THE DISCOVERY GATE IS BACK, and the note that removed it is superseded.
  *
- * The gate existed because an early sweep cost 4.8 s on the poll thread. That
- * cost was the per-byte guarded reader (fixed in 56fa641); the gate outlived
- * the bug and then did real harm, because with the file absent -- the normal
- * state -- the only mechanism that can name a screen never ran at all.
+ * The gate was deleted on this reasoning: it had been added for a cost that was
+ * later fixed, and with the file absent -- the normal state -- "the only
+ * mechanism that can name a screen never ran at all". That was sound WHEN
+ * WRITTEN. It is false now, and the evidence is one-sided:
  *
- * ⭐ The general shape: a guard added for a measured cost must be re-measured
- * when the cost is fixed, or it silently becomes a feature switch that is
- * always off. Measure, then delete the guard; do not keep it "just in case",
- * because a diagnostic nobody runs is a diagnostic that does not exist. */
+ *   - ⛔ The sweep has stalled the user's session TWICE (37 s on 2026-09-09
+ *     23:13, 11.9 s at 23:52). Both times the mod stopped speaking and the
+ *     user navigated blind.
+ *   - ⛔ In every run it has ever made, it printed ONE candidate list:
+ *     "248:Heavy Kick  659:Single-player Rounds  730:Damage:" -- three wrong
+ *     answers for the music screen.
+ *   - ⛔ NOT ONE shipped g_screens row was named by it. Every row cites live
+ *     text, the disassembly, or the caption channel.
+ *   - ⭐ And the premise is gone: the CAPTION channel names screens now, and
+ *     it is what named Online Play (tools/name_screens.py, 3 verified bases
+ *     reproduced). Discovery is no longer "the only mechanism"; it is the
+ *     weakest one.
+ *
+ * ⚠ This is not a retreat from the earlier lesson -- a guard must be
+ * re-measured when its cost is fixed. It IS that lesson applied again with new
+ * measurements: the cost came back, the benefit never arrived, and a better
+ * mechanism exists. Re-measure means re-measure, in both directions.
+ *
+ * ⭐⭐ AND THE PRIORITY THAT WAS INVERTED: this is a DEVELOPMENT AID. A stall
+ * in the user's speech is a broken mod; a diagnostic that does not run is an
+ * inconvenience to ME. Two rounds went into making the diagnostic fast while
+ * the user's actual bug -- "it stopped reading" -- stayed open. Off by default;
+ * create cfc2_discover.on next to the exe when deliberately naming a screen. */
+/* Set once at startup by mod.c, which owns the opt-in-file logic. Default OFF:
+ * a session that never touches it never pays for discovery. */
+static BOOL g_discovery_enabled;
+
+void menu_speak_set_discovery(BOOL on)
+{
+    g_discovery_enabled = on;
+}
+
+BOOL menu_speak_discovery_enabled(void)
+{
+    return g_discovery_enabled;
+}
 
 /* ⭐⭐ THE GAME-NAME PROBE -- LOGGED, NEVER SPOKEN.
  *
@@ -1075,26 +1107,31 @@ sweep:
      *     move-list text that can never be a menu.
      *
      * \u26a0 Everything here is LOGGED, NEVER SPOKEN. A candidate is a hypothesis. */
-    /* ⭐⭐ ON BY DEFAULT, because the cost that justified the gate is GONE.
+    /* ⛔⛔ A NOTE THAT WAS HERE CLAIMED "ON BY DEFAULT ... MEASURED, not
+     * estimated ... under 1 ms". It was written in good faith and it was
+     * wrong: the benchmark behind it had drifted from this code (it capped at
+     * 600 bases and never ran the relaxed second pass), and the real cost
+     * stalled the user for 37 s and then 11.9 s. Removed rather than left to
+     * reassure the next reader. The history it described is preserved in the
+     * v1/v2/v3 list above and in git.
      *
-     * This sweep was gated behind cfc2_discover.on after a version of it took
-     * 4.8 SECONDS on the poll thread. That cost was the per-byte guarded
-     * reader, fixed in 56fa641 -- and the gate outlived the bug.
-     *
-     * ⛔ The consequence was worse than the freeze it prevented: with the file
-     * absent (the normal state) discovery NEVER RAN, so a run that visited 21
-     * unnamed screens produced 21 "unknown screen" lines and not one candidate.
-     * The only mechanism that can name a screen was off in every ordinary
-     * session, and coverage could not grow. Three screens named in a week is
-     * the result.
-     *
-     * ⭐ MEASURED, not estimated -- against the real 4165-string blob, on the
-     * shipping code path (tools/bench_discovery.c): 0.10 ms for a 2-item menu,
-     * 0.64 ms for 8 items, 0.82 ms worst case at 40 and 67 items. Under 1 ms
-     * against a 100 ms poll, and it runs ONCE PER SCREEN, not per movement.
-     *
-     * ⚠ I have twice estimated this kind of cost by arithmetic and been wrong
-     * both times. This number came from running it. */
+     * ⛔ OFF unless deliberately enabled. This is the sweep that stalled the
+     * user twice for zero findings -- see the note on menu_speak_set_discovery.
+     * The "unknown screen" header above still logs either way, so a run always
+     * records WHICH screens are unnamed; only the expensive candidate hunt is
+     * gated. */
+    if (!g_discovery_enabled) {
+        static BOOL said;
+        if (!said) {
+            said = TRUE;
+            log_line("mcspeak: [DISCOVERY] candidate sweep is OFF (create "
+                     "cfc2_discover.on next to the exe to enable it). Unknown "
+                     "screens are still logged; naming is better served by "
+                     "the caption channel -- see tools/name_screens.py.");
+        }
+        return;
+    }
+
     if (gmd_text_count() > 0) {
         /* ⭐⭐ TWO PASSES: strict first, relaxed if strict finds too little.
          *
