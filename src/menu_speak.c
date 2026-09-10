@@ -428,6 +428,32 @@ static const mc_screen g_screens[] = {
     { 0x14009ba21ULL, -1, 6, "Online Play", MC_VERIFIED_LIVE_TEXT,
       MC_LIST, 0, g_online_play_rows, 6, NULL, 0 },
 
+    /* ⭐⭐ MUSEUM > GALLERY's game chooser, 9 items, horizontal.
+     *
+     * ESTABLISHED 2026-09-10 (17:32 run) -- the FIRST run ever to enter it.
+     * It sets the game's full arcade title as a per-movement caption:
+     *
+     *   pos 1  "Capcom Fighting Collection 2"                   (x1)
+     *   pos 2  "Capcom Vs. SNK: Millennium Fight 2000 Pro"      (x2)
+     *   pos 3  "Capcom Vs. SNK 2: Mark of the Millennium 2001"  (x2)
+     *   pos 4  "Capcom Fighting Evolution"                      (x1)
+     *
+     * ⛔⛔ THIS RETIRES A CLAIM HELD FOR WEEKS: "Gallery's items are unnumbered
+     * logos and its confirm indexes resource-id tables, so it needs a selection
+     * signal." The second half is true and the CONCLUSION was false -- the
+     * screen sets text freely. Nothing had ever entered it; the claim was
+     * extrapolated from the confirm handler.
+     *
+     * ⚠ count = 0: position 1 is the COLLECTION itself, not a ROM, so the strip
+     * is 1 + 8 games. A count is not what keeps this honest -- the ROM-table
+     * corroboration is.
+     *
+     * ⚠ The sibling strip under MUSIC (0x14009af21) is NOT this screen and is
+     * deliberately absent: in the same run it produced NO captions at all. Two
+     * 9-item horizontal choosers, different behaviour, separate evidence. */
+    { 0x14009a482ULL, -1, 0, "Gallery", MC_VERIFIED_LIVE_TEXT,
+      MC_GAME_STRIP, 0, NULL, 0, NULL, 0 },
+
     /* ⭐⭐ The LOBBY menu (Online Play > Custom Match). See g_lobby_rows: all
      * three positions named by their own captions across 7 sightings. */
     { 0x140083e09ULL, -1, 3, "Lobby", MC_VERIFIED_LIVE_TEXT,
@@ -841,6 +867,16 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
      * ⭐ The framing is the whole benefit available today: "row 2 of 3" and
      * "value 3 of 8" are both TRUE statements telling a blind user which axis
      * they just moved on -- which a bare "3 of 8" did not. */
+    /* ⭐ A GAME-TITLE STRIP. The item name arrives as the movement's caption
+     * and is corroborated against the exe's ROM table; that happens in
+     * menu_speak() where the caption is in hand. Nothing to resolve here, so
+     * the flag is set and the position speaks meanwhile. */
+    if (s->kind == MC_GAME_STRIP) {
+        out->game_strip = TRUE;
+        out->why = MC_UNNAMED_NO_LABELS;
+        return;
+    }
+
     /* ⭐⭐ A NUMBERED LIVE LIST: the item names itself on screen.
      *
      * Ask the instance set for the object whose text begins with THIS position's
@@ -1254,6 +1290,37 @@ void menu_speak(const mc_move *m)
                     size_t used = strlen(line);
                     _snprintf(line + used, sizeof(line) - used - 1,
                               ". %s", spoken);
+                    line[sizeof(line) - 1] = '\0';
+                }
+            } else if (!sp.named && sp.game_strip &&
+                       rom_table_has_title(cap)) {
+                /* ⭐⭐ A GAME-TITLE STRIP: the caption IS the item name.
+                 *
+                 * Museum > Gallery draws the full arcade title on each
+                 * movement -- "Capcom Vs. SNK: Millennium Fight 2000 Pro" --
+                 * and the corpus refuses it because those titles are not GMD
+                 * message labels. That is a corpus MISS, not an absent signal,
+                 * and the screen read as silent because of it.
+                 *
+                 * ⭐ TWO INDEPENDENT SOURCES, the standard every shipped row
+                 * here meets: the game DREW this string on this movement, and
+                 * the exe's own ROM table agrees it is a real game title. A
+                 * caption that is not in that table is refused -- so a help
+                 * sentence or a stray value can never become an item name.
+                 *
+                 * ⛔ It cannot reuse the value-quote path below: that caps at
+                 * 40 characters (two of these titles are 41 and 45) and applies
+                 * only to MC_AXIS_VALUE. Widening that guard would loosen every
+                 * settings screen to fix this one screen.
+                 *
+                 * ⚠ Gated on sp.game_strip, so the rule is unreachable on any
+                 * screen the table does not declare as a game strip -- being in
+                 * the ROM table is not by itself permission to speak. */
+                char spoken[GM_OUT_MAX];
+                gm_speak(cap, spoken, sizeof(spoken));
+                if (spoken[0] && !gm_has_residue(spoken)) {
+                    _snprintf(line, sizeof(line), "%s, %d of %d",
+                              spoken, sp.position, sp.total);
                     line[sizeof(line) - 1] = '\0';
                 }
             } else if (!sp.named && sp.axis == MC_AXIS_VALUE &&

@@ -226,6 +226,66 @@ int main(void)
         }
         check("9. slots 0..7 map to the confirmed game order", ok, "");
     }
+
+    /* --- 10: a real title is recognised, a non-title is NOT ---------------
+     * ⭐⭐ This predicate is the ONLY corroboration on speaking a Gallery
+     * caption, so both directions matter. A matcher that always said yes would
+     * let any caption -- a help sentence, a stray value -- become an item name
+     * on that screen, which is the substitution menu_speak.c exists to prevent.
+     *
+     * ⚠ The negative is the discriminating half and is asserted FIRST-CLASS,
+     * not as an afterthought: "Title Of Game 3x" is deliberately a near-miss of
+     * a real entry, so a prefix-compare bug fails here rather than shipping. */
+    {
+        build_table(NREC);
+        int yes_exact = rom_table_has_title("Title Of Game 0");
+        int yes_last  = rom_table_has_title("Title Of Game 17");
+        int no_near   = rom_table_has_title("Title Of Game 3x");
+        int no_prefix = rom_table_has_title("Title Of Game");
+        int no_empty  = rom_table_has_title("");
+        int no_null   = rom_table_has_title(NULL);
+        int no_prose  = rom_table_has_title("Choose the game you want to play.");
+        check("10. ROM titles match exactly; near-misses and prose do NOT",
+              yes_exact && yes_last && !no_near && !no_prefix && !no_empty &&
+              !no_null && !no_prose,
+              "exact=%d last=%d near=%d prefix=%d empty=%d null=%d prose=%d",
+              yes_exact, yes_last, no_near, no_prefix, no_empty, no_null,
+              no_prose);
+    }
+
+    /* --- 11: the match is CASE-INSENSITIVE -------------------------------
+     * ⚠ MEASURED, not stylistic. The 2026-09-10 17:32 log contains BOTH
+     * "Capcom Vs. SNK: Millennium Fight 2000 Pro" and "Capcom vs. SNK:
+     * Millennium Fight 2000 Pro" -- the shell displays the same game with
+     * different casing on different screens. An exact compare would name a game
+     * on one screen and refuse it on another. */
+    {
+        build_table(NREC);
+        int upper = rom_table_has_title("TITLE OF GAME 5");
+        int lower = rom_table_has_title("title of game 5");
+        int mixed = rom_table_has_title("TiTlE oF gAmE 5");
+        /* ...but case-insensitivity must not become "close enough". */
+        int still_no = rom_table_has_title("title of game 55");
+        check("11. titles match case-insensitively, but not loosely",
+              upper && lower && mixed && !still_no,
+              "upper=%d lower=%d mixed=%d near=%d",
+              upper, lower, mixed, still_no);
+    }
+
+    /* --- 12: an UNREADABLE table recognises NOTHING ------------------------
+     * ⭐⭐ "Could not read" must not look like "read and matched". With the
+     * table pointed at unmapped memory the predicate must refuse everything --
+     * otherwise a failed identity check would silently become permission to
+     * speak whatever the caption happened to say. */
+    {
+        rom_table_test_redirect(0x10ULL, 0x10ULL);   /* certainly unmapped */
+        int any = rom_table_has_title("Title Of Game 0");
+        rom_table_test_redirect(0, 0);
+        build_table(NREC);
+        check("12. an unreadable ROM table recognises NOTHING", !any,
+              "matched=%d", any);
+    }
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");

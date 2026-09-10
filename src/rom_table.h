@@ -67,6 +67,19 @@ BOOL rom_table_region(int i, char *out, unsigned cap);
  * Returns -1 when the result would be out of range. */
 int rom_table_index_for(int game, int version);
 
+/* ⭐⭐ Is `s` one of the titles the exe's ROM table holds? Compared
+ * case-INSENSITIVELY: the shell displays both "Capcom Vs. SNK" and "Capcom vs.
+ * SNK" for the same game (both appear in the 2026-09-10 17:32 log), so an exact
+ * compare would name a game on one screen and refuse it on another.
+ *
+ * Used to corroborate a live caption on a game-title strip: the caption says
+ * what the game DREW, this says the exe agrees it is a real game title. Two
+ * independent sources, which is the standard every shipped row here meets.
+ *
+ * ⚠ Returns FALSE unless rom_table_ready() -- without the identity check this
+ * would compare against whatever sits at those addresses. */
+BOOL rom_table_has_title(const char *s);
+
 /* Is the table where we think it is? Checks that record 0's code is "cvs1"
  * and that the index table's first pointer targets it -- a positive identity
  * check, not merely a readable address. */

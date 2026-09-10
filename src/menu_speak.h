@@ -120,7 +120,20 @@ typedef enum {
      * The item is named by asking the live instance set for the object whose
      * text starts with THIS position's number, so the game's own numbering and
      * the cursor's index must agree. No `base_index`, no `labels`. */
-    MC_NUMBERED_LIVE
+    MC_NUMBERED_LIVE,
+    /* ⭐⭐ A strip whose items are GAME TITLES, named from the caption the game
+     * sets on each movement and CORROBORATED against the exe's ROM table.
+     *
+     * The Museum > Gallery chooser (0x14009a482) is the first. Its titles are
+     * the full arcade names -- "Capcom Vs. SNK: Millennium Fight 2000 Pro" --
+     * which are NOT in the GMD corpus, so prompt_identify refuses them and the
+     * screen read as silent. That is a corpus miss, not an absent signal.
+     *
+     * ⛔ It cannot use the value-quote path: that caps at 40 characters (two of
+     * these titles are 41 and 45) and applies only to a VALUE axis. Widening
+     * that guard would loosen every settings screen to fix this one, so this
+     * gets its own narrow rule instead. */
+    MC_GAME_STRIP
 } mc_kind;
 
 typedef struct {
@@ -231,6 +244,11 @@ typedef struct {
     char  screen_name[64];     /* the screen, if known */
     int   position;            /* 1-based, for "item 3 of 6" */
     int   total;
+    /* ⭐ The screen is a GAME-TITLE STRIP (MC_GAME_STRIP). Carried out of
+     * build() so the caption path can apply its own rule without re-looking-up
+     * the screen -- and so the rule is impossible to reach on a screen the
+     * table does not declare as one. */
+    BOOL  game_strip;
 } mc_speech;
 
 /* Build the announcement for a movement. Always fills `position`/`total`;

@@ -150,6 +150,50 @@ int rom_table_index_for(int game, int version)
     return idx;
 }
 
+/* Case-insensitive ASCII compare. ⚠ NOT stricmp/_stricmp: those are
+ * locale-sensitive, and this project already shipped a locale bug (the Turkish
+ * dotless-i class of problem is exactly what a locale-aware tolower() invites
+ * on a string like "Fighting"). The titles are ASCII; compare them as ASCII. */
+static BOOL ascii_ieq(const char *a, const char *b)
+{
+    if (!a || !b)
+        return FALSE;
+    for (;; a++, b++) {
+        unsigned char ca = (unsigned char)*a, cb = (unsigned char)*b;
+        if (ca >= 'A' && ca <= 'Z') ca = (unsigned char)(ca - 'A' + 'a');
+        if (cb >= 'A' && cb <= 'Z') cb = (unsigned char)(cb - 'A' + 'a');
+        if (ca != cb)
+            return FALSE;
+        if (ca == '\0')
+            return TRUE;
+    }
+}
+
+BOOL rom_table_has_title(const char *s)
+{
+    if (!s || !*s)
+        return FALSE;
+    /* ⚠ Identity first. Without rom_table_ready() this would compare against
+     * whatever happens to sit at those addresses, and a chance match would be
+     * indistinguishable from a real one. */
+    if (!rom_table_ready())
+        return FALSE;
+
+    int n = rom_table_count();
+    for (int i = 0; i < n; i++) {
+        char t[128];
+        if (!rom_table_title(i, t, sizeof(t)) || !t[0])
+            continue;
+        /* ⭐ Case-insensitive because the shell displays BOTH casings for the
+         * same game -- the 17:32 log contains "Capcom Vs. SNK" and "Capcom vs.
+         * SNK" in the same run. An exact compare would name a game on one
+         * screen and refuse it on another, which is worse than either. */
+        if (ascii_ieq(s, t))
+            return TRUE;
+    }
+    return FALSE;
+}
+
 BOOL rom_table_ready(void)
 {
     /* ⭐⭐ A POSITIVE IDENTITY CHECK, not merely "is this address readable".

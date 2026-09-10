@@ -798,6 +798,42 @@ int main(void)
         check("21. row 0 (the games) has NO value variant -- they are images",
               v && !any_row0, "any_row0=%d", any_row0);
     }
+
+    /* --- case 22: the GAME-STRIP flag is set for Gallery, and ONLY there ---
+     * ⭐⭐ sp.game_strip is the gate on a rule that speaks an unverified-by-
+     * corpus caption as an ITEM NAME. Being in the ROM table is not by itself
+     * permission to speak -- the screen must be declared a game strip too.
+     *
+     * ⚠ Both directions asserted. A flag that was always TRUE would let the
+     * rule fire on the main menu, where a caption like "Play offline." is a
+     * DESCRIPTION and must never become the item's name. That failure would be
+     * invisible to a positive-only test.
+     *
+     * ⚠ Gallery's count is 0 (position 1 is the collection, not a ROM), so the
+     * movement below deliberately uses a 9-item range to mirror the real
+     * screen -- and case 3's staleness check must not reject it. */
+    {
+        mc_speech g;
+        mc_move gm_ = mk(0x14009a482ULL, 1, 0, 8);
+        menu_speak_build(&gm_, &g);
+
+        mc_speech mn;
+        mc_move mm = mk(MAIN_CALLER, 1, 0, 5);
+        menu_speak_build(&mm, &mn);
+
+        /* And a screen that IS named must not be flagged either. */
+        mc_speech lb;
+        mc_move lm = mk(0x140083e09ULL, 1, 0, 2);
+        menu_speak_build(&lm, &lb);
+
+        check("22. game_strip is set for Gallery and for nothing else",
+              g.game_strip && g.position == 2 && g.total == 9 &&
+              !mn.game_strip && !lb.game_strip,
+              "gallery=%d (pos %d of %d), main=%d, lobby=%d",
+              (int)g.game_strip, g.position, g.total,
+              (int)mn.game_strip, (int)lb.game_strip);
+    }
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");
