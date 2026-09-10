@@ -273,10 +273,14 @@ int main(void)
     }
 
     /* --- 12: an UNREADABLE table recognises NOTHING ------------------------
-     * ⭐⭐ "Could not read" must not look like "read and matched". With the
-     * table pointed at unmapped memory the predicate must refuse everything --
-     * otherwise a failed identity check would silently become permission to
-     * speak whatever the caption happened to say. */
+     * ⭐⭐ "Could not read" must not look like "read and matched".
+     *
+     * ⚠⚠ THIS CASE DOES NOT TEST THE IDENTITY CHECK, and I first claimed it
+     * did. Sabotage proved otherwise: with rom_table_ready() deleted from
+     * rom_table_has_title(), cases 10-12 ALL still passed, because an unmapped
+     * table makes rom_table_count() return 0 on its own and the match loop
+     * never runs. A guard that cannot be seen to fail is not evidence -- hence
+     * case 13, which is the one that actually isolates it. */
     {
         rom_table_test_redirect(0x10ULL, 0x10ULL);   /* certainly unmapped */
         int any = rom_table_has_title("Title Of Game 0");
@@ -284,6 +288,37 @@ int main(void)
         build_table(NREC);
         check("12. an unreadable ROM table recognises NOTHING", !any,
               "matched=%d", any);
+    }
+
+    /* --- 13: a READABLE table that is NOT OURS recognises nothing ----------
+     * ⭐⭐ THE DISCRIMINATING CASE for the identity check, and the reason it
+     * exists: the failure it guards is not an unreadable address (which fails
+     * safe by itself) but a perfectly readable table that belongs to something
+     * else. Then every field parses, the count is sane, and the titles are
+     * simply WRONG -- and a caption matching one of them would be spoken with
+     * full confidence.
+     *
+     * Built by corrupting record 0's CODE, which is exactly what
+     * rom_table_ready() interrogates. Structure intact, identity broken.
+     *
+     * ⚠ Same lesson as the GMD language check that passed a stale FRENCH table:
+     * structure is not identity. */
+    {
+        build_table(NREC);
+        /* A well-formed table whose first record is not "cvs1". */
+        _snprintf(g_strings[0][0], 64, "%s", "notcvs1");
+        int matched = rom_table_has_title("Title Of Game 4");
+        int ready   = rom_table_ready();
+        /* ⭐ And the control: restoring the code makes the SAME lookup succeed,
+         * so the refusal above is attributable to identity and not to the
+         * lookup being broken generally. */
+        build_table(NREC);
+        int matched_after = rom_table_has_title("Title Of Game 4");
+
+        check("13. a readable table that is NOT ours recognises nothing",
+              !matched && !ready && matched_after,
+              "matched=%d ready=%d control=%d",
+              matched, ready, matched_after);
     }
 
     printf("\n");
