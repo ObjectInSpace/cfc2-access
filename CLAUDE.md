@@ -109,6 +109,36 @@ screen at caller `0x14009BA21` produced none at all (setText froze at 306
 across its 7 movements). So the caption channel SUPPLEMENTS cursor+GMD; it does
 not replace it. Do not build anything that assumes every row has one.
 
+### ⛔⛔ FIXED: the mod went SILENT for 37 s when leaving the Music screen
+
+User-reported, confirmed in `docs/run-2026-09-09-2313.log`: ONE 37.3-second gap
+on the poll thread, bracketing a single `[DISCOVERY]` event for the 9-item
+music screen. The mod was alive but stuck, so speech stopped and the user
+navigated blind.
+
+⛔⛔ **The benchmark that said "under 1 ms" was measuring code that no longer
+existed** -- `bench_discovery.c` still capped at 600 bases, ran ONE pass, and
+checked a single trailing sentence, while the shipping sweep had grown to all
+4165 bases with a per-item check and a RELAXED SECOND PASS. Corrected, it
+measured 70 ms -- and even that understates the live cost, because this blob is
+one clean allocation and the game's is on a heap. That understating has now
+happened THREE times in that file.
+
+**Two fixes:**
+1. A **25 ms wall-clock budget** enforced as the sweep runs, checked every 64
+   bases. A budget cannot be wrong about the machine it is on. A truncated
+   sweep says so, and the "no candidate" line reports the count ACTUALLY
+   examined. It does not back off to the relaxed pass after a timeout.
+2. **The algorithm is now cheap: 70.38 ms -> 0.03 ms.** Each string is
+   classified ONCE (ITEM-shaped / BLURB-shaped, 1.46 ms for all 4165) and the
+   window test is array arithmetic; the old loop re-read string i once per
+   window containing it.
+
+⭐ `tools/run_de_test.ps1` proves the rewrite is EQUIVALENT (138 count/mode
+combinations, 0 mismatches; fails with 69 when a threshold is nudged) and then
+benchmarks it. A speedup that changed which bases survive would silently change
+which screens can be named.
+
 ### ⭐⭐ ONLINE PLAY IS NAMED (23:13 run) -- and a caller serves TWO screens
 
 `0x14009ba21` shipped as "Select Mode" (3 items) and is **also Online Play**
