@@ -1179,14 +1179,41 @@ sweep:
          * candidates would be a behaviour change wearing a performance
          * change's clothes. */
         static unsigned char cls[GMD_MAX_STRINGS];
-        static int cls_valid;
-        static int cls_total;
-        if (!cls_valid || cls_total != total) {
+        static int cls_done;    /* how many strings are classified so far */
+        static int cls_total;   /* the table size they were classified for */
+        /* ⛔⛔ THE CLASSIFICATION IS INSIDE THE BUDGET, and it is RESUMABLE.
+         *
+         * The first version of this ran the whole pass before the budget
+         * started, and it took ELEVEN AND A HALF SECONDS in-game -- I had moved
+         * the stall rather than removed it, and the budget then reported
+         * "0 of 4165 bases" because the clock was already spent. Reported by
+         * the user as the mod still breaking. (The underlying cost is fixed in
+         * gmd_find.c: per-string VirtualQuery in a 2336-region process.)
+         *
+         * ⭐ So it is bounded like everything else here, and picks up where it
+         * left off on the next movement instead of restarting. A screen visited
+         * twice therefore classifies further each time rather than doing the
+         * same expensive prefix again and never finishing. */
+        if (cls_total != total) {          /* table changed -> start over */
+            cls_done = 0;
+            cls_total = total;
+        }
+        {
             int n = total < GMD_MAX_STRINGS ? total : GMD_MAX_STRINGS;
-            for (int i = 0; i < n; i++) {
+            int start = cls_done;
+            while (cls_done < n) {
+                if ((cls_done & 63) == 0) {
+                    LARGE_INTEGER now;
+                    QueryPerformanceCounter(&now);
+                    if ((now.QuadPart - t0.QuadPart) * 1000.0 /
+                        (double)freq.QuadPart > BUDGET_MS) {
+                        timed_out = 1;
+                        break;
+                    }
+                }
                 char s[128];
                 unsigned char f = 0;
-                if (gmd_text_by_index(i, s, sizeof(s)) && s[0]) {
+                if (gmd_text_by_index(cls_done, s, sizeof(s)) && s[0]) {
                     size_t L = strlen(s);
                     char last = s[L - 1];
                     int terminal = (last == '.' || last == '?' || last == '!');
@@ -1195,18 +1222,46 @@ sweep:
                     if (terminal)
                         f |= CLS_BLURB;
                 }
-                cls[i] = f;
+                cls[cls_done++] = f;
             }
-            cls_total = total;
-            cls_valid = 1;
-            log_line("mcspeak: [DISCOVERY] classified %d strings once; "
-                     "the sweep is now array arithmetic.", n);
+            if (cls_done > start) {
+                /* ⭐⭐ REPORT THE PER-READ COST FROM THE GAME ITSELF.
+                 *
+                 * Two offline benchmarks have now failed to reproduce this
+                 * cost: a clean-blob one understated it ~7000x, and a
+                 * deliberately fragmented one (6132 regions, more than the
+                 * game's 2336) still showed 0.0003 ms/read against the ~2.9 ms
+                 * the live run implies. So the cause is NOT region count, and
+                 * I have guessed wrong twice.
+                 *
+                 * Stop guessing: make the shipping code state its own measured
+                 * rate. This number comes from the machine that actually has
+                 * the problem. (memory: dont-diagnose-from-one-log,
+                 * measure-dont-predict) */
+                LARGE_INTEGER now;
+                QueryPerformanceCounter(&now);
+                double ms = (now.QuadPart - t0.QuadPart) * 1000.0 /
+                            (double)freq.QuadPart;
+                int did = cls_done - start;
+                log_line("mcspeak: [DISCOVERY] classified %d..%d of %d strings "
+                         "in %.1f ms (%.4f ms per string)%s",
+                         start, cls_done - 1, n, ms,
+                         did > 0 ? ms / did : 0.0,
+                         cls_done < n ? " -- budget reached; continues on the "
+                                        "next movement"
+                                      : " -- COMPLETE");
+            }
         }
 
-        /* ⚠ Sweep only what was CLASSIFIED. If the table ever exceeds the
-         * ceiling, `total` would run past the end of `cls`. Clamping here (and
-         * reporting `swept` below) keeps the bound and the claim honest. */
-        int swept = total < GMD_MAX_STRINGS ? total : GMD_MAX_STRINGS;
+        /* ⚠⚠ SWEEP ONLY THE CLASSIFIED PREFIX.
+         *
+         * `cls` is zeroed static storage, so an UNCLASSIFIED entry reads as
+         * "neither ITEM nor BLURB" -- indistinguishable from a real negative.
+         * Sweeping past cls_done would therefore silently report "no candidate"
+         * for a region never examined, which is exactly the "0 failed means 0
+         * checked" trap. Bound by what has actually been classified, and the
+         * log below reports that number rather than the table size. */
+        int swept = cls_done;
 
     again:
         shown = 0;

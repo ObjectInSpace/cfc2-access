@@ -1,0 +1,233 @@
+[23:51:41.042] === CFC2 Access -- Phase 1.3: unpacked image dump ===
+[23:51:41.042] worker thread started, pid=3844
+[23:51:41.090] speech: ready, backend=NVDA
+[23:51:41.091] image [t0]: base=0000000140000000, 10 readable sections
+[23:51:41.091] image [t0]:   rva=0x1000     size=16625664  code distinct=256/256 prot=0x80   packed
+[23:51:41.091] image [t0]:   rva=0xfdc000   size=2072576   code distinct=256/256 prot=0x80   packed
+[23:51:41.091] image [t0]:   rva=0x11d6000  size=28758016  code distinct=256/256 prot=0x80   packed
+[23:51:41.092] image [t0]:   rva=0x2d43000  size=745472    code distinct=1/256 prot=0x80   UNPACKED
+[23:51:41.092] image [t0]:   rva=0x2df9000  size=4096      code distinct=256/256 prot=0x80   packed
+[23:51:41.092] image [t0]:   rva=0x2dfa000  size=270336    code distinct=1/256 prot=0x80   UNPACKED
+[23:51:41.092] image [t0]:   rva=0x2e3c000  size=233472    code distinct=256/256 prot=0x80   packed
+[23:51:41.092] image [t0]:   rva=0x2e75000  size=270336    data distinct=254/256 prot=0x2    
+[23:51:41.092] image [t0]:   rva=0x2eb7000  size=13451264  code distinct=85/256 prot=0x40   UNPACKED
+[23:51:41.092] image [t0]:   rva=0x3b8b000  size=3952640   code distinct=256/256 prot=0x40   packed
+[23:51:41.617] image: unpacked after 531 ms -- section rva=0x1000 distinct=233/256 prot=0x20
+[23:51:41.618] image [unpacked]: base=0000000140000000, 10 readable sections
+[23:51:41.618] image [unpacked]:   rva=0x1000     size=16625664  code distinct=233/256 prot=0x20   UNPACKED
+[23:51:41.618] image [unpacked]:   rva=0xfdc000   size=2072576   data distinct=195/256 prot=0x2    
+[23:51:41.618] image [unpacked]:   rva=0x11d6000  size=28758016  data distinct=35/256 prot=0x4    
+[23:51:41.619] image [unpacked]:   rva=0x2d43000  size=745472    data distinct=1/256 prot=0x2    
+[23:51:41.619] image [unpacked]:   rva=0x2df9000  size=4096      data distinct=255/256 prot=0x2    
+[23:51:41.619] image [unpacked]:   rva=0x2dfa000  size=270336    data distinct=1/256 prot=0x2    
+[23:51:41.619] image [unpacked]:   rva=0x2e3c000  size=233472    code distinct=234/256 prot=0x20   UNPACKED
+[23:51:41.619] image [unpacked]:   rva=0x2e75000  size=270336    data distinct=254/256 prot=0x2    
+[23:51:41.620] image [unpacked]:   rva=0x2eb7000  size=13451264  code distinct=85/256 prot=0x40   UNPACKED
+[23:51:41.620] image [unpacked]:   rva=0x3b8b000  size=3952640   code distinct=256/256 prot=0x40   packed
+[23:51:41.620] probe: VirtualProtect OK (target 0000000140001000, old prot 0x20) -- detours should be installable
+[23:51:41.620] kbd: identity CONFIRMED in this process -- vtable+0x30 -> 0x140253220 and the class name reads "sKeyboard".
+[23:51:41.659] kbd: hooked the sKeyboard state builder at 0x140253750. It receives rcx=the instance and rdx=the state bitmap, so the instance pointer arrives as an ARGUMENT -- no memory search.
+[23:51:41.660] mc: identity CONFIRMED in this process -- both cursor helpers carry the expected prologue.
+[23:51:41.758] mc: hooked both menu cursor helpers -- vertical 0x14007cdc0, horizontal 0x14007c9f0. The screen object and the cursor pointer arrive as ARGUMENTS, so there is no memory search.
+[23:51:41.758] gt: identity CONFIRMED -- 0x1402fd6a0 carries the expected prologue and sits in the instance vtable's slot 13.
+[23:51:41.848] gt: hooked the cGUIObjText CONSTRUCTOR at 0x1402efc10. It has exactly ONE caller (the factory 0x1402ef980), so this counts EVERY object of this class that is ever built -- which is what tells a wrong hook target apart from a class the shell never instantiates.
+[23:51:42.033] gt: hooked 4 of 4 setText overloads (cGUIObjText slots 25/26, cGUIObjMessage slots 25/26). Each carries its own counter, so the log will name WHICH one the shell uses.
+[23:51:42.033] gt: ready -- ctor probe live and update hook installed. Detours DEREFERENCE NOTHING beyond a single guarded vptr read; all inspection happens on the worker thread under the fault guard.
+[23:51:42.033] dump: SKIPPED -- image never unpacked. Any dump taken now would be ciphertext that silently looks like a valid file.
+[23:51:42.034] phase 1.3 result: speech=YES protect=YES unpacked=YES sections_dumped=0
+[23:51:42.034] pad: OFF -- cfc2_pad.on is absent. sPad is inert for the shell (Kind=0, update never runs); create that file only for in-game work.
+[23:51:42.135] kbd: ⛔ the builder has not run yet -- no state has been captured, so nothing can be concluded about key state.
+[23:51:42.135] memsafe: fault guard armed (self-test passed)
+[23:51:42.135] gmdfind: excluding own stack 0000000002970000..0000000002B70000 and own module 00007FF995250000..00007FF995290000
+[23:51:43.684] gmdfind: walked 2336 regions; scanned 581 private (1624440 KB) in 1546 ms; 1 candidate(s); guard absorbed 0 fault(s)
+[23:51:43.684] gmdfind:  candidate 0: array_base=000000003B7100A0 form=LIVE_TABLE probes=64/64 geometry=2016/2016 pairs pad=0xcdcdcdcd region=000000003B450000+524288KB
+[23:51:43.694] gmdfind: ⭐ CLOSED LOOP -- followed labelOffset to "STATS_PWS2_06_NAME", re-hashed those bytes, hashes MATCH the entry. This is the GMD label array.
+[23:51:43.708] gmdfind: string blob was NOT at the usual +0x140000 -- found at +0xd0000 this run (it moves)
+[23:51:43.708] gmdfind: ⭐⭐ TEXT RESOLVED (live) -- "LANG_NAME_JAPANESE" = "Japanese [jp]", via a pointer at entry+0xd0000. We can READ the shell's messages. (matched shipped variant 1 of 4, English)
+[23:51:43.724] gmdtext:   blob at entries+0xd0000 is "eng"  <== matches config.ini
+[23:51:43.724] gmdtext: ⭐⭐ blob resolved at entries+0xd0000; 4165 messages readable. Table language: eng (matches config.ini).
+[23:51:43.724] mc: the cursor helpers have not run yet -- nothing can be concluded about menu movement.
+[23:51:43.826] kbd: CAPTURED instance=0000000029108990 state=0000000029108AC8 after 99 builder calls.
+[23:51:43.826] kbd: ⭐⭐ state - instance == 0x138, exactly as the disassembly predicted. The offline model is CONFIRMED in live memory.
+[23:51:43.827] kbd: down=[(none)]  pressed=[(none)]  released=[(none)]  (engine Trg=[(none)])
+[23:51:45.666] heartbeat 1 (alive 2 s)
+[23:51:45.666] gt: 2 CONSTRUCTED; setText ran 0 time(s), 0 string(s) captured; 0 guarded read(s) faulted.  ⛔ Objects exist but setText NEVER RAN: the class is right and 0x1402f0b50 is not how its text is assigned. Find the other writer.
+[23:51:47.705] heartbeat 2 (alive 4 s)
+[23:51:49.749] kbd: down=[0x11 0xa2]  pressed=[0x11 0xa2]  released=[(none)]  (engine Trg=[(none)])
+[23:51:49.749] heartbeat 3 (alive 6 s)
+[23:51:49.749] kbd: builder ran 454 times; instance=0000000029108990 state=0000000029108AC8 offset=0x138 CONFIRMED
+[23:51:49.749] gt: 2 CONSTRUCTED; setText ran 0 time(s), 0 string(s) captured; 0 guarded read(s) faulted.  ⛔ Objects exist but setText NEVER RAN: the class is right and 0x1402f0b50 is not how its text is assigned. Find the other writer.
+[23:51:49.851] kbd: down=[(none)]  pressed=[(none)]  released=[0x11 0xa2]  (engine Trg=[(none)])
+[23:51:52.199] gt: * TEXT SET on 000000002BE811D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[23:51:53.116] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[23:51:53.320] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[23:51:53.422] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[23:51:53.526] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[23:51:53.628] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[23:51:53.729] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[23:51:53.832] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[23:51:53.832] heartbeat 5 (alive 10 s)
+[23:51:53.832] gt: 3 CONSTRUCTED; setText ran 101 time(s), 101 string(s) captured; 0 guarded read(s) faulted.
+[23:51:53.832] gt:   by overload: cGUIObjText.25=101 .26=0  cGUIObjMessage.25=0 .26=0
+[23:51:53.833] gt: ⚠ focus recorder INCONCLUSIVE -- 1 string(s) recorded but the cursor hook never notified us (0 movements). Nothing can be concluded about per-row captions.
+[23:51:53.935] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[23:51:54.038] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[23:51:54.140] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[23:51:54.242] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[23:51:54.345] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[23:51:54.855] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[23:51:54.957] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[23:51:55.874] gt: 5 CONSTRUCTED; setText ran 225 time(s), 225 string(s) captured; 0 guarded read(s) faulted.
+[23:51:55.874] gt:   by overload: cGUIObjText.25=225 .26=0  cGUIObjMessage.25=0 .26=0
+[23:51:56.180] gt: * TEXT SET on 000000002BE3BBF0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[23:51:56.384] mc: the helpers ARE running (3 calls so far). The hook is live.
+[23:51:56.690] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[23:51:56.894] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[23:51:57.099] gt: * TEXT SET on 000000002BE6BEB0: "Choose the game you want to play.        <SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58><ICON BTN_X></SIZE>Game Settings <SIZE 58><ICON BTN_Y></SIZE>Controller Settings <SIZE 58><ICON DECIDE></SIZE>Start Game <SIZE 58><ICON CANCEL></SIZE>Back          "
+[23:51:57.409] mcspeak: [ROMPROBE] RESTING on cursor index 1 (position 2 of 8) -- IF the mapping rom=2*game+version holds, this is "Capcom vs. SNK 2: Millionaire Fighting 2001" [cvs2] / "Capcom vs. SNK 2: Mark of the Millennium 2001" [cvs2u]. ⚠ NOT SPOKEN: compare against the game actually on screen before trusting it.
+[23:51:57.919] gt: 36 CONSTRUCTED; setText ran 245 time(s), 245 string(s) captured; 0 guarded read(s) faulted.
+[23:51:57.919] gt:   by overload: cGUIObjText.25=245 .26=0  cGUIObjMessage.25=0 .26=0
+[23:51:58.326] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[23:51:58.406] gmdtext: ⭐ indexed 4165 string offsets in one pass; lookups are now a single bounded read each.
+[23:51:58.410] mcspeak: caption AMBIGUOUS, not spoken: "Choose a game version."
+[23:51:58.410] mcspeak: spoke "Game Version, 2 of 3"
+[23:51:58.412] mc: vertical   cursor 0 -> 1  (item 2 of 3, range 0..2, step +1)  caller=00000001400B1B69 screen=000000002BE4C200 cursor=000000002BE4C530
+[23:51:58.412] gt: * TEXT SET on 000000002BE3BBF0: "<SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58><ICON BTN_X></SIZE>Game Settings <SIZE 58><ICON BTN_Y></SIZE>Controller Settings <SIZE 58><ICON DECIDE></SIZE>Start Game <SIZE 58><ICON CANCEL></SIZE>Back"
+[23:51:58.514] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[23:51:59.126] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[23:51:59.130] mcspeak: [ROMPROBE] RESTING on cursor index 1 (position 2 of 8) -- IF the mapping rom=2*game+version holds, this is "Capcom vs. SNK 2: Millionaire Fighting 2001" [cvs2] / "Capcom vs. SNK 2: Mark of the Millennium 2001" [cvs2u]. ⚠ NOT SPOKEN: compare against the game actually on screen before trusting it.
+[23:51:59.135] mcspeak: spoke "Game, 1 of 3. Choose the game you want to play."
+[23:51:59.135] mc: vertical   cursor 1 -> 0  (item 1 of 3, range 0..2, step -1)  caller=00000001400B1B69 screen=000000002BE4C200 cursor=000000002BE4C530
+[23:51:59.135] gt: * TEXT SET on 000000002BE6BEB0: "Choose the game you want to play.        <SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58><ICON BTN_X></SIZE>Game Settings <SIZE 58><ICON BTN_Y></SIZE>Controller Settings <SIZE 58><ICON DECIDE></SIZE>Start Game <SIZE 58><ICON CANCEL></SIZE>Back          "
+[23:51:59.238] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[23:51:59.748] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[23:51:59.751] mcspeak: [ROMPROBE] RESTING on cursor index 2 (position 3 of 8) -- IF the mapping rom=2*game+version holds, this is "Capcom Fighting Jam" [cfj] / "Capcom Fighting Evolution" [cfe]. ⚠ NOT SPOKEN: compare against the game actually on screen before trusting it.
+[23:51:59.757] mcspeak: caption not in the corpus, not spoken: "P1"
+[23:51:59.759] mcspeak: spoke "Game, Capcom Fighting Jam, 3 of 8"
+[23:51:59.759] mc: horizontal cursor 1 -> 2  (item 3 of 8, range 0..7, step +1)  caller=00000001400B1BD9 screen=000000002BE4C200 cursor=000000002BE4C538
+[23:51:59.759] gt: * TEXT SET on 000000002C331200: "P1"
+[23:51:59.861] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[23:52:00.065] gt: 36 CONSTRUCTED; setText ran 260 time(s), 260 string(s) captured; 0 guarded read(s) faulted.
+[23:52:00.065] gt:   by overload: cGUIObjText.25=260 .26=0  cGUIObjMessage.25=0 .26=0
+[23:52:00.370] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[0x25])
+[23:52:00.373] mcspeak: [ROMPROBE] RESTING on cursor index 1 (position 2 of 8) -- IF the mapping rom=2*game+version holds, this is "Capcom vs. SNK 2: Millionaire Fighting 2001" [cvs2] / "Capcom vs. SNK 2: Mark of the Millennium 2001" [cvs2u]. ⚠ NOT SPOKEN: compare against the game actually on screen before trusting it.
+[23:52:00.381] mcspeak: caption not in the corpus, not spoken: "P1"
+[23:52:00.381] mcspeak: spoke "Game, Capcom vs. SNK 2: Millionaire Fighting 2001, 2 of 8"
+[23:52:00.381] mc: horizontal cursor 2 -> 1  (item 2 of 8, range 0..7, step -1)  caller=00000001400B1BD9 screen=000000002BE4C200 cursor=000000002BE4C538
+[23:52:00.585] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[23:52:00.994] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[23:52:01.000] mcspeak: caption AMBIGUOUS, not spoken: "Choose a game version."
+[23:52:01.001] mcspeak: spoke "Game Version, 2 of 3"
+[23:52:01.001] mc: vertical   cursor 0 -> 1  (item 2 of 3, range 0..2, step +1)  caller=00000001400B1B69 screen=000000002BE4C200 cursor=000000002BE4C530
+[23:52:01.001] gt: * TEXT SET on 000000002BE3BBF0: "<SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58><ICON BTN_X></SIZE>Game Settings <SIZE 58><ICON BTN_Y></SIZE>Controller Settings <SIZE 58><ICON DECIDE></SIZE>Start Game <SIZE 58><ICON CANCEL></SIZE>Back"
+[23:52:01.103] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[23:52:01.512] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[23:52:01.521] mcspeak: caption not in the corpus, not spoken: "P1"
+[23:52:01.522] mcspeak: spoke "Game Version, English Version, 2 of 2"
+[23:52:01.522] mc: horizontal cursor 0 -> 1  (item 2 of 2, range 0..1, step +1)  caller=00000001400B1BD9 screen=000000002BE4C200 cursor=000000002BE4C53C
+[23:52:01.522] gt: * TEXT SET on 000000002C331200: "P1"
+[23:52:01.625] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[23:52:02.134] gt: 36 CONSTRUCTED; setText ran 271 time(s), 271 string(s) captured; 0 guarded read(s) faulted.
+[23:52:02.134] gt:   by overload: cGUIObjText.25=271 .26=0  cGUIObjMessage.25=0 .26=0
+[23:52:02.338] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[23:52:02.347] mcspeak: caption not in the corpus, not spoken: "Capcom Vs. SNK 2: Millionaire Fighting 2001"
+[23:52:02.347] mcspeak: spoke "Game Version, Japanese Version, 1 of 2"
+[23:52:02.347] mc: horizontal cursor 1 -> 0  (item 1 of 2, range 0..1, step -1)  caller=00000001400B1BD9 screen=000000002BE4C200 cursor=000000002BE4C53C
+[23:52:02.450] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[23:52:02.960] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[23:52:02.965] mcspeak: spoke "Player, 3 of 3"
+[23:52:02.965] mc: vertical   cursor 1 -> 2  (item 3 of 3, range 0..2, step +1)  caller=00000001400B1B69 screen=000000002BE4C200 cursor=000000002BE4C530
+[23:52:02.965] gt: * TEXT SET on 000000002BE3BBF0: "<SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58><ICON BTN_X></SIZE>Game Settings <SIZE 58><ICON BTN_Y></SIZE>Controller Settings <SIZE 58><ICON DECIDE></SIZE>Start Game <SIZE 58><ICON CANCEL></SIZE>Back"
+[23:52:03.169] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[23:52:03.475] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[23:52:03.485] mcspeak: spoke "Player, P2, 2 of 2"
+[23:52:03.485] mc: horizontal cursor 0 -> 1  (item 2 of 2, range 0..1, step +1)  caller=00000001400B1BD9 screen=000000002BE4C200 cursor=000000002BE4C540
+[23:52:03.485] gt: * TEXT SET on 000000002C331200: "P2"
+[23:52:03.587] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[23:52:04.200] heartbeat 10 (alive 20 s)
+[23:52:04.200] kbd: builder ran 1321 times; instance=0000000029108990 state=0000000029108AC8 offset=0x138 CONFIRMED
+[23:52:04.200] gt: 36 CONSTRUCTED; setText ran 282 time(s), 282 string(s) captured; 0 guarded read(s) faulted.
+[23:52:04.200] gt:   by overload: cGUIObjText.25=282 .26=0  cGUIObjMessage.25=0 .26=0
+[23:52:04.200] gt: === FOCUS RECORD: 48 distinct string(s) across 9 cursor movement(s), 8 dropped (buffer full) ===
+[23:52:04.200] gt:   [move 0] strip 000000002BE811D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[23:52:04.200] gt:   [move 0] PROSE 000000002BE68B10: "Now loading..."
+[23:52:04.201] gt:   [move 0] strip 000000002BE811D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[23:52:04.201] gt:   [move 0] strip 000000002BE453B0: "<FONT 2>Main Menu</FONT>"
+[23:52:04.201] gt:   [move 0] PROSE 000000002C2B2A30: "Offline Play"
+[23:52:04.201] gt:   [move 0] PROSE 000000002BE370D0: "Online Play"
+[23:52:04.201] gt:   [move 0] PROSE 000000002BEA8A80: "Museum"
+[23:52:04.201] gt:   [move 0] PROSE 000000002BE86DE0: "Fighter Awards"
+[23:52:04.201] gt:   [move 0] PROSE 000000002BE69AE0: "Options"
+[23:52:04.201] gt:   [move 0] PROSE 000000002C3318A0: "Quit"
+[23:52:04.201] gt:   [move 0] PROSE 000000002BE6BEB0: "Play offline."
+[23:52:04.201] gt:   [move 0] strip 000000002BE3BBF0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[23:52:04.201] gt:   [move 0] PROSE 000000002BE45410: "Select Game"
+[23:52:04.201] gt:   [move 0] PROSE 000000002C2B2210: "Game"
+[23:52:04.201] gt:   [move 0] PROSE 000000002BE657C0: "Game Version"
+[23:52:04.203] gt:   [move 0] PROSE 000000002BE39400: "Player"
+[23:52:04.203] gt:   [move 0] PROSE 000000002BE6AE40: "Capcom Vs. SNK 2: Millionaire Fighting 2001"
+[23:52:04.203] gt:   [move 0] PROSE 000000002BE37220: "Japanese Version"
+[23:52:04.203] gt:   [move 0] PROSE 000000002C331200: "P1"
+[23:52:04.203] gt:   [move 0] PROSE 000000002BE6BEB0: "Choose the game you want to play."
+[23:52:04.203] gt:   [move 0] strip 000000002BE3BBF0: "<SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58><ICON BTN_X></SIZE>Game Settings <SIZE 5"
+[23:52:04.203] gt:   [move 0] strip 000000002BE6BEB0: "Choose the game you want to play.        <SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58"
+[23:52:04.203] gt:   [move 1] PROSE 000000002BE6AE40: "Capcom Vs. SNK 2: Millionaire Fighting 2001"
+[23:52:04.204] gt:   [move 1] PROSE 000000002BE37220: "Japanese Version"
+[23:52:04.204] gt:   [move 1] PROSE 000000002C331200: "P1"
+[23:52:04.204] gt:   [move 1] PROSE 000000002BE6BEB0: "Choose a game version."
+[23:52:04.204] gt:   [move 1] strip 000000002BE3BBF0: "<SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58><ICON BTN_X></SIZE>Game Settings <SIZE 5"
+[23:52:04.204] gt:   [move 2] PROSE 000000002BE6AE40: "Capcom Vs. SNK 2: Millionaire Fighting 2001"
+[23:52:04.204] gt:   [move 2] PROSE 000000002BE37220: "Japanese Version"
+[23:52:04.204] gt:   [move 2] PROSE 000000002C331200: "P1"
+[23:52:04.204] gt:   [move 2] PROSE 000000002BE6BEB0: "Choose the game you want to play."
+[23:52:04.204] gt:   [move 2] strip 000000002BE3BBF0: "<SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58><ICON BTN_X></SIZE>Game Settings <SIZE 5"
+[23:52:04.204] gt:   [move 2] strip 000000002BE6BEB0: "Choose the game you want to play.        <SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58"
+[23:52:04.204] gt:   [move 3] PROSE 000000002BE6AE40: "Capcom Fighting Jam"
+[23:52:04.206] gt:   [move 3] PROSE 000000002BE37220: "Japanese Version"
+[23:52:04.206] gt:   [move 3] PROSE 000000002C331200: "P1"
+[23:52:04.206] gt:   [move 4] PROSE 000000002BE6AE40: "Capcom Vs. SNK 2: Millionaire Fighting 2001"
+[23:52:04.206] gt:   [move 4] PROSE 000000002BE37220: "Japanese Version"
+[23:52:04.206] gt:   [move 4] PROSE 000000002C331200: "P1"
+[23:52:04.206] gt:   [move 5] PROSE 000000002BE6AE40: "Capcom Vs. SNK 2: Millionaire Fighting 2001"
+[23:52:04.207] gt:   [move 5] PROSE 000000002BE37220: "Japanese Version"
+[23:52:04.207] gt:   [move 5] PROSE 000000002C331200: "P1"
+[23:52:04.207] gt:   [move 5] PROSE 000000002BE6BEB0: "Choose a game version."
+[23:52:04.207] gt:   [move 5] strip 000000002BE3BBF0: "<SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58><ICON BTN_X></SIZE>Game Settings <SIZE 5"
+[23:52:04.207] gt:   [move 6] PROSE 000000002BE6AE40: "Capcom Vs. SNK 2: Mark of the Millennium 2001"
+[23:52:04.207] gt:   [move 6] PROSE 000000002BE37220: "English Version"
+[23:52:04.207] gt:   [move 6] PROSE 000000002C331200: "P1"
+[23:52:04.207] gt:   [move 7] PROSE 000000002BE6AE40: "Capcom Vs. SNK 2: Millionaire Fighting 2001"
+[23:52:04.208] gt: of 48 string(s): 26 arrived after a cursor movement, 38 were prose captions.
+[23:52:04.208] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[23:52:04.310] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[23:52:04.319] mcspeak: caption not in the corpus, not spoken: "P1"
+[23:52:04.319] mcspeak: spoke "Player, P1, 1 of 2"
+[23:52:04.320] mc: horizontal cursor 1 -> 0  (item 1 of 2, range 0..1, step -1)  caller=00000001400B1BD9 screen=000000002BE4C200 cursor=000000002BE4C540
+[23:52:04.320] gt: * TEXT SET on 000000002C331200: "P1"
+[23:52:04.422] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[23:52:05.034] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[23:52:05.040] mcspeak: caption AMBIGUOUS, not spoken: "Choose a game version."
+[23:52:05.040] mcspeak: spoke "Game Version, 2 of 3"
+[23:52:05.040] mc: vertical   cursor 2 -> 1  (item 2 of 3, range 0..2, step -1)  caller=00000001400B1B69 screen=000000002BE4C200 cursor=000000002BE4C530
+[23:52:05.040] gt: * TEXT SET on 000000002BE3BBF0: "<SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58><ICON BTN_X></SIZE>Game Settings <SIZE 58><ICON BTN_Y></SIZE>Controller Settings <SIZE 58><ICON DECIDE></SIZE>Start Game <SIZE 58><ICON CANCEL></SIZE>Back"
+[23:52:05.143] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[23:52:05.245] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[23:52:05.247] mcspeak: [ROMPROBE] RESTING on cursor index 1 (position 2 of 8) -- IF the mapping rom=2*game+version holds, this is "Capcom vs. SNK 2: Millionaire Fighting 2001" [cvs2] / "Capcom vs. SNK 2: Mark of the Millennium 2001" [cvs2u]. ⚠ NOT SPOKEN: compare against the game actually on screen before trusting it.
+[23:52:05.253] mcspeak: spoke "Game, 1 of 3. Choose the game you want to play."
+[23:52:05.253] mc: vertical   cursor 1 -> 0  (item 1 of 3, range 0..2, step -1)  caller=00000001400B1B69 screen=000000002BE4C200 cursor=000000002BE4C530
+[23:52:05.253] gt: * TEXT SET on 000000002BE6BEB0: "Choose the game you want to play.        <SIZE 58><ICON BTN_START></SIZE>Training <SIZE 58><ICON BTN_X></SIZE>Game Settings <SIZE 58><ICON BTN_Y></SIZE>Controller Settings <SIZE 58><ICON DECIDE></SIZE>Start Game <SIZE 58><ICON CANCEL></SIZE>Back          "
+[23:52:05.355] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[23:52:06.274] gt: 36 CONSTRUCTED; setText ran 297 time(s), 297 string(s) captured; 0 guarded read(s) faulted.
+[23:52:06.274] gt:   by overload: cGUIObjText.25=297 .26=0  cGUIObjMessage.25=0 .26=0
+[23:52:06.479] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[23:52:06.581] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[23:52:06.786] gt: * TEXT SET on 000000002BE3BBF0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[23:52:06.990] mcspeak: [OPTPROBE] options strip (caller 0x1400b2729): 3 items, option ids [0 1 2]. ⚠ These identify WHICH setting each item is; the dispatch at 0x1400b27b2 treats 1, 2 and 3 as three different destinations.
+[23:52:06.990] mcspeak: [DISCOVERY] unknown screen -- caller=0x1400b2729  items=3  axis=horizontal  (screen=000000002BE3A590).
+[23:52:18.914] mcspeak: [DISCOVERY] classified 4165 strings once; the sweep is now array arithmetic.
+[23:52:18.914] mcspeak: [DISCOVERY] ⚠ caller=0x1400b2729  sweep STOPPED at the 25 ms budget after 0 of 4165 bases -- the list below is PARTIAL. Absence from it is NOT evidence. (This budget exists because an unbounded sweep stalled a live run for 37 seconds.)
+[23:52:18.916] mcspeak: [DISCOVERY] caller=0x1400b2729  position 1 of 3; no candidate run found in 0 of 4165 labels (sweep hit its time budget). ⚠ This screen's labels may simply lack the one-blurb-per-item shape this looks for -- absence here is NOT evidence the labels are missing.
+[23:52:18.916] mcspeak: [DISCOVERY]   -> to name it, add { 0x1400b2729, <base>, 3, "<name>", MC_VERIFIED_LIVE_TEXT, MC_LIST, 0 } to g_screens (src/menu_speak.c) using tools/find_label_runs.py 3
+[23:52:18.916] mcspeak: [DISCOVERY]   cursor sits at screen+0x338 on this movement. ⚠ If this OFFSET CHANGES between movements at the same caller, it is a settings VALUE list (row + per-row values), NOT a flat menu -- use MC_SETTINGS_VALUE with values_off set to the SMALLEST offset seen, and give it NO base index. See memory cfc2-settings-screen-shape.
+[23:52:18.916] mcspeak: spoke "1 of 6"
+[23:52:18.916] mc: vertical   cursor 5 -> 0  (item 1 of 6, range 0..5, step +1)  caller=0000000140097A59 screen=000000002BE4C5D0 cursor=000000002BE4C900

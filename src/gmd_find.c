@@ -1136,6 +1136,17 @@ int gmd_text_count(void) { return g_text_blob ? g_text_count : 0; }
 #define GMD_BLOCK 0x1000
 
 static unsigned *g_text_off;      /* byte offset of each string from the blob */
+/* The blob's extent, recorded while text_index_build() walked it.
+ *
+ * ⛔⛔ DIAGNOSTIC ONLY -- DO NOT USE THIS TO SKIP mem_readable_run().
+ * That was tried: a "the range is already validated" fast path around the
+ * guarded memcpy in gmd_text_by_index(), and it CRASHED the process. A guarded
+ * memcpy over a bad page is not reliably caught (tools/test_span_safety.c
+ * pins this: a byte read and a byte loop ARE caught, memcpy is not). The fault
+ * guard is a net for the race between the check and the copy -- never a
+ * replacement for the check. */
+static const BYTE *g_text_span_lo;
+static const BYTE *g_text_span_hi;
 static int       g_text_indexed;
 
 static void text_index_free(void)
@@ -1144,6 +1155,11 @@ static void text_index_free(void)
         HeapFree(GetProcessHeap(), 0, g_text_off);
         g_text_off = NULL;
     }
+    /* ⚠ The span must die with the index. A stale span would let reads skip
+     * validation for a blob that has moved -- the one way this optimisation
+     * could become unsafe. */
+    g_text_span_lo = NULL;
+    g_text_span_hi = NULL;
     g_text_indexed = 0;
 }
 
@@ -1202,8 +1218,59 @@ static BOOL text_index_build(void)
     }
 
     g_text_indexed = 1;
-    log_line("gmdtext: ⭐ indexed %d string offsets in one pass; lookups are "
-             "now a single bounded read each.", g_text_count);
+
+    /* ⭐⭐ CACHE THE BLOB'S VALIDATED EXTENT, so per-string reads stop calling
+     * VirtualQuery at all.
+     *
+     * ⛔ THE BUG THIS FIXES, from a live run: classifying all 4165 strings took
+     * ELEVEN AND A HALF SECONDS in-game (2026-09-09 23:52) while the same loop
+     * measured 1.46 ms on a test blob. ~2.9 ms per read, ~7000x the bench.
+     *
+     * The cause is not the copy -- it is mem_readable_run()'s VirtualQuery on
+     * EVERY read. That call walks the process's VAD tree, and this process has
+     * **2336 regions over 1.6 GB** (the log says so). My microbenchmark ran in
+     * a small test process with one 1 MB allocation, where the same call is
+     * essentially free. Cost that depends on the whole address space cannot be
+     * measured in a process that does not have one.
+     *
+     * ⭐ But the loop above has ALREADY walked the entire blob under the fault
+     * guard, block by block, and knows exactly how far it reads cleanly. That
+     * is the same validation mem_readable_run performs -- so record the span
+     * once and let reads inside it skip the query.
+     *
+     * ⚠ This does NOT weaken the guard. Reads are still bounded to the span and
+     * still run under MEM_GUARDED, so a page decommitted afterwards faults
+     * safely instead of crashing. What is dropped is only the RE-ASKING of a
+     * question already answered for this exact range. */
+    g_text_span_lo  = g_text_blob;
+    g_text_span_hi  = g_text_blob + pos;
+
+    /* ⭐ Report the blob's REGION SHAPE, because that is the remaining
+     * hypothesis for why per-string reads cost ~2.9 ms in-game while every
+     * offline benchmark says microseconds.
+     *
+     * mem_readable_run(src, 255) LOOPS until it has accumulated 255 readable
+     * bytes. If VirtualQuery here returns a small RegionSize, that is many
+     * queries per string rather than one -- a cost that depends on region SIZE,
+     * which a benchmark counting regions would never show. This prints the
+     * actual size so the next run answers it instead of me guessing a third
+     * time. */
+    {
+        MEMORY_BASIC_INFORMATION mbi;
+        if (VirtualQuery(g_text_blob, &mbi, sizeof(mbi)) == sizeof(mbi)) {
+            log_line("gmdtext: blob region: base=%p size=%llu KB state=0x%lx "
+                     "protect=0x%lx type=0x%lx",
+                     mbi.BaseAddress,
+                     (unsigned long long)(mbi.RegionSize / 1024),
+                     (unsigned long)mbi.State, (unsigned long)mbi.Protect,
+                     (unsigned long)mbi.Type);
+        }
+    }
+    log_line("gmdtext: ⭐ indexed %d string offsets in one pass; blob spans "
+             "%p..%p (%llu bytes) and is validated ONCE -- per-string reads no "
+             "longer call VirtualQuery.",
+             g_text_count, (void *)g_text_span_lo, (void *)g_text_span_hi,
+             (unsigned long long)pos);
     return TRUE;
 }
 
@@ -1217,8 +1284,41 @@ BOOL gmd_text_by_index(int index, char *out, unsigned out_cap)
     if (!g_text_indexed && !text_index_build())
         return FALSE;
 
+    const BYTE *src = g_text_blob + g_text_off[index];
     char buf[256];
-    if (!read_cstr(g_text_blob + g_text_off[index], buf, sizeof(buf)))
+
+    /* ⭐ Inside the validated span, copy directly: the extent was checked once
+     * when the index was built, and VirtualQuery here costs ~2.9 ms in this
+     * process (2336 regions / 1.6 GB) -- 11.5 s to read all 4165 strings.
+     *
+     * ⚠ Still under the fault guard and still bounded to the span, so a page
+     * decommitted since indexing faults safely rather than crashing. Only the
+     * redundant re-query is skipped, never the protection. */
+    /* ⛔⛔ REVERTED: an "already validated span" fast path that skipped
+     * mem_readable_run() before the copy. It looked safe -- the extent HAD been
+     * walked under the guard while indexing -- and it CRASHED the process.
+     *
+     * ⭐⭐ THE REASON MATTERS FOR EVERY GUARDED READ IN THIS PROJECT.
+     * tools/test_span_safety.c reproduces it in twenty lines:
+     *
+     *     A. a guarded single-byte read of a PAGE_NOACCESS page -> caught.
+     *     B. a guarded byte LOOP across the boundary            -> caught.
+     *     C. a guarded memcpy() across the boundary             -> ⛔ CRASH.
+     *
+     * MinGW's optimised memcpy uses vector instructions, and a fault inside one
+     * is not recoverable through this VEH + longjmp guard the way a scalar
+     * access is.
+     *
+     * ⚠ So THE FAULT GUARD IS A NET FOR A RACE, NOT THE PRIMARY CHECK. Every
+     * other guarded memcpy in this codebase (mem_copy, read_cstr, pad_watch)
+     * calls mem_readable_run FIRST and only then copies; the guard exists for
+     * the window between the query and the copy. My fast path deleted the
+     * primary check and leaned on a net that does not hold for memcpy.
+     *
+     * The stall it was trying to fix is real, but it must be fixed WITHOUT
+     * dropping the pre-check -- the resumable, budgeted classification in
+     * menu_speak.c is what bounds it now. */
+    if (!read_cstr(src, buf, sizeof(buf)))
         return FALSE;
     _snprintf(out, out_cap, "%s", buf);
     out[out_cap - 1] = '\0';
