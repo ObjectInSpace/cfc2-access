@@ -109,6 +109,49 @@ screen at caller `0x14009BA21` produced none at all (setText froze at 306
 across its 7 movements). So the caption channel SUPPLEMENTS cursor+GMD; it does
 not replace it. Do not build anything that assumes every row has one.
 
+### ⭐⭐ THE OPTIONS SUBMENUS ARE SETTINGS SCREENS (2026-09-10)
+
+Network / Sound / PC Settings / Controls are each a **row selector + value
+selectors** sharing one screen object -- `MC_SETTINGS_ROW` + `MC_SETTINGS_VALUE`,
+the shape Select Game already used. They were unnamed only for want of evidence.
+
+**Shipped:** Network Settings (new), and Sound + PC Settings converted so they
+speak VALUES as well as rows ("Display, Windowed, 1 of 3").
+
+⚠⚠ **Every screen's offsets DIFFER** -- `values_off` is 0x338 / 0x358 / 0x35c,
+and Network's row cursor is +0x334 where the others use +0x330. Read them from
+that screen's own log offsets; never copy another screen's. Case 20b asserts it.
+
+⭐ The standard that made these shippable: **two independent sources per row** --
+the caption names it, and the value-slot arithmetic
+(`(cursor - screen - values_off)/4`) confirms the ORDER. Both agreed on every
+move.
+
+⛔ Rows whose values are GENERATED (volume sliders, Input Delay) get no variant;
+the live-caption quote path speaks those. A quote of what the game drew is not a
+claim about a label that does not exist.
+
+⭐⭐ `tools/test_screen_maps.py` now validates **value sets** too, which nothing
+did before -- a wrong `first` would have spoken the wrong words for a setting
+with no test catching it.
+
+### ▶ NEXT RUN: one SLOW pass finishes Controls
+
+⚠⚠ **PAUSE ~1 SECOND ON EACH ROW.** Controls (`0x1400a33b8`, 6 rows) yielded
+only 1 of 6 names last run purely because it was walked at **~300 ms per row** --
+the game's caption does not arrive before the next movement, so the mod says
+position only. The single row that worked is the one that was paused on.
+This is a property of the caption channel, not a Controls quirk: any screen
+walked quickly produces position-only lines and looks like a bug.
+
+Its shape is already measured (`values_off` 0x338; value counts 14/6/7/6/2 for
+rows 0-4, none for row 5). Strong but UNSHIPPED hypotheses: row 0 = Language
+(`LANG_NAME_*` is exactly 14 labels, matching row 0's 14 values), row 2 =
+`MENU_OP_START_BTN`. Neither has been seen on screen at that position.
+
+Also still unconfirmed by ear: the PC/Sound/Network row maps themselves were
+derived from logs, never heard back.
+
 ### ⛔⛔ THE ACTUAL FIX: the DISCOVERY sweep is OFF by default
 
 Two rounds went into making that sweep fast. The right answer was that **it is a
