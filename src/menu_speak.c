@@ -403,6 +403,29 @@ static const mc_screen g_screens[] = {
     { 0x14009ba21ULL, -1, 6, "Online Play", MC_VERIFIED_LIVE_TEXT,
       MC_LIST, 0, g_online_play_rows, 6, NULL, 0 },
 
+    /* ⭐⭐ THE MUSIC PLAYER'S TRACK LIST (Museum > Music, after choosing a game).
+     *
+     * Caller 0x1400b2ebb, vertical. Its items are named from the game's OWN live
+     * text via the instance set -- "01. Title: Take Your Best Shot" -- because
+     * they can be named no other way: track titles are not GMD labels, so there
+     * is no base and no map to build, and the caption channel is blind here (the
+     * list's text is set ONCE on entry, 5 sets per object all at one move seq,
+     * and moving the cursor sets nothing at all).
+     *
+     * ⚠⚠ count = 0 ON PURPOSE -- the count legitimately VARIES. This screen is
+     * reached through a 9-item horizontal game strip (caller 0x14009af21: the 8
+     * games plus the collection's own music), and each game's soundtrack is a
+     * different length. The run that measured this had 5 tracks because it was
+     * standing on one particular game. A fixed count here would disable the row
+     * on every other game -- and the staleness check has nothing to protect,
+     * since the name comes from the live text rather than from an index into a
+     * label run.
+     *
+     * ⭐ The safety does not come from the count; it comes from the numbering
+     * having to AGREE with the cursor. See gt_numbered_item(). */
+    { 0x1400b2ebbULL, -1, 0, "Music", MC_VERIFIED_LIVE_TEXT,
+      MC_NUMBERED_LIVE, 0, NULL, 0, NULL, 0 },
+
     /* ⭐ PC Settings -- 4 rows, every one named by its own live caption.
      * See g_pc_settings_rows for why no base works here.
      *
@@ -788,6 +811,40 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
      * ⭐ The framing is the whole benefit available today: "row 2 of 3" and
      * "value 3 of 8" are both TRUE statements telling a blind user which axis
      * they just moved on -- which a bare "3 of 8" did not. */
+    /* ⭐⭐ A NUMBERED LIVE LIST: the item names itself on screen.
+     *
+     * Ask the instance set for the object whose text begins with THIS position's
+     * number. The match is the whole safety argument: the cursor says "position
+     * 2" and the game's own text says "02.", so a name is spoken only when two
+     * independent sources agree about which row this is. No match -- a scrolled
+     * window, a list from another screen, a table that has evicted the entry --
+     * yields position only, which is what this screen already said.
+     *
+     * ⚠ out->position, not the raw index: the printed numbering is 1-based and
+     * so is position. Using m->new_index here would be off by one whenever
+     * min_index is 0, which is every screen measured. */
+    if (s->kind == MC_NUMBERED_LIVE) {
+        char text[GT_CAPTION_MAX];
+        if (!gt_numbered_item(out->position, text, (int)sizeof(text)) ||
+            !text[0]) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        /* The live text carries engine markup like everything else on this
+         * channel, so it goes through the same translator, and residue is
+         * refused rather than read aloud as tag soup. */
+        char spoken[GM_OUT_MAX];
+        gm_speak(text, spoken, sizeof(spoken));
+        if (!spoken[0] || gm_has_residue(spoken)) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        _snprintf(out->item, sizeof(out->item), "%s", spoken);
+        out->item[sizeof(out->item) - 1] = '\0';
+        out->named = TRUE;
+        return;
+    }
+
     if (s->kind == MC_SETTINGS_ROW) {
         out->axis = MC_AXIS_ROW;
         /* ⭐⭐ THE MAP. A settings/select screen's row labels are scattered

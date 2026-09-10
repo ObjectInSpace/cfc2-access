@@ -764,6 +764,142 @@ int main(void)
               kept_recent && first_sets == 0, d);
     }
 
+    /* --- case 22: a numbered item is found BY ITS NUMBER ------------------
+     * The music player's five tracks, in the exact form the run captured them.
+     *
+     * ⛔⛔ THE OBJECTS ARE INSERTED IN THE WRONG ORDER ON PURPOSE. In the real
+     * run insertion order happened to equal row order, so a lookup that simply
+     * returned the Nth entry would have passed every honest-looking test and
+     * shipped. Scrambling the order here means only a lookup that reads the
+     * PRINTED NUMBER can pass -- which is the entire safety argument of this
+     * channel, and it must be the thing under test rather than a coincidence
+     * the fixture reproduces. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG t1[4], t2[4], t3[4], t4[4], t5[4];
+        t1[0] = t2[0] = t3[0] = t4[0] = t5[0] = GT_VTABLE_ADDR;
+
+        gt_test_settext_body(t3, "03. Gallery: Swayin' Flame", NULL, 0);
+        gt_test_settext_body(t5, "05. Result: The Fire's Respite", NULL, 0);
+        gt_test_settext_body(t1, "01. Title: Take Your Best Shot", NULL, 0);
+        gt_test_settext_body(t4, "04. Credits: Ode to Fighting Mirage", NULL, 0);
+        gt_test_settext_body(t2, "02. Game Select: Overdrive Blaze", NULL, 0);
+        /* The durations sit in their own objects alongside the titles, exactly
+         * as the run shows. They must not be mistaken for items. */
+        static ULONGLONG d1[4];
+        d1[0] = GT_VTABLE_ADDR;
+        gt_test_settext_body(d1, "2:51", NULL, 0);
+
+        char got1[GT_CAPTION_MAX] = { 0 }, got4[GT_CAPTION_MAX] = { 0 };
+        BOOL ok1 = gt_numbered_item(1, got1, sizeof got1);
+        BOOL ok4 = gt_numbered_item(4, got4, sizeof got4);
+
+        char d[240];
+        snprintf(d, sizeof d, "1 -> %d \"%s\"; 4 -> %d \"%s\"",
+                 (int)ok1, got1, (int)ok4, got4);
+        check("case 22: a numbered item is found by its PRINTED number",
+              ok1 && strcmp(got1, "01. Title: Take Your Best Shot") == 0 &&
+              ok4 && strcmp(got4, "04. Credits: Ode to Fighting Mirage") == 0,
+              d);
+    }
+
+    /* --- case 23: a number that is not present names NOTHING --------------
+     * ⭐⭐ THE DISCRIMINATING CASE. The music list's length varies per game (a
+     * 9-item strip selects the game), so asking for position 6 of a 5-track list
+     * is a real situation, not a contrived one. It MUST come back empty: the
+     * caller then speaks position only, which is what the screen said before
+     * this work. A lookup falling back to "nearest" or "last" would name the
+     * wrong track with total confidence -- the exact failure this project has
+     * shipped twice and now tests against. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG t1[4], t2[4];
+        t1[0] = t2[0] = GT_VTABLE_ADDR;
+        gt_test_settext_body(t1, "01. Title: Take Your Best Shot", NULL, 0);
+        gt_test_settext_body(t2, "02. Game Select: Overdrive Blaze", NULL, 0);
+
+        char got[GT_CAPTION_MAX] = { 0 };
+        BOOL ok = gt_numbered_item(6, got, sizeof got);
+
+        char d[200];
+        snprintf(d, sizeof d, "asked for 6 of a 2-item list -> %d \"%s\"",
+                 (int)ok, got);
+        check("case 23: an absent number names NOTHING", !ok && !got[0], d);
+    }
+
+    /* --- case 24: "1." must not match inside "11." -------------------------
+     * ⚠ A prefix compare against "1." matches "11. ..." and would name track 11
+     * as track 1. Real soundtracks in this collection run well past ten tracks,
+     * so this is a live hazard rather than a theoretical one. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG e[4];
+        e[0] = GT_VTABLE_ADDR;
+        gt_test_settext_body(e, "11. Eleventh Track", NULL, 0);
+
+        char got[GT_CAPTION_MAX] = { 0 };
+        BOOL ok = gt_numbered_item(1, got, sizeof got);
+
+        char d[200];
+        snprintf(d, sizeof d, "asked for 1 with only \"11.\" present -> %d \"%s\"",
+                 (int)ok, got);
+        check("case 24: \"1.\" does not match inside \"11.\"", !ok && !got[0], d);
+    }
+
+    /* --- case 25: TWO objects claiming one number name NOTHING -------------
+     * ⛔ The table holds objects from screens already left (30 of 64 entries
+     * were stale in the run this was built from). If a previous screen's
+     * numbered list is still resident, two live objects can claim "01." and
+     * there is no evidence saying which is on screen. A contradiction must
+     * produce silence, not a coin flip.
+     *
+     * ⚠ Asserted as a SEPARATE case from 23 because the two failures arrive by
+     * different routes: 23 is "no evidence", this is "conflicting evidence",
+     * and a lookup could easily get one right and the other wrong. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG x[4], y[4];
+        x[0] = y[0] = GT_VTABLE_ADDR;
+        gt_test_settext_body(x, "01. Title: Take Your Best Shot", NULL, 0);
+        gt_test_settext_body(y, "01. A Different Screen's First Track", NULL, 0);
+
+        char got[GT_CAPTION_MAX] = { 0 };
+        BOOL ok = gt_numbered_item(1, got, sizeof got);
+
+        char d[200];
+        snprintf(d, sizeof d, "two objects claim 01. -> %d \"%s\"", (int)ok, got);
+        check("case 25: an ambiguous number names NOTHING", !ok && !got[0], d);
+    }
+
+    /* --- case 26: a STALE object's text is not returned --------------------
+     * ⚠ The entry survives until eviction, so the pointer must be re-validated
+     * on every lookup. An object whose vptr is no longer ours has been freed and
+     * its slot reused; its text is a leftover, not the screen's content.
+     *
+     * ⭐ This is the property gt_instance_report already prints as LIVE/STALE.
+     * The lookup must ACT on it, not merely be able to report it. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG z[4];
+        z[0] = GT_VTABLE_ADDR;
+        gt_test_settext_body(z, "01. Title: Take Your Best Shot", NULL, 0);
+        /* The object is freed and its memory reused by something else. */
+        z[0] = 0xDEADBEEFULL;
+
+        char got[GT_CAPTION_MAX] = { 0 };
+        BOOL ok = gt_numbered_item(1, got, sizeof got);
+
+        char d[200];
+        snprintf(d, sizeof d, "stale object -> %d \"%s\"", (int)ok, got);
+        check("case 26: a STALE object's text is not returned", !ok && !got[0],
+              d);
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",

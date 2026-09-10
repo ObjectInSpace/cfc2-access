@@ -187,6 +187,13 @@ static LONG           g_taken_seq;
 static BOOL              g_installed;
 static gt_install_status g_why = GT_INSTALL_NOT_TRIED;
 
+/* ⚠ Test-only, declared here because BOTH the caption path and the numbered
+ * lookup below gate on it. The SHIPPING guard (`g_installed`) is load-bearing --
+ * without it the mod reads a recorder no hook is filling -- so it cannot be
+ * dropped, and a suite that cannot reach the code cannot test it either.
+ * Defined once, near the state it guards, rather than mid-file. */
+static BOOL g_focus_test_mode;
+
 gt_install_status gt_install_why(void) { return g_why; }
 
 /* --- the detour ----------------------------------------------------------
@@ -759,12 +766,7 @@ void gt_note_focus_move(void)
     InterlockedIncrement(&g_move_notifications);
 }
 
-/* ⚠ Test-only: lets the offline suite exercise the caption path without a real
- * install. The SHIPPING guard (`g_installed`) is load-bearing -- without it the
- * mod would read a recorder no hook is filling -- so it cannot simply be
- * dropped, and a suite that cannot reach the code cannot test it either.
- * Mirrors the existing gt_test_* entry points rather than inventing a pattern. */
-static BOOL g_focus_test_mode;
+/* See the declaration of g_focus_test_mode above for why this exists. */
 void gt_test_focus_enable(void) { g_focus_test_mode = TRUE; }
 
 /* Test-only: the window clear that gt_focus_report() performs, without needing
@@ -877,6 +879,84 @@ void gt_instance_report(void)
                  "here is spoken; this is a measurement.");
     }
     InterlockedExchange(&g_inst_busy, 0);
+}
+
+/* Does `s` begin with the decimal number `n` followed by '.'?
+ *
+ * ⚠ Exact-width comparison, not atoi(): atoi("0123") and atoi("12") would both
+ * satisfy a numeric test for values they should not, and a prefix compare
+ * against "1." would match "1." inside "11.". Formatting the expected prefix and
+ * comparing the whole thing is the form with no such gap.
+ *
+ * ⭐ Both widths are accepted ("1." and "01.") because the padding is the
+ * game's presentation choice, not part of the identity. The music list pads to
+ * two digits; nothing guarantees another numbered list will. */
+static BOOL text_has_number_prefix(const char *s, int n)
+{
+    char pad[16], bare[16];
+    if (!s || n < 0) return FALSE;
+    _snprintf(pad,  sizeof(pad),  "%02d.", n);
+    _snprintf(bare, sizeof(bare), "%d.",   n);
+    pad[sizeof(pad) - 1] = 0; bare[sizeof(bare) - 1] = 0;
+    return strncmp(s, pad,  strlen(pad))  == 0 ||
+           strncmp(s, bare, strlen(bare)) == 0;
+}
+
+BOOL gt_numbered_item(int n, char *out, int outlen)
+{
+    if (out && outlen > 0) out[0] = 0;
+    if ((!g_installed && !g_focus_test_mode) || !out || outlen <= 0 || n < 0)
+        return FALSE;
+    /* Never block the render thread's hook; a missed lookup is silence. */
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return FALSE;
+
+    /* ⚠⚠ volatile because MEM_GUARDED is setjmp/longjmp: a fault inside the
+     * loop unwinds to the guard, and a non-volatile local held in a register
+     * across that jump is restored to an INDETERMINATE value. `matches` deciding
+     * whether a name is spoken and `i` driving the loop are the two worst
+     * variables in this function to have quietly rewound.
+     *
+     * ⭐ -Wclobbered caught this on the first code written after it was added to
+     * build.ps1 -- the flag was kept from a reverted change for exactly this
+     * reason, and it earned its place immediately. */
+    volatile int matches = 0;
+    LONG n_ent = g_inst_count;
+    for (volatile LONG i = 0; i < n_ent; i++) {
+        if (!text_has_number_prefix(g_inst[i].text, n))
+            continue;
+        /* ⚠ Re-validate the pointer exactly as gt_instance_report does. An
+         * entry survives until eviction, so a stale object from a screen left
+         * long ago can still hold matching text -- and 30 of 64 entries were
+         * stale in the very run this was built from. */
+        ULONGLONG vptr = 0;
+        BOOL faulted = FALSE;
+        void *o = g_inst[i].obj;
+        if (!o || ((ULONG_PTR)o & 7u) ||
+            mem_readable_run(o, sizeof(vptr)) < sizeof(vptr))
+            continue;
+        MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)o);
+        if (faulted || (vptr != GT_VTABLE_ADDR && vptr != GT_VTABLE_MSG))
+            continue;
+        matches++;
+        if (matches == 1) {
+            strncpy(out, g_inst[i].text, (size_t)outlen - 1);
+            out[outlen - 1] = 0;
+        }
+    }
+    InterlockedExchange(&g_inst_busy, 0);
+
+    /* ⛔ TWO LIVE OBJECTS CLAIMING THE SAME NUMBER IS A CONTRADICTION. It means
+     * the table holds another screen's numbered list as well as this one's, and
+     * there is no evidence saying which is on screen. Refuse both. */
+    if (matches != 1) {
+        if (matches > 1)
+            log_line("gt: ⚠ %d live objects claim item number %d -- ambiguous, "
+                     "naming none.", matches, n);
+        out[0] = 0;
+        return FALSE;
+    }
+    return TRUE;
 }
 
 void gt_focus_report(void)

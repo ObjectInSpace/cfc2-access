@@ -108,7 +108,19 @@ typedef enum {
 typedef enum {
     MC_LIST = 0,      /* a flat list: base_index + index names the item */
     MC_SETTINGS_ROW,  /* the VERTICAL site of a settings screen: moves rows */
-    MC_SETTINGS_VALUE /* the HORIZONTAL site: changes the focused row's value */
+    MC_SETTINGS_VALUE,/* the HORIZONTAL site: changes the focused row's value */
+    /* ⭐⭐ A list whose items name THEMSELVES in live text, numbered on screen.
+     *
+     * The music player is the first: its five tracks are "01. Title: Take Your
+     * Best Shot" and so on. They are NOT in the GMD -- track titles are not
+     * message labels -- so no base and no map can ever name them, and the
+     * caption channel cannot either (the list's text is set once when the screen
+     * opens and cursor movement sets nothing).
+     *
+     * The item is named by asking the live instance set for the object whose
+     * text starts with THIS position's number, so the game's own numbering and
+     * the cursor's index must agree. No `base_index`, no `labels`. */
+    MC_NUMBERED_LIVE
 } mc_kind;
 
 typedef struct {

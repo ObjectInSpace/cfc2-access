@@ -470,6 +470,37 @@ void gt_focus_report(void);
  * ⚠ LOGGED, NEVER SPOKEN. A live object set is not yet a row->text mapping. */
 void gt_instance_report(void);
 
+/* ⭐⭐ THE NUMBERED-LIST LOOKUP: find a live object whose text begins with the
+ * decimal number `n` followed by '.', and copy that text out.
+ *
+ * Built for the music player, whose five tracks are captured here in full --
+ * "01. Title: Take Your Best Shot" -- and are reachable by NOTHING else: the
+ * titles are not in the GMD corpus (they are not message labels at all), and the
+ * caption channel cannot see them either.
+ *
+ * ⛔⛔ WHY IT MATCHES ON THE PRINTED NUMBER RATHER THAN INSERTION ORDER.
+ * Insertion order DID equal row order in both runs, and relying on it would have
+ * worked -- and would have been the "fits the shape" mistake this project keeps
+ * paying for. The number the game itself printed is an INDEPENDENT statement of
+ * which row the text belongs to, so a match is two sources agreeing (the
+ * cursor's index and the game's own numbering) rather than one source trusted
+ * twice. A scrolled window, a re-ordered list or a stale table then yields NO
+ * match -- silence -- instead of confidently naming the wrong track.
+ *
+ * ⚠ THIS IS A LOOKUP, NOT A MAILBOX. Unlike gt_take_caption, nothing here is
+ * stamped with a movement: the music list's text is set ONCE when the screen
+ * opens (5 sets each, all at one move seq) and moving the cursor sets NOTHING.
+ * That is measured, not assumed -- and it is exactly why the caption channel
+ * reads this screen as silent. So the text must be pulled by index on demand.
+ *
+ * ⚠ Pointers are re-validated (vptr must still be ours) exactly as the report
+ * does, because a GUI object is freed on a screen change and the table keeps
+ * entries until they are evicted.
+ *
+ * Returns TRUE only if exactly ONE live object matched. Two objects claiming the
+ * same number is a contradiction, not a tie to be broken -- it returns FALSE. */
+BOOL gt_numbered_item(int n, char *out, int outlen);
+
 /* --- test seams ----------------------------------------------------------
  * ⭐⭐ The stand-in must NOT re-derive what the shipping code derives. A
  * harness that recomputes the mechanism under test leaves the suite green with
