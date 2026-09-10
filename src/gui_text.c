@@ -426,25 +426,68 @@ static void *settext_body(int which, pfn_settext real, void *self,
                          * user is actually on. 30 of 64 entries were STALE
                          * objects from screens left long ago.
                          *
-                         * ⭐ Evict the OLDEST entry by move_seq. A GUI object
-                         * is freed on a screen change, so an entry last
-                         * touched many movements ago is almost certainly dead;
-                         * the current screen's objects are re-set constantly
-                         * and stay. This keeps the table tracking the present
-                         * instead of the past.
+                         * ⭐⭐ PREFER A DEAD SLOT. Age alone was not enough, and
+                         * the 13:43 run says why in two numbers:
                          *
-                         * ⚠ Cheap linear scan: 64 entries on a render-thread
-                         * hook that already walks the table to find `self`, so
-                         * the cost is the same order as the lookup above. */
-                        LONG oldest = 0;
-                        for (LONG k = 1; k < GT_INST_MAX; k++) {
-                            if (g_inst[k].move_seq < g_inst[oldest].move_seq)
-                                oldest = k;
+                         *  - `move_seq` only advances when the CURSOR MOVES, so
+                         *    entries arrive in ties -- 15 at move 16, 15 at
+                         *    move 10, 12 at move 20. A minimum-by-move_seq scan
+                         *    cannot order within a tie and always takes the
+                         *    lowest index, so it evicted the same early slots
+                         *    repeatedly.
+                         *  - meanwhile every `move 0` entry was STALE (freed
+                         *    title-screen and main-menu objects) and still held
+                         *    a slot ~40 minutes in. The table could already SEE
+                         *    they were dead -- gt_instance_report labels them --
+                         *    and never acted on it.
+                         *
+                         * So: find a slot whose object is no longer a live
+                         * cGUIObjText and take that first. Only if every entry
+                         * is live does age decide. A dead entry costs nothing to
+                         * lose; a live one may be the screen the user is on.
+                         *
+                         * ⚠ THE VALIDATION IS THE SAME ONE THE REPORT USES, and
+                         * it must be: a slot this considers dead is exactly a
+                         * slot the report would print STALE. Two different
+                         * notions of "dead" would make the log stop describing
+                         * the table's behaviour.
+                         *
+                         * ⚠ Cost: one guarded pointer read per entry, on a hook
+                         * that already walks the table. Bounded at 64 and only
+                         * on the insert path for an object not already present
+                         * -- not on the common case, which is a re-set of an
+                         * object the table already holds. */
+                        LONG victim = -1;
+                        for (LONG k = 0; k < GT_INST_MAX; k++) {
+                            ULONGLONG vptr = 0;
+                            volatile BOOL faulted = FALSE;
+                            void *o = g_inst[k].obj;
+                            if (!o || ((ULONG_PTR)o & 7u) ||
+                                mem_readable_run(o, sizeof(vptr)) <
+                                    sizeof(vptr)) {
+                                victim = k;          /* unreadable => dead */
+                                break;
+                            }
+                            MEM_GUARDED(faulted,
+                                        vptr = *(volatile ULONGLONG *)o);
+                            if (faulted || (vptr != GT_VTABLE_ADDR &&
+                                            vptr != GT_VTABLE_MSG)) {
+                                victim = k;          /* not ours any more */
+                                break;
+                            }
                         }
-                        g_inst[oldest].obj = self;
-                        g_inst[oldest].sets = 0;
-                        g_inst[oldest].text[0] = 0;
-                        i = oldest;
+                        if (victim < 0) {
+                            /* Every entry is still live -- fall back to age. */
+                            victim = 0;
+                            for (LONG k = 1; k < GT_INST_MAX; k++) {
+                                if (g_inst[k].move_seq < g_inst[victim].move_seq)
+                                    victim = k;
+                            }
+                        }
+                        g_inst[victim].obj = self;
+                        g_inst[victim].sets = 0;
+                        g_inst[victim].text[0] = 0;
+                        i = victim;
                         InterlockedIncrement(&g_inst_evicted);
                     }
                     if (i < GT_INST_MAX && g_inst[i].obj == self) {

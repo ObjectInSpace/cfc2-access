@@ -900,6 +900,120 @@ int main(void)
               d);
     }
 
+    /* --- case 27: a DEAD slot is reclaimed before a LIVE one ---------------
+     * ⛔⛔ FROM THE 13:43 RUN. The table ran 100% full with up to 6670
+     * evictions while every `move 0` entry was STALE -- freed title-screen and
+     * main-menu objects still holding slots ~40 minutes in. gt_instance_report
+     * could already SEE they were dead and nothing acted on it.
+     *
+     * ⚠ THE FIXTURE MAKES THE DEAD ENTRY THE *NEWEST*, which is what makes this
+     * a test of deadness rather than of age. Under the old age-only rule the
+     * dead entry is the LAST thing evicted; only a rule that checks liveness
+     * reclaims it first. So an implementation that regressed to pure LRU fails
+     * here even though it still "evicts something".
+     *
+     * The live entries are deliberately given IDENTICAL move_seq values too --
+     * the real table arrives in ties (15 at move 16, 15 at move 10), which is
+     * the second half of why age alone did not work. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        /* ⚠ The cap is private to gui_text.c, so -- exactly as case 21 does --
+         * the fixture OVERSHOOTS it rather than referencing it. The table must
+         * be FULL for this to test anything: with a free slot no eviction
+         * happens at all and the case would pass without ever reaching the
+         * reclaim path. */
+        enum { N_LIVE = 200 };
+        static ULONGLONG live[N_LIVE];
+        static ULONGLONG dead[4];
+
+        /* Saturate with live objects, all at the SAME move seq -- the tie
+         * condition the real table exhibits (15 entries at move 16, 15 at
+         * move 10), which is half of why age alone did not work. */
+        for (int k = 0; k < N_LIVE; k++) {
+            live[k] = GT_VTABLE_ADDR;
+            char s[32];
+            snprintf(s, sizeof s, "live %d", k);
+            gt_test_settext_body(&live[k], s, NULL, 0);
+        }
+
+        /* ⭐ SNAPSHOT WHAT THE FULL TABLE ACTUALLY HOLDS, rather than assuming.
+         * With every entry live and tied on move_seq the age fallback has no
+         * ordering to work with, so WHICH objects survive saturation is an
+         * implementation detail -- and an assertion that assumed LRU semantics
+         * would be testing the fixture's guess, not the reclaim rule. Asking
+         * the table is the measurement; predicting it is not. */
+        int resident_before = 0;
+        static char held_before[N_LIVE];
+        for (int k = 0; k < N_LIVE; k++) {
+            char got[GT_CAPTION_MAX] = { 0 }, want[32];
+            snprintf(want, sizeof want, "live %d", k);
+            held_before[k] = (gt_test_instance_text(&live[k], got,
+                                                   sizeof got) &&
+                              strcmp(got, want) == 0);
+            if (held_before[k]) resident_before++;
+        }
+
+        /* Advance time, add a NEWER object, then kill it. It is now the newest
+         * entry in the table AND it is dead -- so under an age-only rule it is
+         * the LAST thing that would ever be evicted. That inversion is what
+         * makes this a test of deadness rather than of age.
+         *
+         * ⚠⚠ THIS INSERT ITSELF COSTS ONE LIVE ENTRY, LEGITIMATELY. The table
+         * is full and every entry is live at this moment, so there is no dead
+         * slot to reclaim and the age fallback must take a live one. Counting
+         * that loss against the reclaim rule would be measuring the wrong
+         * insert -- which is exactly what an earlier version of this case did.
+         * So the snapshot is retaken HERE, after the unavoidable eviction. */
+        gt_note_focus_move();
+        dead[0] = GT_VTABLE_ADDR;
+        gt_test_settext_body(dead, "doomed", NULL, 0);
+        dead[0] = 0xDEADBEEFULL;          /* freed and reused */
+
+        int resident_mid = 0;
+        for (int k = 0; k < N_LIVE; k++) {
+            char got[GT_CAPTION_MAX] = { 0 }, want[32];
+            snprintf(want, sizeof want, "live %d", k);
+            held_before[k] = (gt_test_instance_text(&live[k], got,
+                                                   sizeof got) &&
+                              strcmp(got, want) == 0);
+            if (held_before[k]) resident_mid++;
+        }
+
+        /* One more new object must land in the DEAD slot, not on a live one. */
+        static ULONGLONG fresh[4];
+        fresh[0] = GT_VTABLE_ADDR;
+        gt_test_settext_body(fresh, "01. Fresh Arrival", NULL, 0);
+
+        /* ⭐ THE ASSERTION: nothing that was resident BEFORE is gone AFTER. The
+         * newcomer had a dead slot available, so no live entry needed to pay for
+         * it. That is the property, stated without any assumption about which
+         * objects saturation happened to keep.
+         *
+         * ⚠ `resident_before` is asserted non-trivial too: if the snapshot had
+         * found nothing, "nothing was lost" would be vacuously true -- a zero
+         * that looks identical to success. */
+        int lost = 0;
+        for (int k = 0; k < N_LIVE; k++) {
+            if (!held_before[k]) continue;
+            char got[GT_CAPTION_MAX] = { 0 }, want[32];
+            snprintf(want, sizeof want, "live %d", k);
+            if (!gt_test_instance_text(&live[k], got, sizeof got) ||
+                strcmp(got, want) != 0)
+                lost++;
+        }
+        char found[GT_CAPTION_MAX] = { 0 };
+        int fresh_ok = gt_test_instance_text(fresh, found, sizeof found);
+
+        char d[240];
+        snprintf(d, sizeof d,
+                 "resident before=%d, after the dead insert=%d, lost to the "
+                 "RECLAIM insert=%d, fresh stored=%d (\"%s\")",
+                 resident_before, resident_mid, lost, fresh_ok, found);
+        check("case 27: a DEAD slot is reclaimed before any LIVE one",
+              resident_mid > 8 && lost == 0 && fresh_ok > 0, d);
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",
