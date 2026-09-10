@@ -1,5 +1,44 @@
 # What is left in the SHELL
 
+## ⭐ UPDATE 2026-09-10, after the 17:32 run — THREE SHIPPED, TEN REMAIN
+Shipped since this file was written: **Music tracks** (confirmed in-game),
+**Lobby** (`0x140083e09`), **Gallery** (`0x14009a482`). Section B below is
+therefore ANSWERED — Gallery was never closed; nothing had entered it.
+
+⚠ The run also revealed **three callers never seen before**, so the remaining
+count went 8 → 10. Naming screens uncovers screens.
+
+### ▶ THE NEW ONE: lobby settings (`0x140082c3c` 10-row + `0x140082d16` 9-value)
+One screen object (`0x2C370E20`), reached from Create Lobby. A ROW+VALUE screen,
+the shape Select Game and the Options submenus already use.
+
+⭐ Identity is CERTAIN: the corpus has a **60-label `LOBBY_*` family**, and the
+live instance set on that screen holds its values verbatim — "On (Quick Match)"
+(`LOBBY_EVENT_00`), "First to 1" (`LOBBY_ROUND_00`), "On", "2".
+
+⛔⛔ **AND IT IS NOT SHIPPABLE, FOR THE MOST DANGEROUS REASON.** The family
+contains exactly the plausible row labels — Event Mode, Victory Condition,
+Number of Players, Passcode, Cross-region Matchmaking, Game Start Privilege,
+One-button Special Moves — and ten of them could be assembled into a map that
+"fits" a 10-row screen. **That is the reasoning that produced
+`g_game_options_candidate` and the mislabelled "Controls" screen.**
+
+What the evidence ACTUALLY supports, from the single visit:
+- row 1 → `HELP_GAME_TITLE` → `GAME_TITLE`, unique. ⭐ Usable.
+- row 2 → `HELP_GAME_VERSION` / `HELP_GAME_VERSION_ON`, **AMBIGUOUS** — and the
+  mod correctly refused it in the run.
+- rows 3-10 → **no caption, no evidence of any kind.**
+
+▶ It needs one slow pass (~1 s dwell per row) down all ten rows. Then the
+caption channel names them and `test_screen_maps.py` validates the map. Until
+then it speaks position, which is correct.
+
+⚠ A `LOBBY_*` label existing is NOT evidence that it is row N of this screen.
+The corpus says which labels EXIST; only a run says which the screen DRAWS.
+
+---
+
+
 Written 2026-09-10, after the music tracks shipped. Derived by cross-referencing
 every `[DISCOVERY] unknown screen` line in **all seven run logs** against the
 current `g_screens`, so it is a measurement rather than an impression.
