@@ -155,3 +155,35 @@ unnumbered) it will.
    STALE, but nothing reclaims the slot.
 
 Both must be fixed before step 2, or a longer session measures nothing.
+
+
+## ⛔⛔ CORRECTION (2026-09-10): I said Gallery had never been entered. WRONG.
+
+The user said they had entered it and told me to check the logs. They were
+right; I had been reading my own stale COPIES in `docs/`, not the live log.
+
+`docs/run-2026-09-10-1343.log` (the live log) contains **three callers never
+seen before** -- `0x14009885E`, `0x1400988BF`, `0x14009890D` -- all on one
+screen object `0x2BD9C3E0`, reached from Online Play > Casual Match. A 3-item
+vertical list and a 4-item list sharing a screen.
+
+⭐ And the screen sets GAME TITLES as live text: "Plasma Sword", "Capcom
+Fighting Evolution", "Capcom Vs. SNK Pro". The instance set holds **all eight
+titles at once**, each in its own object, 363 sets each.
+
+### ⚠ So my claim that Gallery items are "unnumbered logos" was never tested
+It came from an old note about Gallery's CONFIRM indexing resource-id tables,
+which says nothing about whether the screen sets text. This run shows the
+online game-select screen setting titles freely. Gallery proper (Museum >
+Gallery) still has not been entered -- but the assumption behind "it needs a
+selection signal" is now unsupported either way.
+
+### ⭐⭐ The 9-item music browser: the instance set explains the silence
+Caller `0x14009af21`, "1 of 9", inside Museum > Music. The live set at that
+moment holds **nine objects with EMPTY strings** (`[move 16, 1 set(s)] ""`)
+alongside the five track objects. So the selector's elements exist but carry no
+text -- which is why it reads nothing, and it is a different problem from "we
+cannot find the text".
+
+⚠ An empty string is a real measurement here, not a failed read: the objects
+were constructed and `setText` ran once on each with an empty value.
