@@ -109,7 +109,37 @@ screen at caller `0x14009BA21` produced none at all (setText froze at 306
 across its 7 movements). So the caption channel SUPPLEMENTS cursor+GMD; it does
 not replace it. Do not build anything that assumes every row has one.
 
-### ⛔⛔ FIXED: the mod went SILENT for 37 s when leaving the Music screen
+### ⚠ THE STALL, ROUND 2 -- and a crash I nearly shipped
+
+The 37 s fix MOVED the stall rather than removing it: the classification pass
+ran BEFORE the time budget started, so the 23:52 run stalled **11.9 s** and then
+reported "sweep STOPPED after 0 of 4165 bases". The budget worked; it was
+guarding the wrong half. Classification is now INSIDE the budget and
+**resumable** -- it does what it can in 25 ms and continues on the next
+movement. The sweep is bounded by `cls_done`, never the table size (an
+unclassified entry is indistinguishable from a real negative).
+
+⛔⛔ **AND THE RULE THAT CAME OUT OF IT.** I also wrote a fast path skipping
+`mem_readable_run()` before the guarded `memcpy`, since the range had been
+validated at index time. The test written to prove it safe **CRASHED**:
+
+    A. guarded single-byte read of a bad page  -> CAUGHT
+    B. guarded byte LOOP across the boundary   -> CAUGHT
+    C. guarded memcpy() across the boundary    -> ⛔ NOT CAUGHT
+
+⚠ C is not even consistent -- inline at -O2 it crashed inside memcpy; in a child
+process it returned reporting NO fault. **The fault guard is a net for the race
+between the check and the copy, never a replacement for the check.** Every bulk
+read must call `mem_readable_run()` first. Reverted; pinned by
+`.\tools\run_span_test.ps1`.
+
+⚠ **STILL UNEXPLAINED: ~2.9 ms per string read in-game.** Two hypotheses were
+measured and REFUTED -- it is not the string index (the whole blob indexes in
+80 ms) and it is not VAD-tree depth (6132 regions offline still gives
+0.0003 ms/read). The next run's log now prints the rate and the blob's region
+shape directly. Do not guess a third time; read those lines.
+
+### ⛔⛔ (round 1) the mod went SILENT for 37 s when leaving the Music screen
 
 User-reported, confirmed in `docs/run-2026-09-09-2313.log`: ONE 37.3-second gap
 on the poll thread, bracketing a single `[DISCOVERY]` event for the 9-item
