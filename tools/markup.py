@@ -281,6 +281,104 @@ class Translator:
         return text.strip()
 
 
+def strip_hint_stutter(text, translator, game=None):
+    """
+    Speech for a BUTTON HINT STRIP: a run of `<ICON button>Action` pairs.
+
+    ⭐ This mode exists because of a defect found by running clean() against
+    the REAL live captures, which no offline audit could have surfaced:
+
+        "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+        clean()  -> "Confirm Confirm Cancel Back"
+
+    The icon's spoken name and the printed action are the SAME WORD, because
+    the button is named after what it does. Speaking both stutters. Measured in
+    the corpus: 25 such pairs, concentrated in exactly the HELP_BUTTON_* /
+    HB_* labels this channel captures.
+
+    ⚠ The duplicate must be dropped by PREFIX and only the duplicated word:
+    HB_LOBBY_CANCEL is "<ICON CANCEL>Cancel Ready" -> "Cancel Ready", not
+    "Cancel Cancel Ready" and not "Ready".
+
+    ⚠ And the pairs must be SEPARATED. Run together they are unparseable by
+    ear: "Start Training X Game Settings Cancel Back" gives no clue where one
+    hint stops. Each becomes "<button> <action>", joined by "; ".
+
+    ⛔ Two shapes are NOT pair boundaries and must not be split on -- both
+    measured in the corpus, both would be mangled by a naive per-icon split:
+      - HB_AWARD_TITLE   "<ICON BTN_LB>/<ICON BTN_RB>Change Game"  (either-of)
+      - HB_RANKING_100   "<ICON BTN_LT>+<ICON D_KEY>Move 100"      (chord)
+    An icon whose gap to the next icon is only "/" or "+" belongs to the SAME
+    hint, and the joiner is kept and spoken ("LB or RB", "LT plus d-pad").
+    """
+    if not text:
+        return ""
+
+    # Layout tags carry nothing audible; drop them before splitting so the
+    # gaps between icons reflect real text, not markup.
+    t = re.sub(r"</?SIZE[^>]*>", "", text)
+    t = re.sub(r"</?RGB[^>]*>", "", t)
+    t = re.sub(r"</?FONT[^>]*>", "", t, flags=re.IGNORECASE)
+    t = re.sub(r"<CNTR>", "", t)
+    t = re.sub(r"</?ltr>", "", t, flags=re.IGNORECASE)
+    t = t.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+
+    # Split into alternating prose / icon-token pieces.
+    parts = re.split(r"<ICON ([A-Za-z0-9_]+)>", t)
+    if len(parts) == 1:
+        # No icons at all: ordinary prose (e.g. a caption like "P1").
+        return translator.clean(text, game=game)
+
+    lead = parts[0].strip()
+    hints = []          # [[button words], action]
+    i = 1
+    while i < len(parts):
+        tok = parts[i]
+        gap = parts[i + 1] if i + 1 < len(parts) else ""
+        name = translator.icon(tok, game)
+        if name is None:
+            name = "[%s]" % tok
+
+        joiner = gap.strip()
+        if joiner in ("/", "+") and i + 2 < len(parts):
+            # Combination: this icon and the next form ONE hint.
+            hints.append([[name, "or" if joiner == "/" else "plus"], None])
+            i += 2
+            continue
+
+        # Attach to a pending combination, or open a new hint.
+        if hints and hints[-1][1] is None:
+            hints[-1][0].append(name)
+        else:
+            hints.append([[name], None])
+
+        action = gap.strip()
+        # ⭐ The stutter: drop the action's leading copy of the button name.
+        # Prefix, not equality -- "Cancel Ready" must keep "Ready".
+        if action:
+            low, nlow = action.lower(), name.lower()
+            if low == nlow:
+                action = ""
+            elif low.startswith(nlow) and low[len(nlow):len(nlow) + 1] in (" ", ""):
+                action = action[len(name):].strip()
+        hints[-1][1] = action
+        i += 2
+
+    out = []
+    for buttons, action in hints:
+        # buttons is ["LB", "or", "RB"] for a combination, ["Start"] otherwise.
+        btn = " ".join(b for b in buttons if b)
+        piece = ("%s %s" % (btn, action)).strip() if action else btn
+        if piece:
+            out.append(piece)
+
+    joined = "; ".join(out)
+    if lead:
+        joined = ("%s  %s" % (lead, joined)).strip() if joined else lead
+    joined = re.sub(r"\s+", " ", joined)
+    return joined.strip(" ;")
+
+
 def unknown_tokens(strings, translator):
     """Every ICON token in `strings` the translator cannot name. Should be empty."""
     seen = set()
@@ -291,7 +389,18 @@ def unknown_tokens(strings, translator):
 
 # Tags the translator deliberately understands. Anything else is dropped by
 # the safety net in clean() and reported by unknown_tags().
-KNOWN_TAGS = {"ICON", "SIZE", "/SIZE", "RGB", "/RGB", "CNTR", "ltr", "/ltr"}
+#
+# ⭐⭐ FONT/`/FONT` occur ZERO times in the offline corpus -- all 14 languages,
+# 58310 strings -- and DO occur in the live setText captures:
+#     "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+# So the live channel's tag vocabulary is a SUPERSET of the file's, and no
+# amount of auditing the GMD could have found it. This is the same lesson the
+# <ltr> tag taught within the corpus (a vocabulary surveyed in one place is not
+# closed), one level up: the corpus itself is one source among several.
+# Listed here so unknown_tags() does not report it forever; clean() drops it
+# either way via the safety net.
+KNOWN_TAGS = {"ICON", "SIZE", "/SIZE", "RGB", "/RGB", "CNTR", "ltr", "/ltr",
+              "FONT", "/FONT"}
 
 
 def unknown_tags(strings):
