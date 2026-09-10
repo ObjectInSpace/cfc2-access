@@ -1,5 +1,34 @@
 # What is left in the SHELL
 
+## ⚠⚠ UPDATE 2026-09-10, after the 19:13 run — THE COUNT IS NOT CONVERGING
+
+**15 unnamed of 29 callers ever seen.** The count has gone **8 → 10 → 15** across
+three runs *while screens were being shipped in each*. Seven of the 19:13 run's
+callers had never been seen before.
+
+⭐ **This is the single most important planning fact in this file.** Deeper
+exploration keeps finding screens faster than naming retires them, so "name the
+remaining screens" is not a task with a near horizon. It is not a setback — the
+mod degrades correctly on every unknown screen ("3 of 6" is true and useful) —
+but it should stop being described as almost done.
+
+⭐ The 15 callers are only ~8 SCREENS: call sites pair up on one screen object
+(a row list plus a value axis), the shape already known from settings screens.
+
+### What the 19:13 run added
+- `0x14008a8ef` (36, vertical) + `0x14008a91b` (6, horizontal) on
+  `0x2C440110` — reached immediately after **"Search Lobby ID"**, so this is the
+  lobby-ID **entry keypad**: 36 = 10 digits + 26 letters, with a value of "0".
+  ⚠ No single-character objects appear in the instance set, so its glyphs are
+  probably layout data — the consent-dialog problem, not the caption problem.
+- `0x14008e799` (6, vertical) + `0x14008e813` (3, horizontal) on `0x2C5002F0`.
+- `0x1400ac059` (8, horizontal), standalone.
+
+⚠ None produced usable captions. They are listed so the next run knows they
+exist, NOT as evidence about what they contain.
+
+---
+
 ## ⭐ UPDATE 2026-09-10, after the 17:32 run — THREE SHIPPED, TEN REMAIN
 Shipped since this file was written: **Music tracks** (confirmed in-game),
 **Lobby** (`0x140083e09`), **Gallery** (`0x14009a482`). Section B below is
