@@ -8,6 +8,9 @@
 #include "memsafe.h"
 #include "speech.h"
 #include "log.h"
+#include "gui_text.h"     /* the live caption channel */
+#include "gui_markup.h"   /* markup -> speech */
+#include "prompt_id.h"    /* which label produced a captured string */
 
 #include <stdio.h>
 #include <string.h>
@@ -595,6 +598,53 @@ void menu_speak(const mc_move *m)
     else
         _snprintf(line, sizeof(line), "%d of %d", sp.position, sp.total);
     line[sizeof(line) - 1] = '\0';
+
+    /* ⭐⭐ THE ROW'S OWN DESCRIPTION, appended when the game supplied one.
+     *
+     * CFC2 authors a one-line help caption for essentially every menu item
+     * ("Play offline.", "Choose the game you want to play."), and a sighted
+     * player has it on screen the whole time. Speaking it on focus is parity,
+     * not extra verbosity -- which is why it is not behind a hotkey: making the
+     * blind player press a key for what the sighted player simply SEES is not
+     * parity. (memory: judge-cues-against-the-sighted-experience)
+     *
+     * ⚠ It comes AFTER the item name and position. The name is the headline; a
+     * sentence-long description leading would bury it, and the user can
+     * interrupt once they have heard the name.
+     *
+     * ⛔ IT NEVER REPLACES A NAME. If the item is unnamed, this does not fill
+     * the gap -- an unnamed row still says its position, because a description
+     * is not a name and speaking one as the other is the substitution that
+     * makes a wrong claim sound like a right one.
+     *
+     * ⚠⚠ AND IT IS ONLY SPOKEN IF THE CORPUS CONFIRMS IT. A captured string is
+     * matched against the shipped GMD (prompt_identify): a string the corpus
+     * does not contain, or one several screens share, is NOT spoken. So the
+     * worst case is silence, never a caption belonging to another row. */
+    {
+        char cap[GT_CAPTION_MAX];
+        if (gt_take_caption(cap, (int)sizeof(cap))) {
+            prompt_id id = prompt_identify(cap);
+            if (id.result == PROMPT_ID_FOUND) {
+                char spoken[GM_OUT_MAX];
+                gm_speak(cap, spoken, sizeof(spoken));
+                if (spoken[0] && !gm_has_residue(spoken)) {
+                    size_t used = strlen(line);
+                    _snprintf(line + used, sizeof(line) - used - 1,
+                              ". %s", spoken);
+                    line[sizeof(line) - 1] = '\0';
+                }
+            } else if (id.result == PROMPT_ID_AMBIGUOUS) {
+                /* Logged, never spoken: the string belongs to more than one
+                 * screen, so naming one would be a guess. */
+                log_line("mcspeak: caption AMBIGUOUS, not spoken: \"%.70s\"",
+                         cap);
+            } else {
+                log_line("mcspeak: caption not in the corpus, not spoken: "
+                         "\"%.70s\"", cap);
+            }
+        }
+    }
 
     wchar_t w[256];
     int n = MultiByteToWideChar(CP_UTF8, 0, line, -1, w,

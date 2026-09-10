@@ -7,6 +7,7 @@
 #include "log.h"
 #include "memsafe.h"
 #include "menu_speak.h"
+#include "gui_text.h"     /* gt_note_focus_move() -- the focus stamp */
 
 #include "../libs/minhook/include/MinHook.h"
 
@@ -190,6 +191,18 @@ static int detour_body(pfn_move real, void *screen, int *cursor,
     InterlockedIncrement(&g_seq);
 
     InterlockedIncrement(&g_moves);
+
+    /* ⭐ Stamp the focus recorder, HERE and not in the poller.
+     *
+     * This is the moment the game actually moved the cursor. Text the shell
+     * sets in response arrives after it, so stamping here is what makes
+     * "this string belongs to the current row" an ORDERING fact. Stamping in
+     * mc_poll_and_log() instead would put the boundary up to 100 ms late and
+     * attribute the new row's caption to the old row -- which is the timing
+     * join docs/rethink-after-gui-text.md forbids, just with extra steps.
+     *
+     * ⚠ Two atomics and nothing else: this runs on the render thread. */
+    gt_note_focus_move();
     return delta;
 }
 

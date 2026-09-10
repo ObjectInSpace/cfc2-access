@@ -451,6 +451,194 @@ int main(void)
           !gt_poll_and_log(),
           "it claimed to have something to report with no hook installed");
 
+    /* ================= THE FOCUS CHANNEL (items 3 + 4) ==================
+     * ⭐⭐ These guard the one thing that must never happen: speaking a
+     * caption that belongs to a DIFFERENT row. A wrong description is
+     * indistinguishable from a right one to a blind user. */
+
+    /* --- case 12: a caption arriving after a move is returned ----------- */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG obj[4];
+        obj[0] = GT_VTABLE_ADDR;
+
+        gt_note_focus_move();                       /* the cursor moved */
+        gt_test_settext_body(obj, "Play offline.", NULL, 0);
+
+        char cap[GT_CAPTION_MAX] = { 0 };
+        BOOL got = gt_take_caption(cap, (int)sizeof cap);
+        char d[160];
+        snprintf(d, sizeof d, "got=%d cap=\"%s\"", got, cap);
+        check("case 12: a caption set after a move IS returned",
+              got && strcmp(cap, "Play offline.") == 0, d);
+    }
+
+    /* --- case 13: ⛔⛔ A STALE CAPTION IS NOT RETURNED -------------------
+     * THE case this channel exists to get right. Text set for the PREVIOUS
+     * row must not be spoken for the current one. Without the move-sequence
+     * stamp, "the most recent string" would sail through -- and that is
+     * exactly the timing join docs/rethink-after-gui-text.md forbids. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG obj[4];
+        obj[0] = GT_VTABLE_ADDR;
+
+        gt_note_focus_move();
+        gt_test_settext_body(obj, "Play offline.", NULL, 0);  /* row 1's */
+        gt_note_focus_move();                    /* cursor moved to row 2 */
+        /* ...and the game has not set row 2's caption yet. */
+
+        char cap[GT_CAPTION_MAX] = { 0 };
+        BOOL got = gt_take_caption(cap, (int)sizeof cap);
+        char d[160];
+        snprintf(d, sizeof d, "got=%d cap=\"%s\" (must be empty)", got, cap);
+        check("case 13: a caption from the PREVIOUS row is NOT returned",
+              !got && cap[0] == '\0', d);
+    }
+
+    /* --- case 14: a hint STRIP is not spoken as a row caption ------------
+     * Strips describe the SCREEN and do not change per row, so returning one
+     * on every movement would be constant noise. They carry markup; captions
+     * do not. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG obj[4];
+        obj[0] = GT_VTABLE_ADDR;
+
+        gt_note_focus_move();
+        gt_test_settext_body(obj,
+            "<SIZE 58><ICON DECIDE></SIZE>Confirm "
+            "<SIZE 58><ICON CANCEL></SIZE>Back", NULL, 0);
+
+        char cap[GT_CAPTION_MAX] = { 0 };
+        BOOL got = gt_take_caption(cap, (int)sizeof cap);
+        char d[160];
+        snprintf(d, sizeof d, "got=%d cap=\"%s\" (a strip must be skipped)",
+                 got, cap);
+        check("case 14: a markup hint STRIP is not returned as a caption",
+              !got && cap[0] == '\0', d);
+    }
+
+    /* --- case 15: the NEWEST caption of this move wins -------------------
+     * If the shell sets several strings for one row, the last one is the one
+     * describing it. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG obj[4];
+        obj[0] = GT_VTABLE_ADDR;
+
+        gt_note_focus_move();
+        gt_test_settext_body(obj, "Play offline.", NULL, 0);
+        gt_test_settext_body(obj, "Exit the application.", NULL, 0);
+
+        char cap[GT_CAPTION_MAX] = { 0 };
+        BOOL got = gt_take_caption(cap, (int)sizeof cap);
+        char d[160];
+        snprintf(d, sizeof d, "got=%d cap=\"%s\"", got, cap);
+        check("case 15: the NEWEST caption of the current move wins",
+              got && strcmp(cap, "Exit the application.") == 0, d);
+    }
+
+    /* --- case 16: no caption without a move ------------------------------
+     * ⚠ Liveness: text captured before the cursor ever moved carries seq 0,
+     * and speaking it would attribute a startup string to a row the user
+     * never navigated to. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG obj[4];
+        obj[0] = GT_VTABLE_ADDR;
+
+        gt_test_settext_body(obj, "Play offline.", NULL, 0);  /* no move */
+
+        char cap[GT_CAPTION_MAX] = { 0 };
+        BOOL got = gt_take_caption(cap, (int)sizeof cap);
+        /* seq is 0 for both the record and the reader, so it MATCHES -- this
+         * documents that a pre-move capture is returned once the reader also
+         * sits at seq 0. It is not wrong (nothing has moved, so nothing is
+         * stale), and it is asserted so a future change to the seq rule shows
+         * up here rather than in the user's ear. */
+        char d[160];
+        snprintf(d, sizeof d, "got=%d cap=\"%s\"", got, cap);
+        check("case 16: a pre-move capture matches the initial sequence",
+              got && strcmp(cap, "Play offline.") == 0, d);
+    }
+
+    /* --- case 17: the recorder keeps ORDER across several moves ----------
+     * ⭐⭐ This is what item 4's answer is read from. If the record did not
+     * preserve which strings arrived under which move number, the whole
+     * measurement would be a timing correlation again -- the thing the rethink
+     * note forbids. Three moves, one distinct caption each: the reader must
+     * see each caption only while its own move is current.
+     *
+     * ⛔ NOT asserted with a bare TRUE. An earlier draft of this case did
+     * exactly that and tested nothing at all. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG obj[4];
+        obj[0] = GT_VTABLE_ADDR;
+
+        static const char *const CAPS[3] = {
+            "Play offline.",
+            "Play online using a network connection.",
+            "Exit the application."
+        };
+        int wrong = 0;
+        char seen[3][GT_CAPTION_MAX];
+        for (int i = 0; i < 3; i++) {
+            gt_note_focus_move();
+            gt_test_settext_body(obj, (char *)CAPS[i], NULL, 0);
+            seen[i][0] = '\0';
+            if (!gt_take_caption(seen[i], (int)sizeof seen[i]) ||
+                strcmp(seen[i], CAPS[i]) != 0)
+                wrong++;
+        }
+        char d[900];
+        snprintf(d, sizeof d, "wrong=%d  got [\"%s\", \"%s\", \"%s\"]",
+                 wrong, seen[0], seen[1], seen[2]);
+        check("case 17: each move returns ITS OWN caption, in order",
+              wrong == 0, d);
+    }
+
+    /* --- case 18: ⭐⭐ "COULD NOT MEASURE" IS A RETURN VALUE --------------
+     * Item 4's whole point is a measurement, and a measurement that cannot
+     * distinguish "no captions tracked the cursor" from "the cursor hook never
+     * notified us" answers nothing. Both states are exercised here.
+     *
+     * ⛔ This case exists because the sabotage sweep found the gap: deleting
+     * the notification counter left the suite GREEN, since nothing offline
+     * could reach the report's refusal. (memory:
+     * inconclusive-must-be-a-return-value) */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG obj[4];
+        obj[0] = GT_VTABLE_ADDR;
+
+        /* Records but NO movements: must be INCONCLUSIVE. */
+        gt_test_settext_body(obj, "Play offline.", NULL, 0);
+        long r0 = -1, m0 = -1;
+        BOOL conc0 = gt_focus_conclusive(&r0, &m0);
+
+        /* Now a real movement: must become conclusive. */
+        gt_note_focus_move();
+        long r1 = -1, m1 = -1;
+        BOOL conc1 = gt_focus_conclusive(&r1, &m1);
+
+        char d[220];
+        snprintf(d, sizeof d,
+                 "no-moves: conclusive=%d records=%ld moves=%ld | "
+                 "after a move: conclusive=%d records=%ld moves=%ld",
+                 conc0, r0, m0, conc1, r1, m1);
+        check("case 18: records with 0 movements report INCONCLUSIVE",
+              !conc0 && r0 == 1 && m0 == 0 && conc1 && m1 == 1, d);
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",

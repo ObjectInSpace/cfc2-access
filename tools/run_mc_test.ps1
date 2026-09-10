@@ -17,11 +17,18 @@ $minhookSrc = @(
     "$root\libs\minhook\src\hde\hde64.c"
 )
 
+# ⚠ menu_cursor now stamps the focus recorder (gt_note_focus_move) and
+# menu_speak speaks the focused row's caption, so this suite needs gui_text,
+# gui_markup and prompt_id linked in too. A shared-header change that leaves a
+# runner UN-BUILDABLE looks exactly like a passing suite -- this one broke that
+# way and was caught only by running every runner after the change.
+# (memory: a-suite-that-cannot-build)
 & $gcc -O2 -Wall -Wextra -Wclobbered -o "$out\test_menu_cursor.exe" `
     "$root\tools\test_menu_cursor.c" "$root\src\menu_cursor.c" `
     "$root\src\log.c" "$root\src\memsafe.c" `
     "$root\src\menu_speak.c" "$root\src\gmd_find.c" "$root\src\speech.c" `
     "$root\src\rom_table.c" `
+    "$root\src\gui_text.c" "$root\src\gui_markup.c" "$root\src\prompt_id.c" `
     @minhookSrc `
     -I "$root\libs\minhook\include" `
     -luser32

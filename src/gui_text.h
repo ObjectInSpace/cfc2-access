@@ -413,6 +413,46 @@ void gt_get_stats(gt_stats *out);
  * the dump goes away. */
 BOOL gt_poll_and_log(void);
 
+/* ---- The focus channel: item 4's measurement, and the caption source. ----
+ *
+ * ⭐⭐ THE OPEN QUESTION THIS ANSWERS. Does the shell push a per-ROW caption
+ * through setText when the cursor moves? The corpus proves such strings exist
+ * and are distinct (docs/screen-id-from-prompt-text.md); it does NOT prove the
+ * game sets one per row change -- the 21:19 run saw 6 distinct strings from 324
+ * calls. Nothing here assumes the answer.
+ *
+ * ⛔ NOT A TIMING JOIN. docs/rethink-after-gui-text.md forbids correlating
+ * captured text with cursor indices by time, because 3 of 6 captures in that
+ * run coincided with NO cursor movement. Instead the cursor side stamps a
+ * MOVEMENT SEQUENCE NUMBER, and records carry the stamp current when they
+ * arrived -- an ordering fact. If captions do not track the cursor, the record
+ * shows the same few strings repeating across many move numbers, which is a
+ * clean NO rather than a fabricated correlation. */
+
+/* Buffer size a caller must provide to gt_take_caption(). Matches the capture
+ * buffer, so a caption can never be truncated further than the game's own
+ * capture already was. */
+#define GT_CAPTION_MAX 256
+
+/* Called by the cursor hook on a real movement. Bumps the sequence AND counts
+ * the notification, so the report can tell "no captions" from "the cursor side
+ * never called us" -- without this count the negative is unfalsifiable. */
+void gt_note_focus_move(void);
+
+/* The newest PROSE caption recorded since the last movement, if any.
+ *
+ * ⚠ Returns FALSE when there is none, when the recorder is busy, or when the
+ * hook is not installed -- all of which mean "say nothing", never "say the
+ * previous row's caption". Hint strips (which carry markup) are skipped: they
+ * describe the SCREEN and do not change per row, so speaking one on every
+ * movement would be noise. */
+BOOL gt_take_caption(char *out, int outlen);
+
+/* Log the whole ordered record, with a positive count of what was examined and
+ * an explicit reading guide. Refuses to conclude if the cursor side never
+ * notified us. */
+void gt_focus_report(void);
+
 /* --- test seams ----------------------------------------------------------
  * ⭐⭐ The stand-in must NOT re-derive what the shipping code derives. A
  * harness that recomputes the mechanism under test leaves the suite green with
@@ -462,5 +502,23 @@ BOOL gt_test_inspect(const void *buf, SIZE_T len, int *text_offset);
 
 /* Reset all captured state, so one test cannot inherit another's. */
 void gt_test_reset(void);
+
+/* Test-only: enable the caption path without a real install. The shipping
+ * `g_installed` guard is load-bearing (the mod must not read a recorder no hook
+ * is filling), so it stays -- but a suite that cannot reach the code cannot
+ * test it either. */
+void gt_test_focus_enable(void);
+
+/* ⭐⭐ Is item 4's measurement CONCLUSIVE? Returns FALSE when the cursor side
+ * never notified the recorder -- in which case every record carries sequence 0
+ * and "no captions tracked the cursor" is indistinguishable from "the cursor
+ * hook never ran". gt_focus_report() refuses to draw a conclusion on FALSE.
+ *
+ * ⚠ This is a RETURN VALUE, not a logged warning, for the reason this project
+ * has re-learned repeatedly: if the code notices it cannot measure something,
+ * a caller must be able to act on that, and a test must be able to assert it.
+ * `*records` and `*moves` report the positive counts behind the verdict.
+ * (memory: inconclusive-must-be-a-return-value) */
+BOOL gt_focus_conclusive(long *records, long *moves);
 
 #endif /* CFC2_GUI_TEXT_H */

@@ -580,6 +580,18 @@ static DWORD WINAPI worker(LPVOID param)
                          gs.settext_each[2], gs.settext_each[3]);
         }
 
+        /* ⭐⭐ THE FOCUS RECORD -- the open question this build exists to
+         * answer: do per-ROW captions flow through setText as the cursor moves?
+         *
+         * ⚠ On the SLOW beats only, never on gt_changed. The record is a whole
+         * ordered transcript, so printing it every time a counter moved would
+         * reprint dozens of lines several times a second and bury the log --
+         * the exact failure the retired ring sweep caused (1235 refusal lines
+         * in one run). It also refuses to conclude when the cursor side never
+         * notified it; see gt_focus_report(). */
+        if (gt_ok && (beat == 10 || beat == 30 || beat % 60 == 0))
+            gt_focus_report();
+
         /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning
          * 1.3 GB, and it duplicated work: gmd_text_ready() already calls
          * gmd_find(), caches the resolved table, and is itself retried by this

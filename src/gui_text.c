@@ -82,6 +82,55 @@ static volatile LONG  g_text_ready;   /* mailbox full */
 static volatile LONG  g_text_busy;    /* claim flag over g_text_buf */
 static char           g_text_last[GT_TEXT_MAX];  /* dedupe: last logged */
 
+/* ⭐⭐ THE FOCUS RECORDER -- item 4's measurement, and the caption channel.
+ *
+ * THE QUESTION IT EXISTS TO ANSWER: does the shell push a per-ROW caption
+ * through setText when the cursor moves? The corpus proves such strings EXIST
+ * and are distinct (docs/screen-id-from-prompt-text.md); it does NOT prove the
+ * game sets one on every row change. The 21:19 run saw 6 distinct strings from
+ * 324 calls, which is far fewer than one per row -- so this is genuinely open,
+ * and nothing downstream may assume its outcome.
+ *
+ * ⛔ WHY THE EXISTING MAILBOX CANNOT ANSWER IT. g_text_buf is a ONE-SLOT
+ * mailbox that deliberately drops intermediate strings: it is built for
+ * "distinct sightings", not a transcript. Whether a caption arrives per row
+ * change is exactly a question about the strings it discards.
+ *
+ * ⛔ AND WHY THIS IS NOT A TIMING JOIN. docs/rethink-after-gui-text.md forbids
+ * joining captured text to cursor indices BY TIMING -- three of six captures in
+ * that run coincided with no cursor movement at all, so a time-window
+ * correlation would fabricate relationships. This records a MOVEMENT SEQUENCE
+ * NUMBER stamped by menu_cursor itself, so a reader can see which strings
+ * arrived between one movement and the next. That is an ordering fact, not a
+ * correlation: if captions do NOT track the cursor, the recording shows strings
+ * with no movement between them and the answer is a clean NO.
+ *
+ * ⚠ Bounded and lossy by design: it stops recording when full rather than
+ * wrapping, so the earliest evidence after a movement is what survives, and
+ * `g_focus_dropped` counts what did not fit. A recorder that silently wraps
+ * would show a full buffer whether or not anything was missed. */
+#define GT_FOCUS_MAX 48
+/* The header promises callers this size; a mismatch would silently truncate
+ * captions. Caught at COMPILE time rather than by a comment asking nicely. */
+typedef char gt_caption_size_check[(GT_CAPTION_MAX == GT_TEXT_MAX) ? 1 : -1];
+typedef struct {
+    char      text[GT_TEXT_MAX];
+    void     *self;
+    LONG      move_seq;     /* value of g_move_seq when this arrived */
+    int       which;        /* which of the four overloads fired */
+} gt_focus_rec;
+static gt_focus_rec  g_focus[GT_FOCUS_MAX];
+static volatile LONG g_focus_count;
+static volatile LONG g_focus_dropped;
+static volatile LONG g_focus_busy;
+/* Stamped by gt_note_focus_move() from the cursor hook. Never read as a
+ * timestamp -- only compared for equality/order. */
+static volatile LONG g_move_seq;
+/* ⭐ Liveness: if this is 0, the cursor side never called us and EVERY record
+ * carries seq 0. Then "no caption tracked the cursor" would be unfalsifiable,
+ * so the report must refuse to conclude. */
+static volatile LONG g_move_notifications;
+
 /* The most recently seen instance, published for the worker thread.
  *
  * ⚠ A sequence counter, not a flag: the hook runs on the game's render thread
@@ -301,6 +350,39 @@ static void *settext_body(int which, pfn_settext real, void *self,
                     InterlockedExchange(&g_text_busy, 0);
                 }
                 InterlockedIncrement(&g_with_text);
+
+                /* ⭐ THE FOCUS RECORD -- a separate, ordered channel. See the
+                 * block comment at g_focus. Same discipline as the mailbox: a
+                 * bounded try-lock that never blocks the render thread, and no
+                 * logging or formatting here.
+                 *
+                 * ⚠ Records DISTINCT strings only. The setter fires ~650/s and
+                 * a transcript of repeats would fill 48 slots in under a tenth
+                 * of a second, burying the very transition being measured. */
+                if (InterlockedCompareExchange(&g_focus_busy, 1, 0) == 0) {
+                    LONG n = g_focus_count;
+                    BOOL dup = (n > 0 &&
+                                strcmp(g_focus[n - 1].text, buf) == 0);
+                    if (!dup) {
+                        if (n < GT_FOCUS_MAX) {
+                            /* memcpy + explicit terminator: `buf` is already
+                             * NUL-terminated and the same size, so strncpy's
+                             * truncation warning is about a case that cannot
+                             * arise -- but silencing a warning by ignoring it
+                             * is how a real one gets missed later. */
+                            memcpy(g_focus[n].text, buf, GT_TEXT_MAX - 1);
+                            g_focus[n].text[GT_TEXT_MAX - 1] = 0;
+                            g_focus[n].self = self;
+                            g_focus[n].move_seq = g_move_seq;
+                            g_focus[n].which = which;
+                            /* Publish the count last. */
+                            InterlockedExchange(&g_focus_count, n + 1);
+                        } else {
+                            InterlockedIncrement(&g_focus_dropped);
+                        }
+                    }
+                    InterlockedExchange(&g_focus_busy, 0);
+                }
             } else {
                 InterlockedIncrement(&g_faults);
             }
@@ -571,6 +653,131 @@ static SIZE_T resolve_live(void *ctx, ULONGLONG addr, char *out, SIZE_T max)
         return 0;
     }
     return run;
+}
+
+void gt_note_focus_move(void)
+{
+    InterlockedIncrement(&g_move_seq);
+    InterlockedIncrement(&g_move_notifications);
+}
+
+/* ⚠ Test-only: lets the offline suite exercise the caption path without a real
+ * install. The SHIPPING guard (`g_installed`) is load-bearing -- without it the
+ * mod would read a recorder no hook is filling -- so it cannot simply be
+ * dropped, and a suite that cannot reach the code cannot test it either.
+ * Mirrors the existing gt_test_* entry points rather than inventing a pattern. */
+static BOOL g_focus_test_mode;
+void gt_test_focus_enable(void) { g_focus_test_mode = TRUE; }
+
+BOOL gt_take_caption(char *out, int outlen)
+{
+    BOOL got = FALSE;
+
+    if (!out || outlen <= 0)
+        return FALSE;
+    out[0] = '\0';
+    if (!g_installed && !g_focus_test_mode)
+        return FALSE;
+
+    /* ⭐ The NEWEST record stamped with the CURRENT movement -- i.e. text the
+     * game set after the cursor last moved. A record from an earlier movement
+     * is stale by construction, and returning it is how a caption for the
+     * previous row gets spoken for this one.
+     *
+     * ⛔ This is deliberately NOT "the most recent string": that is the timing
+     * join the rethink note forbids. The stamp is set by the cursor hook, so
+     * "belongs to this movement" is an ordering fact, not a time window. */
+    if (InterlockedCompareExchange(&g_focus_busy, 1, 0) != 0)
+        return FALSE;               /* never block the caller; try again later */
+    {
+        LONG seq = g_move_seq;
+        for (LONG i = g_focus_count - 1; i >= 0; i--) {
+            if (g_focus[i].move_seq != seq)
+                break;              /* records are appended in order */
+            /* Prefer a PROSE caption over a hint strip: the strip describes the
+             * screen and does not change per row, so speaking it on every
+             * movement would be noise. A caption has no markup. */
+            if (strchr(g_focus[i].text, '<') == NULL) {
+                strncpy(out, g_focus[i].text, (size_t)outlen - 1);
+                out[outlen - 1] = '\0';
+                got = TRUE;
+                break;
+            }
+        }
+    }
+    InterlockedExchange(&g_focus_busy, 0);
+    return got;
+}
+
+BOOL gt_focus_conclusive(long *records, long *moves)
+{
+    if (records) *records = (long)g_focus_count;
+    if (moves)   *moves   = (long)g_move_notifications;
+    /* ⭐ Conclusive only if the cursor side actually notified us. Records
+     * without movements cannot answer "do captions track the cursor?" at all. */
+    return g_move_notifications > 0;
+}
+
+void gt_focus_report(void)
+{
+    LONG n, dropped, notes;
+
+    if (!g_installed) {
+        log_line("gt: focus recorder: the hook is not installed; "
+                 "NOTHING was measured.");
+        return;
+    }
+
+    if (InterlockedCompareExchange(&g_focus_busy, 1, 0) != 0) {
+        log_line("gt: focus recorder busy; report skipped this poll.");
+        return;
+    }
+    n       = g_focus_count;
+    dropped = g_focus_dropped;
+    notes   = g_move_notifications;
+
+    /* ⭐⭐ LIVENESS BEFORE FINDINGS. If the cursor side never notified us,
+     * every record carries seq 0 and "no caption tracked the cursor" is
+     * unfalsifiable -- indistinguishable from "the cursor never moved". Refuse
+     * to conclude, exactly as iat_probe and kbd_state do.
+     * (memory: inconclusive-must-be-a-return-value) */
+    /* ⭐ One implementation of the verdict, shared with the tests. A report
+     * that re-derived the rule could drift from the function callers trust --
+     * a harness must not supply the mechanism under test, and neither must a
+     * log line. (memory: harness-supplies-the-mechanism) */
+    if (!gt_focus_conclusive(NULL, NULL)) {
+        log_line("gt: ⚠ focus recorder INCONCLUSIVE -- %ld string(s) recorded "
+                 "but the cursor hook never notified us (%ld movements). "
+                 "Nothing can be concluded about per-row captions.", n, notes);
+        InterlockedExchange(&g_focus_busy, 0);
+        return;
+    }
+
+    log_line("gt: === FOCUS RECORD: %ld distinct string(s) across %ld cursor "
+             "movement(s), %ld dropped (buffer full) ===", n, notes, dropped);
+
+    {
+        LONG with_move = 0;      /* strings that arrived after a movement */
+        LONG prose     = 0;      /* strings with no markup = captions      */
+        for (LONG i = 0; i < n; i++) {
+            BOOL is_prose = (strchr(g_focus[i].text, '<') == NULL);
+            if (g_focus[i].move_seq > 0) with_move++;
+            if (is_prose) prose++;
+            log_line("gt:   [move %ld] %s %p: \"%.90s\"",
+                     g_focus[i].move_seq, is_prose ? "PROSE" : "strip",
+                     g_focus[i].self, g_focus[i].text);
+        }
+        /* ⭐ A POSITIVE count of what was examined, so "0 captions" from a run
+         * that saw 40 strings is distinguishable from one that saw none. */
+        log_line("gt: of %ld string(s): %ld arrived after a cursor movement, "
+                 "%ld were prose captions.", n, with_move, prose);
+        log_line("gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped "
+                 "with each successive move number = per-row captions DO flow "
+                 "through setText. The same few strings repeating across many "
+                 "move numbers = they do NOT, and the existing cursor+GMD "
+                 "channel stays the only item-name source.");
+    }
+    InterlockedExchange(&g_focus_busy, 0);
 }
 
 BOOL gt_poll_and_log(void)
@@ -1144,4 +1351,15 @@ void gt_test_reset(void)
     for (int i = 0; i < GT_RING_SIZE; i++) g_ring[i] = NULL;
     g_seq = 0; g_taken_seq = 0;
     g_last_self = NULL; g_last_caller = NULL;
+    /* ⚠ The focus channel too. A case that inherits the previous case's
+     * records would assert against evidence it did not produce -- and would
+     * PASS while testing nothing, which is the worst shape of green. */
+    g_focus_count = 0; g_focus_dropped = 0; g_focus_busy = 0;
+    g_move_seq = 0; g_move_notifications = 0;
+    for (int i = 0; i < GT_FOCUS_MAX; i++) {
+        g_focus[i].text[0] = 0;
+        g_focus[i].self = NULL;
+        g_focus[i].move_seq = 0;
+        g_focus[i].which = 0;
+    }
 }
