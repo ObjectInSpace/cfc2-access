@@ -174,6 +174,24 @@ its own `g_screens` entry and all four must carry the same `name` so
 `menu_speak_sibling_row` finds the row map. Case 20d asserts all four -- a typo
 on the FOURTH is caught only by checking every one.
 
+### ▶ WHERE SCREEN NAMING STANDS (2026-09-10)
+
+**19 rows shipped.** Every caller ever seen in a log is named EXCEPT the two
+halves of Fighter Awards (`0x140079833` 7-item list, `0x140079739` 40-item
+grid). Its ITEMS already speak -- the game hands us each achievement's title as
+live text -- so the screen is usable; naming the seven list rows is what is
+left. ⚠ It has no per-row captions (one static sentence for the whole screen),
+so the caption channel cannot do it.
+
+⛔⛔ **A SCREEN's caption must never repeat on every row.** Fighter Awards sets
+"View all of your challenges." for all 47 positions. That became a real problem
+the moment ACHIEVEMENT_*_NAME entered the prompt table, and is now suppressed:
+first sighting on a screen speaks, an identical repeat does not, a screen change
+re-arms. ⭐ `gt_take_caption` already refused markup STRIPS on this exact
+reasoning -- the principle was right and the TEST WAS A PROXY (it keyed on
+markup; this one is plain prose). When a guard tests a proxy, a case with the
+property but not the proxy defeats it.
+
 ### ⚠ THE ONE REMAINING SCREEN NEEDS A DIFFERENT CHANNEL
 
 Caller `0x140087cda`, 3 items, the data-sharing consent dialog (reached by
