@@ -309,7 +309,24 @@ static const mc_value_set g_ingame_av_values[] = {
  * ⚠ Six rows have an ambiguous corpus match (Light Punch is both
  * MENU_KBD_SHOT1 and PAD_OPT_6BUTTON_01). The MENU_KBD_* family is chosen
  * because this is the KEYBOARD screen and that family is contiguous here; the
- * PAD_OPT_* family belongs to the controller screen. */
+ * PAD_OPT_* family belongs to the controller screen.
+ *
+ * ⛔⛔ AND ITS SECOND VALUE AXIS (0x14009ed68, 2 items) CANNOT BE JOINED AT
+ * ALL -- not for want of a run. Its cursor address is 0x0000000006F5FC80 while
+ * the screen object is at 0x2C498050: the pointer is on the STACK, a local
+ * variable the game passes to the generic cursor helper, not a field of the
+ * screen. `(cursor - screen - values_off)/4` is therefore meaningless for it
+ * (it computes as a negative offset, 0x-255383d0), and no value of values_off
+ * can rescue it.
+ *
+ * ⭐ That is a STRUCTURAL fact about this call site, so it is worth writing
+ * down rather than re-deriving: a stack-local cursor has no stable identity
+ * across calls, and every join this project trusts keys on one that does. If
+ * this axis is ever to be named it needs a different anchor entirely -- the
+ * caption channel or the instance set -- not a better offset.
+ *
+ * ⚠ It speaks "1 of 2" / "2 of 2", which is a correct reading of a two-value
+ * toggle; it simply does not say WHICH setting. */
 static const int g_kbd_settings_rows[] = {
     464, 168, 573, 238, 572, 241, 239, 242, 240,
     243, 244, 245, 246, 247, 248, 234
@@ -889,6 +906,23 @@ static const mc_screen g_screens[] = {
      * "Controller Settings". */
     { 0x14009ec58ULL, -1, 16, "Keyboard Settings", MC_VERIFIED_LIVE_TEXT,
       MC_LIST, 0, g_kbd_settings_rows, 16, NULL, 0, 0 },
+
+    /* ⭐⭐ KEYBOARD SETTINGS' VALUE AXIS (0x14009ed20), 4 items, horizontal.
+     * Same screen object (0x2C498050) as the row site above -- another AXIS of
+     * a screen already named, the shape established in 0795b7f.
+     *
+     * Its cursor is screen+0x380, a real field of the screen object, so the
+     * row join is the usual arithmetic and not a timing guess.
+     *
+     * ⚠ NO VALUE SET SHIPS YET. It fires while the cursor sits on row 1
+     * ("Key Bindings"), whose caption in the 02:12 run was "Type A" -- but the
+     * corpus holds only Type A and Type B (234, 235), which is TWO, and this
+     * axis has FOUR items. Those numbers disagree, so naming its values from
+     * that pair would be exactly the plausible-but-wrong map this file has
+     * shipped before. It speaks its row name and position until a run captures
+     * all four value strings. */
+    { 0x14009ed20ULL, -1, 4, "Keyboard Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x380, NULL, 0, NULL, 0, 0 },
 
     /* ⭐⭐⭐ THE IN-GAME PAUSE MENU. See g_pause_menu_rows: all 8 rows named by
      * their own captions across 20 sightings. ⚠ The first screen behind the

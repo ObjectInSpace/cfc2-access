@@ -1057,3 +1057,96 @@ mis-diagnosed twice in this project.
 far. It means **every screen a player passes through in normal use speaks its
 items**, with the remainder degrading correctly to position, which they already
 do.
+
+---
+
+# ▶ WHERE IT ACTUALLY STANDS (2026-09-11, measured by tools/coverage.py)
+
+## ⛔⛔ FIRST, THE MEASUREMENT THAT WAS WRONG
+
+I reported "16% of movements speak a name" from the newest log. **That number
+described a build four commits old.** The run started 02:10:34; the commits
+naming the pause menu, keyboard settings, the in-game AV screen and the move
+list landed 02:18-02:39. A log cannot show the effect of code written after it.
+
+⭐ This is structural, not a slip: every log in `docs/` ages the moment the
+table grows, and the screens named most recently are exactly the ones the
+newest log predates. So the naive count **drifts downward as the project
+improves** -- the same defect as [[benchmark-drifts-from-the-code]], in a
+measurement rather than a benchmark.
+
+**`tools/coverage.py`** replays a log's movements (caller + count + position --
+facts about the GAME, which do not age) against the table as it stands NOW.
+
+- newest run, current table: **55%** (not 16%)
+- **all runs, current table: 2045 of 2642 movements = 77% named**
+
+⚠ Sabotage-verified: with `parse_maps()` returning nothing, 77% collapses to
+1%. The number comes from the table, not from the parser being generous.
+
+⚠ It reports whether a row is COVERED, never whether the label is RIGHT. A
+screen can read 100% here and speak the wrong words. Coverage is necessary,
+never sufficient; every row still needs `MC_VERIFIED_LIVE_TEXT`.
+
+⭐ Its first version reported a false gap on the MAIN MENU, because it only
+understood label maps and the main menu uses the original `base + index`
+contiguous-run model. Fixed. A coverage number is only as good as its model of
+what counts as covered.
+
+## What the remaining 597 movements actually are
+
+**Not silent -- already correct, and only "gaps" because a bare position is
+the complete reading:**
+- `0x140079739` (40) + `0x140079833` (7) -- Fighter Awards; items speak via the
+  ACHIEVEMENT path, the game hands us each title as live text.
+- `0x14009885e`, `0x1400988bf`, `0x14009890d` (3 each) -- Casual Match paging
+  controls over image resources. "3 of 3" IS the reading.
+- `0x140080250` (3) + `0x14008028e` (48) -- the move list's page selector and
+  its 48 moves, which now speak motion notation.
+
+**Two more AXES of screens already named** (same shape as the 0795b7f commit):
+- `0x14009ed20` (4) and `0x14009ed68` (2) both carry screen `0x2C498050` --
+  the SAME screen object as the in-game AV value axis already shipped.
+
+**Genuinely unnamed, and both need the same missing piece:**
+
+### ⭐⭐ `0x14008a91b` IS THE LOBBY ID FIELD -- identified by ENTRY POINT
+6 items, horizontal, 121 movements -- the most-visited unnamed screen. It
+appears in EVERY run that also contains the 36-item character picker
+(`0x14008a8ef`), always interleaved with it.
+
+The evidence is decisive: the instance set holds **exactly six
+single-character objects, all LIVE at once**, and the one being edited walks
+the picker's alphabet (`Z` -> `W` -> `U` -> `Q`) while the other five hold
+`"0"`. Six slots = a six-character lobby ID. The refused captions on this
+screen are `"0"` and `"Y"` -- `Y` is the last letter of the picker's `0-9 A-Y`
+range, i.e. the field reading back what the picker committed.
+
+⛔⛔ **BUT INSERTION ORDER IS NOT SLOT ORDER.** In the 1913 run the changing
+slot is LAST in the instance list; in the 1945 run it is FIRST. Whichever slot
+was edited decides. A lookup by list position would have passed both runs
+individually and spoken the wrong slot in general -- the exact sabotage the
+music-track fixture exists to catch.
+
+▶ So the join must be cursor-address arithmetic
+(`(cursor - screen - values_off)/4`), the only method never wrong here. That is
+a LIVE-MEMORY question and cannot be settled from these logs.
+
+### ⚠ `0x14009af21` (Music chooser's 9-item strip) is NOT a game strip
+The titles ARE live text on that screen (`"Capcom Fighting Evolution"`,
+`"Capcom Vs. SNK 2: Mark of the Millennium 2001"` appear in its instance dump),
+so they are reachable. But **24 movements across all runs produced ZERO
+captions** -- confirmed across every log, not from the single run the earlier
+note cited. `MC_GAME_STRIP` names from the CAPTION, so shipping it as one would
+ship a screen that speaks nothing.
+
+⭐ Same structural problem as the lobby field: the text exists, the caption
+channel is blind, so it needs a position join. This is what `MC_NUMBERED_LIVE`
+did for the music tracks -- but the tracks self-verify via a PRINTED NUMBER and
+game titles carry none, so the ROM table is the corroborator instead.
+
+## ⭐ THE ONE PIECE BOTH NEED
+A **position -> live object** join for screens where the caption channel is
+blind. Two screens now want it, both already have the text on screen, and both
+are blocked on the same thing. That, not more label tables, is the next real
+piece of work.
