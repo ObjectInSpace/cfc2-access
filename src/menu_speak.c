@@ -2382,6 +2382,111 @@ BOOL menu_speak_test_caption_repeat(const char *cap, const char *screen_name)
 }
 
 
+/* ⭐⭐⭐ MODAL PROMPTS: announce the QUESTION, not a selection.
+ *
+ * ⛔⛔ WHY THIS IS A SEPARATE CHANNEL. The quit dialogs move their selection
+ * WITHOUT the cursor helpers -- measured, 3/8/12 arrow presses with ZERO
+ * movements logged -- so everything else in this file is unreachable for them:
+ * menu_speak() is driven by movements, and gt_take_caption() is keyed on the
+ * movement stamp. A modal that never moves gets nothing, however it is walked.
+ *
+ * ⛔ AND THE SELECTION IS GENUINELY NOT AVAILABLE. Measured and closed in
+ * run-2026-09-11-1322: both options are live text objects, but the fields that
+ * separate them (+0x124, +0x13c) are byte-identical across four arrow presses,
+ * and the differ -- reporting freely on other objects in the same run, which is
+ * the control that makes this a real negative -- saw no change on either. So
+ * this speaks WHAT IS BEING ASKED and deliberately claims nothing about which
+ * button is highlighted. ⚠ Saying "Yes" or "No" here would state a selection
+ * the mod cannot observe, on a prompt that ends the game.
+ *
+ * ⭐ Both prompts are ordinary GMD strings, so they are matched by TEXT against
+ * the corpus rather than by a hardcoded English literal -- the mod follows the
+ * game's language, which a literal would break for 13 of the 14 languages.
+ *
+ * ⚠ Announced ONCE per appearance: the dialog re-sets its text while open, and
+ * a prompt repeating every redraw would talk over the user. */
+static const int K_MODAL_PROMPTS[] = {
+    384,    /* SYS_EXIT_APP    'If you exit the application, ...Continue?'   */
+    383,    /* SYS_BACK_TITLE  'If you return to the title screen, ...'      */
+};
+
+/* ⭐ Collapse the corpus strings' CR/LF layout to single spaces.
+ *
+ * ⚠ The prompts carry "\r\n" as visual line breaks. Spoken verbatim those
+ * become pauses or literal characters depending on the reader, and the run of
+ * whitespace they leave behind reads as a stutter. Exposed as a test seam
+ * because it is the only part of the modal path that can run offline --
+ * gmd_text_by_index() has no table in the test process. */
+void menu_speak_flatten_prompt(const char *in, char *out, int outlen)
+{
+    int o = 0;
+    if (!out || outlen <= 0)
+        return;
+    out[0] = '\0';
+    if (!in)
+        return;
+    for (int i = 0; in[i] && o < outlen - 1; i++) {
+        char c = in[i];
+        if (c == '\r' || c == '\n' || c == '\t')
+            c = ' ';
+        if (c == ' ' && (o == 0 || out[o - 1] == ' '))
+            continue;                   /* collapse runs, and never lead with one */
+        out[o++] = c;
+    }
+    while (o > 0 && out[o - 1] == ' ')  /* and never trail with one */
+        o--;
+    out[o] = '\0';
+}
+
+/* Test seam: is this text one of the modal prompts, given a resolver?
+ * ⭐ The resolver is passed in so the suite can supply the corpus strings the
+ * test process cannot load. The SHIPPING caller passes gmd_text_by_index. */
+BOOL menu_speak_is_modal_prompt(const char *text,
+                                BOOL (*resolve)(int, char *, unsigned))
+{
+    if (!text || !text[0] || !resolve)
+        return FALSE;
+    for (size_t i = 0; i < sizeof(K_MODAL_PROMPTS) / sizeof(K_MODAL_PROMPTS[0]);
+         i++) {
+        char want[GT_CAPTION_MAX];
+        if (resolve(K_MODAL_PROMPTS[i], want, sizeof(want)) &&
+            want[0] && strcmp(want, text) == 0)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static BOOL modal_resolve(int idx, char *out, unsigned outlen)
+{
+    return gmd_text_by_index(idx, out, outlen);
+}
+
+void menu_speak_check_modal(void)
+{
+    static char last[GT_CAPTION_MAX];
+    char text[GT_CAPTION_MAX];
+    char flat[GT_CAPTION_MAX];
+
+    if (!gt_latest_text(text, (int)sizeof(text)) || !text[0])
+        return;
+
+    if (!menu_speak_is_modal_prompt(text, modal_resolve)) {
+        /* ⚠ Clear the guard once OTHER text has appeared, so the same dialog
+         * opened a second time speaks again. Without this it announces once per
+         * session, which looks exactly like a broken feature. */
+        if (last[0] && strcmp(last, text) != 0)
+            last[0] = '\0';
+        return;
+    }
+    if (strcmp(last, text) == 0)
+        return;                         /* already announced this appearance */
+    _snprintf(last, sizeof(last), "%s", text);
+    last[sizeof(last) - 1] = '\0';
+
+    menu_speak_flatten_prompt(text, flat, (int)sizeof(flat));
+    menu_speak_line(flat);
+}
+
 void menu_speak(const mc_move *m)
 {
     mc_speech sp;
@@ -2652,9 +2757,21 @@ void menu_speak(const mc_move *m)
         }
     }
 
+    menu_speak_line(line);
+}
+
+/* ⭐ The one place a line reaches the speech backend. Extracted from
+ * menu_speak() so the modal announcer shares it rather than duplicating the
+ * conversion, the interrupt policy and the honest logging. */
+void menu_speak_line(const char *line)
+{
     wchar_t w[256];
-    int n = MultiByteToWideChar(CP_UTF8, 0, line, -1, w,
-                                (int)(sizeof(w) / sizeof(w[0])));
+    int n;
+
+    if (!line || !line[0])
+        return;
+    n = MultiByteToWideChar(CP_UTF8, 0, line, -1, w,
+                            (int)(sizeof(w) / sizeof(w[0])));
     if (n <= 0) {
         /* ⭐ A conversion failure must not speak mojibake. Say nothing and log,
          * rather than emit bytes the reader will render as noise. */

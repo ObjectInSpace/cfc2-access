@@ -82,6 +82,26 @@ static void check(const char *name, int cond, const char *fmt, ...)
     failures++;
 }
 
+/* ⭐ The two modal prompts, verbatim from the corpus (SYS_EXIT_APP 384 and
+ * SYS_BACK_TITLE 383), and a resolver standing in for gmd_text_by_index --
+ * which has no table in this process.
+ *
+ * ⚠ The stub returns the REAL strings rather than re-deriving the match, so it
+ * supplies DATA, not the mechanism under test. A stub that answered "yes, that
+ * is a prompt" would leave the matcher untested. */
+#define MODAL_EXIT_APP "If you exit the application, all unsaved\r\nprogress will be lost. Continue?"
+#define MODAL_BACK_TITLE "If you return to the title screen,\r\nall unsaved progress will be lost.\r\nContinue?"
+
+static BOOL test_modal_resolve(int idx, char *out, unsigned outlen)
+{
+    const char *s = (idx == 384) ? MODAL_EXIT_APP :
+                    (idx == 383) ? MODAL_BACK_TITLE : NULL;
+    if (!s || !out || outlen == 0) return FALSE;
+    _snprintf(out, outlen, "%s", s);
+    out[outlen - 1] = '\0';
+    return TRUE;
+}
+
 static mc_move mk(ULONGLONG caller, int newi, int mini, int maxi)
 {
     mc_move m;
@@ -711,6 +731,64 @@ int main(void)
               (const void *)rowmap, linked);
     }
 
+    /* --- cases 20l-20n: ⭐⭐ THE MODAL PROMPT (the quit dialogs) -------------
+     *
+     * These dialogs produce ZERO cursor movements, so every movement-driven
+     * path in this file is blind to them; and their SELECTION is not observable
+     * at all (measured and closed in run-2026-09-11-1322). So the mod announces
+     * the QUESTION and claims nothing about which button is highlighted.
+     *
+     * ⚠ Only the decision logic is testable offline -- gmd_text_by_index() has
+     * no table in this process -- so the matcher takes a resolver and the
+     * flattener is exposed directly. The speech itself is out of scope here for
+     * the same reason menu_speak() is: it calls into UniversalSpeech. */
+    {
+        /* 20l: the corpus strings carry "\r\n" as LAYOUT. Spoken verbatim that
+         * is a pause or a literal character depending on the reader, and the
+         * whitespace run it leaves reads as a stutter. */
+        char out[256];
+        menu_speak_flatten_prompt(
+            "If you exit the application, all unsaved\r\n"
+            "progress will be lost. Continue?", out, (int)sizeof out);
+        int ok = strcmp(out,
+            "If you exit the application, all unsaved progress will be lost. "
+            "Continue?") == 0;
+
+        char lead[64];
+        menu_speak_flatten_prompt("\r\n  padded  \r\n", lead, (int)sizeof lead);
+        ok = ok && strcmp(lead, "padded") == 0;
+
+        char empty[16];
+        menu_speak_flatten_prompt(NULL, empty, (int)sizeof empty);
+        ok = ok && empty[0] == '\0';
+
+        check("20l. a modal prompt's line breaks collapse to single spaces",
+              ok, "got \"%s\" / \"%s\"", out, lead);
+    }
+    {
+        /* 20m: the matcher accepts ONLY the known prompts. ⚠ Asserted in both
+         * directions: a matcher that accepts everything would pass a
+         * one-sided test and announce ordinary menu prose as a quit warning. */
+        int ok = menu_speak_is_modal_prompt(MODAL_EXIT_APP, test_modal_resolve) &&
+                 menu_speak_is_modal_prompt(MODAL_BACK_TITLE, test_modal_resolve) &&
+                 !menu_speak_is_modal_prompt("Play offline.", test_modal_resolve) &&
+                 !menu_speak_is_modal_prompt("Exit the application.",
+                                             test_modal_resolve) &&
+                 !menu_speak_is_modal_prompt("", test_modal_resolve) &&
+                 !menu_speak_is_modal_prompt(NULL, test_modal_resolve);
+        check("20m. only the known modal prompts match, in both directions",
+              ok, "one or more classifications wrong");
+    }
+    {
+        /* 20n: ⛔ with no resolver it must match NOTHING. In the game a missing
+         * GMD table is a real state (it is built during startup), and silence
+         * is correct there -- announcing an unresolved string would speak
+         * whatever prose happened to be on screen. */
+        int ok = !menu_speak_is_modal_prompt(MODAL_EXIT_APP, NULL);
+        check("20n. no resolver means no match, not a fallback",
+              ok, "matched with a NULL resolver");
+    }
+
     /* --- cases 20i-20k: ⛔⛔ ONE CALLER, TWO SCREENS, ONE SHARED VALUE AXIS
      *
      * USER-REPORTED, and the user named the consequence exactly: "the values
@@ -1106,7 +1184,7 @@ int main(void)
             if (!sp.named || sp.item[0] != ALPHA[p - 1] || sp.item[1] != '\0') {
                 if (!wrong)
                     snprintf(first_bad, sizeof first_bad,
-                             "pos %d named=%d item=\"%s\" want '%c'",
+                             "pos %d named=%d item=\"%.20s\" want '%c'",
                              p, (int)sp.named, sp.item, ALPHA[p - 1]);
                 wrong++;
             }

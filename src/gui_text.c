@@ -817,6 +817,44 @@ void gt_test_focus_enable(void) { g_focus_test_mode = TRUE; }
  * the test drives the shipping behaviour rather than a copy of it. */
 void gt_test_focus_clear(void) { g_focus_count = 0; }
 
+/* ⭐⭐ The most recent PROSE string the game set, with NO movement stamp.
+ *
+ * ⛔⛔ THIS IS DELIBERATELY THE TIMING JOIN gt_take_caption() REFUSES, and it is
+ * safe here for one reason only: the caller matches the text against a KNOWN
+ * SET of strings before acting on it. A modal prompt identifies itself by its
+ * own content, so "which movement did this belong to?" -- the question the
+ * stamp exists to answer -- does not arise.
+ *
+ * ⚠ DO NOT use this to name a menu ITEM. That is exactly the join that speaks
+ * one row's caption on another row, and the stamp exists because 3 of 6 early
+ * captures coincided with no cursor movement at all.
+ *
+ * ⚠ Needed because the quit dialogs produce ZERO cursor movements, so every
+ * movement-stamped channel is structurally blind to them. */
+BOOL gt_latest_text(char *out, int outlen)
+{
+    BOOL got = FALSE;
+
+    if (!out || outlen <= 0)
+        return FALSE;
+    out[0] = '\0';
+    if (!g_installed && !g_focus_test_mode)
+        return FALSE;
+    if (InterlockedCompareExchange(&g_focus_busy, 1, 0) != 0)
+        return FALSE;
+    for (LONG i = g_focus_count - 1; i >= 0; i--) {
+        /* Prose only -- a markup strip is a button hint, never a prompt. */
+        if (g_focus[i].text[0] && strchr(g_focus[i].text, '<') == NULL) {
+            strncpy(out, g_focus[i].text, (size_t)outlen - 1);
+            out[outlen - 1] = '\0';
+            got = TRUE;
+            break;
+        }
+    }
+    InterlockedExchange(&g_focus_busy, 0);
+    return got;
+}
+
 BOOL gt_take_caption(char *out, int outlen)
 {
     BOOL got = FALSE;

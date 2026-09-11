@@ -446,6 +446,15 @@ void gt_note_focus_move(void);
  * previous row's caption". Hint strips (which carry markup) are skipped: they
  * describe the SCREEN and do not change per row, so speaking one on every
  * movement would be noise. */
+/* ⭐⭐ The newest PROSE string, with NO movement stamp -- for MODALS that
+ * produce no cursor movements at all (the quit dialogs).
+ *
+ * ⛔ Only safe when the caller matches the text against a KNOWN SET first: a
+ * modal prompt identifies itself by its content, so the "which movement?"
+ * question the stamp answers does not arise. ⚠ NEVER use it to name a menu
+ * item -- that is the timing join gt_take_caption() exists to refuse. */
+BOOL gt_latest_text(char *out, int outlen);
+
 BOOL gt_take_caption(char *out, int outlen);
 
 /* Log the whole ordered record, with a positive count of what was examined and

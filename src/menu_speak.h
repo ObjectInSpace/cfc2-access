@@ -334,6 +334,25 @@ void menu_speak_build(const mc_move *m, mc_speech *out);
 /* Build it and speak it. */
 void menu_speak(const mc_move *m);
 
+/* Speak one already-built line. ⭐ The single point where text reaches the
+ * backend, shared by the movement path and the modal announcer. */
+void menu_speak_line(const char *line);
+
+/* ⭐⭐ Announce a MODAL PROMPT (the quit dialogs) if one has just appeared.
+ *
+ * ⛔ Speaks the QUESTION only, never a selection: measured and closed in
+ * run-2026-09-11-1322, the dialog's selection is not observable in its text
+ * objects, and claiming one on a prompt that ends the game would be worse than
+ * saying less. Driven by TEXT rather than movement because these dialogs
+ * produce no cursor movements at all. */
+void menu_speak_check_modal(void);
+
+/* Test seams for the modal path -- the only parts that can run offline, since
+ * gmd_text_by_index() has no table in the test process. */
+void menu_speak_flatten_prompt(const char *in, char *out, int outlen);
+BOOL menu_speak_is_modal_prompt(const char *text,
+                                BOOL (*resolve)(int, char *, unsigned));
+
 /* Report what the ROM table would name the game the cursor is RESTING on.
  * Logged, never spoken -- the index mapping is not yet confirmed. */
 void menu_speak_probe_rest(const mc_move *m);

@@ -683,6 +683,18 @@ static DWORD WINAPI worker(LPVOID param)
         if (gt_ok && (beat == 10 || beat % 5 == 0))
             gt_instance_report();
 
+        /* ⭐⭐⭐ MODAL PROMPTS -- the quit dialogs. NOT gated on a switch: this
+         * is shipping speech, not a diagnostic.
+         *
+         * ⚠ It runs on the poll loop rather than off a movement because these
+         * dialogs produce NO cursor movements at all; everything else in the
+         * speech path is movement-driven and therefore blind to them.
+         * menu_speak_check_modal() matches the live text against the two known
+         * prompt strings and announces once per appearance, so polling it costs
+         * a string compare. */
+        if (gt_ok)
+            menu_speak_check_modal();
+
         /* ⭐⭐ The LAYOUT PROBE (cfc2_layout.on, absent = off). Looks for the
          * field that orders objects by SCREEN POSITION.
          *
