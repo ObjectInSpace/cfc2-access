@@ -131,6 +131,14 @@ EXPECTED_VALUES = {
         ],
         (4, 2): ["Decline", "Agree"],
     },
+    # Create Lobby, row 8 (0-based) = "Game Start Privilege". The 21:00 run
+    # shows value position 1 = "Challenger" and 2 = "Host", three times each,
+    # and both strings are UNIQUE in the corpus (LOBBY_PERM_00/01) -- so the
+    # order is confirmed twice over. The other 2-value rows on that screen are
+    # On/Off, which the corpus can never resolve, and get no variant.
+    "g_create_lobby_values": {
+        (8, 2): ["Challenger", "Host"],
+    },
     "g_select_game_values": {
         (1, 2): ["Japanese Version", "English Version"],
         (2, 2): ["P1", "P2"],

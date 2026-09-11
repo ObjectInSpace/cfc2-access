@@ -212,6 +212,28 @@ static const int g_lobby_filter_rows[] = {
  * two 3-item lists sharing the screen object. */
 static const int g_casual_match_rows[] = { 51, 52, 84, 88 };
 
+/* ⭐⭐ CREATE LOBBY's VALUE labels. Only the rows whose values were actually
+ * SEEN as live text, at the same timestamp as the movement.
+ *
+ * Row 8 (0-based) = "Game Start Privilege", 2 values: the run shows
+ * position 1 = "Challenger" and position 2 = "Host", three times each, and the
+ * corpus makes both UNIQUE -- LOBBY_PERM_00 = Challenger (137),
+ * LOBBY_PERM_01 = Host (138). ⭐ Two independent sources agreeing on the ORDER,
+ * and the row itself is already named LOBBY_PERM, so row and values corroborate
+ * each other.
+ *
+ * ⛔ The other 2-value rows (2, 3, 5, 6, 10) are almost certainly On/Off and get
+ * NO variant: "On" occurs 18 times in the corpus and "Off" 22, so
+ * prompt_identify can never resolve which pair they are, and guessing a `first`
+ * would speak a label from a different setting. The live-quote path already
+ * speaks those from the game's own text -- which is the right answer, not a
+ * fallback.
+ *
+ * ⚠ Row 8 (1-based 9) is the ONLY row here whose values are unique strings. */
+static const mc_value_set g_create_lobby_values[] = {
+    { 8, 2, 137 },   /* Game Start Privilege: Challenger / Host -- MEASURED */
+};
+
 /* ⭐⭐ CREATE LOBBY's settings, 10 rows, caller 0x140082c3c. FIVE positions
  * established, each by its OWN caption, pooled across four runs:
  *
@@ -599,7 +621,8 @@ static const mc_screen g_screens[] = {
     { 0x140082c3cULL, -1, 10, "Lobby Settings", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_ROW, 0, g_create_lobby_rows, 10, NULL, 0 },
     { 0x140082d16ULL, -1, 0, "Lobby Settings", MC_VERIFIED_LIVE_TEXT,
-      MC_SETTINGS_VALUE, 0x33c, NULL, 0, NULL, 0 },
+      MC_SETTINGS_VALUE, 0x33c, NULL, 0, g_create_lobby_values,
+      (int)(sizeof(g_create_lobby_values) / sizeof(g_create_lobby_values[0])) },
 
     /* ⭐⭐ CASUAL MATCH's 4 rows + their value axis. See g_casual_match_rows:
      * three independent sources agree, including the value-slot arithmetic that
@@ -1314,6 +1337,44 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
  * sentence punctuation -- "Off", "1024x768", "English [en]", "Original".
  * A caption ("Adjust the volume of background music.") fails on both length
  * and the terminal period. */
+/* ⭐⭐ Does this caption match the character the picker's POSITION implies?
+ *
+ * ⛔⛔ MEASURED BUG, 21:17 run. The keypad wrapped to position 36 (which is "Z")
+ * and the mod spoke "0" -- the value of the six-slot ID DISPLAY, set 100 ms
+ * earlier by the OTHER axis on the SAME screen object. The caption channel
+ * cannot tell the two apart, because both write text on that screen.
+ *
+ * Across every run: 36 picker movements where the nearby single character is
+ * the expected one, and 2 where it is a stale character from the ID slots. A
+ * ~5% rate of confidently speaking the WRONG character is exactly what this
+ * file exists to prevent.
+ *
+ * ⭐ So the quote is now CHECKED against the position rather than trusted. The
+ * mapping is not a guess: positions 1-35 were measured as "0".."9" then
+ * "A".."Y" across 83 movements in three runs, and position 36 follows the
+ * sequence to "Z".
+ *
+ * ⚠ This makes the channel SELF-VERIFYING in the same way the music list's
+ * numbering is: two independent sources (the cursor's position and the text the
+ * game drew) must agree, or nothing is spoken. A mismatch yields the bare
+ * position, which is always true. */
+static BOOL char_picker_matches(const char *s, int position)
+{
+    static const char *const K = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    if (!s || position < 1 || position > 36)
+        return FALSE;
+    /* Exactly one character, and it must be the one this position holds. */
+    if (s[0] == '\0' || s[1] != '\0')
+        return FALSE;
+    return s[0] == K[position - 1];
+}
+
+/* Test seam: the picker's position/character agreement check. */
+BOOL menu_speak_test_char_picker(const char *s, int position)
+{
+    return char_picker_matches(s, position);
+}
+
 static BOOL is_value_shaped(const char *s)
 {
     if (!s || !*s)
@@ -1547,7 +1608,8 @@ void menu_speak(const mc_move *m)
                               spoken, sp.position, sp.total);
                     line[sizeof(line) - 1] = '\0';
                 }
-            } else if (!sp.named && sp.char_picker && is_value_shaped(cap)) {
+            } else if (!sp.named && sp.char_picker &&
+                       char_picker_matches(cap, sp.position)) {
                 /* ⭐⭐ A CHARACTER PICKER: the caption IS the character.
                  *
                  * The lobby-ID keypad (0x14008a8ef, 36 items) sets the

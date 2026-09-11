@@ -376,6 +376,12 @@ BOOL menu_speak_discovery_enabled(void);
  * the only thing keeping prose or a button strip out of that path. */
 BOOL menu_speak_test_value_shaped(const char *s);
 
+/* ⭐ The character picker's self-verification: does the caption match the
+ * character this POSITION holds? Measured bug it prevents -- the keypad wrapped
+ * to position 36 ("Z") and spoke "0", a stale value from the six-slot ID
+ * display on the same screen. */
+BOOL menu_speak_test_char_picker(const char *s, int position);
+
 /* Test seam: would this caption be suppressed as the SCREEN's rather than the
  * row's? A caption that does not change as the cursor moves describes the
  * screen, and repeating it after every movement is noise -- Fighter Awards sets

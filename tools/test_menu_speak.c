@@ -960,6 +960,39 @@ int main(void)
               (int)stale.char_picker);
     }
 
+    /* --- case 27: the picker's character must MATCH its position -----------
+     * ⛔⛔ FROM THE 21:17 RUN. The keypad wrapped to position 36 ("Z") and the
+     * mod spoke "0" -- the six-slot ID display's value, set 100 ms earlier by
+     * the OTHER axis on the SAME screen object. Across all runs: 36 movements
+     * where the nearby character is right, 2 where it is stale. Speaking the
+     * wrong character ~5% of the time is exactly the failure this file exists
+     * to prevent, and is_value_shaped() alone cannot catch it -- "0" is a
+     * perfectly value-shaped string.
+     *
+     * ⭐ So the quote is checked against the position. Two independent sources
+     * -- the cursor's index and the text the game drew -- must agree, the same
+     * standard the music list's numbering meets. */
+    {
+        int ok = 1;
+        /* The real mapping, spot-checked at both ends and the digit/letter seam */
+        ok &= menu_speak_test_char_picker("0", 1);
+        ok &= menu_speak_test_char_picker("9", 10);
+        ok &= menu_speak_test_char_picker("A", 11);
+        ok &= menu_speak_test_char_picker("Z", 36);
+        /* ⛔ THE MEASURED BUG: "0" at position 36 must be REFUSED. */
+        ok &= !menu_speak_test_char_picker("0", 36);
+        ok &= !menu_speak_test_char_picker("Z", 1);
+        /* Multi-character and degenerate input */
+        ok &= !menu_speak_test_char_picker("AB", 11);
+        ok &= !menu_speak_test_char_picker("", 1);
+        ok &= !menu_speak_test_char_picker(NULL, 1);
+        /* Out-of-range positions */
+        ok &= !menu_speak_test_char_picker("0", 0);
+        ok &= !menu_speak_test_char_picker("Z", 37);
+        check("27. the picker speaks a character ONLY if it matches the position",
+              ok, "one or more mappings misclassified");
+    }
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");
