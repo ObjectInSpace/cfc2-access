@@ -7,6 +7,7 @@
 #include <windows.h>
 #include "../src/gui_text.h"
 #include "../src/menu_speak.h"
+#include "../src/log.h"
 
 #define P "If you exit the application, all unsaved\r\nprogress will be lost. Continue?"
 
@@ -18,6 +19,7 @@ static BOOL res(int idx, char *out, unsigned n)
 int main(void)
 {
     int bad = 0;
+    log_init();          /* menu_speak_line() reports through the log */
     /* 1. the text reaches gt_latest_text with NO cursor movement at all */
     gt_test_reset();
     gt_test_focus_enable();
@@ -76,7 +78,47 @@ int main(void)
                        "will be lost. Continue?";
     if (strcmp(flat, want) != 0) {
         printf("FAIL  flattened wrongly: \"%s\"\n", flat); bad++;
-    } else printf("ok    spoken line: \"%s\"\n", flat);
+    } else printf("ok    prompt flattens correctly\n");
+
+    /* 4. ⛔⛔ CALL THE SHIPPING FUNCTION AND READ WHAT IT TRIED TO SAY.
+     *
+     * My first version of this check REIMPLEMENTED the option lookup here --
+     * and passed with the real one disabled, because the harness was supplying
+     * the mechanism under test ([[harness-supplies-the-mechanism]]). Third time
+     * on this project, second time today.
+     *
+     * menu_speak_line() logs the exact string it hands the backend (which
+     * refuses, there being no speech here -- and it logs that too). So the ONE
+     * honest assertion is: run menu_speak_check_modal() and read the line out
+     * of the log it wrote. Nothing here decides what the answer should be. */
+    {
+        FILE *lf;
+        char buf[1024];
+        int said = 0;
+        const char *WANT = "If you exit the application, all unsaved progress "
+                           "will be lost. Continue? Yes or No";
+
+        menu_speak_test_set_modal_resolver(res);   /* no GMD table here */
+        menu_speak_check_modal();                  /* the real thing */
+        menu_speak_test_set_modal_resolver(NULL);
+
+        lf = fopen("CFC2Access.log", "rb");
+        if (!lf) {
+            printf("FAIL  no log written -- cannot tell what was said\n");
+            bad++;
+        } else {
+            while (fgets(buf, sizeof buf, lf))
+                if (strstr(buf, WANT)) said = 1;
+            fclose(lf);
+            if (!said) {
+                printf("FAIL  menu_speak_check_modal() did not produce:\n"
+                       "        \"%s\"\n", WANT);
+                bad++;
+            } else {
+                printf("ok    the SHIPPING path said: \"%s\"\n", WANT);
+            }
+        }
+    }
 
     printf("\n%s\n", bad ? "FAILED" : "ALL PASSED");
     return bad ? 1 : 0;

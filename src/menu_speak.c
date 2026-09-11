@@ -2456,9 +2456,21 @@ BOOL menu_speak_is_modal_prompt(const char *text,
     return FALSE;
 }
 
+/* ⭐ The resolver menu_speak_check_modal() uses. Overridable ONLY by the test
+ * harness, which has no GMD table -- so the end-to-end probe can drive the real
+ * function instead of reimplementing its logic and testing its own copy. */
+static BOOL (*g_modal_resolver)(int, char *, unsigned);
+
 static BOOL modal_resolve(int idx, char *out, unsigned outlen)
 {
+    if (g_modal_resolver)
+        return g_modal_resolver(idx, out, outlen);
     return gmd_text_by_index(idx, out, outlen);
+}
+
+void menu_speak_test_set_modal_resolver(BOOL (*fn)(int, char *, unsigned))
+{
+    g_modal_resolver = fn;
 }
 
 void menu_speak_check_modal(void)
@@ -2480,15 +2492,16 @@ void menu_speak_check_modal(void)
      * ⚠ My end-to-end test passed anyway because it planted ONLY the prompt --
      * a fixture that omits the very strings that break the code. The screen's
      * real neighbours are part of the input, not noise to be left out. */
+    int at = -1;
     {
-        int i, found = 0;
+        int i;
         for (i = 0; gt_prose_at(i, text, (int)sizeof(text)); i++) {
             if (menu_speak_is_modal_prompt(text, modal_resolve)) {
-                found = 1;
+                at = i;
                 break;
             }
         }
-        if (!found) {
+        if (at < 0) {
             /* ⚠ Nothing on screen is a prompt: clear the guard so the same
              * dialog opened again speaks again. */
             last[0] = '\0';
@@ -2502,6 +2515,40 @@ void menu_speak_check_modal(void)
     last[sizeof(last) - 1] = '\0';
 
     menu_speak_flatten_prompt(text, flat, (int)sizeof(flat));
+
+    /* ⭐⭐ AND THE OPTIONS. The question alone leaves the user to guess what the
+     * buttons are; the dialog sets them as live text right after the prompt, so
+     * they can be READ rather than assumed.
+     *
+     * ⭐ THE ORDER IS MEASURED, NOT ASSUMED: across every log that captured a
+     * complete dump, the dialog sets prompt -> "Yes" -> "No", 4 of 4 with no
+     * counter-example (the other 3 sightings were truncated dumps, not a
+     * different order). Since gt_prose_at() walks NEWEST-FIRST, the prompt sits
+     * at index i and the options are at i-1 and i-2.
+     *
+     * ⛔⛔ THIS STILL CLAIMS NOTHING ABOUT WHICH IS SELECTED. The selection is
+     * not observable in these objects (measured and closed in
+     * run-2026-09-11-1322), so the options are announced as a LIST -- "Yes or
+     * No" -- which is true regardless of the highlight. Saying "Yes" alone
+     * would state a selection the mod cannot see, on a prompt that ends the
+     * game. ⚠ Do not "improve" this into naming one of them without a signal
+     * that actually tracks the highlight.
+     *
+     * ⚠ The strings are quoted from the game, so this follows its language. */
+    {
+        char a[GT_CAPTION_MAX], b[GT_CAPTION_MAX];
+        int i = at;
+        if (i >= 2 &&
+            gt_prose_at(i - 1, a, (int)sizeof(a)) && a[0] &&
+            gt_prose_at(i - 2, b, (int)sizeof(b)) && b[0] &&
+            !strchr(a, '<') && !strchr(b, '<') &&
+            strlen(a) <= 24 && strlen(b) <= 24) {
+            size_t used = strlen(flat);
+            _snprintf(flat + used, sizeof(flat) - used - 1, " %s or %s", a, b);
+            flat[sizeof(flat) - 1] = '\0';
+        }
+    }
+
     menu_speak_line(flat);
 }
 

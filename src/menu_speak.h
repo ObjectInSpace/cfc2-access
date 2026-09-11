@@ -349,6 +349,11 @@ void menu_speak_check_modal(void);
 
 /* Test seams for the modal path -- the only parts that can run offline, since
  * gmd_text_by_index() has no table in the test process. */
+/* ⚠ TEST ONLY: substitute the GMD resolver menu_speak_check_modal() uses, so
+ * the end-to-end probe can drive the REAL function (there is no GMD table in a
+ * test process). Passing NULL restores the shipping resolver. */
+void menu_speak_test_set_modal_resolver(BOOL (*fn)(int, char *, unsigned));
+
 void menu_speak_flatten_prompt(const char *in, char *out, int outlen);
 BOOL menu_speak_is_modal_prompt(const char *text,
                                 BOOL (*resolve)(int, char *, unsigned));
