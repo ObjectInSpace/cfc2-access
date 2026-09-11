@@ -51,6 +51,13 @@ EXPECTED = {
     # drops was MEASURED (Ranked row 3 shows 2 values = Cross-region), not
     # inferred -- all four labels are live in both modes, so the instance set
     # could not decide it.
+    # ⭐ The data-collection consent dialog. Shipped on TWO sources: the entry
+    # point (all 7 sightings follow "Data Collection, Agree") and this being the
+    # only 3-label run in the SYS_WINDOW family. The count alone was never
+    # enough -- that is the reasoning that mislabelled two screens here.
+    "g_consent_rows": [
+        "Agree", "Decline", "Privacy Policy",
+    ],
     "g_ranked_match_rows": [
         "Game", "Game Version", "Cross-region Matchmaking",
     ],

@@ -1186,3 +1186,25 @@ kind of check -- the ROM table names all eight games plus the collection.
 length. That is a real lead, not a guess: MC_GAME_STRIP already corroborates
 titles that way, and the strip's contents ARE ROM-table titles (confirmed in
 its instance dump).
+
+## ▶ THE QUIT CONFIRMATION PROMPT -- NO DATA EXISTS YET
+
+User-reported: "we still lack speech for the yes/no prompt when
+quitting/exiting." Correct, and the reason is simply that **it has never
+appeared in any log**. Every run that reaches Quit on the main menu moves AWAY
+from it -- nobody has ever confirmed it with the mod running, which is
+reasonable, since confirming ends the session.
+
+⛔ SO NOTHING IS SHIPPED FOR IT. The corpus has an obvious candidate --
+SYS_WINDOW_YES (25) / SYS_WINDOW_NO (26), 'Yes' / 'No', a 2-label run -- and
+shipping it would be precisely the "fits the count and the category" reasoning
+that mislabelled two screens on this project. There is no caller, no count, and
+no entry point recorded for this dialog.
+
+⚠ The 2-item caller 0x140099b23 is NOT it: 18 sightings, every one entered from
+Museum's Gallery/Music selector.
+
+▶ TO CAPTURE IT, one short run: main menu > Quit > Confirm, then move
+left/right ONCE on the prompt and cancel out. That single movement records the
+caller, the count, the axis and the cursor offset -- everything the consent
+dialog needed. ⚠ Do NOT confirm the quit; cancelling still logs the movement.

@@ -359,6 +359,38 @@ static const int g_sentinel_test_rows[] = { 51, MC_LABEL_UNKNOWN, 84 };
  * two 3-item lists sharing the screen object. */
 static const int g_casual_match_rows[] = { 51, 52, 84, 88 };
 
+/* ⭐⭐⭐ THE DATA-COLLECTION CONSENT DIALOG (0x140087cda), 3 items, HORIZONTAL.
+ * Agree · Decline · Privacy Policy.
+ *
+ * ⛔⛔ THIS WAS CLOSED FOR DAYS AS "NOT SHIPPABLE", and the note was right at
+ * the time: the dialog sets NO item text -- only its button strip
+ * ("Confirm / Back") -- so the caption channel can never name it, and
+ * SYS_WINDOW_YES2/NO2/PP "fitting the count and the category" is exactly the
+ * reasoning that mislabelled two screens here.
+ *
+ * ⭐ WHAT CHANGED IS THE ENTRY POINT -- the identification this project trusts
+ * over every other (see the memory note: identify by what was SELECTED, not by
+ * contents). Across every log, ALL 7 sightings are immediately preceded by
+ *     spoke "Data Collection, Agree, 2 of 2"
+ * with no exceptions. The dialog is reached by confirming System > Data
+ * Collection, which is what a consent dialog is, and the user independently
+ * reported reaching it exactly that way.
+ *
+ * So there are now TWO independent facts, which is the standard every other
+ * row here meets: the entry point says WHICH dialog, and the corpus run
+ * 29/30/31 is the only 3-label run in the SYS_WINDOW family that matches it.
+ * Neither alone was enough; that is why this waited.
+ *
+ * ⚠ USER-REPORTED, and it explains the remaining confusion: "you can't press up
+ * or down to go to another row". Correct -- the axis is HORIZONTAL. Every
+ * sighting in every log is the horizontal helper, so up/down doing nothing is
+ * the GAME's design, not a gap in the mod. All three positions are reached
+ * (16/13/12 movements), so the third option is real and not a phantom.
+ *
+ * ⚠ Its cursor is a stable field at screen+0x340 -- a real object field, not a
+ * stack local, so the position is trustworthy. */
+static const int g_consent_rows[] = { 29, 30, 31 };
+
 /* ⭐⭐⭐ RANKED MATCH'S ROWS -- the SAME CALLER as Casual Match, three rows.
  *
  * ⛔⛔ USER-REPORTED: "the number of rows is not constant when I arrow up or
@@ -979,6 +1011,12 @@ static const mc_screen g_screens[] = {
      * ⛔ NOT a 36-entry label table, deliberately -- see MC_CHAR_PICKER. */
     { 0x14008a8efULL, -1, 36, "Enter Lobby ID", MC_VERIFIED_LIVE_TEXT,
       MC_CHAR_PICKER, 0, NULL, 0, NULL, 0 },
+
+    /* ⭐⭐⭐ THE DATA-COLLECTION CONSENT DIALOG. See g_consent_rows: entry point
+     * (always reached from "Data Collection, Agree") plus the SYS_WINDOW label
+     * run, which is two independent sources where the count alone was one. */
+    { 0x140087cdaULL, -1, 3, "Data Collection", MC_VERIFIED_LIVE_TEXT,
+      MC_LIST, 0, g_consent_rows, 3, NULL, 0 },
 
     /* ⭐⭐⭐ THE LOBBY-ID FIELD ITSELF (0x14008a91b), 6 character slots,
      * horizontal. The screen beside the picker above: the picker chooses a
