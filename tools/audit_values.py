@@ -95,9 +95,76 @@ def audit(paths):
     print()
     print(f"{sum(agree.values())} agreements, {sum(differ.values())} "
           f"disagreements across {len(paths)} log(s).")
+
+    # ⭐ The second, harsher question: which shipped strings has the game ever
+    # actually been seen drawing? See sightings() for why this is not a bug list.
+    drawn, spoken = sightings(paths)
+    src = open(os.path.join(ROOT, "src", "menu_speak.c"),
+               encoding="utf-8").read()
+    sys.path.insert(0, HERE)
+    from name_screens import load_corpus
+    corpus = load_corpus()
+    labels = list(corpus.keys())
+
+    total = sighted = 0
+    unsighted_spoken = []
+    for name, body in re.findall(
+            r"static const mc_value_set (g_\w+)\[\]\s*=\s*\{(.*?)\n\};",
+            src, re.S):
+        body = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+        for row, cnt, first in re.findall(
+                r"\{\s*(\d+),\s*(\d+),\s*(\d+)\s*\}", body):
+            for j in range(int(cnt)):
+                idx = int(first) + j
+                if idx >= len(labels):
+                    continue
+                val = corpus[labels[idx]]
+                total += 1
+                if val in drawn:
+                    sighted += 1
+                elif val in spoken:
+                    # ⚠ The sharp end: spoken to the user, never confirmed
+                    # against the screen. A wrong entry here reaches the ear.
+                    unsighted_spoken.append((name, int(row), val))
+
+    print(f"{sighted} of {total} shipped value strings have been SEEN drawn "
+          f"({total - sighted} rest on inference).")
+    if unsighted_spoken:
+        print("  spoken to the user but never confirmed on screen:")
+        for name, row, val in unsighted_spoken[:12]:
+            print(f"    {name} row {row}: {val!r}")
     # ⭐ A return code a CI step could use, but NOT a pass/fail claim about the
     # mod: only the clustered rows mean anything.
     return 1 if any(differ[r] > agree[r] for r in rows) else 0
+
+
+def sightings(paths):
+    """⭐⭐ Which shipped value STRINGS has the game ever been seen drawing?
+
+    ⚠ This is a different and harsher question than the agreement audit above.
+    A value set can be internally consistent, corpus-validated and derived from
+    the renderer's own table, and STILL contain strings no run has ever put on
+    screen. Measured 2026-09-10: **59 of 104 shipped value strings had never
+    been sighted**, which is far more inference than the commit messages
+    implied.
+
+    ⛔ A never-sighted string is NOT a bug. Most are simply positions nobody has
+    visited -- the 14 display languages, eight lobby comment presets, P3/P4 on
+    four-player games. Listing them is how we know WHICH parts of the shipping
+    data are still resting on inference rather than on a sighting.
+
+    ⭐ It is also how a run gets prioritised: the strings the mod has already
+    SPOKEN but never had confirmed are the ones a wrong entry would have
+    reached the user through.
+    """
+    import glob as _glob
+    drawn = set()
+    spoken = set()
+    for p in paths:
+        text = open(p, encoding="utf-8", errors="replace").read()
+        drawn |= set(re.findall(r'TEXT SET on [0-9A-F]+: "([^"]*)"', text))
+        spoken |= set(re.findall(r'spoke "[^",]+, ([^",]+), \d+ of \d+"', text))
+    return drawn, spoken
 
 
 def main():

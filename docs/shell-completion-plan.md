@@ -8,6 +8,38 @@ everything else.
 across three runs). Treating it as a campaign with a checklist is the fix; doing
 one screen per run is what let the count drift.
 
+## ⚠⚠ HOW MUCH OF THE VALUE DATA IS SIGHTED? 45 of 104 (2026-09-10)
+
+Prompted by the user asking whether "Either" was data or assumption. Auditing
+EVERY shipped value string the same way: **59 of 104 have never been seen drawn
+in any run.** That is far more inference than my commit messages implied, and
+the honest scope of the question.
+
+⛔ A never-sighted string is not automatically wrong. Most are positions nobody
+has visited — the 14 display languages, eight lobby comment presets, P3/P4 on
+four-player games. They come from the renderer's own table plus the corpus, and
+that is real evidence.
+
+### ⭐ The sharp end: SPOKEN but never confirmed
+`audit_values.py` now reports the subset that matters — strings the mod has
+already said to the user while no run has ever shown the game drawing them:
+
+    Japanese Version / English Version   (on all FOUR screens that have the row)
+    English [en] / French [fr]           (System > Language)
+
+⛔⛔ **And the version row cannot be checked from the logs at all.** Six
+Game-Version value movements on Select Game draw exactly one thing: `"P1"`, the
+Player row's object. The row draws nothing capturable, so no amount of log
+analysis will confirm those two strings.
+
+⭐ What DOES check out by sighting: the Player row. Value 1 draws `"P1"` and
+value 2 draws `"P2"`, consistently across three runs — so `{2, 2, 58}` is
+confirmed by measurement, not inference.
+
+▶ The version strings can only be settled BY EAR: change Game Version on Select
+Game and listen. If it says "Japanese Version" while the screen shows something
+else, that is a real defect and the audit cannot find it.
+
 ## ⭐⭐ "IF WE KNOW WHAT THE TEXT DRAWS, WHY NOT USE THAT INSTEAD OF THE TABLE?"
 
 User's question, 2026-09-10. It is the right question and the answer is
