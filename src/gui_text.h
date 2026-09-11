@@ -516,6 +516,21 @@ void gt_instance_report(void);
  * same number is a contradiction, not a tie to be broken -- it returns FALSE. */
 BOOL gt_numbered_item(int n, char *out, int outlen);
 
+/* ⭐⭐⭐ Name the item at cursor POSITION by the objects' own screen
+ * coordinates (+0x040 X, +0x044 Y, floats). `match` filters the instance set
+ * down to this screen's objects; the coordinates then ORDER them.
+ *
+ * ⭐ The layout axis is DERIVED -- it sorts by whichever of X/Y actually
+ * varies -- so it serves vertical menus and horizontal strips alike. The lobby
+ * ID field is a ROW (one Y, X 64px apart); every menu is a COLUMN.
+ *
+ * Refuses (returns FALSE, out empty) when the candidate count disagrees with
+ * `total`, or two candidates share a coordinate. Both mean the ordering is not
+ * this screen's, and a bare position is always true where a guess is not. */
+typedef BOOL (*gt_cand_fn)(const char *text, void *ctx);
+BOOL gt_item_at_position(int position, int total, gt_cand_fn match, void *ctx,
+                         char *out, int outlen);
+
 /* ⭐⭐ A SETTINGS SCREEN'S ROW VALUES, from the live object list.
  *
  * `labels` is the screen's row labels in row order. If the instance table holds

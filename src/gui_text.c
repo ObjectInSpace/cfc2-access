@@ -1096,6 +1096,146 @@ BOOL gt_numbered_item(int n, char *out, int outlen)
     return TRUE;
 }
 
+/* ⭐⭐⭐ POSITION -> LIVE OBJECT, BY THE OBJECT'S OWN SCREEN COORDINATES.
+ *
+ * The join two screens were blocked on. A cGUIObjText stores where it is:
+ *     +0x040  float X        +0x044  float Y
+ * verified in run-2026-09-11-0317 against screens whose row order was ALREADY
+ * established independently (Online Play 6 of 6, Lobby 3 of 3, 0 contradictions),
+ * and again in ...-0322 on the lobby-ID field itself.
+ *
+ * ⛔⛔ WHY NOTHING ELSE WILL DO. On the lobby field's six slots, +0x050 reads
+ * 0a, 0c, 0b, 0d, 0e, 0f -- slots 2 and 3 INVERTED -- and the instance set's
+ * insertion order puts the edited slot FIRST in one run and LAST in another.
+ * Either key silently swaps two characters of a code the user is spelling out.
+ * The coordinate is the only one that orders them correctly.
+ *
+ * ⭐ THE AXIS IS DERIVED, NOT ASSUMED. A menu column varies in Y at constant X;
+ * a strip varies in X at constant Y. This measures the spread of both across
+ * the candidates and sorts by whichever actually varies, so the same function
+ * serves the vertical menus and the horizontal lobby field. Assuming Y would
+ * have been right for every screen that motivated this and wrong for the one
+ * it was built for.
+ *
+ * ⚠ Candidates are filtered by `match`, supplied by the caller, because the
+ * instance set holds several screens at once (30 of 64 entries were stale in
+ * the run this was built from). Coordinates order a set; they do not decide
+ * membership of it.
+ */
+/* ⚠ Named, not anonymous: two anonymous struct declarations are DISTINCT types
+ * in C, so the swap below cannot assign one to the other. */
+typedef struct { float x, y; const char *text; } gt_cand;
+
+BOOL gt_item_at_position(int position, int total, gt_cand_fn match, void *ctx,
+                         char *out, int outlen)
+{
+    gt_cand cand[GT_INST_MAX];
+    volatile int n_cand = 0;
+
+    if (out && outlen > 0) out[0] = 0;
+    if ((!g_installed && !g_focus_test_mode) || !out || outlen <= 0)
+        return FALSE;
+    if (position < 1 || total < 1 || position > total)
+        return FALSE;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return FALSE;
+
+    LONG n_ent = g_inst_count;
+    for (volatile LONG i = 0; i < n_ent && n_cand < GT_INST_MAX; i++) {
+        void *o = g_inst[i].obj;
+        ULONGLONG vptr = 0;
+        BOOL faulted = FALSE;
+        unsigned char buf[GT_CLASS_SIZE];
+
+        if (!o || ((ULONG_PTR)o & 7u))
+            continue;
+        if (!g_inst[i].text[0])
+            continue;
+        if (match && !match(g_inst[i].text, ctx))
+            continue;
+        /* ⚠ Re-validate: an entry survives until eviction, so a stale object
+         * from a screen left long ago can still hold matching text. */
+        if (mem_readable_run(o, sizeof(vptr)) < sizeof(vptr))
+            continue;
+        MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)o);
+        if (faulted || (vptr != GT_VTABLE_ADDR && vptr != GT_VTABLE_MSG))
+            continue;
+        /* ⛔⛔ mem_readable_run FIRST, then the guard. A guarded memcpy across
+         * a bad page is NOT reliably caught -- case C of run_span_test. */
+        if (mem_readable_run(o, GT_CLASS_SIZE) < GT_CLASS_SIZE)
+            continue;
+        if (!mem_copy(buf, o, GT_CLASS_SIZE))
+            continue;
+
+        memcpy((void *)&cand[n_cand].x, buf + 0x40, sizeof(float));
+        memcpy((void *)&cand[n_cand].y, buf + 0x44, sizeof(float));
+        /* ⚠ Reject NaN/inf outright: they make a comparison sort inconsistent,
+         * which is undefined behaviour, not merely a wrong order. */
+        if (!(cand[n_cand].x == cand[n_cand].x) ||
+            !(cand[n_cand].y == cand[n_cand].y))
+            continue;
+        cand[n_cand].text = g_inst[i].text;
+        n_cand++;
+    }
+
+    /* ⛔ THE COUNT MUST MATCH THE SCREEN. Fewer candidates than the cursor
+     * reports means some rows are missing from the set and position N is not
+     * the Nth candidate; more means another screen's objects are mixed in.
+     * Either way the ordering is not this screen's, so refuse. */
+    if (n_cand != total) {
+        if (n_cand)
+            log_line("gt: position %d of %d -- %d candidate object(s), "
+                     "count MISMATCH, naming none.", position, total, n_cand);
+        InterlockedExchange(&g_inst_busy, 0);
+        return FALSE;
+    }
+
+    /* ⭐ Which axis is this screen laid out on? Sort by the one that VARIES. */
+    {
+        float xmin = cand[0].x, xmax = cand[0].x;
+        float ymin = cand[0].y, ymax = cand[0].y;
+        for (int i = 1; i < n_cand; i++) {
+            if (cand[i].x < xmin) xmin = cand[i].x;
+            if (cand[i].x > xmax) xmax = cand[i].x;
+            if (cand[i].y < ymin) ymin = cand[i].y;
+            if (cand[i].y > ymax) ymax = cand[i].y;
+        }
+        BOOL by_x = (xmax - xmin) > (ymax - ymin);
+
+        /* Insertion sort: n is at most 64 and typically under 10. */
+        for (int i = 1; i < n_cand; i++) {
+            for (int j = i; j > 0; j--) {
+                float a = by_x ? cand[j].x     : cand[j].y;
+                float b = by_x ? cand[j - 1].x : cand[j - 1].y;
+                if (a >= b) break;
+                gt_cand t = cand[j];
+                cand[j] = cand[j - 1];
+                cand[j - 1] = t;
+            }
+        }
+
+        /* ⛔ TWO OBJECTS AT THE SAME COORDINATE CANNOT BE ORDERED. Speaking
+         * either would be a coin flip on which row the user is standing on. */
+        for (int i = 1; i < n_cand; i++) {
+            float a = by_x ? cand[i].x     : cand[i].y;
+            float b = by_x ? cand[i - 1].x : cand[i - 1].y;
+            if (a == b) {
+                log_line("gt: position %d of %d -- two objects share a "
+                         "coordinate, order is UNDEFINED, naming none.",
+                         position, total);
+                InterlockedExchange(&g_inst_busy, 0);
+                return FALSE;
+            }
+        }
+
+        strncpy(out, cand[position - 1].text, (size_t)outlen - 1);
+        out[outlen - 1] = 0;
+    }
+
+    InterlockedExchange(&g_inst_busy, 0);
+    return out[0] != 0;
+}
+
 /* --- the focus differ (see gui_text.h) ----------------------------------- */
 
 #define FD_MAX 16          /* objects tracked per screen; a strip has 8-9 */

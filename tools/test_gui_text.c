@@ -1218,6 +1218,132 @@ int main(void)
         check("32. labels in order but NOT consecutive are refused", !got, d);
     }
 
+    /* --- cases 33-37: ⭐⭐⭐ POSITION -> OBJECT BY SCREEN COORDINATES -------
+     *
+     * The join the lobby-ID field and the music strip were blocked on.
+     * EVERY FIXTURE BELOW IS REAL DATA from run-2026-09-11-0322: the six lobby
+     * slots at y=556.0, x = 800..1120 stepping 64.0.
+     *
+     * ⛔⛔ CASE 34 IS THE ONE THAT MATTERS. In that run the slots' +0x050 field
+     * reads 0a, 0c, 0b, 0d, 0e, 0f -- slots 2 and 3 INVERTED -- and insertion
+     * order put the edited slot FIRST in one run and LAST in another. So the
+     * fixture plants the objects in a DELIBERATELY WRONG order with that exact
+     * inversion: any implementation that sorts by arrival, or by +0x050, or
+     * that does not sort at all, returns the wrong character and fails. A
+     * fixture in screen order would pass with the sort deleted entirely.
+     */
+    {
+        /* A cGUIObjText must be at least GT_CLASS_SIZE for the coordinate read
+         * to be in bounds; these stand in for the real objects. */
+        static unsigned char slot[6][GT_CLASS_SIZE];
+        /* Planted in SCRAMBLED order -- see above. Screen order is the X. */
+        static const float SX[6] = { 928.f, 800.f, 1120.f, 864.f, 1056.f, 992.f };
+        static const char *const SC[6] = { "C", "A", "F", "B", "E", "D" };
+
+        gt_test_reset();
+        gt_test_focus_enable();
+        for (int i = 0; i < 6; i++) {
+            memset(slot[i], 0, sizeof slot[i]);
+            *(ULONGLONG *)slot[i] = GT_VTABLE_ADDR;
+            memcpy(slot[i] + 0x40, &SX[i], sizeof(float));
+            float y = 556.f;
+            memcpy(slot[i] + 0x44, &y, sizeof(float));
+            gt_test_settext_body(slot[i], SC[i], NULL, 0);
+        }
+
+        /* case 33: every position resolves to the character at that X. */
+        {
+            static const char *const WANT[6] = { "A","B","C","D","E","F" };
+            int wrong = 0;
+            char d[200]; int used = 0;
+            for (int p = 1; p <= 6; p++) {
+                char v[32] = { 0 };
+                BOOL ok = gt_item_at_position(p, 6, NULL, NULL, v, sizeof v);
+                if (!ok || strcmp(v, WANT[p - 1]) != 0) wrong++;
+                used += snprintf(d + used, sizeof d - used, "%s%d:%s",
+                                 used ? " " : "", p, v[0] ? v : "-");
+            }
+            check("33. six slots resolve left-to-right by X", wrong == 0, d);
+        }
+
+        /* case 34: ⛔ THE SORT IS LOAD-BEARING. Position 2 is "B" (x=864),
+         * which is the FOURTH object planted. Insertion order yields "A";
+         * +0x050 order would swap slots 2 and 3. Only the coordinate is right. */
+        {
+            char v[32] = { 0 };
+            BOOL ok = gt_item_at_position(2, 6, NULL, NULL, v, sizeof v);
+            char d[120];
+            snprintf(d, sizeof d, "returned %d, \"%s\" (insertion order gives "
+                     "\"B\" only by accident if unsorted: planted 4th)",
+                     (int)ok, v);
+            check("34. position 2 is the 2nd BY X, not the 2nd planted",
+                  ok && strcmp(v, "B") == 0, d);
+        }
+
+        /* case 35: ⛔ A COUNT MISMATCH IS REFUSED. Six objects on screen but a
+         * cursor reporting nine means the set is not this screen's; naming the
+         * 9th of six would be a read past the candidates. */
+        {
+            char v[32] = { 1 };
+            BOOL ok = gt_item_at_position(3, 9, NULL, NULL, v, sizeof v);
+            char d[120];
+            snprintf(d, sizeof d, "returned %d, \"%s\"", (int)ok, v);
+            check("35. candidate count disagreeing with the cursor is refused",
+                  !ok && v[0] == 0, d);
+        }
+    }
+
+    /* case 36: ⭐ THE AXIS IS DERIVED, not assumed. The same function must
+     * order a vertical COLUMN by Y -- the shape of every menu -- using the real
+     * Online Play coordinates (x=376 constant, y 192..592 stepping 80).
+     * ⚠ Planted bottom-to-top so an unsorted implementation fails. */
+    {
+        static unsigned char row[6][GT_CLASS_SIZE];
+        static const float RY[6] = { 592.f, 512.f, 432.f, 352.f, 272.f, 192.f };
+        static const char *const RC[6] = {
+            "High Score Challenge Leaderboard", "High Score Challenge",
+            "Ranked Leaderboard", "Custom Match", "Ranked Match", "Casual Match"
+        };
+        gt_test_reset();
+        gt_test_focus_enable();
+        for (int i = 0; i < 6; i++) {
+            memset(row[i], 0, sizeof row[i]);
+            *(ULONGLONG *)row[i] = GT_VTABLE_ADDR;
+            float x = 376.f;
+            memcpy(row[i] + 0x40, &x, sizeof(float));
+            memcpy(row[i] + 0x44, &RY[i], sizeof(float));
+            gt_test_settext_body(row[i], RC[i], NULL, 0);
+        }
+        char v[64] = { 0 };
+        BOOL ok = gt_item_at_position(1, 6, NULL, NULL, v, sizeof v);
+        char d[160];
+        snprintf(d, sizeof d, "returned %d, \"%s\"", (int)ok, v);
+        check("36. a vertical column sorts by Y (row 1 = topmost)",
+              ok && strcmp(v, "Casual Match") == 0, d);
+    }
+
+    /* case 37: ⛔ TWO OBJECTS AT ONE COORDINATE CANNOT BE ORDERED. Speaking
+     * either is a coin flip on which row the user is standing on, so refuse. */
+    {
+        static unsigned char dup[2][GT_CLASS_SIZE];
+        gt_test_reset();
+        gt_test_focus_enable();
+        for (int i = 0; i < 2; i++) {
+            memset(dup[i], 0, sizeof dup[i]);
+            *(ULONGLONG *)dup[i] = GT_VTABLE_ADDR;
+            float x = 400.f, y = 300.f;      /* identical on purpose */
+            memcpy(dup[i] + 0x40, &x, sizeof(float));
+            memcpy(dup[i] + 0x44, &y, sizeof(float));
+            gt_test_settext_body(dup[i], i ? "Second" : "First", NULL, 0);
+        }
+        char v[32] = { 1 };
+        BOOL ok = gt_item_at_position(1, 2, NULL, NULL, v, sizeof v);
+        char d[120];
+        snprintf(d, sizeof d, "returned %d, \"%s\"", (int)ok, v);
+        check("37. objects sharing a coordinate are refused, not guessed",
+              !ok && v[0] == 0, d);
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",
