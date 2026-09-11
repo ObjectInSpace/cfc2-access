@@ -1429,9 +1429,38 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
              * ⛔ Still keyed on an explicit CALLER LIST, never widened to "any
              * row 0": row 0 means the game list on these screens and something
              * else elsewhere. The comment below explains why the key matters. */
+            /* ⭐⭐ THE LOBBY SCREENS' GAME LIST HAS NINE ENTRIES, not eight:
+             * position 1 is "Any" (a matchmaking FILTER, not a game) and
+             * positions 2-9 are the eight ROMs. Established from the renderer's
+             * own table, which gives row 0 first = 14 = GAME_NAME_ANY -- and
+             * that family has exactly ONE member, because "Any" is the only
+             * game-list entry that is not a ROM. The other 8 labels from index
+             * 14 are SYSTEM_OK, SYSTEM_CANCEL... i.e. there is no 9-game run in
+             * the GMD at all, so the titles must come from the ROM table here
+             * exactly as they do on Select Game.
+             *
+             * ⚠ The 00:10 run walked all nine positions and named NONE of them.
+             *
+             * ⛔ NOT assumed from Gallery. Gallery's 9-item chooser is
+             * "collection + 8 games", which is a DIFFERENT shape, and borrowing
+             * it would have put the collection at position 1 instead of "Any".
+             * The table is what distinguishes them. */
+            int nine = (s->caller == 0x140082d16ULL ||
+                        s->caller == 0x14008e813ULL);
             if (row == 0 && rom_table_ready() &&
-                (s->caller == 0x1400b1bd9ULL || s->caller == 0x140098986ULL)) {
+                (s->caller == 0x1400b1bd9ULL || s->caller == 0x140098986ULL ||
+                 nine)) {
                 int game = m->new_index - m->min_index;
+                if (nine) {
+                    /* Position 1 is "Any"; the ROMs start at position 2. */
+                    if (game == 0) {
+                        _snprintf(out->item, sizeof(out->item), "Any");
+                        out->named = TRUE;
+                        out->why = MC_NAMED_OK;
+                        return;
+                    }
+                    game -= 1;
+                }
                 /* ⭐⭐ SPEAK THE TITLE THE SCREEN IS SHOWING -- version 1, the
                  * US side, not version 0.
                  *

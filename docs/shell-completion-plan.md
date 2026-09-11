@@ -121,6 +121,44 @@ been caught by measurement instead of by ear — and it is the next piece of wor
 screens the "text near a movement" is very often a NEIGHBOURING row's object.
 Four times this session that produced a confident wrong reading.
 
+## ⭐⭐ THE 00:10 RUN CONFIRMS YESTERDAY'S VALUE WORK — with one new gap
+
+Everything shipped for the online screens was exercised and is correct:
+
+    "Comment, Everyone is welcome!, 1 of 8" ... "Let's chat!, 8 of 8"   (all 8)
+    "Comment, Any, 1 of 9"            (the 9-value FILTER variant, correctly
+                                       starting with the filter-only "Any")
+    "Event Mode, On (Quick Match), 1 of 2" · "Off (Arcade Style), 2 of 2"
+    "Game Start Privilege, Challenger, 1 of 2" · "Host, 2 of 2"
+    "Number of Players, 3, 2 of 8" · "Passcode, Off/On"
+    "Cross-region Matchmaking, Off/On" · "One-button Special Moves, On/Off"
+
+⭐⭐ **AND THE JP/US FIX IS CONFIRMED BY DIRECT COMPARISON.** Before and after,
+same screens:
+
+    2130 run:  "Game, Capcom Fighting Jam, ..."
+               "Game, Capcom vs. SNK 2: Millionaire Fighting 2001, ..."
+    0010 run:  "Game, Capcom Fighting Evolution, ..."
+               "Game, Capcom vs. SNK 2: Mark of the Millennium 2001, ..."
+
+⭐ "Either" also spoke, at position 3 of 3 on both online screens. Still not
+confirmed against the display (the row draws nothing), but it is now exercised.
+
+### ⛔ THE NEW GAP: the lobby screens' game list has NINE entries
+Row 0 of both Lobby Settings and Lobby Filters is a 9-item game list, and it
+names nothing: `"Game, 1 of 9"` through `"Game, 9 of 9"`.
+
+⚠ The tempting inference is "9 = the collection + 8 games", because that is
+exactly what Gallery's and Music's 9-item choosers are. **That is a borrowed
+assumption, not a measurement on THIS screen** — the same shape of reasoning
+that produced `g_game_options_candidate`. Pairing every 9-item row-0 movement
+across all logs (via `logpair`) yields only neighbouring values: `'On'`, `'2'`,
+`'4'`. No position has ever been named here.
+
+▶ It needs either a renderer table for row 0 (Lobby Settings' table gives first
+= 14 = `GAME_NAME_ANY`, which suggests the list DOES start with an "Any"
+filter entry rather than the collection) or a run where the titles are drawn.
+
 ## ⭐⭐ THE PICKER'S CHARACTERS ARE EXACT — my "off by one" was a pairing error
 
 Pooling every picker sample across all logs, keyed on SAME-TIMESTAMP text:

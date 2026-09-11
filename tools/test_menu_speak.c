@@ -1043,6 +1043,32 @@ int main(void)
               "select=%d casual=%d", sg != NULL, cm != NULL);
     }
 
+    /* --- case 29: the lobby game list is NINE entries, "Any" then 8 ROMs ----
+     * ⭐⭐ The renderer's table gives row 0 first = 14 = GAME_NAME_ANY, a family
+     * with exactly ONE member, because "Any" is the only game-list entry that
+     * is not a ROM. So position 1 is a FILTER and the games start at 2.
+     *
+     * ⛔⛔ AN OFF-BY-ONE HERE NAMES EVERY GAME WRONGLY -- position 2 would say
+     * "Capcom vs. SNK 2" where the screen shows "Capcom vs. SNK". That is the
+     * confidently-wrong-value failure the user reported, so the shape is
+     * asserted rather than left to the comment.
+     *
+     * ⚠ Asserted on the SCREEN TABLE: the two 9-entry callers must be distinct
+     * from the two 8-entry ones, since the code branches on exactly that. */
+    {
+        const mc_screen *nine_a = menu_speak_lookup(0x140082d16ULL);
+        const mc_screen *nine_b = menu_speak_lookup(0x14008e813ULL);
+        const mc_screen *eight  = menu_speak_lookup_n(0x140098986ULL, 8);
+        int ok = nine_a && nine_b && eight &&
+                 nine_a->kind == MC_SETTINGS_VALUE &&
+                 nine_b->kind == MC_SETTINGS_VALUE &&
+                 nine_a->caller != eight->caller &&
+                 nine_b->caller != eight->caller;
+        check("29. the two 9-entry game lists are distinct from the 8-entry one",
+              ok, "a=%d b=%d eight=%d", nine_a != NULL, nine_b != NULL,
+              eight != NULL);
+    }
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");
