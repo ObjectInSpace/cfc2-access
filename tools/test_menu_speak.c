@@ -1008,6 +1008,71 @@ int main(void)
               ok, "one or more mappings misclassified");
     }
 
+    /* --- cases 27b-27d: ⛔⛔ THE PICKER MUST SPEAK WITHOUT A CAPTION --------
+     *
+     * USER-REPORTED: "when I press up and down to choose a value I don't hear
+     * anything." Measured in run-...-1222: of 101 up/down movements, only TWO
+     * spoke a character; 99 gave a bare "19 of 36", which is useless when you
+     * are spelling out a code.
+     *
+     * THE CAUSE: the picker's speech lived in the CAPTION block, so it needed a
+     * caption to corroborate the position -- and this screen SETS NO TEXT AT
+     * ALL. Its 36 characters have no text objects (the layout probe finds only
+     * the six lobby slots at y=556), so they are sprites. The path was gated on
+     * a signal that does not exist for it.
+     *
+     * ⚠ THESE CASES ASSERT SPEECH WITH NO CAPTION SUPPLIED, which is the whole
+     * point -- menu_speak_build() must name the item from POSITION alone. A
+     * case that passed a caption in would have passed before the fix. */
+    {
+        /* 27b: every one of the 36 positions names its own character. */
+        int wrong = 0;
+        char first_bad[64] = { 0 };
+        static const char *const ALPHA =
+            "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        for (int p = 1; p <= 36; p++) {
+            mc_speech sp;
+            mc_move m = mk(0x14008a8efULL, p - 1, 0, 35);
+            menu_speak_build(&m, &sp);
+            if (!sp.named || sp.item[0] != ALPHA[p - 1] || sp.item[1] != '\0') {
+                if (!wrong)
+                    snprintf(first_bad, sizeof first_bad,
+                             "pos %d named=%d item=\"%s\" want '%c'",
+                             p, (int)sp.named, sp.item, ALPHA[p - 1]);
+                wrong++;
+            }
+        }
+        check("27b. all 36 picker positions name their character, NO caption",
+              wrong == 0, "%d wrong; first: %s", wrong, first_bad);
+    }
+    {
+        /* 27c: ⛔ a screen with a different live count is NOT this picker and
+         * must get nothing -- the count is the membership test. */
+        mc_speech sp;
+        mc_move m = mk(0x14008a8efULL, 0, 0, 9);     /* 10 items, not 36 */
+        menu_speak_build(&m, &sp);
+        check("27c. a picker-caller screen with the wrong count names nothing",
+              !sp.named && sp.item[0] == '\0',
+              "named=%d item=\"%s\"", (int)sp.named, sp.item);
+    }
+    {
+        /* 27d: ⚠ THE TWO ALPHABETS MUST BE THE SAME ONE. build() speaks from
+         * K_PICKER_STR and char_picker_matches() guards with K_PICKER; if those
+         * ever drift, the picker says one character while its own guard checks
+         * another. Asserted by requiring the spoken character to satisfy the
+         * guard at every position. */
+        int bad = 0;
+        for (int p = 1; p <= 36; p++) {
+            mc_speech sp;
+            mc_move m = mk(0x14008a8efULL, p - 1, 0, 35);
+            menu_speak_build(&m, &sp);
+            if (!sp.named || !menu_speak_test_char_picker(sp.item, p))
+                bad++;
+        }
+        check("27d. the spoken character satisfies the picker's OWN guard",
+              bad == 0, "%d position(s) disagree between the two alphabets", bad);
+    }
+
     /* --- case 28: the ROM probe is caller-gated, like the speaking path -----
      * ⛔⛔ MEASURED: it was firing on EIGHTEEN callers across the logs -- 16
      * times on PC Settings -- logging "IF the mapping holds, this is Capcom

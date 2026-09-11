@@ -1418,6 +1418,13 @@ BOOL menu_speak_derive_row(const void *screen, const void *cursor,
  * ⚠ A blurb or a button-hint strip sharing the screen would otherwise become a
  * candidate, and then the COUNT check in gt_item_at_position() is what refuses
  * the whole reading rather than silently shifting every position by one. */
+/* ⭐ The picker's alphabet, needed by build() which sits above K_PICKER's
+ * definition. ⚠ ONE literal, referenced twice -- two copies could drift, and a
+ * picker speaking a different alphabet from the one its guard checks is exactly
+ * the class of bug this file exists to prevent. Case 38 asserts they agree. */
+#define K_PICKER_STR "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+#define K_PICKER_CH(pos) (K_PICKER_STR[(pos) - 1])
+
 typedef struct { int maxlen; } coord_ctx;
 
 static BOOL coord_candidate(const char *text, void *ctx)
@@ -1502,10 +1509,45 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
         return;
     }
 
-    /* ⭐ A character picker: the caption is the item, quoted in menu_speak(). */
+    /* ⭐⭐⭐ A CHARACTER PICKER NAMES ITSELF FROM ITS POSITION.
+     *
+     * ⛔⛔ THE BUG THIS FIXES, user-reported: "when I press up and down to
+     * choose a value I don't hear anything". Measured in run-...-1222: of 101
+     * up/down movements only TWO spoke a character; 99 gave a bare "19 of 36",
+     * which is useless when you are spelling out a code.
+     *
+     * THE CAUSE: this block used to set the flag and RETURN UNNAMED, leaving
+     * the naming to the caption path in menu_speak() -- and THIS SCREEN SETS NO
+     * TEXT AT ALL. Its 36 characters have no text objects (the layout probe
+     * finds only the six lobby SLOTS at y=556 and nothing else), so they are
+     * drawn as sprites. The path was gated on a signal that does not exist for
+     * it, which is why it fired on 2 movements out of 101 -- those two picked
+     * up a caption that belonged to the FIELD, not the picker.
+     *
+     * ⭐ THE POSITION IS SUFFICIENT, AND THAT IS MEASURED. Across every run, 23
+     * movements spoke a character and 21 agreed exactly with the alphabet; the
+     * only 2 disagreements are the same stale '0' at position 36 from a build
+     * predating the staleness guard. The 03:22 run added 16 of 16 exact over 32
+     * upward movements, and the layout probe independently caught the edited
+     * slot mirroring the picker (F@16, M@23, Z@36, all exact).
+     *
+     * ⚠ THE CORROBORATION MOVED, IT DID NOT VANISH. The alphabet is pinned by
+     * two independent facts: the live item count is exactly 36, and
+     * "0".."9","A".."Z" is exactly 36 characters. char_picker is still set, so
+     * char_picker_matches() still guards the caption path for the rare movement
+     * that does carry one.
+     *
+     * ⚠ The count is the membership test: a screen with a different live count
+     * is not this picker and gets nothing. */
     if (s->kind == MC_CHAR_PICKER) {
         out->char_picker = TRUE;
-        out->why = MC_UNNAMED_NO_LABELS;
+        if (out->total == 36 && out->position >= 1 && out->position <= 36) {
+            out->item[0] = K_PICKER_CH(out->position);
+            out->item[1] = '\0';
+            out->named = TRUE;
+            return;
+        }
+        out->why = MC_UNNAMED_COUNT_MISMATCH;
         return;
     }
 
@@ -1934,7 +1976,8 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
  * numbering is: two independent sources (the cursor's position and the text the
  * game drew) must agree, or nothing is spoken. A mismatch yields the bare
  * position, which is always true. */
-static const char *const K_PICKER = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+/* ⚠ THE SAME literal build() uses, not a second copy -- see K_PICKER_STR. */
+static const char *const K_PICKER = K_PICKER_STR;
 
 static BOOL char_picker_matches(const char *s, int position)
 {
