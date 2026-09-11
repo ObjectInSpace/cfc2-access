@@ -1488,6 +1488,139 @@ static BOOL layout_enabled(void)
     return cached != 0;
 }
 
+/* ⭐⭐⭐ THE MODAL SELECTION HUNT -- a TARGETED heap diff.
+ *
+ * ⛔ WHAT IS ALREADY RULED OUT, so this does not repeat it: the selection is not
+ * in the "Yes"/"No" TEXT OBJECTS. Their differing fields (+0x124, +0x13c) are
+ * byte-identical across four arrow presses, and the focus differ -- reporting
+ * freely on other objects in the same run -- saw no change on either. Closed in
+ * run-2026-09-11-1322.
+ *
+ * ⭐ THE LEAD THIS FOLLOWS: both option objects carry the SAME pointer at
+ * +0x088, stable for the life of a dialog appearance and different between
+ * appearances. A value shared by exactly the two widgets that form one control
+ * is the control itself -- the natural place for "which one is selected".
+ *
+ * ⭐⭐ AND WHY THIS IS NOT THE BLIND SCAN THAT FAILED FOUR TIMES ON THIS
+ * PROJECT. Those searched 1.4 GB for something selection-SHAPED, and look-alikes
+ * are abundant and indistinguishable as data. This has an ANCHOR the game gave
+ * us and a CONTROL the user performs: snapshot the parent, the user presses a
+ * direction, snapshot again, and report only what CHANGED. A field that moves
+ * when and only when the selection moves is not a look-alike.
+ *
+ * ⚠ It reports OFFSETS AND VALUES, never a conclusion. Naming a field "the
+ * selection" from one movement is the mistake this file exists to avoid; two
+ * presses in opposite directions, with the value returning, is what would
+ * settle it -- and that is a judgement for a human reading the log.
+ *
+ * Switch: cfc2_modal.on. Absent = off.
+ */
+#define MODAL_PARENT_OFF 0x088
+#define MODAL_SNAP       0x400          /* bytes of the parent to watch */
+
+static BOOL modal_enabled(void)
+{
+    static int cached = -1;
+    if (cached < 0)
+        cached = (GetFileAttributesA("cfc2_modal.on") != INVALID_FILE_ATTRIBUTES);
+    return cached != 0;
+}
+
+void gt_modal_probe(void)
+{
+    static void         *g_parent;
+    static unsigned char g_snap[MODAL_SNAP];
+    static BOOL          g_have;
+
+    void *parent = NULL;
+    unsigned char cur[MODAL_SNAP];
+    LONG n;
+
+    if (!modal_enabled() || (!g_installed && !g_focus_test_mode))
+        return;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return;
+
+    /* Find a live object whose text is "Yes" and read its +0x088. ⚠ Keyed on
+     * the TEXT, so this probe is inert on every screen that has no such
+     * widget -- it cannot wander onto another menu's objects. */
+    n = g_inst_count;
+    for (LONG i = 0; i < n && !parent; i++) {
+        void *o = g_inst[i].obj;
+        ULONGLONG vptr = 0;
+        BOOL faulted = FALSE;
+        unsigned char buf[MODAL_PARENT_OFF + sizeof(void *)];
+
+        if (!o || strcmp(g_inst[i].text, "Yes") != 0)
+            continue;
+        if (mem_readable_run(o, sizeof(vptr)) < sizeof(vptr))
+            continue;
+        MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)o);
+        if (faulted || (vptr != GT_VTABLE_ADDR && vptr != GT_VTABLE_MSG))
+            continue;
+        /* ⛔⛔ mem_readable_run FIRST, then the guard -- a guarded memcpy over a
+         * bad page is NOT reliably caught (case C of run_span_test). */
+        if (mem_readable_run(o, sizeof(buf)) < sizeof(buf))
+            continue;
+        if (!mem_copy(buf, o, sizeof(buf)))
+            continue;
+        memcpy(&parent, buf + MODAL_PARENT_OFF, sizeof(parent));
+    }
+
+    if (!parent) {
+        /* No dialog on screen. Drop the baseline so the NEXT appearance starts
+         * clean rather than diffing against a dead object's bytes. */
+        g_have = FALSE;
+        g_parent = NULL;
+        InterlockedExchange(&g_inst_busy, 0);
+        return;
+    }
+
+    if (((ULONG_PTR)parent & 7u) ||
+        mem_readable_run(parent, MODAL_SNAP) < MODAL_SNAP ||
+        !mem_copy(cur, parent, MODAL_SNAP)) {
+        log_line("modal: parent %p is not readable for %d bytes -- NOTHING was "
+                 "measured (this is not a negative result).",
+                 parent, MODAL_SNAP);
+        InterlockedExchange(&g_inst_busy, 0);
+        return;
+    }
+
+    if (!g_have || parent != g_parent) {
+        memcpy(g_snap, cur, MODAL_SNAP);
+        g_parent = parent;
+        g_have = TRUE;
+        log_line("modal: watching parent %p (%d bytes). ▶ Press a direction on "
+                 "the dialog; each change is logged as offset:old->new. A field "
+                 "that moves ONLY with the selection, and RETURNS when you move "
+                 "back, is the candidate.", parent, MODAL_SNAP);
+        InterlockedExchange(&g_inst_busy, 0);
+        return;
+    }
+
+    {
+        char line[600];
+        int used = 0, nch = 0;
+        for (int off = 0; off < MODAL_SNAP && used < (int)sizeof(line) - 28;
+             off += 4) {
+            if (memcmp(g_snap + off, cur + off, 4) == 0)
+                continue;
+            nch++;
+            used += _snprintf(line + used, sizeof(line) - used - 1,
+                              "%s+0x%03x:%08x->%08x", used ? " " : "",
+                              off, *(unsigned *)(g_snap + off),
+                              *(unsigned *)(cur + off));
+        }
+        line[sizeof(line) - 1] = '\0';
+        if (nch)
+            log_line("modal: parent %p -- %d dword(s) changed: %s",
+                     parent, nch, line);
+        memcpy(g_snap, cur, MODAL_SNAP);
+    }
+
+    InterlockedExchange(&g_inst_busy, 0);
+}
+
 void gt_layout_report(void)
 {
     LONG n;

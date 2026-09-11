@@ -695,6 +695,12 @@ static DWORD WINAPI worker(LPVOID param)
         if (gt_ok)
             menu_speak_check_modal();
 
+        /* ⭐⭐ The MODAL SELECTION HUNT (cfc2_modal.on, absent = off). Same
+         * redraw clock as the other probes -- a dialog is open for ~2 s and a
+         * beat cadence misses it entirely, which already cost one run. */
+        if (gt_ok)
+            gt_modal_probe();
+
         /* ⭐⭐ The LAYOUT PROBE (cfc2_layout.on, absent = off). Looks for the
          * field that orders objects by SCREEN POSITION.
          *

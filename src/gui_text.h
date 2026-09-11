@@ -475,6 +475,16 @@ void gt_focus_report(void);
  * went 0 for 4 on this project.
  *
  * Switch: cfc2_layout.on. Absent = off, and it does nothing at all. */
+/* ⭐⭐⭐ Hunt the MODAL SELECTION: snapshot the parent object both option
+ * widgets point at (+0x088) and report what changes when the user moves.
+ *
+ * ⭐ Anchored, not a blind scan: the anchor is a pointer the game itself shares
+ * between exactly the two widgets of one control, and the control is the user
+ * pressing a direction. Reports OFFSETS AND VALUES only -- never a conclusion.
+ *
+ * Switch: cfc2_modal.on. Absent = off. */
+void gt_modal_probe(void);
+
 void gt_layout_report(void);
 
 /* ⭐⭐ Log the LIVE INSTANCE SET: every cGUIObjText the hook has seen, keyed by
