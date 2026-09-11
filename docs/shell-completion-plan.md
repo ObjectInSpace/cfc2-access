@@ -8,6 +8,35 @@ everything else.
 across three runs). Treating it as a campaign with a checklist is the fix; doing
 one screen per run is what let the count drift.
 
+## ▶ STATUS 2026-09-10 (end of day): 8 callers left, from 15
+
+Shipped and CONFIRMED BY LOG since this plan was written: Lobby · Lobby Filters
+(5 of 6 rows + its value axis) · Casual Match (4 rows) · Lobby Settings (5 of 10
+rows + values_off 0x33c) · Gallery · Ranked Leaderboard · Music tracks.
+
+⚠ **ONE THING IS DEPLOYED BUT NOT YET HEARD:** Casual Match's game list speaking
+the eight TITLES instead of "Game, N of 8". Corroborated by two independent
+sources but never played. If any position names the wrong game, revert it — a
+confident wrong title is worse than "Game, 3 of 8".
+
+### The eight that remain, and why each is stuck
+- `0x14009885e` 3v · `0x1400988bf` 3v — Casual Match's other two lists. **No
+  route**: stack-local cursors (no values_off arithmetic possible) and no
+  per-row captions in any run. Every caption near them is a stale leftover.
+- `0x140079833` 7v · `0x140079739` 40h — Fighter Awards. Its ITEMS already
+  speak; only the 7 list rows are unnamed, and one static caption covers the
+  whole screen.
+- `0x14008a8ef` 36v · `0x14008a91b` 6h — the lobby-ID keypad. It DOES set text
+  ("Enter Lobby ID", six character slots), so it is reachable; nobody has walked
+  the 36-item picker slowly enough to see whether it sets text per position.
+- `0x14009af21` 9h — the Music chooser. Gave no captions in any run, unlike
+  Gallery's identical-looking strip.
+- `0x140087cda` 3h — the consent dialog. Sets no item text at all.
+
+⭐ **The keypad is the only one with an untried, evidence-backed route.** The
+other seven need either a channel nobody has (selection state — see the focus
+differ's negative below) or captions the game has never produced in five runs.
+
 ## The target: 15 callers = 8 SCREENS
 
 Call sites pair up on one screen object (row list + value axis), the shape

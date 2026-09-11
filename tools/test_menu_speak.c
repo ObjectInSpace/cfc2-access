@@ -326,6 +326,13 @@ int main(void)
         static const char *const VALUES[] = {
             "Off", "On", "1024x768", "English [en]", "Original",
             "Agree", "Any", "2+", "Borderless Windowed",
+            /* ⭐ THE CHARACTER PICKER's items (lobby-ID keypad). Single
+             * characters must be ADMITTED -- they are the whole content of that
+             * screen, and the same predicate gates them. ⚠ The hint strip that
+             * polluted position 36 in the logs is already a NEGATIVE below, so
+             * these two cases together are exactly the discrimination the
+             * keypad needs. */
+            "0", "9", "A", "Z",
         };
         static const char *const NOT_VALUES[] = {
             /* captions -- prose, and they end in a period */
@@ -922,6 +929,35 @@ int main(void)
                  (sg && cm) ? (sg->caller != cm->caller) : 0,
                  (!sv || sv->caller != 0x1400b1bd9ULL));
         check("25. the ROM game-list path is keyed to specific callers", ok, d);
+    }
+
+    /* --- case 26: char_picker is set for the keypad and nothing else -------
+     * ⚠ Same reasoning as case 22 for game_strip: this flag gates a rule that
+     * speaks an unverified-by-corpus caption as the ITEM. On any other screen a
+     * short caption is a VALUE or a leftover, and quoting it as the item name
+     * would be the substitution this file exists to prevent.
+     *
+     * ⚠ The count is asserted too: 36 is 10 digits + 26 letters, a real
+     * invariant. A different live count means this is not that picker, and the
+     * staleness check must reject it. */
+    {
+        mc_speech kp, other;
+        mc_move km = mk(0x14008a8efULL, 0, 0, 35);
+        menu_speak_build(&km, &kp);
+        mc_move om = mk(MAIN_CALLER, 0, 0, 5);
+        menu_speak_build(&om, &other);
+
+        /* And with the WRONG count, the entry must not apply. */
+        mc_speech stale;
+        mc_move sm = mk(0x14008a8efULL, 0, 0, 9);   /* 10 items, not 36 */
+        menu_speak_build(&sm, &stale);
+
+        check("26. char_picker is set only for the keypad, and only at 36",
+              kp.char_picker && kp.total == 36 &&
+              !other.char_picker && !stale.char_picker,
+              "keypad=%d(total %d) main=%d wrong-count=%d",
+              (int)kp.char_picker, kp.total, (int)other.char_picker,
+              (int)stale.char_picker);
     }
 
     printf("\n");

@@ -133,7 +133,14 @@ typedef enum {
      * these titles are 41 and 45) and applies only to a VALUE axis. Widening
      * that guard would loosen every settings screen to fix this one, so this
      * gets its own narrow rule instead. */
-    MC_GAME_STRIP
+    MC_GAME_STRIP,
+    /* ⭐⭐ A CHARACTER PICKER: the lobby-ID keypad's 36-item axis, where every
+     * position sets the character under the cursor as live text ("0".."9",
+     * "A".."Y" across 83 measured movements). The item is spoken as a QUOTE of
+     * what the game drew, never from a 36-entry table -- a table would freeze
+     * in whatever the log happened to show, including the two positions where
+     * an unrelated hint strip landed in the same window. */
+    MC_CHAR_PICKER
 } mc_kind;
 
 /* ⭐ A mapped screen's row whose label is NOT established. See `labels`. */
@@ -263,6 +270,11 @@ typedef struct {
      * the screen -- and so the rule is impossible to reach on a screen the
      * table does not declare as one. */
     BOOL  game_strip;
+    /* ⭐ The screen is a CHARACTER PICKER (MC_CHAR_PICKER): each position sets
+     * the character under the cursor as live text, so the caption IS the item.
+     * Carried out of build() for the same reason as game_strip -- so the rule
+     * cannot fire on a screen the table does not declare as one. */
+    BOOL  char_picker;
 } mc_speech;
 
 /* Build the announcement for a movement. Always fills `position`/`total`;

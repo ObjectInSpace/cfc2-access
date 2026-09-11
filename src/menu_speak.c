@@ -567,6 +567,20 @@ static const mc_screen g_screens[] = {
     { 0x1400ac059ULL, -1, 8, "Ranked Leaderboard", MC_VERIFIED_LIVE_TEXT,
       MC_GAME_STRIP, 0, NULL, 0, NULL, 0 },
 
+    /* ⭐⭐ THE LOBBY-ID KEYPAD's character picker (Search Lobby ID > Enter
+     * Lobby ID), 36 items, vertical. Caller 0x14008a8ef.
+     *
+     * Every position sets the character under the cursor as live text --
+     * measured across 83 movements in three runs, positions 1-35 are exactly
+     * "0".."9" then "A".."Y", one per position, no gaps and no conflicts.
+     *
+     * ⚠ count = 36 is a real invariant: 10 digits + 26 letters. A different
+     * live count means this is not that picker.
+     *
+     * ⛔ NOT a 36-entry label table, deliberately -- see MC_CHAR_PICKER. */
+    { 0x14008a8efULL, -1, 36, "Enter Lobby ID", MC_VERIFIED_LIVE_TEXT,
+      MC_CHAR_PICKER, 0, NULL, 0, NULL, 0 },
+
     /* ⭐⭐ CREATE LOBBY's settings, 10 rows, 5 named. See g_create_lobby_rows.
      *
      * ⭐⭐ values_off = 0x33c, DERIVED AND VERIFIED against all ten rows in the
@@ -1040,6 +1054,13 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
      * the flag is set and the position speaks meanwhile. */
     if (s->kind == MC_GAME_STRIP) {
         out->game_strip = TRUE;
+        out->why = MC_UNNAMED_NO_LABELS;
+        return;
+    }
+
+    /* ⭐ A character picker: the caption is the item, quoted in menu_speak(). */
+    if (s->kind == MC_CHAR_PICKER) {
+        out->char_picker = TRUE;
         out->why = MC_UNNAMED_NO_LABELS;
         return;
     }
@@ -1519,6 +1540,35 @@ void menu_speak(const mc_move *m)
                  * ⚠ Gated on sp.game_strip, so the rule is unreachable on any
                  * screen the table does not declare as a game strip -- being in
                  * the ROM table is not by itself permission to speak. */
+                char spoken[GM_OUT_MAX];
+                gm_speak(cap, spoken, sizeof(spoken));
+                if (spoken[0] && !gm_has_residue(spoken)) {
+                    _snprintf(line, sizeof(line), "%s, %d of %d",
+                              spoken, sp.position, sp.total);
+                    line[sizeof(line) - 1] = '\0';
+                }
+            } else if (!sp.named && sp.char_picker && is_value_shaped(cap)) {
+                /* ⭐⭐ A CHARACTER PICKER: the caption IS the character.
+                 *
+                 * The lobby-ID keypad (0x14008a8ef, 36 items) sets the
+                 * character under the cursor as live text on EVERY movement.
+                 * Measured across 83 movements in three runs, positions 1-35
+                 * map exactly to "0".."9" then "A".."Y" -- one character per
+                 * position, no gaps, no conflicts.
+                 *
+                 * ⛔ SPOKEN AS A QUOTE, NOT FROM A TABLE. A 36-entry table
+                 * would be a claim about what sits at each position; this
+                 * repeats what the game just drew. The two readings that
+                 * conflicted in the logs (34 and 36) were an unrelated hint
+                 * strip landing in the same window -- exactly the kind of
+                 * timing artefact a shipped table would have frozen in, and
+                 * which the quote path simply never sees.
+                 *
+                 * ⚠ Same safety argument as the VALUE axis: a wrong quote
+                 * repeats a stale character, it does not misname a menu item.
+                 * is_value_shaped() still applies, so markup strips and
+                 * sentences are refused -- which is what rejects the "Confirm /
+                 * Back" hint that polluted position 36. */
                 char spoken[GM_OUT_MAX];
                 gm_speak(cap, spoken, sizeof(spoken));
                 if (spoken[0] && !gm_has_residue(spoken)) {
