@@ -189,6 +189,53 @@ static const int g_lobby_filter_rows[] = {
     51, MC_LABEL_UNKNOWN, 84, 93, 106, 88
 };
 
+/* ⭐⭐ CASUAL MATCH's game/filter rows (Online Play > Casual Match), 4 rows,
+ * caller 0x14009890d. Established 2026-09-10 (21:00 run) on THREE independent
+ * sources, which is what finally made it shippable:
+ *
+ *  1. The instance set holds exactly these four labels, and only these:
+ *     Game (51) · Game Version (52) · Cross-region Matchmaking (84) ·
+ *     One-button Special Moves (88).
+ *  2. ⭐ THE VALUE-SLOT ARITHMETIC CONFIRMS THE ORDER, which is the source that
+ *     was missing until this run. values_off = 0x344, so
+ *     (cursor - screen - 0x344)/4 puts the 8-value list on ROW 0 and the
+ *     3-value list on ROW 1 -- i.e. Game has 8 values (the eight games) and
+ *     Game Version has 3. Both match the labels above.
+ *  3. The screen's own caption is HELP_GAME_TITLE_ON -- "Choose one or more
+ *     games to play." -- the ONLINE variant of the Game row's help, which also
+ *     explains why row 0 takes eight values: you pick several games for
+ *     matchmaking.
+ *
+ * ⛔ Until source 2 existed this was refused for days as "fits the count and
+ * the category" -- the reasoning behind g_game_options_candidate. The labels
+ * alone were never enough; nothing tied them to THIS caller rather than to the
+ * two 3-item lists sharing the screen object. */
+static const int g_casual_match_rows[] = { 51, 52, 84, 88 };
+
+/* ⭐⭐ CREATE LOBBY's settings, 10 rows, caller 0x140082c3c. FOUR positions
+ * established, each by its OWN caption, pooled across three runs:
+ *
+ *   pos  5  'Turn event mode on or off.'                 -> LOBBY_EVENT 106
+ *   pos  7  'The first player to win the indicated...'   -> LOBBY_ROUND 114
+ *   pos  9  'Set which player has the ability to...'     -> LOBBY_PERM  136
+ *   pos 10  'Choose a passcode for the lobby.'           -> LOBBY_PASS  110
+ *
+ * ⛔⛔ THE OTHER SIX STAY UNKNOWN, and this is the screen where that discipline
+ * matters most. The instance set hands over eight plausible row labels (Game,
+ * Game Version, Cross-region Matchmaking, Comment, One-button Special Moves,
+ * Number of Players...) and six slots to drop them into. Every one of those
+ * assignments would be a guess, and the run that pinned positions 5/9 DISPROVED
+ * the ordering the instance set implied -- "Passcode" was absent from the set
+ * entirely while sitting at position 10.
+ *
+ * ⭐ Shipping 4 of 10 is the whole point of MC_LABEL_UNKNOWN: four rows a blind
+ * player would otherwise hear as bare numbers, with the remaining six still
+ * saying their position, exactly as before. */
+static const int g_create_lobby_rows[] = {
+    MC_LABEL_UNKNOWN, MC_LABEL_UNKNOWN, MC_LABEL_UNKNOWN, MC_LABEL_UNKNOWN,
+    106, MC_LABEL_UNKNOWN, 114, MC_LABEL_UNKNOWN, 136, 110
+};
+
 /* ⛔ NO VALUE VARIANTS FOR THIS SCREEN, deliberately.
  *
  * The per-row value COUNTS are measured from the 19:45 run, via
@@ -518,6 +565,33 @@ static const mc_screen g_screens[] = {
      * 8-item horizontal game strips, different channels, separate evidence. */
     { 0x1400ac059ULL, -1, 8, "Ranked Leaderboard", MC_VERIFIED_LIVE_TEXT,
       MC_GAME_STRIP, 0, NULL, 0, NULL, 0 },
+
+    /* ⭐⭐ CREATE LOBBY's settings, 10 rows, 4 named. See g_create_lobby_rows.
+     * ⚠ The value site (0x140082d16) is NOT entered: its values_off has never
+     * been derived, because no run has produced two value cursors on this
+     * screen to solve it from. Adding it with a guessed offset would derive the
+     * WRONG ROW and name the wrong setting -- the exact failure the row
+     * arithmetic exists to prevent. */
+    { 0x140082c3cULL, -1, 10, "Lobby Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_ROW, 0, g_create_lobby_rows, 10, NULL, 0 },
+
+    /* ⭐⭐ CASUAL MATCH's 4 rows + their value axis. See g_casual_match_rows:
+     * three independent sources agree, including the value-slot arithmetic that
+     * was missing until the 21:00 run.
+     *
+     * ⚠ values_off = 0x344 -- read from THIS screen's own offsets (screen
+     * 0x2BDBC7C0, row cursor +0x334, value cursors +0x344 and +0x348). The
+     * 8-value list is row 0 and the 3-value list is row 1.
+     *
+     * ⚠ The VALUE site (0x140098986) is the same call site as the 8-item game
+     * strip, and it is entered here as MC_SETTINGS_VALUE with count 0 because
+     * its live count VARIES by row (8 for Game, 3 for Game Version). The strip
+     * itself is deliberately NOT MC_GAME_STRIP -- see the plan doc: it captions
+     * not at all, and its titles arrive only on the transcript channel. */
+    { 0x14009890dULL, -1, 4, "Casual Match", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_ROW, 0, g_casual_match_rows, 4, NULL, 0 },
+    { 0x140098986ULL, -1, 0, "Casual Match", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x344, NULL, 0, NULL, 0 },
 
     /* ⭐⭐ JOIN LOBBY > search filters. Two call sites, one screen object:
      * the vertical ROW selector and the horizontal VALUE selector.

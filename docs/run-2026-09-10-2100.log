@@ -1,0 +1,971 @@
+[20:25:28.717] === CFC2 Access -- Phase 1.3: unpacked image dump ===
+[20:25:28.717] worker thread started, pid=33652
+[20:25:28.771] speech: ready, backend=NVDA
+[20:25:28.772] image [t0]: base=0000000140000000, 10 readable sections
+[20:25:28.773] image [t0]:   rva=0x1000     size=16625664  code distinct=256/256 prot=0x80   packed
+[20:25:28.773] image [t0]:   rva=0xfdc000   size=2072576   code distinct=256/256 prot=0x80   packed
+[20:25:28.773] image [t0]:   rva=0x11d6000  size=28758016  code distinct=256/256 prot=0x80   packed
+[20:25:28.773] image [t0]:   rva=0x2d43000  size=745472    code distinct=1/256 prot=0x80   UNPACKED
+[20:25:28.773] image [t0]:   rva=0x2df9000  size=4096      code distinct=256/256 prot=0x80   packed
+[20:25:28.773] image [t0]:   rva=0x2dfa000  size=270336    code distinct=1/256 prot=0x80   UNPACKED
+[20:25:28.773] image [t0]:   rva=0x2e3c000  size=233472    code distinct=256/256 prot=0x80   packed
+[20:25:28.773] image [t0]:   rva=0x2e75000  size=270336    data distinct=254/256 prot=0x2    
+[20:25:28.773] image [t0]:   rva=0x2eb7000  size=13451264  code distinct=85/256 prot=0x40   UNPACKED
+[20:25:28.773] image [t0]:   rva=0x3b8b000  size=3952640   code distinct=256/256 prot=0x40   packed
+[20:25:29.292] image: unpacked after 516 ms -- section rva=0x1000 distinct=233/256 prot=0x20
+[20:25:29.292] image [unpacked]: base=0000000140000000, 10 readable sections
+[20:25:29.293] image [unpacked]:   rva=0x1000     size=16625664  code distinct=233/256 prot=0x20   UNPACKED
+[20:25:29.293] image [unpacked]:   rva=0xfdc000   size=2072576   data distinct=195/256 prot=0x2    
+[20:25:29.293] image [unpacked]:   rva=0x11d6000  size=28758016  data distinct=35/256 prot=0x4    
+[20:25:29.293] image [unpacked]:   rva=0x2d43000  size=745472    data distinct=1/256 prot=0x2    
+[20:25:29.293] image [unpacked]:   rva=0x2df9000  size=4096      data distinct=255/256 prot=0x2    
+[20:25:29.293] image [unpacked]:   rva=0x2dfa000  size=270336    data distinct=1/256 prot=0x2    
+[20:25:29.293] image [unpacked]:   rva=0x2e3c000  size=233472    code distinct=234/256 prot=0x20   UNPACKED
+[20:25:29.294] image [unpacked]:   rva=0x2e75000  size=270336    data distinct=254/256 prot=0x2    
+[20:25:29.294] image [unpacked]:   rva=0x2eb7000  size=13451264  code distinct=85/256 prot=0x40   UNPACKED
+[20:25:29.294] image [unpacked]:   rva=0x3b8b000  size=3952640   code distinct=256/256 prot=0x40   packed
+[20:25:29.294] probe: VirtualProtect OK (target 0000000140001000, old prot 0x20) -- detours should be installable
+[20:25:29.294] kbd: identity CONFIRMED in this process -- vtable+0x30 -> 0x140253220 and the class name reads "sKeyboard".
+[20:25:29.337] kbd: hooked the sKeyboard state builder at 0x140253750. It receives rcx=the instance and rdx=the state bitmap, so the instance pointer arrives as an ARGUMENT -- no memory search.
+[20:25:29.337] mc: identity CONFIRMED in this process -- both cursor helpers carry the expected prologue.
+[20:25:29.436] mc: hooked both menu cursor helpers -- vertical 0x14007cdc0, horizontal 0x14007c9f0. The screen object and the cursor pointer arrive as ARGUMENTS, so there is no memory search.
+[20:25:29.436] gt: identity CONFIRMED -- 0x1402fd6a0 carries the expected prologue and sits in the instance vtable's slot 13.
+[20:25:29.530] gt: hooked the cGUIObjText CONSTRUCTOR at 0x1402efc10. It has exactly ONE caller (the factory 0x1402ef980), so this counts EVERY object of this class that is ever built -- which is what tells a wrong hook target apart from a class the shell never instantiates.
+[20:25:29.719] gt: hooked 4 of 4 setText overloads (cGUIObjText slots 25/26, cGUIObjMessage slots 25/26). Each carries its own counter, so the log will name WHICH one the shell uses.
+[20:25:29.719] gt: ready -- ctor probe live and update hook installed. Detours DEREFERENCE NOTHING beyond a single guarded vptr read; all inspection happens on the worker thread under the fault guard.
+[20:25:29.719] dump: SKIPPED -- image never unpacked. Any dump taken now would be ciphertext that silently looks like a valid file.
+[20:25:29.720] phase 1.3 result: speech=YES protect=YES unpacked=YES sections_dumped=0
+[20:25:29.720] pad: OFF -- cfc2_pad.on is absent. sPad is inert for the shell (Kind=0, update never runs); create that file only for in-game work.
+[20:25:29.821] kbd: ⛔ the builder has not run yet -- no state has been captured, so nothing can be concluded about key state.
+[20:25:29.821] memsafe: fault guard armed (self-test passed)
+[20:25:29.821] gmdfind: excluding own stack 00000000028F0000..0000000002AF0000 and own module 00007FF9635A0000..00007FF9635EB000
+[20:25:31.418] gmdfind: walked 2338 regions; scanned 579 private (1614752 KB) in 1594 ms; 1 candidate(s); guard absorbed 0 fault(s)
+[20:25:31.418] gmdfind:  candidate 0: array_base=000000003B7100A0 form=LIVE_TABLE probes=64/64 geometry=2016/2016 pairs pad=0xcdcdcdcd region=000000003B450000+524288KB
+[20:25:31.426] gmdfind: ⭐ CLOSED LOOP -- followed labelOffset to "STATS_PWS2_06_NAME", re-hashed those bytes, hashes MATCH the entry. This is the GMD label array.
+[20:25:31.436] gmdfind: string blob was NOT at the usual +0x140000 -- found at +0x170000 this run (it moves)
+[20:25:31.436] gmdfind: ⭐⭐ TEXT RESOLVED (live) -- "LANG_NAME_JAPANESE" = "Giapponese [jp]", via a pointer at entry+0x170000. We can READ the shell's messages. (matched shipped variant 3 of 4, a non-English locale)
+[20:25:31.448] gmdtext:   blob at entries+0x170000 is "ita"
+[20:25:31.455] gmdtext:   blob at entries+0x100000 is "fre"
+[20:25:31.540] gmdtext: ⭐ found the "eng" blob by SEARCH at entries+0x220000 (not in the hint list -- add it).
+[20:25:31.541] gmdtext: ⭐⭐ blob resolved at entries+0x220000; 4165 messages readable. Table language: eng (matches config.ini).
+[20:25:31.541] mc: the cursor helpers have not run yet -- nothing can be concluded about menu movement.
+[20:25:31.641] kbd: CAPTURED instance=0000000029088990 state=0000000029088AC8 after 107 builder calls.
+[20:25:31.641] kbd: ⭐⭐ state - instance == 0x138, exactly as the disassembly predicted. The offline model is CONFIRMED in live memory.
+[20:25:31.643] kbd: down=[0x27]  pressed=[(none)]  released=[(none)]  (engine Trg=[(none)])
+[20:25:31.745] kbd: down=[0x25]  pressed=[0x25]  released=[0x27]  (engine Trg=[(none)])
+[20:25:31.848] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:25:33.477] heartbeat 1 (alive 2 s)
+[20:25:33.477] gt: 2 CONSTRUCTED; setText ran 0 time(s), 0 string(s) captured; 0 guarded read(s) faulted.  ⛔ Objects exist but setText NEVER RAN: the class is right and 0x1402f0b50 is not how its text is assigned. Find the other writer.
+[20:25:35.515] heartbeat 2 (alive 4 s)
+[20:25:36.533] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:25:36.635] kbd: down=[0x26 0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[20:25:37.042] kbd: down=[0x25 0x26 0x27]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[20:25:37.145] kbd: down=[0x25 0x27]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:25:37.348] kbd: down=[0x25 0x27 0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:25:37.451] kbd: down=[0x25 0x28]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[20:25:37.552] kbd: down=[0x25]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:25:37.552] heartbeat 3 (alive 6 s)
+[20:25:37.552] kbd: builder ran 462 times; instance=0000000029088990 state=0000000029088AC8 offset=0x138 CONFIRMED
+[20:25:37.552] gt: 2 CONSTRUCTED; setText ran 0 time(s), 0 string(s) captured; 0 guarded read(s) faulted.  ⛔ Objects exist but setText NEVER RAN: the class is right and 0x1402f0b50 is not how its text is assigned. Find the other writer.
+[20:25:37.757] kbd: down=[0x26]  pressed=[0x26]  released=[0x25]  (engine Trg=[(none)])
+[20:25:37.859] kbd: down=[0x25]  pressed=[0x25]  released=[0x26]  (engine Trg=[(none)])
+[20:25:37.962] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:25:38.166] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[20:25:38.268] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:25:38.472] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:25:38.575] kbd: down=[0x25]  pressed=[0x25]  released=[0x28]  (engine Trg=[(none)])
+[20:25:38.779] kbd: down=[0x25 0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:25:38.881] kbd: down=[0x25]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:25:38.983] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:25:39.083] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[20:25:39.288] kbd: down=[0x26 0x27]  pressed=[0x26 0x27]  released=[0x25]  (engine Trg=[(none)])
+[20:25:39.390] kbd: down=[0x25 0x26 0x27]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[20:25:39.492] kbd: down=[0x27]  pressed=[(none)]  released=[0x25 0x26]  (engine Trg=[(none)])
+[20:25:39.697] kbd: down=[0x25 0x27 0x28]  pressed=[0x25 0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:25:39.799] kbd: down=[0x25]  pressed=[(none)]  released=[0x27 0x28]  (engine Trg=[(none)])
+[20:25:40.004] kbd: down=[0x25 0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:25:40.106] kbd: down=[0x25]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:25:40.208] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:25:40.310] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[20:25:40.412] kbd: down=[0x26 0x27]  pressed=[0x26 0x27]  released=[0x25]  (engine Trg=[(none)])
+[20:25:40.514] kbd: down=[0x25 0x26 0x27]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[20:25:40.616] kbd: down=[0x27]  pressed=[(none)]  released=[0x25 0x26]  (engine Trg=[(none)])
+[20:25:40.820] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[20:25:41.634] heartbeat 5 (alive 10 s)
+[20:25:41.634] gt: ⚠ focus recorder INCONCLUSIVE -- 0 string(s) recorded but the cursor hook never notified us (0 movements). Nothing can be concluded about per-row captions.
+[20:25:41.634] gt: === INSTANCE SET: 0 live text object(s), 0 dropped (table full) ===
+[20:25:41.634] gt: of 0 object(s): 0 still LIVE, 0 stale; current move seq 0.
+[20:25:41.634] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[20:25:42.652] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[20:25:42.652] gt: * TEXT SET on 000000002BE011D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[20:25:42.856] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[20:25:43.163] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[0x0d])
+[20:25:43.570] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[20:25:43.672] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[20:25:43.672] gt: 3 CONSTRUCTED; setText ran 62 time(s), 62 string(s) captured; 0 guarded read(s) faulted.
+[20:25:43.672] gt:   by overload: cGUIObjText.25=62 .26=0  cGUIObjMessage.25=0 .26=0
+[20:25:43.775] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[20:25:43.877] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[20:25:44.183] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[20:25:44.284] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[0x0d])
+[20:25:44.489] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[20:25:45.711] gt: 5 CONSTRUCTED; setText ran 185 time(s), 185 string(s) captured; 0 guarded read(s) faulted.
+[20:25:45.711] gt:   by overload: cGUIObjText.25=185 .26=0  cGUIObjMessage.25=0 .26=0
+[20:25:46.423] gt: * TEXT SET on 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:25:46.729] mc: the helpers ARE running (7 calls so far). The hook is live.
+[20:25:47.750] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:25:47.820] gmdtext: blob region: base=000000003B930000 size=519296 KB state=0x1000 protect=0x4 type=0x20000
+[20:25:47.820] gmdtext: ⭐ indexed 4165 string offsets in one pass; blob spans 000000003B9300A0..000000003B94A0A0 (106496 bytes) and is validated ONCE -- per-string reads no longer call VirtualQuery.
+[20:25:47.824] mcspeak: spoke "Online Play, 2 of 6. Play online using a network connection."
+[20:25:47.824] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=0000000140097A59 screen=000000002BE05EE0 cursor=000000002BE06210
+[20:25:47.826] gt: 26 CONSTRUCTED; setText ran 224 time(s), 224 string(s) captured; 0 guarded read(s) faulted.
+[20:25:47.826] gt:   by overload: cGUIObjText.25=224 .26=0  cGUIObjMessage.25=0 .26=0
+[20:25:47.927] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:25:49.149] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[0x26])
+[20:25:49.154] mcspeak: spoke "Offline Play, 1 of 6"
+[20:25:49.154] mc: vertical   cursor 1 -> 0  (item 1 of 6, range 0..5, step -1)  caller=0000000140097A59 screen=000000002BE05EE0 cursor=000000002BE06210
+[20:25:49.358] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:25:49.867] gt: 26 CONSTRUCTED; setText ran 226 time(s), 226 string(s) captured; 0 guarded read(s) faulted.
+[20:25:49.868] gt:   by overload: cGUIObjText.25=226 .26=0  cGUIObjMessage.25=0 .26=0
+[20:25:50.277] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:25:50.282] mcspeak: spoke "Online Play, 2 of 6"
+[20:25:50.283] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=0000000140097A59 screen=000000002BE05EE0 cursor=000000002BE06210
+[20:25:50.385] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:25:50.487] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[0x0d])
+[20:25:50.692] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[20:25:51.811] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:25:51.817] mcspeak: spoke "Ranked Match, 2 of 6. Test your skills in a competitive match. The results will affect your rank."
+[20:25:51.817] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=000000014009BA21 screen=000000002BE07380 cursor=000000002BE076B0
+[20:25:51.918] heartbeat 10 (alive 20 s)
+[20:25:51.918] kbd: builder ran 1324 times; instance=0000000029088990 state=0000000029088AC8 offset=0x138 CONFIRMED
+[20:25:51.918] gt: 43 CONSTRUCTED; setText ran 239 time(s), 239 string(s) captured; 0 guarded read(s) faulted.
+[20:25:51.918] gt:   by overload: cGUIObjText.25=239 .26=0  cGUIObjMessage.25=0 .26=0
+[20:25:51.919] gt: === FOCUS RECORD: 29 distinct string(s) across 4 cursor movement(s), 0 dropped (buffer full) ===
+[20:25:51.919] gt:   [move 0] strip 000000002BE011D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[20:25:51.919] gt:   [move 0] PROSE 000000002BE1D490: "Now loading..."
+[20:25:51.919] gt:   [move 0] strip 000000002BE011D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[20:25:51.919] gt:   [move 0] strip 000000002C231580: "<FONT 2>Main Menu</FONT>"
+[20:25:51.919] gt:   [move 0] PROSE 000000002BDB6BB0: "Offline Play"
+[20:25:51.919] gt:   [move 0] PROSE 000000002BE28BF0: "Online Play"
+[20:25:51.920] gt:   [move 0] PROSE 000000002BE021B0: "Museum"
+[20:25:51.920] gt:   [move 0] PROSE 000000002BDEC2E0: "Fighter Awards"
+[20:25:51.920] gt:   [move 0] PROSE 000000002BE1EE20: "Options"
+[20:25:51.920] gt:   [move 0] PROSE 000000002BDCBB10: "Quit"
+[20:25:51.920] gt:   [move 0] PROSE 000000002C2B1140: "Play offline."
+[20:25:51.920] gt:   [move 0] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:25:51.920] gt:   [move 1] PROSE 000000002C2B1140: "Play online using a network connection."
+[20:25:51.920] gt:   [move 1] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:25:51.920] gt:   [move 2] PROSE 000000002C2B1140: "Play offline."
+[20:25:51.920] gt:   [move 2] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:25:51.921] gt:   [move 3] PROSE 000000002C2B1140: "Play online using a network connection."
+[20:25:51.921] gt:   [move 3] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:25:51.921] gt:   [move 3] PROSE 000000002BDC53B0: "Online Play"
+[20:25:51.921] gt:   [move 3] PROSE 000000002C232A30: "Casual Match"
+[20:25:51.921] gt:   [move 3] PROSE 000000002BDB70D0: "Ranked Match"
+[20:25:51.921] gt:   [move 3] PROSE 000000002BE28A80: "Custom Match"
+[20:25:51.921] gt:   [move 3] PROSE 000000002BE07CA0: "Ranked Leaderboard"
+[20:25:51.921] gt:   [move 3] PROSE 000000002BDE9FD0: "High Score Challenge"
+[20:25:51.921] gt:   [move 3] PROSE 000000002C2B22A0: "High Score Challenge Leaderboard"
+[20:25:51.922] gt:   [move 3] PROSE 000000002C2B1140: "Play a friendly match against other players."
+[20:25:51.922] gt:   [move 3] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:25:51.922] gt:   [move 4] PROSE 000000002C2B1140: "Test your skills in a competitive match. The results will affect your rank."
+[20:25:51.922] gt:   [move 4] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:25:51.922] gt: of 29 string(s): 17 arrived after a cursor movement, 20 were prose captions.
+[20:25:51.922] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[20:25:51.922] gt: === INSTANCE SET: 18 live text object(s), 0 dropped (table full) ===
+[20:25:51.923] gt:   000000002BE011D0 STALE [move 0, 212 set(s)] "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[20:25:51.923] gt:   000000002BE1D490 STALE [move 0, 1 set(s)] "Now loading..."
+[20:25:51.923] gt:   000000002C231580 STALE [move 0, 1 set(s)] "<FONT 2>Main Menu</FONT>"
+[20:25:51.923] gt:   000000002BDB6BB0 STALE [move 0, 1 set(s)] "Offline Play"
+[20:25:51.924] gt:   000000002BE28BF0 STALE [move 0, 1 set(s)] "Online Play"
+[20:25:51.924] gt:   000000002BE021B0 STALE [move 0, 1 set(s)] "Museum"
+[20:25:51.924] gt:   000000002BDEC2E0 STALE [move 0, 1 set(s)] "Fighter Awards"
+[20:25:51.924] gt:   000000002BE1EE20 STALE [move 0, 1 set(s)] "Options"
+[20:25:51.924] gt:   000000002BDCBB10 STALE [move 0, 1 set(s)] "Quit"
+[20:25:51.924] gt:   000000002C2B1140 LIVE  [move 4, 6 set(s)] "Test your skills in a competitive match. The results will affect your "
+[20:25:51.924] gt:   000000002BE2D700 LIVE  [move 4, 6 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:25:51.926] gt:   000000002BDC53B0 LIVE  [move 3, 1 set(s)] "Online Play"
+[20:25:51.926] gt:   000000002C232A30 LIVE  [move 3, 1 set(s)] "Casual Match"
+[20:25:51.926] gt:   000000002BDB70D0 LIVE  [move 3, 1 set(s)] "Ranked Match"
+[20:25:51.926] gt:   000000002BE28A80 LIVE  [move 3, 1 set(s)] "Custom Match"
+[20:25:51.926] gt:   000000002BE07CA0 LIVE  [move 3, 1 set(s)] "Ranked Leaderboard"
+[20:25:51.927] gt:   000000002BDE9FD0 LIVE  [move 3, 1 set(s)] "High Score Challenge"
+[20:25:51.927] gt:   000000002C2B22A0 LIVE  [move 3, 1 set(s)] "High Score Challenge Leaderboard"
+[20:25:51.927] gt: of 18 object(s): 9 still LIVE, 9 stale; current move seq 4.
+[20:25:51.927] gt: ⭐ reclaimed 9 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[20:25:51.927] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[20:25:52.030] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:25:53.964] gt: 43 CONSTRUCTED; setText ran 239 time(s), 239 string(s) captured; 0 guarded read(s) faulted.
+[20:25:53.964] gt:   by overload: cGUIObjText.25=239 .26=0  cGUIObjMessage.25=0 .26=0
+[20:25:54.577] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:25:54.582] mcspeak: spoke "Casual Match, 1 of 6. Play a friendly match against other players."
+[20:25:54.583] mc: vertical   cursor 1 -> 0  (item 1 of 6, range 0..5, step -1)  caller=000000014009BA21 screen=000000002BE07380 cursor=000000002BE076B0
+[20:25:54.685] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:25:55.704] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[20:25:55.805] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[20:25:56.008] gt: * TEXT SET on 000000002C2CABC0: "Plasma Sword"
+[20:25:56.008] gt: 117 CONSTRUCTED; setText ran 275 time(s), 275 string(s) captured; 0 guarded read(s) faulted.
+[20:25:56.008] gt:   by overload: cGUIObjText.25=275 .26=0  cGUIObjMessage.25=0 .26=0
+[20:25:56.213] mcspeak: [DISCOVERY] unknown screen -- caller=0x140098986  items=8  axis=horizontal  (screen=000000002BDBC7C0).
+[20:25:56.213] mcspeak: [DISCOVERY] candidate sweep is OFF (create cfc2_discover.on next to the exe to enable it). Unknown screens are still logged; naming is better served by the caption channel -- see tools/name_screens.py.
+[20:25:57.027] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:25:57.028] mcspeak: spoke "2 of 3"
+[20:25:57.028] mcspeak: [DISCOVERY] unknown screen -- caller=0x14009885e  items=3  axis=vertical  (screen=000000002BDBC7C0).
+[20:25:57.028] mc: vertical   cursor 0 -> 1  (item 2 of 3, range 0..2, step +1)  caller=000000014009885E screen=000000002BDBC7C0 cursor=0000000006DAFC50
+[20:25:57.232] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:25:57.537] gt: * TEXT SET on 000000002C2AFB10: "Capcom Fighting Evolution"
+[20:25:57.639] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:25:57.639] mcspeak: spoke "1 of 3"
+[20:25:57.639] mcspeak: [DISCOVERY] unknown screen -- caller=0x1400988bf  items=3  axis=vertical  (screen=000000002BDBC7C0).
+[20:25:57.640] mc: vertical   cursor 1 -> 0  (item 1 of 3, range 0..2, step -1)  caller=00000001400988BF screen=000000002BDBC7C0 cursor=0000000006DAFC50
+[20:25:57.640] gt: * TEXT SET on 000000002C2CABC0: "Plasma Sword"
+[20:25:57.742] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:25:58.048] gt: 117 CONSTRUCTED; setText ran 1268 time(s), 1268 string(s) captured; 0 guarded read(s) faulted.
+[20:25:58.048] gt:   by overload: cGUIObjText.25=1268 .26=0  cGUIObjMessage.25=0 .26=0
+[20:25:58.150] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[20:25:58.151] mcspeak: spoke "2 of 8"
+[20:25:58.151] mc: horizontal cursor 0 -> 1  (item 2 of 8, range 0..7, step +1)  caller=0000000140098986 screen=000000002BDBC7C0 cursor=000000002BDBCB04
+[20:25:58.253] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[20:25:58.763] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[20:25:58.764] mcspeak: spoke "1 of 8"
+[20:25:58.764] mc: horizontal cursor 1 -> 0  (item 1 of 8, range 0..7, step -1)  caller=0000000140098986 screen=000000002BDBC7C0 cursor=000000002BDBCB04
+[20:25:58.865] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:25:59.171] gt: * TEXT SET on 000000002BDF9B70: "Power Stone"
+[20:25:59.273] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:25:59.273] mcspeak: spoke "2 of 3"
+[20:25:59.273] mc: vertical   cursor 0 -> 1  (item 2 of 3, range 0..2, step +1)  caller=000000014009885E screen=000000002BDBC7C0 cursor=0000000006DAFC50
+[20:25:59.274] gt: * TEXT SET on 000000002C2F6420: "Power Stone 2"
+[20:25:59.375] gt: * TEXT SET on 000000002C2CABC0: "Plasma Sword"
+[20:25:59.477] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:25:59.681] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[20:25:59.681] mcspeak: spoke "3 of 3"
+[20:25:59.681] mc: vertical   cursor 1 -> 2  (item 3 of 3, range 0..2, step +1)  caller=00000001400988BF screen=000000002BDBC7C0 cursor=0000000006DAFC50
+[20:25:59.885] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:25:59.988] gt: * TEXT SET on 000000002C2F6420: "Power Stone 2"
+[20:26:00.089] gt: * TEXT SET on 000000002C2D9640: "Project Justice"
+[20:26:00.089] gt: 117 CONSTRUCTED; setText ran 2266 time(s), 2266 string(s) captured; 0 guarded read(s) faulted.
+[20:26:00.089] gt:   by overload: cGUIObjText.25=2266 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:00.192] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[0x27])
+[20:26:00.193] mcspeak: spoke "1 of 3"
+[20:26:00.193] mc: horizontal cursor 2 -> 0  (item 1 of 3, range 0..2, step +1)  caller=0000000140098986 screen=000000002BDBC7C0 cursor=000000002BDBCB08
+[20:26:00.193] gt: * TEXT SET on 000000002C2CABC0: "Star Gladiator 2"
+[20:26:00.295] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[20:26:00.601] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[20:26:00.602] mcspeak: spoke "3 of 3"
+[20:26:00.602] mc: horizontal cursor 0 -> 2  (item 3 of 3, range 0..2, step -1)  caller=0000000140098986 screen=000000002BDBC7C0 cursor=000000002BDBCB08
+[20:26:00.602] gt: * TEXT SET on 000000002C2CABC0: "Plasma Sword"
+[20:26:00.704] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:26:00.908] gt: * TEXT SET on 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:01.010] gt: * TEXT SET on 000000002C2CABC0: "Plasma Sword"
+[20:26:01.620] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:26:01.621] mcspeak: spoke "1 of 4"
+[20:26:01.621] mcspeak: [DISCOVERY] unknown screen -- caller=0x14009890d  items=4  axis=vertical  (screen=000000002BDBC7C0).
+[20:26:01.621] mc: vertical   cursor 1 -> 0  (item 1 of 4, range 0..3, step -1)  caller=000000014009890D screen=000000002BDBC7C0 cursor=000000002BDBCAF4
+[20:26:01.621] gt: * TEXT SET on 000000002C2D9640: "Project Justice"
+[20:26:01.723] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:26:01.723] gt: * TEXT SET on 000000002C2CABC0: "Plasma Sword"
+[20:26:02.131] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[20:26:02.132] mcspeak: spoke "6 of 8"
+[20:26:02.132] mc: horizontal cursor 4 -> 5  (item 6 of 8, range 0..7, step +1)  caller=0000000140098986 screen=000000002BDBC7C0 cursor=000000002BDBCB04
+[20:26:02.132] heartbeat 15 (alive 30 s)
+[20:26:02.132] gt: 117 CONSTRUCTED; setText ran 3256 time(s), 3256 string(s) captured; 0 guarded read(s) faulted.
+[20:26:02.132] gt:   by overload: cGUIObjText.25=3256 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:02.133] gt: === FOCUS RECORD: 48 distinct string(s) across 15 cursor movement(s), 2623 dropped (buffer full) ===
+[20:26:02.133] gt:   [move 5] PROSE 000000002C2B1140: "Play a friendly match against other players."
+[20:26:02.133] gt:   [move 5] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:02.133] gt:   [move 5] PROSE 000000002C23D1D0: "Casual Match"
+[20:26:02.133] gt:   [move 5] PROSE 000000002C2C76C0: "Game"
+[20:26:02.133] gt:   [move 5] PROSE 000000002C2ADC60: "Game Version"
+[20:26:02.133] gt:   [move 5] PROSE 000000002C2BDB60: "Cross-region Matchmaking"
+[20:26:02.133] gt:   [move 5] PROSE 000000002C2C8630: "One-button Special Moves"
+[20:26:02.134] gt:   [move 5] PROSE 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:02.134] gt:   [move 5] PROSE 000000002C2BE9D0: "Capcom Vs. SNK 2"
+[20:26:02.134] gt:   [move 5] PROSE 000000002C2AFB10: "Capcom Fighting Evolution"
+[20:26:02.134] gt:   [move 5] PROSE 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:02.134] gt:   [move 5] PROSE 000000002BDF9B70: "Power Stone"
+[20:26:02.134] gt:   [move 5] PROSE 000000002C2F6420: "Power Stone 2"
+[20:26:02.134] gt:   [move 5] PROSE 000000002C2D9640: "Project Justice"
+[20:26:02.134] gt:   [move 5] PROSE 000000002C2CABC0: "Plasma Sword"
+[20:26:02.134] gt:   [move 5] PROSE 000000002C2BD500: "Either"
+[20:26:02.134] gt:   [move 5] PROSE 000000002C2C7FD0: "Off"
+[20:26:02.135] gt:   [move 5] PROSE 000000002C2D7870: "On"
+[20:26:02.135] gt:   [move 5] PROSE 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:02.135] gt:   [move 5] PROSE 000000002C2BE9D0: "Capcom Vs. SNK 2"
+[20:26:02.135] gt:   [move 5] PROSE 000000002C2AFB10: "Capcom Fighting Evolution"
+[20:26:02.135] gt:   [move 5] PROSE 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:02.135] gt:   [move 5] PROSE 000000002BDF9B70: "Power Stone"
+[20:26:02.135] gt:   [move 5] PROSE 000000002C2F6420: "Power Stone 2"
+[20:26:02.135] gt:   [move 5] PROSE 000000002C2D9640: "Project Justice"
+[20:26:02.136] gt:   [move 5] PROSE 000000002C2CABC0: "Plasma Sword"
+[20:26:02.136] gt:   [move 5] PROSE 000000002C2B1140: "Choose one or more games to play."
+[20:26:02.136] gt:   [move 5] strip 000000002BE2D700: "<SIZE 58><ICON BTN_X></SIZE>Check Rules <SIZE 58><ICON BTN_Y></SIZE>Select Game <SIZE 58><"
+[20:26:02.136] gt:   [move 5] PROSE 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:02.136] gt:   [move 5] PROSE 000000002C2BE9D0: "Capcom Vs. SNK 2"
+[20:26:02.136] gt:   [move 5] PROSE 000000002C2AFB10: "Capcom Fighting Evolution"
+[20:26:02.136] gt:   [move 5] PROSE 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:02.136] gt:   [move 5] PROSE 000000002BDF9B70: "Power Stone"
+[20:26:02.136] gt:   [move 5] PROSE 000000002C2F6420: "Power Stone 2"
+[20:26:02.136] gt:   [move 5] PROSE 000000002C2D9640: "Project Justice"
+[20:26:02.136] gt:   [move 5] PROSE 000000002C2CABC0: "Plasma Sword"
+[20:26:02.137] gt:   [move 5] PROSE 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:02.137] gt:   [move 5] PROSE 000000002C2BE9D0: "Capcom Vs. SNK 2"
+[20:26:02.137] gt:   [move 5] PROSE 000000002C2AFB10: "Capcom Fighting Evolution"
+[20:26:02.137] gt:   [move 5] PROSE 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:02.138] gt:   [move 5] PROSE 000000002BDF9B70: "Power Stone"
+[20:26:02.138] gt:   [move 5] PROSE 000000002C2F6420: "Power Stone 2"
+[20:26:02.138] gt:   [move 5] PROSE 000000002C2D9640: "Project Justice"
+[20:26:02.138] gt:   [move 5] PROSE 000000002C2CABC0: "Plasma Sword"
+[20:26:02.138] gt:   [move 5] PROSE 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:02.138] gt:   [move 5] PROSE 000000002C2BE9D0: "Capcom Vs. SNK 2"
+[20:26:02.138] gt:   [move 5] PROSE 000000002C2AFB10: "Capcom Fighting Evolution"
+[20:26:02.138] gt:   [move 5] PROSE 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:02.138] gt: of 48 string(s): 48 arrived after a cursor movement, 46 were prose captions.
+[20:26:02.138] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[20:26:02.138] gt: === INSTANCE SET: 34 live text object(s), 0 dropped (table full) ===
+[20:26:02.138] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:02.139] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:02.139] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:02.139] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:02.139] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:02.140] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:02.140] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:02.140] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:02.140] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:02.140] gt:   000000002C2B1140 LIVE  [move 14, 10 set(s)] "Choose one or more games to play."
+[20:26:02.140] gt:   000000002BE2D700 LIVE  [move 14, 10 set(s)] "<SIZE 58><ICON BTN_X></SIZE>Check Rules <SIZE 58><ICON BTN_Y></SIZE>Se"
+[20:26:02.140] gt:   000000002BDC53B0 LIVE  [move 3, 1 set(s)] "Online Play"
+[20:26:02.140] gt:   000000002C232A30 LIVE  [move 3, 1 set(s)] "Casual Match"
+[20:26:02.140] gt:   000000002BDB70D0 LIVE  [move 3, 1 set(s)] "Ranked Match"
+[20:26:02.141] gt:   000000002BE28A80 LIVE  [move 3, 1 set(s)] "Custom Match"
+[20:26:02.141] gt:   000000002BE07CA0 LIVE  [move 3, 1 set(s)] "Ranked Leaderboard"
+[20:26:02.141] gt:   000000002BDE9FD0 LIVE  [move 3, 1 set(s)] "High Score Challenge"
+[20:26:02.141] gt:   000000002C2B22A0 LIVE  [move 3, 1 set(s)] "High Score Challenge Leaderboard"
+[20:26:02.142] gt:   000000002C23D1D0 LIVE  [move 5, 1 set(s)] "Casual Match"
+[20:26:02.142] gt:   000000002C2C76C0 LIVE  [move 5, 1 set(s)] "Game"
+[20:26:02.142] gt:   000000002C2ADC60 LIVE  [move 5, 1 set(s)] "Game Version"
+[20:26:02.142] gt:   000000002C2BDB60 LIVE  [move 5, 1 set(s)] "Cross-region Matchmaking"
+[20:26:02.142] gt:   000000002C2C8630 LIVE  [move 5, 1 set(s)] "One-button Special Moves"
+[20:26:02.142] gt:   000000002C2C8C60 LIVE  [move 15, 372 set(s)] "Capcom Vs. SNK Pro"
+[20:26:02.143] gt:   000000002C2BE9D0 LIVE  [move 15, 372 set(s)] "Capcom Vs. SNK 2"
+[20:26:02.143] gt:   000000002C2AFB10 LIVE  [move 15, 372 set(s)] "Capcom Fighting Evolution"
+[20:26:02.143] gt:   000000002C2E8E80 LIVE  [move 15, 372 set(s)] "Street Fighter Alpha 3 Upper"
+[20:26:02.143] gt:   000000002BDF9B70 LIVE  [move 15, 372 set(s)] "Power Stone"
+[20:26:02.143] gt:   000000002C2F6420 LIVE  [move 15, 371 set(s)] "Power Stone 2"
+[20:26:02.144] gt:   000000002C2D9640 LIVE  [move 15, 371 set(s)] "Project Justice"
+[20:26:02.144] gt:   000000002C2CABC0 LIVE  [move 15, 371 set(s)] "Plasma Sword"
+[20:26:02.144] gt:   000000002C2BD500 LIVE  [move 15, 12 set(s)] "Either"
+[20:26:02.144] gt:   000000002C2C7FD0 LIVE  [move 15, 12 set(s)] "Off"
+[20:26:02.144] gt:   000000002C2D7870 LIVE  [move 15, 12 set(s)] "On"
+[20:26:02.144] gt: of 34 object(s): 25 still LIVE, 9 stale; current move seq 15.
+[20:26:02.145] gt: ⭐ reclaimed 9 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[20:26:02.145] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[20:26:02.246] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[20:26:02.655] gt: * TEXT SET on 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:02.758] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[20:26:02.758] mcspeak: spoke "5 of 8"
+[20:26:02.758] mc: horizontal cursor 5 -> 4  (item 5 of 8, range 0..7, step -1)  caller=0000000140098986 screen=000000002BDBC7C0 cursor=000000002BDBCB04
+[20:26:02.759] gt: * TEXT SET on 000000002C2CABC0: "Plasma Sword"
+[20:26:02.860] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:26:03.371] gt: * TEXT SET on 000000002C2D9640: "Project Justice"
+[20:26:03.472] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:03.473] mcspeak: spoke "3 of 3"
+[20:26:03.473] mc: vertical   cursor 1 -> 2  (item 3 of 3, range 0..2, step +1)  caller=00000001400988BF screen=000000002BDBC7C0 cursor=0000000006DAFC50
+[20:26:03.473] gt: * TEXT SET on 000000002C2CABC0: "Plasma Sword"
+[20:26:03.677] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:03.982] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:03.982] mcspeak: spoke "3 of 4"
+[20:26:03.983] mc: vertical   cursor 1 -> 2  (item 3 of 4, range 0..3, step +1)  caller=000000014009890D screen=000000002BDBC7C0 cursor=000000002BDBCAF4
+[20:26:04.186] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:04.187] gt: 117 CONSTRUCTED; setText ran 4253 time(s), 4253 string(s) captured; 0 guarded read(s) faulted.
+[20:26:04.187] gt:   by overload: cGUIObjText.25=4253 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:04.593] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[20:26:04.593] mcspeak: spoke "4 of 4"
+[20:26:04.594] mc: vertical   cursor 2 -> 3  (item 4 of 4, range 0..3, step +1)  caller=000000014009890D screen=000000002BDBC7C0 cursor=000000002BDBCAF4
+[20:26:04.796] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:05.103] gt: * TEXT SET on 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:05.205] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:05.205] mcspeak: spoke "1 of 4"
+[20:26:05.205] mc: vertical   cursor 3 -> 0  (item 1 of 4, range 0..3, step +1)  caller=000000014009890D screen=000000002BDBC7C0 cursor=000000002BDBCAF4
+[20:26:05.206] gt: * TEXT SET on 000000002C2CABC0: "Plasma Sword"
+[20:26:05.410] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:05.919] gt: * TEXT SET on 000000002C2F6420: "Power Stone 2"
+[20:26:06.022] gt: * TEXT SET on 000000002C2CABC0: "Plasma Sword"
+[20:26:06.123] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[20:26:06.123] mcspeak: spoke "2 of 3"
+[20:26:06.123] mc: vertical   cursor 0 -> 1  (item 2 of 3, range 0..2, step +1)  caller=000000014009885E screen=000000002BDBC7C0 cursor=0000000006DAFC50
+[20:26:06.226] gt: 117 CONSTRUCTED; setText ran 5242 time(s), 5242 string(s) captured; 0 guarded read(s) faulted.
+[20:26:06.226] gt:   by overload: cGUIObjText.25=5242 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:06.328] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:06.634] gt: * TEXT SET on 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:06.736] kbd: down=[0x1b]  pressed=[0x1b]  released=[(none)]  (engine Trg=[(none)])
+[20:26:06.736] gt: * TEXT SET on 000000002C2CABC0: "Plasma Sword"
+[20:26:06.940] kbd: down=[(none)]  pressed=[(none)]  released=[0x1b]  (engine Trg=[(none)])
+[20:26:06.940] gt: * TEXT SET on 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:07.756] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:07.760] mcspeak: spoke "Ranked Match, 2 of 6"
+[20:26:07.760] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=000000014009BA21 screen=000000002BE07380 cursor=000000002BE076B0
+[20:26:07.863] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:08.270] gt: 117 CONSTRUCTED; setText ran 5478 time(s), 5478 string(s) captured; 0 guarded read(s) faulted.
+[20:26:08.270] gt:   by overload: cGUIObjText.25=5478 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:08.372] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[20:26:08.474] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[20:26:08.779] gt: * TEXT SET on 000000002C310F60: "Plasma Sword"
+[20:26:09.392] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[20:26:09.392] mcspeak: spoke "2 of 3"
+[20:26:09.393] mc: vertical   cursor 0 -> 1  (item 2 of 3, range 0..2, step +1)  caller=000000014009885E screen=000000002BDEBC80 cursor=0000000006DAFC50
+[20:26:09.596] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:10.004] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:10.004] mcspeak: spoke "3 of 3"
+[20:26:10.005] mc: vertical   cursor 1 -> 2  (item 3 of 3, range 0..2, step +1)  caller=00000001400988BF screen=000000002BDEBC80 cursor=0000000006DAFC50
+[20:26:10.107] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:10.108] gt: * TEXT SET on 000000002C2F73F0: "Power Stone"
+[20:26:10.210] gt: * TEXT SET on 000000002C310F60: "Plasma Sword"
+[20:26:10.313] gt: 191 CONSTRUCTED; setText ran 6299 time(s), 6299 string(s) captured; 0 guarded read(s) faulted.
+[20:26:10.313] gt:   by overload: cGUIObjText.25=6299 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:10.415] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:26:10.415] mcspeak: spoke "1 of 3"
+[20:26:10.415] mc: vertical   cursor 1 -> 0  (item 1 of 3, range 0..2, step -1)  caller=000000014009890D screen=000000002BDEBC80 cursor=000000002BDEBFB4
+[20:26:10.621] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:26:10.723] gt: * TEXT SET on 000000002C2D7D10: "Capcom Fighting Evolution"
+[20:26:10.825] gt: * TEXT SET on 000000002C310F60: "Plasma Sword"
+[20:26:10.927] kbd: down=[0x1b]  pressed=[0x1b]  released=[(none)]  (engine Trg=[(none)])
+[20:26:11.029] kbd: down=[(none)]  pressed=[(none)]  released=[0x1b]  (engine Trg=[(none)])
+[20:26:11.131] gt: * TEXT SET on 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:11.539] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:11.544] mcspeak: spoke "Custom Match, 3 of 6"
+[20:26:11.544] mc: vertical   cursor 1 -> 2  (item 3 of 6, range 0..5, step +1)  caller=000000014009BA21 screen=000000002BE07380 cursor=000000002BE076B0
+[20:26:11.646] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:12.360] heartbeat 20 (alive 40 s)
+[20:26:12.360] gt: 191 CONSTRUCTED; setText ran 6572 time(s), 6572 string(s) captured; 0 guarded read(s) faulted.
+[20:26:12.360] gt:   by overload: cGUIObjText.25=6572 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:12.361] gt: === FOCUS RECORD: 48 distinct string(s) across 26 cursor movement(s), 5486 dropped (buffer full) ===
+[20:26:12.361] gt:   [move 15] PROSE 000000002C2F6420: "Power Stone 2"
+[20:26:12.361] gt:   [move 15] PROSE 000000002C2D9640: "Project Justice"
+[20:26:12.361] gt:   [move 15] PROSE 000000002C2CABC0: "Plasma Sword"
+[20:26:12.361] gt:   [move 15] PROSE 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:12.361] gt:   [move 15] PROSE 000000002C2BE9D0: "Capcom Vs. SNK 2"
+[20:26:12.362] gt:   [move 15] PROSE 000000002C2AFB10: "Capcom Fighting Evolution"
+[20:26:12.362] gt:   [move 15] PROSE 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:12.362] gt:   [move 15] PROSE 000000002BDF9B70: "Power Stone"
+[20:26:12.362] gt:   [move 15] PROSE 000000002C2F6420: "Power Stone 2"
+[20:26:12.362] gt:   [move 15] PROSE 000000002C2D9640: "Project Justice"
+[20:26:12.362] gt:   [move 15] PROSE 000000002C2CABC0: "Plasma Sword"
+[20:26:12.362] gt:   [move 15] PROSE 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:12.362] gt:   [move 15] PROSE 000000002C2BE9D0: "Capcom Vs. SNK 2"
+[20:26:12.363] gt:   [move 15] PROSE 000000002C2AFB10: "Capcom Fighting Evolution"
+[20:26:12.363] gt:   [move 15] PROSE 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:12.363] gt:   [move 15] PROSE 000000002BDF9B70: "Power Stone"
+[20:26:12.364] gt:   [move 15] PROSE 000000002C2F6420: "Power Stone 2"
+[20:26:12.364] gt:   [move 15] PROSE 000000002C2D9640: "Project Justice"
+[20:26:12.364] gt:   [move 15] PROSE 000000002C2CABC0: "Plasma Sword"
+[20:26:12.364] gt:   [move 15] PROSE 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:12.364] gt:   [move 15] PROSE 000000002C2BE9D0: "Capcom Vs. SNK 2"
+[20:26:12.365] gt:   [move 15] PROSE 000000002C2AFB10: "Capcom Fighting Evolution"
+[20:26:12.365] gt:   [move 15] PROSE 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:12.365] gt:   [move 15] PROSE 000000002BDF9B70: "Power Stone"
+[20:26:12.365] gt:   [move 15] PROSE 000000002C2F6420: "Power Stone 2"
+[20:26:12.365] gt:   [move 15] PROSE 000000002C2D9640: "Project Justice"
+[20:26:12.365] gt:   [move 15] PROSE 000000002C2CABC0: "Plasma Sword"
+[20:26:12.365] gt:   [move 15] PROSE 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:12.365] gt:   [move 15] PROSE 000000002C2BE9D0: "Capcom Vs. SNK 2"
+[20:26:12.366] gt:   [move 15] PROSE 000000002C2AFB10: "Capcom Fighting Evolution"
+[20:26:12.366] gt:   [move 15] PROSE 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:12.366] gt:   [move 15] PROSE 000000002BDF9B70: "Power Stone"
+[20:26:12.366] gt:   [move 15] PROSE 000000002C2F6420: "Power Stone 2"
+[20:26:12.366] gt:   [move 15] PROSE 000000002C2D9640: "Project Justice"
+[20:26:12.366] gt:   [move 15] PROSE 000000002C2CABC0: "Plasma Sword"
+[20:26:12.366] gt:   [move 15] PROSE 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:12.366] gt:   [move 15] PROSE 000000002C2BE9D0: "Capcom Vs. SNK 2"
+[20:26:12.366] gt:   [move 15] PROSE 000000002C2AFB10: "Capcom Fighting Evolution"
+[20:26:12.366] gt:   [move 15] PROSE 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:12.367] gt:   [move 15] PROSE 000000002BDF9B70: "Power Stone"
+[20:26:12.367] gt:   [move 15] PROSE 000000002C2F6420: "Power Stone 2"
+[20:26:12.367] gt:   [move 15] PROSE 000000002C2D9640: "Project Justice"
+[20:26:12.367] gt:   [move 15] PROSE 000000002C2CABC0: "Plasma Sword"
+[20:26:12.367] gt:   [move 15] PROSE 000000002C2C8C60: "Capcom Vs. SNK Pro"
+[20:26:12.367] gt:   [move 15] PROSE 000000002C2BE9D0: "Capcom Vs. SNK 2"
+[20:26:12.367] gt:   [move 15] PROSE 000000002C2AFB10: "Capcom Fighting Evolution"
+[20:26:12.367] gt:   [move 15] PROSE 000000002C2E8E80: "Street Fighter Alpha 3 Upper"
+[20:26:12.367] gt:   [move 15] PROSE 000000002BDF9B70: "Power Stone"
+[20:26:12.368] gt: of 48 string(s): 48 arrived after a cursor movement, 48 were prose captions.
+[20:26:12.368] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[20:26:12.368] gt: === INSTANCE SET: 50 live text object(s), 0 dropped (table full) ===
+[20:26:12.368] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:12.368] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:12.368] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:12.368] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:12.368] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:12.368] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:12.368] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:12.368] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:12.369] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:12.369] gt:   000000002C2B1140 LIVE  [move 26, 21 set(s)] "Create your own lobby with your own game rules and battle other player"
+[20:26:12.369] gt:   000000002BE2D700 LIVE  [move 26, 21 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:12.370] gt:   000000002BDC53B0 LIVE  [move 3, 1 set(s)] "Online Play"
+[20:26:12.370] gt:   000000002C232A30 LIVE  [move 3, 1 set(s)] "Casual Match"
+[20:26:12.370] gt:   000000002BDB70D0 LIVE  [move 3, 1 set(s)] "Ranked Match"
+[20:26:12.370] gt:   000000002BE28A80 LIVE  [move 3, 1 set(s)] "Custom Match"
+[20:26:12.371] gt:   000000002BE07CA0 LIVE  [move 3, 1 set(s)] "Ranked Leaderboard"
+[20:26:12.371] gt:   000000002BDE9FD0 LIVE  [move 3, 1 set(s)] "High Score Challenge"
+[20:26:12.371] gt:   000000002C2B22A0 LIVE  [move 3, 1 set(s)] "High Score Challenge Leaderboard"
+[20:26:12.371] gt:   000000002C23D1D0 STALE [move 5, 1 set(s)] "Casual Match"
+[20:26:12.371] gt:   000000002C2C76C0 STALE [move 5, 1 set(s)] "Game"
+[20:26:12.371] gt:   000000002C2ADC60 STALE [move 5, 1 set(s)] "Game Version"
+[20:26:12.372] gt:   000000002C2BDB60 STALE [move 5, 1 set(s)] "Cross-region Matchmaking"
+[20:26:12.372] gt:   000000002C2C8630 STALE [move 5, 1 set(s)] "One-button Special Moves"
+[20:26:12.372] gt:   000000002C2C8C60 STALE [move 21, 645 set(s)] "Capcom Vs. SNK Pro"
+[20:26:12.372] gt:   000000002C2BE9D0 STALE [move 21, 645 set(s)] "Capcom Vs. SNK 2"
+[20:26:12.372] gt:   000000002C2AFB10 STALE [move 21, 645 set(s)] "Capcom Fighting Evolution"
+[20:26:12.372] gt:   000000002C2E8E80 STALE [move 21, 645 set(s)] "Street Fighter Alpha 3 Upper"
+[20:26:12.373] gt:   000000002BDF9B70 STALE [move 21, 645 set(s)] "Power Stone"
+[20:26:12.373] gt:   000000002C2F6420 STALE [move 21, 644 set(s)] "Power Stone 2"
+[20:26:12.373] gt:   000000002C2D9640 STALE [move 21, 644 set(s)] "Project Justice"
+[20:26:12.373] gt:   000000002C2CABC0 STALE [move 21, 644 set(s)] "Plasma Sword"
+[20:26:12.374] gt:   000000002C2BD500 STALE [move 21, 18 set(s)] "Either"
+[20:26:12.374] gt:   000000002C2C7FD0 STALE [move 21, 18 set(s)] "Off"
+[20:26:12.374] gt:   000000002C2D7870 STALE [move 21, 18 set(s)] "On"
+[20:26:12.374] gt:   000000002BE0EB10 STALE [move 22, 1 set(s)] "Ranked Match"
+[20:26:12.374] gt:   000000002C2BD950 STALE [move 22, 1 set(s)] "Game"
+[20:26:12.375] gt:   000000002C2D5E60 STALE [move 22, 1 set(s)] "Game Version"
+[20:26:12.375] gt:   000000002C2AE340 STALE [move 22, 1 set(s)] "Cross-region Matchmaking"
+[20:26:12.375] gt:   000000002C2BE8C0 STALE [move 22, 1 set(s)] "One-button Special Moves"
+[20:26:12.375] gt:   000000002C2BEEF0 STALE [move 25, 133 set(s)] "Capcom Vs. SNK Pro"
+[20:26:12.375] gt:   000000002C2AF1B0 STALE [move 25, 133 set(s)] "Capcom Vs. SNK 2"
+[20:26:12.376] gt:   000000002C2D7D10 STALE [move 25, 133 set(s)] "Capcom Fighting Evolution"
+[20:26:12.376] gt:   000000002BDF9840 STALE [move 25, 133 set(s)] "Street Fighter Alpha 3 Upper"
+[20:26:12.376] gt:   000000002C2F73F0 STALE [move 25, 133 set(s)] "Power Stone"
+[20:26:12.376] gt:   000000002C2E89E0 STALE [move 25, 133 set(s)] "Power Stone 2"
+[20:26:12.376] gt:   000000002C2CA660 STALE [move 25, 133 set(s)] "Project Justice"
+[20:26:12.376] gt:   000000002C310F60 STALE [move 25, 133 set(s)] "Plasma Sword"
+[20:26:12.376] gt:   000000002C2ADCE0 STALE [move 25, 5 set(s)] "Either"
+[20:26:12.376] gt:   000000002C2BE260 STALE [move 25, 5 set(s)] "Off"
+[20:26:12.376] gt:   000000002C2C8940 STALE [move 25, 5 set(s)] "Off"
+[20:26:12.378] gt: of 50 object(s): 9 still LIVE, 41 stale; current move seq 26.
+[20:26:12.378] gt: ⭐ reclaimed 41 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[20:26:12.378] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[20:26:12.785] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[20:26:12.990] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[20:26:13.092] gt: * TEXT SET on 000000002C2EFB90: "Search Lobby ID"
+[20:26:13.195] gt: * TEXT SET on 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:13.704] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:13.709] mcspeak: spoke "Join Lobby, 2 of 3. Select game rules and join another player's lobby."
+[20:26:13.709] mc: vertical   cursor 0 -> 1  (item 2 of 3, range 0..2, step +1)  caller=0000000140083E09 screen=000000002BDEBC80 cursor=000000002BDEBFB0
+[20:26:13.913] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:14.423] gt: 270 CONSTRUCTED; setText ran 6580 time(s), 6580 string(s) captured; 0 guarded read(s) faulted.
+[20:26:14.423] gt:   by overload: cGUIObjText.25=6580 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:15.035] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:15.040] mcspeak: spoke "Search Lobby ID, 3 of 3. Search for another player's lobby by its lobby ID."
+[20:26:15.041] mc: vertical   cursor 1 -> 2  (item 3 of 3, range 0..2, step +1)  caller=0000000140083E09 screen=000000002BDEBC80 cursor=000000002BDEBFB0
+[20:26:15.143] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:15.552] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:26:15.556] mcspeak: spoke "Join Lobby, 2 of 3. Select game rules and join another player's lobby."
+[20:26:15.556] mc: vertical   cursor 2 -> 1  (item 2 of 3, range 0..2, step -1)  caller=0000000140083E09 screen=000000002BDEBC80 cursor=000000002BDEBFB0
+[20:26:15.761] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:26:15.863] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:26:15.867] mcspeak: spoke "Create Lobby, 1 of 3. Select game rules and create your own lobby."
+[20:26:15.868] mc: vertical   cursor 1 -> 0  (item 1 of 3, range 0..2, step -1)  caller=0000000140083E09 screen=000000002BDEBC80 cursor=000000002BDEBFB0
+[20:26:15.970] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:26:16.479] gt: 270 CONSTRUCTED; setText ran 6586 time(s), 6586 string(s) captured; 0 guarded read(s) faulted.
+[20:26:16.479] gt:   by overload: cGUIObjText.25=6586 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:16.582] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[0x0d])
+[20:26:16.785] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[20:26:17.396] mcspeak: [DISCOVERY] unknown screen -- caller=0x140082d16  items=9  axis=horizontal  (screen=000000002C3238B0).
+[20:26:18.007] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:18.007] mcspeak: caption not in the corpus, not spoken: "Comment"
+[20:26:18.007] mcspeak: spoke "2 of 10"
+[20:26:18.008] mcspeak: [DISCOVERY] unknown screen -- caller=0x140082c3c  items=10  axis=vertical  (screen=000000002C3238B0).
+[20:26:18.008] mc: vertical   cursor 0 -> 1  (item 2 of 10, range 0..9, step +1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:18.212] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:18.518] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[20:26:18.518] mcspeak: spoke "3 of 10"
+[20:26:18.519] mc: vertical   cursor 1 -> 2  (item 3 of 10, range 0..9, step +1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:18.519] gt: * TEXT SET on 000000002C354540: "2"
+[20:26:18.519] gt: 349 CONSTRUCTED; setText ran 6647 time(s), 6647 string(s) captured; 0 guarded read(s) faulted.
+[20:26:18.519] gt:   by overload: cGUIObjText.25=6647 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:18.621] gt: * TEXT SET on 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:18.723] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:19.131] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:19.131] mcspeak: spoke "4 of 10"
+[20:26:19.132] mc: vertical   cursor 2 -> 3  (item 4 of 10, range 0..9, step +1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:19.337] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:19.745] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:19.746] mcspeak: spoke "5 of 10"
+[20:26:19.746] mc: vertical   cursor 3 -> 4  (item 5 of 10, range 0..9, step +1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:19.950] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:20.561] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:20.562] mcspeak: spoke "6 of 10"
+[20:26:20.562] mc: vertical   cursor 4 -> 5  (item 6 of 10, range 0..9, step +1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:20.562] gt: 349 CONSTRUCTED; setText ran 6703 time(s), 6703 string(s) captured; 0 guarded read(s) faulted.
+[20:26:20.563] gt:   by overload: cGUIObjText.25=6703 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:20.665] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:21.377] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:21.378] mcspeak: spoke "7 of 10"
+[20:26:21.378] mc: vertical   cursor 5 -> 6  (item 7 of 10, range 0..9, step +1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:21.480] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:22.194] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:22.194] mcspeak: spoke "8 of 10"
+[20:26:22.195] mc: vertical   cursor 6 -> 7  (item 8 of 10, range 0..9, step +1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:22.297] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:22.603] heartbeat 25 (alive 50 s)
+[20:26:22.603] gt: 349 CONSTRUCTED; setText ran 6739 time(s), 6739 string(s) captured; 0 guarded read(s) faulted.
+[20:26:22.603] gt:   by overload: cGUIObjText.25=6739 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:22.604] gt: === FOCUS RECORD: 48 distinct string(s) across 37 cursor movement(s), 5599 dropped (buffer full) ===
+[20:26:22.604] gt:   [move 26] PROSE 000000002C2CE590: "Custom Match"
+[20:26:22.604] gt:   [move 26] PROSE 000000002C2FBC10: "Create Lobby"
+[20:26:22.604] gt:   [move 26] PROSE 000000002C306B60: "Join Lobby"
+[20:26:22.604] gt:   [move 26] PROSE 000000002C2EFB90: "Search Lobby ID"
+[20:26:22.604] gt:   [move 26] PROSE 000000002C2B1140: "Select game rules and create your own lobby."
+[20:26:22.604] gt:   [move 26] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:22.604] gt:   [move 27] PROSE 000000002C2B1140: "Select game rules and join another player's lobby."
+[20:26:22.605] gt:   [move 27] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:22.605] gt:   [move 28] PROSE 000000002C2B1140: "Search for another player's lobby by its lobby ID."
+[20:26:22.605] gt:   [move 28] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:22.605] gt:   [move 29] PROSE 000000002C2B1140: "Select game rules and join another player's lobby."
+[20:26:22.605] gt:   [move 29] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:22.605] gt:   [move 30] PROSE 000000002C2B1140: "Select game rules and create your own lobby."
+[20:26:22.605] gt:   [move 30] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:22.606] gt:   [move 30] PROSE 000000002C373C50: "Create Lobby"
+[20:26:22.606] gt:   [move 30] PROSE 000000002C3403A0: "Game"
+[20:26:22.606] gt:   [move 30] PROSE 000000002C2FDAD0: "Game Version"
+[20:26:22.606] gt:   [move 30] PROSE 000000002C283F40: "Cross-region Matchmaking"
+[20:26:22.606] gt:   [move 30] PROSE 000000002C333E20: "Comment"
+[20:26:22.606] gt:   [move 30] PROSE 000000002C30BC60: "Event Mode"
+[20:26:22.606] gt:   [move 30] PROSE 000000002C31C250: "One-button Special Moves"
+[20:26:22.606] gt:   [move 30] PROSE 000000002C32A820: "Victory Condition"
+[20:26:22.606] gt:   [move 30] PROSE 000000002C3475C0: "Number of Players"
+[20:26:22.607] gt:   [move 30] PROSE 000000002C3403A0: "Game"
+[20:26:22.607] gt:   [move 30] PROSE 000000002C2FD170: "Capcom Vs. SNK 2: Millionaire Fighting 2001"
+[20:26:22.607] gt:   [move 30] PROSE 000000002C2FDAD0: "Game Version"
+[20:26:22.607] gt:   [move 30] PROSE 000000002C2835E0: "Japanese Version"
+[20:26:22.607] gt:   [move 30] PROSE 000000002C283F40: "Cross-region Matchmaking"
+[20:26:22.607] gt:   [move 30] PROSE 000000002C3334C0: "Off"
+[20:26:22.607] gt:   [move 30] PROSE 000000002C333E20: "Comment"
+[20:26:22.607] gt:   [move 30] PROSE 000000002C30B300: "Everyone is welcome!"
+[20:26:22.608] gt:   [move 30] PROSE 000000002C30BC60: "Event Mode"
+[20:26:22.608] gt:   [move 30] PROSE 000000002C31B8F0: "On (Quick Match)"
+[20:26:22.608] gt:   [move 30] PROSE 000000002C31C250: "One-button Special Moves"
+[20:26:22.608] gt:   [move 30] PROSE 000000002C329EC0: "On"
+[20:26:22.609] gt:   [move 30] PROSE 000000002C32A820: "Victory Condition"
+[20:26:22.609] gt:   [move 30] PROSE 000000002C346C60: "First to 1"
+[20:26:22.609] gt:   [move 30] PROSE 000000002C3475C0: "Number of Players"
+[20:26:22.609] gt:   [move 30] PROSE 000000002C354540: "2"
+[20:26:22.609] gt:   [move 30] PROSE 000000002C2B1140: "Choose the game you want to play."
+[20:26:22.609] gt:   [move 30] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:22.609] gt:   [move 31] PROSE 000000002C3403A0: "Game"
+[20:26:22.609] gt:   [move 31] PROSE 000000002C2FD170: "Capcom Vs. SNK 2: Millionaire Fighting 2001"
+[20:26:22.609] gt:   [move 31] PROSE 000000002C2FDAD0: "Game Version"
+[20:26:22.609] gt:   [move 31] PROSE 000000002C2835E0: "Japanese Version"
+[20:26:22.609] gt:   [move 31] PROSE 000000002C283F40: "Cross-region Matchmaking"
+[20:26:22.609] gt:   [move 31] PROSE 000000002C3334C0: "Off"
+[20:26:22.609] gt:   [move 31] PROSE 000000002C333E20: "Comment"
+[20:26:22.609] gt: of 48 string(s): 48 arrived after a cursor movement, 42 were prose captions.
+[20:26:22.609] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[20:26:22.611] gt: === INSTANCE SET: 64 live text object(s), 7 dropped (table full) ===
+[20:26:22.611] gt:   000000002C2835E0 LIVE  [move 37, 8 set(s)] "Japanese Version"
+[20:26:22.611] gt:   000000002C3334C0 LIVE  [move 37, 8 set(s)] "Off"
+[20:26:22.611] gt:   000000002C30B300 LIVE  [move 37, 8 set(s)] "Everyone is welcome!"
+[20:26:22.611] gt:   000000002C31B8F0 LIVE  [move 37, 8 set(s)] "On (Quick Match)"
+[20:26:22.611] gt:   000000002C329EC0 LIVE  [move 37, 8 set(s)] "On"
+[20:26:22.612] gt:   000000002C346C60 LIVE  [move 37, 8 set(s)] "First to 1"
+[20:26:22.612] gt:   000000002C354540 LIVE  [move 37, 8 set(s)] "2"
+[20:26:22.612] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:22.612] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:22.612] gt:   000000002C2B1140 LIVE  [move 37, 34 set(s)] "Choose the number of players that can join the lobby."
+[20:26:22.612] gt:   000000002BE2D700 LIVE  [move 37, 34 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:22.613] gt:   000000002BDC53B0 LIVE  [move 3, 1 set(s)] "Online Play"
+[20:26:22.613] gt:   000000002C232A30 LIVE  [move 3, 1 set(s)] "Casual Match"
+[20:26:22.613] gt:   000000002BDB70D0 LIVE  [move 3, 1 set(s)] "Ranked Match"
+[20:26:22.613] gt:   000000002BE28A80 LIVE  [move 3, 1 set(s)] "Custom Match"
+[20:26:22.614] gt:   000000002BE07CA0 LIVE  [move 3, 1 set(s)] "Ranked Leaderboard"
+[20:26:22.614] gt:   000000002BDE9FD0 LIVE  [move 3, 1 set(s)] "High Score Challenge"
+[20:26:22.614] gt:   000000002C2B22A0 LIVE  [move 3, 1 set(s)] "High Score Challenge Leaderboard"
+[20:26:22.614] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[20:26:22.614] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[20:26:22.614] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[20:26:22.615] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[20:26:22.615] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[20:26:22.615] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:22.615] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:22.615] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:22.615] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:22.615] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:22.615] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:22.616] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:22.616] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:22.616] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:22.616] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:22.616] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:22.616] gt:   0000000000000000 STALE [move 22, 0 set(s)] ""
+[20:26:22.616] gt:   0000000000000000 STALE [move 22, 0 set(s)] ""
+[20:26:22.616] gt:   0000000000000000 STALE [move 22, 0 set(s)] ""
+[20:26:22.616] gt:   0000000000000000 STALE [move 22, 0 set(s)] ""
+[20:26:22.616] gt:   0000000000000000 STALE [move 22, 0 set(s)] ""
+[20:26:22.616] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:22.618] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:22.618] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:22.618] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:22.618] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:22.618] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:22.618] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:22.618] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:22.619] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:22.619] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:22.619] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:22.619] gt:   000000002C2CE590 LIVE  [move 26, 1 set(s)] "Custom Match"
+[20:26:22.619] gt:   000000002C2FBC10 LIVE  [move 26, 1 set(s)] "Create Lobby"
+[20:26:22.619] gt:   000000002C306B60 LIVE  [move 26, 1 set(s)] "Join Lobby"
+[20:26:22.620] gt:   000000002C2EFB90 LIVE  [move 26, 1 set(s)] "Search Lobby ID"
+[20:26:22.620] gt:   000000002C373C50 LIVE  [move 30, 1 set(s)] "Create Lobby"
+[20:26:22.620] gt:   000000002C3403A0 LIVE  [move 37, 9 set(s)] "Game"
+[20:26:22.620] gt:   000000002C2FDAD0 LIVE  [move 37, 9 set(s)] "Game Version"
+[20:26:22.620] gt:   000000002C283F40 LIVE  [move 37, 9 set(s)] "Cross-region Matchmaking"
+[20:26:22.621] gt:   000000002C333E20 LIVE  [move 37, 9 set(s)] "Comment"
+[20:26:22.621] gt:   000000002C30BC60 LIVE  [move 37, 9 set(s)] "Event Mode"
+[20:26:22.621] gt:   000000002C31C250 LIVE  [move 37, 9 set(s)] "One-button Special Moves"
+[20:26:22.621] gt:   000000002C32A820 LIVE  [move 37, 9 set(s)] "Victory Condition"
+[20:26:22.621] gt:   000000002C3475C0 LIVE  [move 37, 9 set(s)] "Number of Players"
+[20:26:22.622] gt:   000000002C2FD170 LIVE  [move 37, 8 set(s)] "Capcom Vs. SNK 2: Millionaire Fighting 2001"
+[20:26:22.622] gt: of 64 object(s): 30 still LIVE, 34 stale; current move seq 37.
+[20:26:22.622] gt: ⭐ reclaimed 34 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[20:26:22.622] gt: ⚠ the table is FULL (64 slots, 7 eviction(s) so far). 34 stale entries present -- dead slots are reclaimed before live ones, so a large stale count here means reclaim is not keeping up.
+[20:26:22.622] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[20:26:23.030] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:23.031] mcspeak: spoke "9 of 10. Set which player has the ability to start the game."
+[20:26:23.031] mc: vertical   cursor 7 -> 8  (item 9 of 10, range 0..9, step +1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:23.133] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:24.253] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[20:26:24.254] mcspeak: spoke "10 of 10. Choose a passcode for the lobby."
+[20:26:24.254] mc: vertical   cursor 8 -> 9  (item 10 of 10, range 0..9, step +1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:24.459] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:24.663] gt: 349 CONSTRUCTED; setText ran 6775 time(s), 6775 string(s) captured; 0 guarded read(s) faulted.
+[20:26:24.663] gt:   by overload: cGUIObjText.25=6775 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:25.987] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[20:26:25.987] mcspeak: caption not in the corpus, not spoken: "2"
+[20:26:25.988] mcspeak: spoke "2 of 2"
+[20:26:25.988] mc: horizontal cursor 0 -> 1  (item 2 of 2, range 0..1, step +1)  caller=0000000140082D16 screen=000000002C3238B0 cursor=000000002C323C10
+[20:26:25.988] gt: * TEXT SET on 000000002C354540: "On"
+[20:26:26.090] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[20:26:26.702] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[0x25])
+[20:26:26.702] mcspeak: spoke "1 of 2"
+[20:26:26.703] mc: horizontal cursor 1 -> 0  (item 1 of 2, range 0..1, step -1)  caller=0000000140082D16 screen=000000002C3238B0 cursor=000000002C323C10
+[20:26:26.703] gt: * TEXT SET on 000000002C354540: "Off"
+[20:26:26.703] gt: 349 CONSTRUCTED; setText ran 6807 time(s), 6807 string(s) captured; 0 guarded read(s) faulted.
+[20:26:26.703] gt:   by overload: cGUIObjText.25=6807 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:26.907] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:26:27.212] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:26:27.213] mcspeak: spoke "9 of 10"
+[20:26:27.213] mc: vertical   cursor 9 -> 8  (item 9 of 10, range 0..9, step -1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:27.214] gt: * TEXT SET on 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:27.316] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:26:27.926] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[0x27])
+[20:26:27.926] mcspeak: spoke "2 of 2"
+[20:26:27.927] mc: horizontal cursor 0 -> 1  (item 2 of 2, range 0..1, step +1)  caller=0000000140082D16 screen=000000002C3238B0 cursor=000000002C323C0C
+[20:26:27.927] gt: * TEXT SET on 000000002C354540: "Off"
+[20:26:28.131] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[20:26:28.436] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[20:26:28.436] mcspeak: spoke "1 of 2"
+[20:26:28.437] mc: horizontal cursor 1 -> 0  (item 1 of 2, range 0..1, step -1)  caller=0000000140082D16 screen=000000002C3238B0 cursor=000000002C323C0C
+[20:26:28.641] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:26:28.744] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:26:28.745] mcspeak: spoke "8 of 10"
+[20:26:28.745] mc: vertical   cursor 8 -> 7  (item 8 of 10, range 0..9, step -1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:28.745] gt: * TEXT SET on 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:28.745] gt: 349 CONSTRUCTED; setText ran 6875 time(s), 6875 string(s) captured; 0 guarded read(s) faulted.
+[20:26:28.745] gt:   by overload: cGUIObjText.25=6875 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:28.950] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:26:29.256] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[20:26:29.256] mcspeak: spoke "2 of 8"
+[20:26:29.257] mc: horizontal cursor 0 -> 1  (item 2 of 8, range 0..7, step +1)  caller=0000000140082D16 screen=000000002C3238B0 cursor=000000002C323C08
+[20:26:29.257] gt: * TEXT SET on 000000002C354540: "Off"
+[20:26:29.359] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[20:26:29.664] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[0x25])
+[20:26:29.664] mcspeak: spoke "1 of 8"
+[20:26:29.665] mc: horizontal cursor 1 -> 0  (item 1 of 8, range 0..7, step -1)  caller=0000000140082D16 screen=000000002C3238B0 cursor=000000002C323C08
+[20:26:29.665] gt: * TEXT SET on 000000002C30BC60: "Victory Condition"
+[20:26:29.768] gt: * TEXT SET on 000000002C354540: "Off"
+[20:26:29.870] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:26:30.073] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:26:30.073] mcspeak: spoke "7 of 10"
+[20:26:30.074] mc: vertical   cursor 7 -> 6  (item 7 of 10, range 0..9, step -1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:30.074] gt: * TEXT SET on 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:30.277] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:26:30.584] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[20:26:30.585] mcspeak: spoke "2 of 10"
+[20:26:30.585] mc: horizontal cursor 0 -> 1  (item 2 of 10, range 0..9, step +1)  caller=0000000140082D16 screen=000000002C3238B0 cursor=000000002C323C04
+[20:26:30.585] gt: * TEXT SET on 000000002C354540: "Off"
+[20:26:30.687] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[20:26:30.790] gt: 349 CONSTRUCTED; setText ran 6941 time(s), 6941 string(s) captured; 0 guarded read(s) faulted.
+[20:26:30.790] gt:   by overload: cGUIObjText.25=6941 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:31.095] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[0x25])
+[20:26:31.095] mcspeak: spoke "1 of 10"
+[20:26:31.096] mc: horizontal cursor 1 -> 0  (item 1 of 10, range 0..9, step -1)  caller=0000000140082D16 screen=000000002C3238B0 cursor=000000002C323C04
+[20:26:31.403] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:26:31.606] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:26:31.606] mcspeak: spoke "6 of 10"
+[20:26:31.607] mc: vertical   cursor 6 -> 5  (item 6 of 10, range 0..9, step -1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:31.607] gt: * TEXT SET on 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:31.811] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:26:32.116] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[20:26:32.116] mcspeak: spoke "2 of 2"
+[20:26:32.117] mc: horizontal cursor 0 -> 1  (item 2 of 2, range 0..1, step +1)  caller=0000000140082D16 screen=000000002C3238B0 cursor=000000002C323C00
+[20:26:32.117] gt: * TEXT SET on 000000002C354540: "Off"
+[20:26:32.218] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[20:26:32.625] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[20:26:32.626] mcspeak: spoke "1 of 2"
+[20:26:32.626] mc: horizontal cursor 1 -> 0  (item 1 of 2, range 0..1, step -1)  caller=0000000140082D16 screen=000000002C3238B0 cursor=000000002C323C00
+[20:26:32.727] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:26:32.830] heartbeat 30 (alive 60 s)
+[20:26:32.831] kbd: builder ran 3777 times; instance=0000000029088990 state=0000000029088AC8 offset=0x138 CONFIRMED
+[20:26:32.831] gt: 349 CONSTRUCTED; setText ran 7007 time(s), 7007 string(s) captured; 0 guarded read(s) faulted.
+[20:26:32.831] gt:   by overload: cGUIObjText.25=7007 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:32.831] gt: === FOCUS RECORD: 48 distinct string(s) across 53 cursor movement(s), 5807 dropped (buffer full) ===
+[20:26:32.831] gt:   [move 38] PROSE 000000002C3403A0: "Game Version"
+[20:26:32.831] gt:   [move 38] PROSE 000000002C2FD170: "Japanese Version"
+[20:26:32.832] gt:   [move 38] PROSE 000000002C2FDAD0: "Cross-region Matchmaking"
+[20:26:32.832] gt:   [move 38] PROSE 000000002C2835E0: "Off"
+[20:26:32.832] gt:   [move 38] PROSE 000000002C283F40: "Comment"
+[20:26:32.832] gt:   [move 38] PROSE 000000002C3334C0: "Everyone is welcome!"
+[20:26:32.832] gt:   [move 38] PROSE 000000002C333E20: "Event Mode"
+[20:26:32.832] gt:   [move 38] PROSE 000000002C30B300: "On (Quick Match)"
+[20:26:32.832] gt:   [move 38] PROSE 000000002C30BC60: "One-button Special Moves"
+[20:26:32.832] gt:   [move 38] PROSE 000000002C31B8F0: "On"
+[20:26:32.833] gt:   [move 38] PROSE 000000002C31C250: "Victory Condition"
+[20:26:32.833] gt:   [move 38] PROSE 000000002C329EC0: "First to 1"
+[20:26:32.833] gt:   [move 38] PROSE 000000002C32A820: "Number of Players"
+[20:26:32.833] gt:   [move 38] PROSE 000000002C346C60: "2"
+[20:26:32.833] gt:   [move 38] PROSE 000000002C3475C0: "Game Start Privilege"
+[20:26:32.833] gt:   [move 38] PROSE 000000002C354540: "Challenger"
+[20:26:32.833] gt:   [move 38] PROSE 000000002C2B1140: "Set which player has the ability to start the game."
+[20:26:32.833] gt:   [move 38] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:32.833] gt:   [move 39] PROSE 000000002C3403A0: "Cross-region Matchmaking"
+[20:26:32.834] gt:   [move 39] PROSE 000000002C2FD170: "Off"
+[20:26:32.834] gt:   [move 39] PROSE 000000002C2FDAD0: "Comment"
+[20:26:32.834] gt:   [move 39] PROSE 000000002C2835E0: "Everyone is welcome!"
+[20:26:32.834] gt:   [move 39] PROSE 000000002C283F40: "Event Mode"
+[20:26:32.834] gt:   [move 39] PROSE 000000002C3334C0: "On (Quick Match)"
+[20:26:32.834] gt:   [move 39] PROSE 000000002C333E20: "One-button Special Moves"
+[20:26:32.834] gt:   [move 39] PROSE 000000002C30B300: "On"
+[20:26:32.834] gt:   [move 39] PROSE 000000002C30BC60: "Victory Condition"
+[20:26:32.834] gt:   [move 39] PROSE 000000002C31B8F0: "First to 1"
+[20:26:32.835] gt:   [move 39] PROSE 000000002C31C250: "Number of Players"
+[20:26:32.835] gt:   [move 39] PROSE 000000002C329EC0: "2"
+[20:26:32.835] gt:   [move 39] PROSE 000000002C32A820: "Game Start Privilege"
+[20:26:32.835] gt:   [move 39] PROSE 000000002C346C60: "Challenger"
+[20:26:32.835] gt:   [move 39] PROSE 000000002C3475C0: "Passcode"
+[20:26:32.835] gt:   [move 39] PROSE 000000002C354540: "Off"
+[20:26:32.835] gt:   [move 39] PROSE 000000002C2B1140: "Choose a passcode for the lobby."
+[20:26:32.835] gt:   [move 39] strip 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:32.835] gt:   [move 40] PROSE 000000002C3403A0: "Cross-region Matchmaking"
+[20:26:32.836] gt:   [move 40] PROSE 000000002C2FD170: "Off"
+[20:26:32.836] gt:   [move 40] PROSE 000000002C2FDAD0: "Comment"
+[20:26:32.836] gt:   [move 40] PROSE 000000002C2835E0: "Everyone is welcome!"
+[20:26:32.836] gt:   [move 40] PROSE 000000002C283F40: "Event Mode"
+[20:26:32.836] gt:   [move 40] PROSE 000000002C3334C0: "On (Quick Match)"
+[20:26:32.836] gt:   [move 40] PROSE 000000002C333E20: "One-button Special Moves"
+[20:26:32.836] gt:   [move 40] PROSE 000000002C30B300: "On"
+[20:26:32.836] gt:   [move 40] PROSE 000000002C30BC60: "Victory Condition"
+[20:26:32.836] gt:   [move 40] PROSE 000000002C31B8F0: "First to 1"
+[20:26:32.837] gt:   [move 40] PROSE 000000002C31C250: "Number of Players"
+[20:26:32.837] gt:   [move 40] PROSE 000000002C329EC0: "2"
+[20:26:32.837] gt: of 48 string(s): 48 arrived after a cursor movement, 46 were prose captions.
+[20:26:32.837] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[20:26:32.837] gt: === INSTANCE SET: 64 live text object(s), 7 dropped (table full) ===
+[20:26:32.837] gt:   000000002C2835E0 LIVE  [move 53, 24 set(s)] "Everyone is welcome!"
+[20:26:32.837] gt:   000000002C3334C0 LIVE  [move 53, 24 set(s)] "On (Quick Match)"
+[20:26:32.838] gt:   000000002C30B300 LIVE  [move 53, 24 set(s)] "On"
+[20:26:32.838] gt:   000000002C31B8F0 LIVE  [move 53, 24 set(s)] "First to 1"
+[20:26:32.838] gt:   000000002C329EC0 LIVE  [move 53, 24 set(s)] "2"
+[20:26:32.838] gt:   000000002C346C60 LIVE  [move 53, 24 set(s)] "Challenger"
+[20:26:32.838] gt:   000000002C354540 LIVE  [move 53, 24 set(s)] "Off"
+[20:26:32.838] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:32.839] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[20:26:32.839] gt:   000000002C2B1140 LIVE  [move 51, 40 set(s)] "Turn one-button special moves on or off."
+[20:26:32.840] gt:   000000002BE2D700 LIVE  [move 51, 40 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:32.840] gt:   000000002BDC53B0 LIVE  [move 3, 1 set(s)] "Online Play"
+[20:26:32.840] gt:   000000002C232A30 LIVE  [move 3, 1 set(s)] "Casual Match"
+[20:26:32.840] gt:   000000002BDB70D0 LIVE  [move 3, 1 set(s)] "Ranked Match"
+[20:26:32.840] gt:   000000002BE28A80 LIVE  [move 3, 1 set(s)] "Custom Match"
+[20:26:32.841] gt:   000000002BE07CA0 LIVE  [move 3, 1 set(s)] "Ranked Leaderboard"
+[20:26:32.841] gt:   000000002BDE9FD0 LIVE  [move 3, 1 set(s)] "High Score Challenge"
+[20:26:32.841] gt:   000000002C2B22A0 LIVE  [move 3, 1 set(s)] "High Score Challenge Leaderboard"
+[20:26:32.841] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[20:26:32.841] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[20:26:32.841] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[20:26:32.841] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[20:26:32.842] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[20:26:32.842] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:32.842] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:32.842] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:32.842] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:32.842] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:32.842] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:32.842] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:32.842] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:32.842] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:32.843] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:32.843] gt:   0000000000000000 STALE [move 21, 0 set(s)] ""
+[20:26:32.843] gt:   0000000000000000 STALE [move 22, 0 set(s)] ""
+[20:26:32.843] gt:   0000000000000000 STALE [move 22, 0 set(s)] ""
+[20:26:32.843] gt:   0000000000000000 STALE [move 22, 0 set(s)] ""
+[20:26:32.843] gt:   0000000000000000 STALE [move 22, 0 set(s)] ""
+[20:26:32.843] gt:   0000000000000000 STALE [move 22, 0 set(s)] ""
+[20:26:32.844] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:32.844] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:32.844] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:32.844] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:32.844] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:32.844] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:32.844] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:32.844] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:32.845] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:32.845] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:32.845] gt:   0000000000000000 STALE [move 25, 0 set(s)] ""
+[20:26:32.845] gt:   000000002C2CE590 LIVE  [move 26, 1 set(s)] "Custom Match"
+[20:26:32.845] gt:   000000002C2FBC10 LIVE  [move 26, 1 set(s)] "Create Lobby"
+[20:26:32.846] gt:   000000002C306B60 LIVE  [move 26, 1 set(s)] "Join Lobby"
+[20:26:32.846] gt:   000000002C2EFB90 LIVE  [move 26, 1 set(s)] "Search Lobby ID"
+[20:26:32.846] gt:   000000002C373C50 LIVE  [move 30, 1 set(s)] "Create Lobby"
+[20:26:32.846] gt:   000000002C3403A0 LIVE  [move 53, 25 set(s)] "Cross-region Matchmaking"
+[20:26:32.846] gt:   000000002C2FDAD0 LIVE  [move 53, 25 set(s)] "Comment"
+[20:26:32.847] gt:   000000002C283F40 LIVE  [move 53, 25 set(s)] "Event Mode"
+[20:26:32.847] gt:   000000002C333E20 LIVE  [move 53, 25 set(s)] "One-button Special Moves"
+[20:26:32.847] gt:   000000002C30BC60 LIVE  [move 53, 25 set(s)] "Victory Condition"
+[20:26:32.847] gt:   000000002C31C250 LIVE  [move 53, 25 set(s)] "Number of Players"
+[20:26:32.847] gt:   000000002C32A820 LIVE  [move 53, 25 set(s)] "Game Start Privilege"
+[20:26:32.848] gt:   000000002C3475C0 LIVE  [move 53, 25 set(s)] "Passcode"
+[20:26:32.848] gt:   000000002C2FD170 LIVE  [move 53, 24 set(s)] "Off"
+[20:26:32.848] gt: of 64 object(s): 30 still LIVE, 34 stale; current move seq 53.
+[20:26:32.848] gt: ⭐ reclaimed 34 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[20:26:32.848] gt: ⚠ the table is FULL (64 slots, 7 eviction(s) so far). 34 stale entries present -- dead slots are reclaimed before live ones, so a large stale count here means reclaim is not keeping up.
+[20:26:32.848] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[20:26:32.951] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:26:32.951] mcspeak: spoke "5 of 10. Turn event mode on or off."
+[20:26:32.951] mc: vertical   cursor 5 -> 4  (item 5 of 10, range 0..9, step -1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:32.952] gt: * TEXT SET on 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:33.053] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:26:33.360] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[20:26:33.361] mcspeak: caption not in the corpus, not spoken: "Off"
+[20:26:33.361] mcspeak: spoke "2 of 2"
+[20:26:33.361] mc: horizontal cursor 0 -> 1  (item 2 of 2, range 0..1, step +1)  caller=0000000140082D16 screen=000000002C3238B0 cursor=000000002C323BFC
+[20:26:33.361] gt: * TEXT SET on 000000002C354540: "Off"
+[20:26:33.463] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[20:26:34.076] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[20:26:34.076] mcspeak: caption not in the corpus, not spoken: "Challenger"
+[20:26:34.077] mcspeak: spoke "1 of 2"
+[20:26:34.077] mc: horizontal cursor 1 -> 0  (item 1 of 2, range 0..1, step -1)  caller=0000000140082D16 screen=000000002C3238B0 cursor=000000002C323BFC
+[20:26:34.179] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[20:26:34.383] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[20:26:34.384] mcspeak: spoke "4 of 10"
+[20:26:34.384] mc: vertical   cursor 4 -> 3  (item 4 of 10, range 0..9, step -1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:34.384] gt: * TEXT SET on 000000002BE2D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[20:26:34.486] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[20:26:34.894] gt: 349 CONSTRUCTED; setText ran 7075 time(s), 7075 string(s) captured; 0 guarded read(s) faulted.
+[20:26:34.894] gt:   by overload: cGUIObjText.25=7075 .26=0  cGUIObjMessage.25=0 .26=0
+[20:26:35.097] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[20:26:35.097] mcspeak: spoke "5 of 10"
+[20:26:35.098] mc: vertical   cursor 3 -> 4  (item 5 of 10, range 0..9, step +1)  caller=0000000140082C3C screen=000000002C3238B0 cursor=000000002C323BE4
+[20:26:35.303] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[20:26:36.422] kbd: down=[0x12 0xa4]  pressed=[0x12 0xa4]  released=[(none)]  (engine Trg=[(none)])
+[20:26:36.829] kbd: down=[0x12 0x73 0xa4]  pressed=[0x73]  released=[(none)]  (engine Trg=[(none)])
+[20:26:36.931] gt: 349 CONSTRUCTED; setText ran 7093 time(s), 7093 string(s) captured; 0 guarded read(s) faulted.
+[20:26:36.931] gt:   by overload: cGUIObjText.25=7093 .26=0  cGUIObjMessage.25=0 .26=0

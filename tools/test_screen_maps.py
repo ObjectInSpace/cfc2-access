@@ -48,6 +48,22 @@ EXPECTED = {
     # the 19:45 run; position 2 never produced one and is MC_LABEL_UNKNOWN.
     # ⚠ The <UNKNOWN> slot is listed so the other five stay pinned to their
     # POSITIONS -- dropping it would silently shift rows 3-6 up by one.
+    # Online Play > Casual Match. Three independent sources in the 21:00 run:
+    # the instance set's labels, the value-slot arithmetic (8 values on row 0,
+    # 3 on row 1, via values_off 0x344) and HELP_GAME_TITLE_ON as the caption.
+    "g_casual_match_rows": [
+        "Game", "Game Version", "Cross-region Matchmaking",
+        "One-button Special Moves",
+    ],
+    # Create Lobby's settings. Four positions pinned by their own captions
+    # across three runs; the other six are MC_LABEL_UNKNOWN and stay that way --
+    # the instance set offers plausible labels but no positions, and the 21:00
+    # run DISPROVED the ordering it implied.
+    "g_create_lobby_rows": [
+        "<UNKNOWN>", "<UNKNOWN>", "<UNKNOWN>", "<UNKNOWN>", "Event Mode",
+        "<UNKNOWN>", "Victory Condition", "<UNKNOWN>", "Game Start Privilege",
+        "Passcode",
+    ],
     "g_lobby_filter_rows": [
         "Game", "<UNKNOWN>", "Cross-region Matchmaking", "Comment",
         "Event Mode", "One-button Special Moves",
