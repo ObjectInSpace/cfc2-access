@@ -191,6 +191,19 @@ typedef struct {
      * cursor index to ROM index is not yet confirmed against a real screen. */
     const struct mc_value_set *values;
     int        nvalues;    /* entries in `values` */
+    /* ⭐⭐ Bitmask of rows whose values are a numeric RANGE -- bit N set means
+     * row N is a LEVEL (volume, input delay) and its cursor position is the
+     * setting itself, not a position in a list of names.
+     *
+     * ⚠ A mask rather than a flag on the screen, because these screens MIX the
+     * two: Sound Settings rows 0-3 are volume levels and row 4 is
+     * Original/Remix. A per-screen flag would say "Challenger Jingle, 2, of 2",
+     * which is not what that row means.
+     *
+     * ⛔ Never inferred from the value COUNT. A ten-value row could equally be
+     * ten named options, and guessing would state a level where a name belongs
+     * -- the failure this file exists to prevent. */
+    unsigned   levels;
 } mc_screen;
 
 /* What a movement should say. */
@@ -275,6 +288,12 @@ typedef struct {
      * Carried out of build() for the same reason as game_strip -- so the rule
      * cannot fire on a screen the table does not declare as one. */
     BOOL  char_picker;
+    /* ⭐ This row's values are a numeric RANGE (a volume slider, an input-delay
+     * step), so the cursor position IS the setting and should be spoken as a
+     * level rather than as a list position. Set from the screen table's
+     * `levels` mask -- never inferred from the count, because a 10-value row
+     * might equally be ten named options. */
+    BOOL  is_level;
 } mc_speech;
 
 /* Build the announcement for a movement. Always fills `position`/`total`;

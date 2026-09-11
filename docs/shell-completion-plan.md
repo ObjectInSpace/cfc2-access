@@ -244,7 +244,33 @@ sentence as the Start Button binding.
 changed during the session — which is the feature working, not noise — but it
 means the values are genuinely dynamic and cannot be baked into a table.
 
-### ⛔⛔ CAN IT REPLACE THE TABLES? NO — it is a SUPPLEMENT, and here is the test
+### ⚠⚠ RETRACTION: "SOUND IS THE DISPROOF" WAS MY BUG, NOT THE CHANNEL'S
+
+The user pushed back — "I would expect a number for a volume setting" — and was
+right. Two separate errors of mine:
+
+**1. The join was misaligned on that screen.** I asserted "row labels appear
+contiguously". On Sound Settings they do NOT: the positions are
+`[0, 4, 5, 6, 7, 8]` — "Music Volume" is separated from the other five by a
+caption, a hint strip and a menu item. My check only tested that the indices
+were SORTED, which they are, so a broken case passed. Every "wrong" value I
+reported was the join reading from the wrong offset.
+
+**2. I claimed the sliders "draw no text at all" without testing it.** The block
+I examined came from a run where the volumes were never adjusted. In the one run
+that has both the instance set AND volume movements, the cursor only ever hit
+positions 1 and 10 — the endpoints — so the level was jumped, not stepped, and
+nothing was captured either way. **I have no data on what a volume row shows
+while being adjusted.** That is an untested assumption, not a disproof.
+
+⛔ So the honest status of the Sound result is UNKNOWN, not "wrong on every
+row". The bare numbers that DO appear in the instance set ('0' x87, '2' x17,
+'5' x4) may well be volume levels; I have not shown otherwise.
+
+▶ What would settle it: step a volume row one notch at a time with the instance
+set on, and look at what appears. That is a small, specific ask.
+
+### (superseded) CAN IT REPLACE THE TABLES? — the original test
 
 User's question, 2026-09-11. Answered by running the join against every screen
 rather than only the two it was found on:

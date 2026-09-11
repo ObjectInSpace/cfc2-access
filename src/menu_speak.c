@@ -902,7 +902,11 @@ static const mc_screen g_screens[] = {
      * per screen and never copied. */
     { 0x1400a2771ULL, -1, 0, "Sound Settings", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_VALUE, 0x358, NULL, 0, g_sound_values,
-      (int)(sizeof(g_sound_values) / sizeof(g_sound_values[0])) },
+      (int)(sizeof(g_sound_values) / sizeof(g_sound_values[0])),
+      /* ⭐ Rows 0-3 are the four VOLUME sliders -- 10 values each, measured by
+       * cursor address across every run. Row 4 (Challenger Jingle) is
+       * Original/Remix and is deliberately NOT a level. */
+      0x0Fu },
 
     /* ⭐⭐ NETWORK SETTINGS -- the ROW half. See g_network_settings_rows. */
     { 0x14009f48eULL, -1, 5, "Network Settings", MC_VERIFIED_LIVE_TEXT,
@@ -915,7 +919,11 @@ static const mc_screen g_screens[] = {
      * assume one settings screen's offsets apply to another. */
     { 0x14009f4c1ULL, -1, 0, "Network Settings", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_VALUE, 0x35c, NULL, 0, g_network_values,
-      (int)(sizeof(g_network_values) / sizeof(g_network_values[0])) },
+      (int)(sizeof(g_network_values) / sizeof(g_network_values[0])),
+      /* ⭐ Rows 1-2 are Voice Chat Volume and Input Delay, 11 values each.
+       * Row 0 (Microphone) is On/Off and row 3 (Connection Strength) is a
+       * named filter list -- neither is a level. */
+      0x06u },
 
     /* ⛔⛔ THE CONSENT DIALOG (0x140087cda, 3 items) IS NOT NAMED -- REVERTED.
      *
@@ -1347,6 +1355,9 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
                                   0, &row)) {
             out->row = row;
             out->have_row = TRUE;
+            /* ⭐ Is this row a numeric level? See mc_screen::levels. */
+            if (row >= 0 && row < 32 && (s->levels & (1u << row)))
+                out->is_level = TRUE;
             out->why = MC_UNNAMED_NO_LABELS;
             /* ⭐⭐ Name the ROW this value belongs to, from the SIBLING row
              * entry's map. "Game Version, English Version" is what a user
@@ -1827,6 +1838,24 @@ void menu_speak(const mc_move *m)
          * WRONG on the first screen it met (Select Game, reached from Offline
          * Play). A bare position is true whatever the screen turns out to be. */
         _snprintf(line, sizeof(line), "%d of %d", sp.position, sp.total);
+    else if (sp.axis == MC_AXIS_VALUE && sp.row_name[0] && sp.is_level)
+        /* ⭐⭐ A LEVEL ROW: the position IS the value.
+         *
+         * User, 2026-09-11: "they might be textless but even an internal value
+         * is fine for our purposes." That reframed the problem and dissolved
+         * it. A volume slider has no label to look up and no string on screen,
+         * but the mod is HANDED the index and the count as arguments -- and for
+         * a slider the index is not a list position, it is the SETTING.
+         *
+         * ⛔ "Music Volume, 7 of 10" was already carrying the answer and
+         * reading like a list position. "Music Volume, 7, of 10" is the same
+         * number stated as a level, which is what a sighted player sees.
+         *
+         * ⚠ Only for rows whose values are a numeric RANGE (see is_level).
+         * Saying "Display, 2 of 3" as a level would be wrong -- that row's
+         * values are names, and the position is genuinely just a position. */
+        _snprintf(line, sizeof(line), "%s, %d, of %d",
+                  sp.row_name, sp.position, sp.total);
     else if (sp.axis == MC_AXIS_VALUE && sp.row_name[0])
         /* ⭐ The useful form: "Game Version, 2 of 2" -- the row NAMED, the
          * value's position given. The value text itself is not claimed. */

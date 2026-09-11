@@ -1103,6 +1103,43 @@ int main(void)
               "buttons=%d lang=%d", any, lang != NULL);
     }
 
+    /* --- case 31: LEVEL rows are marked per-row, not per-screen -------------
+     * ⭐⭐ User, 2026-09-11: "they might be textless but even an internal value
+     * is fine". A volume slider has no label and draws no string, but the mod
+     * is HANDED the index and the count -- and for a slider the index IS the
+     * setting. "Music Volume, 7, of 10" says the level; "7 of 10" reads as a
+     * list position and buries it.
+     *
+     * ⛔⛔ THE MASK MUST BE PER-ROW. These screens MIX the two kinds: Sound
+     * rows 0-3 are volume levels and row 4 is Original/Remix. A per-screen flag
+     * would say "Challenger Jingle, 2, of 2" -- stating a level where a NAME
+     * belongs, which is the exact failure class the user reported. This case
+     * fails if anyone widens the mask to cover the whole screen.
+     *
+     * ⚠ Counts are the MEASURED ones (cursor-address derived): Sound volumes
+     * are 10 values, Network's are 11. */
+    {
+        const mc_screen *snd = menu_speak_lookup(0x1400a2771ULL);
+        const mc_screen *net = menu_speak_lookup(0x14009f4c1ULL);
+        const mc_screen *pc  = menu_speak_lookup(0x1400a1757ULL);
+        int ok = snd && net && pc;
+        if (ok) {
+            /* Sound: rows 0-3 are levels, row 4 (Challenger Jingle) is NOT. */
+            ok &= (snd->levels & 0x0Fu) == 0x0Fu;
+            ok &= (snd->levels & (1u << 4)) == 0;
+            /* Network: rows 1-2 are levels, row 0 (Microphone) is NOT. */
+            ok &= (net->levels & (1u << 1)) != 0;
+            ok &= (net->levels & (1u << 2)) != 0;
+            ok &= (net->levels & (1u << 0)) == 0;
+            /* PC Settings has NO level rows -- Display and VSync are names. */
+            ok &= pc->levels == 0;
+        }
+        check("31. level rows are marked per-row, and named rows are not",
+              ok, "sound=%#x net=%#x pc=%#x",
+              snd ? snd->levels : 0, net ? net->levels : 0,
+              pc ? pc->levels : 0);
+    }
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");
