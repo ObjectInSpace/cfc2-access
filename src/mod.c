@@ -651,8 +651,27 @@ static DWORD WINAPI worker(LPVOID param)
          * cadence would miss most movements. It no-ops unless the cursor moved
          * since the last poll, and unless cfc2_focusdiff.on exists. It runs
          * HERE, on the worker, because the cursor hook must stay two atomics. */
-        if (gt_ok)
+        /* ⛔⛔ AND IT ALSO SAMPLES ON TEXT CHANGE. Per-movement alone was
+         * useless for exactly the screen it was most needed on: the quit
+         * dialogs produce ZERO cursor movements (measured -- 3 and 8 arrow
+         * presses, no movement logged), so a movement-gated differ records
+         * nothing there however long the dialog is open. Sending the user to
+         * capture it would have wasted the run.
+         *
+         * ⭐ setText's counter ticks when the screen REDRAWS, which is what a
+         * modal does when its selection changes. Same clock the layout probe
+         * now uses, and the same lesson: gate on the signal the target screen
+         * actually produces, not the one the other screens happen to share. */
+        if (gt_ok) {
+            static LONG fd_last_sets;
+            gt_stats fs;
+            gt_get_stats(&fs);
             gt_focus_diff_note_move();
+            if (fs.settext_calls != fd_last_sets) {
+                fd_last_sets = fs.settext_calls;
+                gt_focus_diff_note_text();
+            }
+        }
 
         if (gt_ok && (beat == 10 || beat % 5 == 0))
             gt_focus_report();

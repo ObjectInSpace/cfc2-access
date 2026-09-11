@@ -1269,16 +1269,12 @@ static BOOL fd_enabled(void) { return g_fd_on == 1; }
  * ⚠ A movement missed because two happened inside one poll costs one sample,
  * not a wrong one: the snapshot is always compared against the previous
  * snapshot, never against an assumed position. */
-void gt_focus_diff_note_move(void)
+/* The diff itself, with no gate of its own. ⭐ Split out so the SAME comparison
+ * can be driven by a cursor movement OR by a screen redraw -- the quit dialogs
+ * produce no movements at all, so a movement-only differ was blind to exactly
+ * the screen it was most needed on. */
+static void fd_run(void)
 {
-    if (!fd_enabled() || (!g_installed && !g_focus_test_mode))
-        return;
-    /* Only when the cursor actually moved since the last look. */
-    static LONG last_seen = -1;
-    LONG seq = g_move_seq;
-    if (seq == last_seen)
-        return;
-    last_seen = seq;
     if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
         return;
 
@@ -1358,6 +1354,37 @@ void gt_focus_diff_note_move(void)
              g_move_seq, changed_objs, n < FD_MAX ? n : FD_MAX);
 
     InterlockedExchange(&g_inst_busy, 0);
+}
+
+void gt_focus_diff_note_move(void)
+{
+    if (!fd_enabled() || (!g_installed && !g_focus_test_mode))
+        return;
+    /* Only when the cursor actually moved since the last look. */
+    static LONG last_seen = -1;
+    LONG seq = g_move_seq;
+    if (seq == last_seen)
+        return;
+    last_seen = seq;
+    fd_run();
+}
+
+/* ⭐⭐ Sample because the SCREEN REDREW, not because the cursor moved.
+ *
+ * ⛔⛔ The quit dialogs move their selection without going through the cursor
+ * helpers -- measured: 3 and 8 arrow presses, ZERO movements logged -- so
+ * gt_focus_diff_note_move() can never fire on them, however long they are open.
+ * A differ that cannot observe the one screen it is needed for is not a
+ * measurement tool, and the run that would have proved that was nearly spent
+ * before this was noticed.
+ *
+ * ⚠ The caller rate-limits this to once per beat; a screen that redraws
+ * constantly (the music player's timer) would otherwise fill the log. */
+void gt_focus_diff_note_text(void)
+{
+    if (!fd_enabled() || (!g_installed && !g_focus_test_mode))
+        return;
+    fd_run();
 }
 
 void gt_focus_diff_report(void)

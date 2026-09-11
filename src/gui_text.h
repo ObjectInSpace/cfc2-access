@@ -607,6 +607,12 @@ void gt_focus_diff_enable(BOOL on);
  * executing none of the code it named. */
 int gt_test_focus_diff_changed(void);
 void gt_focus_diff_note_move(void);
+
+/* ⭐⭐ Run the same diff because the screen REDREW rather than because the
+ * cursor moved. Needed for modals that bypass the cursor helpers entirely --
+ * the quit dialogs log zero movements, so the movement-gated entry point is
+ * structurally blind to them. */
+void gt_focus_diff_note_text(void);
 void gt_focus_diff_report(void);
 
 /* --- test seams ----------------------------------------------------------

@@ -1344,6 +1344,75 @@ int main(void)
               !ok && v[0] == 0, d);
     }
 
+    /* --- case 38: ⛔⛔ THE DIFFER MUST WORK WITHOUT ANY CURSOR MOVEMENT ------
+     *
+     * MEASURED, and it is why this exists: the quit dialogs move their
+     * selection WITHOUT going through the cursor helpers -- 3 arrow presses on
+     * one and 8 on the other, ZERO cursor movements logged either time. So
+     * gt_focus_diff_note_move(), which is gated on the movement sequence,
+     * records nothing there however long the dialog is open.
+     *
+     * A differ that is structurally blind to the one screen it is needed for is
+     * not a measurement tool. gt_focus_diff_note_text() runs the same
+     * comparison off the screen REDRAW instead.
+     *
+     * ⚠ THE ASSERTION IS DELIBERATELY NOT "it did not crash". The movement
+     * sequence is held FIXED across the whole case -- gt_note_focus_move() is
+     * never called -- so a text-triggered path that secretly still depended on
+     * a movement would report 0 and fail here. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        gt_focus_diff_enable(TRUE);
+
+        static ULONGLONG y[GT_CLASS_SIZE / 8], n[GT_CLASS_SIZE / 8];
+        memset(y, 0, sizeof y); memset(n, 0, sizeof n);
+        y[0] = n[0] = GT_VTABLE_ADDR;
+        gt_test_settext_body(y, "Yes", NULL, 0);
+        gt_test_settext_body(n, "No", NULL, 0);
+
+        /* Baseline, WITHOUT advancing the movement sequence. */
+        gt_focus_diff_note_text();
+
+        /* The selection moves to "Yes": one field changes on ONE object. Still
+         * no cursor movement -- exactly the quit dialog's behaviour. */
+        y[12] = 0xFF;
+        gt_focus_diff_note_text();
+        int selected = gt_test_focus_diff_changed();
+
+        /* And with nothing changing, 0 -- distinct from "never ran". */
+        gt_focus_diff_note_text();
+        int quiet = gt_test_focus_diff_changed();
+
+        gt_focus_diff_enable(FALSE);
+
+        char d38[96];
+        snprintf(d38, sizeof d38, "selected=%d (want 1), quiet=%d (want 0)",
+                 selected, quiet);
+        check("38. the differ samples on REDRAW, with no cursor movement at all",
+              selected == 1 && quiet == 0, d38);
+    }
+
+    /* case 39: ⚠ and it still respects the switch. A probe that runs when it
+     * was not asked to is how a diagnostic ends up in a user's play session. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        gt_focus_diff_enable(FALSE);
+        static ULONGLONG o[GT_CLASS_SIZE / 8];
+        memset(o, 0, sizeof o);
+        o[0] = GT_VTABLE_ADDR;
+        gt_test_settext_body(o, "Yes", NULL, 0);
+        gt_focus_diff_note_text();
+        o[12] = 0xFF;
+        gt_focus_diff_note_text();
+        char d39[96];
+        snprintf(d39, sizeof d39, "changed=%d (want <0 = never ran)",
+                 gt_test_focus_diff_changed());
+        check("39. the redraw-triggered differ stays OFF when disabled",
+              gt_test_focus_diff_changed() < 0, d39);
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",
