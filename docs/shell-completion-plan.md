@@ -1275,3 +1275,46 @@ This needs a signal the mod does not currently have. In rough order of promise:
 ⚠ NOT shippable from the corpus. SYS_WINDOW_YES/NO (25/26) is an obvious
 2-label run and naming the dialog from it would state a SELECTION the mod
 cannot observe -- worse than silence on a prompt that quits the game.
+
+## ⛔⛔ THE QUIT DIALOG'S SELECTION IS NOT IN ITS TEXT OBJECTS -- measured, closed
+
+Run docs/run-2026-09-11-1322.log, with BOTH probes on and the differ retimed to
+sample on redraw. This is a trustworthy negative, not a failed attempt.
+
+**What the dialog HAS.** Both options are real text objects in one column:
+
+    "Yes"  x=1792 y=540        "No"  x=1792 y=600      (60 px apart)
+
+plus prompt text seen for the first time: "If you exit the application,..."
+So the coordinate join COULD order them. Ordering was never the problem.
+
+**⛔ THE SELECTION IS NOT THERE.** Three independent checks agree:
+
+1. **The differ saw no change.** Across 12 arrow presses it reported "Yes"
+   changing ONCE and "No" not at all -- and both objects were demonstrably
+   being tracked (layout dumped them three times each).
+
+2. **The two fields that DO differ never move.** +0x124 (Yes=00800030,
+   No=40800020) and +0x13c (No=1, absent on Yes) separate the objects in every
+   poll -- but FOUR arrow presses fall between poll 1 and poll 2 and both fields
+   are byte-identical across them. A selection marker moves when the selection
+   moves. These are styling.
+
+3. **"No" is re-set exactly twice per run regardless of input** -- 2 sets
+   against 6, 12 and 6 arrow presses in three runs. That tracks OPENING the
+   dialog, not moving inside it.
+
+⭐ THE CONTROL THAT MAKES THIS A REAL NEGATIVE: the differ is not silent for
+lack of trying. In the same run it reported freely on other objects (15 dwords
+on the title prompt, 13 on "Exit the application."), so the channel was live and
+the specific answer is "these objects do not carry it".
+
+▶ WHAT WOULD BE LEFT, and why it is not worth it now: the selection lives on a
+parent node or in the animation system, which means the differential heap work
+that found the menu cursor -- a large investigation for ONE dialog whose two
+options are already knowable ("Yes"/"No") and whose consequence is quitting.
+
+⚠ Speaking the PROMPT is still possible and is a separate, smaller question:
+the dialog sets "If you exit the application,..." as ordinary text, so the
+caption channel can read it. That would announce WHAT is being asked without
+claiming which option is highlighted.
