@@ -244,6 +244,45 @@ sentence as the Start Button binding.
 changed during the session — which is the feature working, not noise — but it
 means the values are genuinely dynamic and cannot be baked into a table.
 
+## ⭐⭐ WHERE ELSE DOES "THE POSITION IS THE VALUE" APPLY? — swept, answer: nowhere else
+
+Asked after the volume fix. Every value row in every log, classified by its
+measured count:
+
+    Sound   rows 0-3  10 values   VOLUME LEVELS      ✅ now marked
+    Network rows 1-2  11 values   Voice Chat, Delay  ✅ now marked
+    Network row 0/3   2/5         Off-On, Any/2+/..  named, has a table
+    Sound   row 4     2           Original/Remix     named, has a table
+    PC      row 0     21          Resolution         NAMES (generated strings)
+    PC      rows 1-2  3/2         Display, VSync     named, has a table
+    Lobby   rows 6-7  10/8        First to N, 2..9   named, HAS a table
+    System  rows 1-3  7/8/7       button bindings    GLYPHS
+
+⭐ So the marking is COMPLETE — there is no other row where the cursor index is
+itself the setting. Checked rather than assumed, including the tempting
+10-value and 8-value rows on Lobby Settings, which are named lists with shipped
+tables and would have been WRONG as levels ("Victory Condition, 4, of 10"
+instead of "First to 4").
+
+⚠ The ID display (`0x14008a91b`, 6 slots, the largest remaining bare count) was
+also checked: its cursor is WHICH SLOT you are editing, so "3 of 6" is already
+the correct reading. The level idea does not apply.
+
+### ⭐ THE STRICT JOIN: 3 correct blocks, 0 wrong, but it only fires 33% of the time
+Requiring the row labels to be TRULY CONSECUTIVE (not merely in order) fixes the
+Sound misalignment by refusing that screen instead of corrupting it:
+
+    PC Settings   Resolution -> '1280x768' / '1280x720'
+                  Display    -> 'Borderless Windowed'   VSync -> 'Off'
+    System        Language -> 'English [en]' · Menu -> <ICON BTN_RB>
+                  Start -> <ICON BTN_START> · Coin -> <ICON BTN_LB>
+                  Data Collection -> 'Decline'
+
+⚠ Of 9 reports where all row labels are present, the strict rule accepts **3
+(33%)**. So these values would read on some visits and not others. That is
+honest but uneven, and it is the cost of refusing to guess when the block is
+broken up.
+
 ### ⚠⚠ RETRACTION: "SOUND IS THE DISPROOF" WAS MY BUG, NOT THE CHANNEL'S
 
 The user pushed back — "I would expect a number for a volume setting" — and was
