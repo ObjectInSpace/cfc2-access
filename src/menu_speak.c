@@ -1401,7 +1401,52 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
             if (row == 0 && rom_table_ready() &&
                 (s->caller == 0x1400b1bd9ULL || s->caller == 0x140098986ULL)) {
                 int game = m->new_index - m->min_index;
-                int ri = rom_table_index_for(game, 0);
+                /* ⭐⭐ SPEAK THE TITLE THE SCREEN IS SHOWING -- version 1, the
+                 * US side, not version 0.
+                 *
+                 * ⛔ This shipped as version 0 and was WRONG IN THE USER'S EAR.
+                 * For four games the two regions have different names, so the
+                 * mod said "Moero! Justice Gakuen" and "Capcom Fighting Jam"
+                 * while an English-language collection displayed "Project
+                 * Justice" and "Capcom Fighting Evolution".
+                 *
+                 * ⭐ The logs settle which side the game actually draws, and it
+                 * is not close: Project Justice 29 sightings vs Moero! Justice
+                 * Gakuen 1; Capcom Fighting Evolution 39 vs Capcom Fighting
+                 * Jam 3; Street Fighter Alpha 3 Upper 18 vs Zero 3 Upper 1.
+                 *
+                 * ⚠ The original comment called version 0 "a true name for the
+                 * game either way" and named following the version selection as
+                 * the obvious next step. True is not the standard -- a blind
+                 * user hearing a name the sighted screen does not show cannot
+                 * match them up, and that is the parity test this project uses.
+                 *
+                 * ⭐⭐ AND IT FOLLOWS THE GAME VERSION ROW. "Whatever is
+                 * displayed" is the standard (user, 2026-09-10): the screen
+                 * shows the JP title when the Japanese version is selected, so
+                 * defaulting to either side unconditionally is wrong half the
+                 * time. Hardcoding US would only have swapped which half.
+                 *
+                 * The version row sits beside this one on the same screen, and
+                 * its current value is the next slot in the value-cursor array
+                 * this screen already uses: row 1 at values_off + 1*4.
+                 *
+                 * ⚠ Guarded read, and only 0/1 are accepted -- "Either" is an
+                 * online FILTER value, not a version, so anything else falls
+                 * back rather than indexing the ROM table with nonsense. */
+                int version = 1;                 /* US unless the row says JP */
+                if (s->values_off > 0 && m->screen) {
+                    const void *vc =
+                        (const char *)m->screen + s->values_off + 4;
+                    int sel = 0;
+                    if (mem_readable(vc, sizeof(sel)) &&
+                        mem_copy(&sel, vc, sizeof(sel)) &&
+                        (sel == 0 || sel == 1))
+                        version = sel;
+                }
+                int ri = rom_table_index_for(game, version);
+                if (ri < 0)
+                    ri = rom_table_index_for(game, version ? 0 : 1);
                 char gt[128];
                 if (ri >= 0 && rom_table_title(ri, gt, sizeof(gt)) && gt[0]) {
                     _snprintf(out->item, sizeof(out->item), "%s", gt);

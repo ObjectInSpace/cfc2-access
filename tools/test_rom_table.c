@@ -227,6 +227,34 @@ int main(void)
         check("9. slots 0..7 map to the confirmed game order", ok, "");
     }
 
+    /* --- 9b: version 0 and version 1 are DIFFERENT rows for every game -----
+     * ⛔⛔ THE BUG THIS GUARDS. The mod spoke version 0 unconditionally and so
+     * said "Moero! Justice Gakuen" and "Capcom Fighting Jam" while the screen
+     * displayed "Project Justice" and "Capcom Fighting Evolution". It now
+     * follows the Game Version row, and this case pins the property that makes
+     * that meaningful: the two versions must resolve to DIFFERENT records, or
+     * following the row would be a no-op that looks like a fix.
+     *
+     * ⚠ Asserted on the ROM CODE, not the title: four of the eight games share
+     * a title across regions (Power Stone is "Power Stone" either way), so a
+     * title comparison would report those as broken when they are correct. */
+    {
+        int ok = 1;
+        for (int g = 0; g < 8; g++) {
+            int a = rom_table_index_for(g, 0), b = rom_table_index_for(g, 1);
+            char ca[32] = "", cb[32] = "";
+            if (a < 0 || b < 0 || a == b) { ok = 0; break; }
+            if (!rom_table_code(a, ca, sizeof ca) ||
+                !rom_table_code(b, cb, sizeof cb)) { ok = 0; break; }
+            if (strcmp(ca, cb) == 0) { ok = 0; break; }
+        }
+        /* And an out-of-range version must refuse rather than wrap. */
+        int refused = rom_table_index_for(0, 2) < 0 &&
+                      rom_table_index_for(0, -1) < 0;
+        check("9b. the two versions are distinct records, bad versions refuse",
+              ok && refused, "distinct=%d refused=%d", ok, refused);
+    }
+
     /* --- 10: a real title is recognised, a non-title is NOT ---------------
      * ⭐⭐ This predicate is the ONLY corroboration on speaking a Gallery
      * caption, so both directions matter. A matcher that always said yes would
