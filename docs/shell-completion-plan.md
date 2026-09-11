@@ -176,7 +176,102 @@ other text channel here was opened. That is real work, not a lookup.
 an incomplete one, and it should be recorded as UNFINISHED rather than shipped
 as correct.
 
-### ⭐ RESOLUTION AND VOLUME ARE A DIFFERENT, EASIER PROBLEM THAN THE GLYPHS
+### ⭐⭐ CORRECTION: THE RESOLUTION *IS* IN THE TEXT CHANNEL
+
+⛔ I concluded "no resolution-shaped string has EVER been drawn". **Wrong** — I
+had only checked same-timestamp `TEXT SET` lines on the VALUE axis. Searching
+the instance set and the caption channel finds them:
+
+    run-2026-09-10-1913: mcspeak: caption not in the corpus, not spoken: "1280x720"
+    run-2026-09-10-1732: instance set: LIVE [move 185, 6 sets] "1280x768"
+    run-2026-09-10-0053: focus record: [move 53] PROSE "1280x720"
+
+⭐ And the 19:13 sighting lands on the **ROW** movement to Resolution — i.e. the
+row's CURRENT VALUE is drawn when you arrive on the row. It was refused only
+because it is not a corpus label, which is exactly what the value-quote path
+existed to handle.
+
+### ⛔ BUT THE ROW AXIS HAS THE SAME ATTRIBUTION PROBLEM
+Pairing every Options ROW movement to the caption refused at that instant:
+
+    PC Settings   row 1 -> '1280x720'      ✅ correct (Resolution)
+    Sound         row 1 -> 'Original'      ✅ plausible (Challenger Jingle)
+    System        row 3 -> 'Agree'         ⛔ wrong row (Data Collection is 5)
+    System        row 5 -> 'English [en]'  ⛔ wrong row (Language is 1)
+    System        row 6 -> 'English [en]'  ⛔ wrong row
+
+⚠ So "speak the caption on the row axis" would be right sometimes and wrong
+sometimes, on the same screens the user already reported as wrong. That is the
+bug they complained about, relocated rather than fixed.
+
+⭐ **What this changes:** the value is REACHABLE — it is in the channel, not
+hidden behind a glyph or an encrypted file. What is missing is still the join
+from a string to the row it belongs to.
+
+## ⭐⭐⭐ THE GUI TREE ANSWERS IT: rows, then their values, in order
+
+The user asked about the GUI tree. The INSTANCE SET (which is the live object
+list, not route 3's static layout template) has the structure:
+
+    PC Settings   Resolution · Display · VSync · Default
+                  then:  '1280x768' · 'Borderless Windowed' · 'Off'
+    System        Language · Menu Button · Start Button · Coin Button ·
+                  Data Collection · Default
+                  then:  'English [en]' · <ICON BTN_RB> · <ICON BTN_START> ·
+                         <ICON BTN_LB> · 'Decline'
+
+⭐⭐ **This gives the button glyphs** — `BTN_RB`, `BTN_START`, `BTN_LB` for
+Menu/Start/Coin — which four earlier routes said were unreachable. They are
+plain `<ICON …>` text after all, and `gui_markup.c` already maps 132 such
+tokens to words. It also gives the resolution and the display mode.
+
+⭐ Verified across FOUR runs and both screens: the row labels appear
+contiguously in row order, immediately followed by their values in the same
+order.
+
+### ⛔ AND THE OBVIOUS IMPLEMENTATION IS ALREADY DISPROVEN
+"Take the next N objects after the last row label" fails: in the 01:30 run the
+sequence is interleaved with help text and a hint strip —
+
+    'English [en]', <ICON BTN_RB>, 'Change the coin button for each game…',
+    '<ICON CANCEL>Back', <ICON BTN_START>, <ICON BTN_LB>
+
+so positions 3 and 4 are prose, not values. A naive offset would speak a help
+sentence as the Start Button binding.
+
+⚠ Also: one 19:13 report shows `BTN_SELECT`/`RSB` where the others show
+`BTN_RB`/`BTN_START`. That is consistent with the bindings actually being
+changed during the session — which is the feature working, not noise — but it
+means the values are genuinely dynamic and cannot be baked into a table.
+
+### ⭐⭐ THE FILTERED JOIN IS VERIFIED OFFLINE — 6 of 6 reports
+
+Skipping prose (ends in punctuation, or > 40 chars) and hint strips, then taking
+the Nth remaining object after the row-label block:
+
+    PC Settings   Resolution -> '1280x768' / '1280x720'
+                  Display    -> 'Borderless Windowed'
+                  VSync      -> 'Off'
+    System        Language        -> 'English [en]'
+                  Menu Button     -> <ICON BTN_RB>
+                  Start Button    -> <ICON BTN_START>
+                  Coin Button     -> <ICON BTN_LB>
+                  Data Collection -> 'Decline'
+
+Correct on **every** report in every run, including the 19:13 one where the
+bindings differ (`BTN_SELECT`/`RSB`) — the join tracks the live setting rather
+than a remembered one.
+
+⚠ **"Default" overruns** — it has no value, so it picks up whatever follows
+("Options"). The row count is known, so the fix is to stop at rows that have a
+value; it must be handled, not discovered later.
+
+⛔ Still to prove before shipping: this is verified against LOGGED instance
+reports, which are taken every 5 beats. The mod would have to do the same walk
+LIVE, at movement time, and the instance table's contents at that instant are
+not guaranteed to match what a later report printed.
+
+### ⭐ RESOLUTION AND VOLUME vs THE GLYPHS
 
 ⚠ The generated rows — Resolution (21 values), the volume sliders (10-11),
 Input Delay (11) — are NOT the same case as the button bindings, and should not
