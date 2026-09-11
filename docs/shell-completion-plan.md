@@ -13,6 +13,40 @@ one screen per run is what let the count drift.
 Call sites pair up on one screen object (row list + value axis), the shape
 settings screens already use. Grouped by screen, with what each NEEDS:
 
+### ⛔⛔ THE FOCUS DIFFER HAS ANSWERED, AND THE ANSWER IS NO (21:30 run)
+
+The differ ran (167 diff lines over 53 movements). **Selection is not a field of
+`cGUIObjText`.** Three measurements, the third decisive:
+
+1. **The eight game-title objects NEVER change. Not once, in any diff line.**
+   Those are precisely the objects the 8-item strip would need a focus signal
+   on. A marker that never moves cannot mark anything.
+2. What *does* change is caption and hint-strip objects — the ones whose TEXT is
+   being re-set every movement ("Play a friendly match against…",
+   `<ICON DECIDE>`). They change because their content changed, which is the
+   thing we already knew.
+3. A genuine menu-row object ("Online Play", 36 changes) touches only **three**
+   offsets — `+0x1b8`, `+0x188`, `+0x170` — and **every one holds churning
+   POINTERS** (`0x2c376be0`, `0x2beb6900`, …), never a stable small value. No
+   offset anywhere in the 528-byte object toggles between two values the way a
+   selection flag must.
+
+⚠ **My first reading of this data was wrong and optimistic.** "2, 3 or 5 objects
+change per movement, never all — a focus candidate, not a ticker" was true as
+far as it went and measured the wrong thing: the objects changing were the ones
+being *rewritten*, not the ones being *selected*. The same-screen control
+distinguishes a ticker from a signal; it does not distinguish a signal from a
+side-effect of text assignment. That distinction needed the third check.
+
+⭐ **This agrees with route 3 rather than contradicting it.** Route 3 found the
+layout TEMPLATE static; this finds the live TEXT objects carry no selection
+state either. Selection lives on a parent node or in the animation system — the
+two places neither route has reached.
+
+▶ So the strip and the keypad stay unnamed, and **the differ should be left off**
+(it is opt-in and costs a 528-byte read per object per movement). It did its job:
+it converted an open question into a measured negative for the price of one run.
+
 ### ⛔⛔ THE 8-ITEM STRIP: MEASURED AND REFUSED (19:45 run)
 
 It WAS finally walked — **20 movements** — and the result is a clean negative
