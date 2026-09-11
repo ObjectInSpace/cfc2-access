@@ -842,6 +842,13 @@ int main(void)
     }
 
     /* --- case 23: an UNKNOWN row in a mapped screen speaks POSITION ---------
+     * ⚠⚠ THIS FIXTURE ROTTED ONCE AND THAT IS THE LESSON. It originally used
+     * Lobby Filters' row 2 as its "unknown row". The moment that row was named
+     * from the renderer's table, the case FAILED -- a test quietly depending on
+     * a screen staying unsolved. It now uses MC_TEST_CALLER, a g_screens row
+     * that exists only to hold a gap, so the mechanism outlives the screens it
+     * was built for.
+     *
      * ⭐⭐ Join Lobby's filters have 5 of 6 rows established. Without
      * MC_LABEL_UNKNOWN a map must be all-or-nothing, so one unproven row would
      * force all six to speak position -- discarding evidence that exists to
@@ -853,9 +860,9 @@ int main(void)
      * disabled the whole map and the test would pass on a broken screen). */
     {
         mc_speech u, k;
-        mc_move um = mk(0x14008e799ULL, 1, 0, 5);   /* position 2 -- unknown */
+        mc_move um = mk(MC_TEST_CALLER, 1, 0, 2);   /* position 2 -- unknown */
         menu_speak_build(&um, &u);
-        mc_move km = mk(0x14008e799ULL, 2, 0, 5);   /* position 3 -- known   */
+        mc_move km = mk(MC_TEST_CALLER, 2, 0, 2);   /* position 3 -- known   */
         menu_speak_build(&km, &k);
 
         /* ⚠ The GMD is not live in this process, so a KNOWN row cannot resolve
@@ -866,7 +873,7 @@ int main(void)
         check("23. an unknown mapped row declines for NO_LABELS, not by "
               "naming, while a known row reaches the text lookup",
               !u.named && u.why == MC_UNNAMED_NO_LABELS &&
-              u.position == 2 && u.total == 6 &&
+              u.position == 2 && u.total == 3 &&
               !k.named && k.why == MC_UNNAMED_TEXT_UNREADABLE,
               "unknown: named=%d why=%d pos=%d; known: named=%d why=%d",
               (int)u.named, (int)u.why, u.position, (int)k.named, (int)k.why);

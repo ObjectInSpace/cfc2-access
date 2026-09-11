@@ -185,9 +185,34 @@ static const int g_lobby_rows[] = { 78, 79, 80 };
  * plausible fillers -- Number of Players, Victory Condition, Game Start
  * Privilege -- and picking one because it "fits a 3-value row" is precisely the
  * reasoning that mislabelled two screens here. It speaks its position. */
+/* ⭐⭐ ROW 2 RESOLVED from the renderer's own table (0x141206e30), read via the
+ * `lea r12, [rip+0x1177f11]` at 0x14008ef18. Per row it holds the FIRST VALUE
+ * index: 14, 53, 85, 94, 107, 89.
+ *
+ * ⭐ FOUR rows validate it against labels captions already established --
+ * 85-1 = LOBBY_AREA · 94-1 = LOBBY_TITLE · 107-1 = LOBBY_EVENT ·
+ * 89-1 = LOBBY_SPMOVE. Row 1 is the game-names case (values start at
+ * GAME_NAME_ANY, label GAME_TITLE), identical to Lobby Settings' row 1.
+ *
+ * So row 2 -> 53 -> GAME_VERSION (52), "Game Version".
+ *
+ * ⛔⛔ AND I HAD REJECTED THIS ONCE ON BAD EVIDENCE. Pairing row 2's value
+ * movements to live text gave "On" three times, which is not a Game Version
+ * value, so I recorded the inference as refuted. Tracing the OBJECT shows it
+ * ever held "On", "Off", "Either" -- that is LOBBY_SPMOVE's family (89-91),
+ * i.e. ROW 6's value object, which is also a 3-value row. The pairing had
+ * attributed row 6's text to row 2.
+ *
+ * ⭐ The lesson: a same-timestamp pairing is still only as good as the OBJECT
+ * identity behind it. When a value looks wrong for the row, check which object
+ * set it before concluding the row is wrong. */
 static const int g_lobby_filter_rows[] = {
-    51, MC_LABEL_UNKNOWN, 84, 93, 106, 88
+    51, 52, 84, 93, 106, 88
 };
+
+/* See MC_TEST_CALLER: a map that deliberately keeps one row UNKNOWN so the
+ * sentinel path stays covered now that no shipped screen has a gap. */
+static const int g_sentinel_test_rows[] = { 51, MC_LABEL_UNKNOWN, 84 };
 
 /* ⭐⭐ CASUAL MATCH's game/filter rows (Online Play > Casual Match), 4 rows,
  * caller 0x14009890d. Established 2026-09-10 (21:00 run) on THREE independent
@@ -647,6 +672,12 @@ static const mc_screen g_screens[] = {
      * ⛔ NOT a 36-entry label table, deliberately -- see MC_CHAR_PICKER. */
     { 0x14008a8efULL, -1, 36, "Enter Lobby ID", MC_VERIFIED_LIVE_TEXT,
       MC_CHAR_PICKER, 0, NULL, 0, NULL, 0 },
+
+    /* ⚠ TEST-ONLY. Not a real call site -- no game movement can reach
+     * 0xDEADCA11 -- so this cannot affect speech. It keeps the
+     * MC_LABEL_UNKNOWN path covered; see MC_TEST_CALLER in the header. */
+    { MC_TEST_CALLER, -1, 3, "Sentinel Test", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_ROW, 0, g_sentinel_test_rows, 3, NULL, 0 },
 
     /* ⭐⭐ CREATE LOBBY's settings, 10 rows, 5 named. See g_create_lobby_rows.
      *
@@ -1565,6 +1596,7 @@ BOOL menu_speak_test_caption_repeat(const char *cap, const char *screen_name)
 {
     return caption_is_stale_repeat(cap, screen_name);
 }
+
 
 void menu_speak(const mc_move *m)
 {

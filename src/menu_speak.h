@@ -394,6 +394,20 @@ void menu_speak_probe_picker(const mc_move *m, const char *cap);
  * SEQUENCE. */
 BOOL menu_speak_test_caption_repeat(const char *cap, const char *screen_name);
 
+/* ⭐⭐ THE SENTINEL'S TEST SCREEN. `MC_TEST_CALLER` is a g_screens row that
+ * exists ONLY to keep the MC_LABEL_UNKNOWN path covered: its map is
+ * {known, UNKNOWN, known}, so a case can assert that the unknown row declines
+ * while its neighbours still resolve.
+ *
+ * ⚠ It exists because the real fixture ROTTED. Case 23 used Lobby Filters'
+ * row 2 as its "unknown row", and the moment that row was named from the
+ * renderer's table the case failed -- a test that quietly depended on a screen
+ * staying unsolved. A mechanism must outlive the screens it was built for.
+ *
+ * ⚠ The caller value is not a real call site, so no game movement can reach it
+ * and it cannot affect speech. */
+#define MC_TEST_CALLER 0xDEADCA11ULL
+
 /* Test-only: row i of the shipped table, or NULL. Lets the suite check the
  * hand-edited rows for typos and duplicate callers. */
 const mc_screen *menu_speak_row(int i);

@@ -69,10 +69,16 @@ EXPECTED = {
     # the 19:45 run; position 2 never produced one and is MC_LABEL_UNKNOWN.
     # ⚠ The <UNKNOWN> slot is listed so the other five stay pinned to their
     # POSITIONS -- dropping it would silently shift rows 3-6 up by one.
+    # All six rows. Row 2 came from the renderer's first-value table at
+    # 0x141206e30, which four caption-established rows validate (each table[i]-1).
     "g_lobby_filter_rows": [
-        "Game", "<UNKNOWN>", "Cross-region Matchmaking", "Comment",
+        "Game", "Game Version", "Cross-region Matchmaking", "Comment",
         "Event Mode", "One-button Special Moves",
     ],
+    # ⚠ TEST-ONLY (MC_TEST_CALLER). Exists solely to keep the MC_LABEL_UNKNOWN
+    # path covered now that every shipped map is fully named; its caller is not
+    # a real call site, so no movement can reach it.
+    "g_sentinel_test_rows": ["Game", "<UNKNOWN>", "Cross-region Matchmaking"],
     "g_select_game_rows": [
         "Game", "Game Version", "Player",
     ],
