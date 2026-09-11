@@ -47,6 +47,13 @@ EXPECTED = {
     # Online Play > Casual Match. Three independent sources in the 21:00 run:
     # the instance set's labels, the value-slot arithmetic (8 values on row 0,
     # 3 on row 1, via values_off 0x344) and HELP_GAME_TITLE_ON as the caption.
+    # ⭐ Ranked Match: the SAME caller as Casual with one row fewer. Which row
+    # drops was MEASURED (Ranked row 3 shows 2 values = Cross-region), not
+    # inferred -- all four labels are live in both modes, so the instance set
+    # could not decide it.
+    "g_ranked_match_rows": [
+        "Game", "Game Version", "Cross-region Matchmaking",
+    ],
     "g_casual_match_rows": [
         "Game", "Game Version", "Cross-region Matchmaking",
         "One-button Special Moves",

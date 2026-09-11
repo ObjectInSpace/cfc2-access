@@ -359,6 +359,36 @@ static const int g_sentinel_test_rows[] = { 51, MC_LABEL_UNKNOWN, 84 };
  * two 3-item lists sharing the screen object. */
 static const int g_casual_match_rows[] = { 51, 52, 84, 88 };
 
+/* ⭐⭐⭐ RANKED MATCH'S ROWS -- the SAME CALLER as Casual Match, three rows.
+ *
+ * ⛔⛔ USER-REPORTED: "the number of rows is not constant when I arrow up or
+ * down ... maybe there's a phantom row". There is no phantom: 0x14009890d
+ * serves TWO screens, and the shipped 4-row map was being applied to both.
+ *
+ * ⭐ IDENTIFIED BY ENTRY POINT, which is the only identification that has held
+ * up on this project. Across 17 visits in every log, with ZERO exceptions:
+ *     entered from "Casual Match" -> ALWAYS 4 rows
+ *     entered from "Ranked Match" -> ALWAYS 3 rows
+ * Same screen OBJECT and same cursor field either side of the change, so the
+ * game itself reports a different row count -- this is not a mis-read.
+ *
+ * ⚠⚠ AND WHICH ROW DROPS WAS MEASURED, NOT INFERRED. The obvious reading is
+ * that Ranked is "Casual minus its last row", and the value counts appear to
+ * agree (Casual 8,3,2,3 vs Ranked 8,3,2). But the instance set shows all FOUR
+ * labels live in BOTH modes, so the labels cannot decide it. Pairing each
+ * Ranked ROW position with the value count that follows it settles it:
+ *     RANKED row 3 -> 2 values (8 sightings)
+ * Two values is Cross-region Matchmaking; One-button Special Moves has three.
+ * So row 3 IS Cross-region and the row that disappears is the LAST one.
+ * ⭐ That is the same conclusion the inference reached, by evidence rather than
+ * by plausibility -- and the labels being present in both modes is exactly the
+ * kind of detail that would have made the guess look wrong.
+ *
+ * ⚠ Game Version is PRESENT on Ranked (row 2, three values: JP/EN/Either),
+ * which is worth stating because "ranked forces a version" would be a natural
+ * assumption and the data refutes it. */
+static const int g_ranked_match_rows[] = { 51, 52, 84 };
+
 /* ⭐ Casual Match's value labels. Its four rows are the SAME four settings as
  * Lobby Filters' rows 1-3 and 6, and the value runs are the ones that screen's
  * renderer table establishes.
@@ -1017,6 +1047,30 @@ static const mc_screen g_screens[] = {
      * not at all, and its titles arrive only on the transcript channel. */
     { 0x14009890dULL, -1, 4, "Casual Match", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_ROW, 0, g_casual_match_rows, 4, NULL, 0 },
+
+    /* ⭐⭐⭐ RANKED MATCH -- THE SAME CALLER, THREE ROWS. See
+     * g_ranked_match_rows: 17 visits across every log, entry point decides the
+     * count with zero exceptions (Casual -> 4, Ranked -> 3).
+     *
+     * ⚠ This is why menu_speak_lookup_n() discriminates on caller AND count --
+     * the same mechanism that split 0x14009ba21 into Select Mode and Online
+     * Play. A caller is not a screen identity. Without this row the 4-row map
+     * was applied to a 3-row screen, which is the user-visible bug: the row
+     * count appeared to change while arrowing.
+     *
+     * ⚠ The VALUE axis needs no second entry -- its count is already 0 ("varies
+     * by row") and it finds its row map through the sibling NAME. But the name
+     * must MATCH for that link to work, so this row is deliberately named
+     * "Casual Match" rather than "Ranked Match".
+     *
+     * ⛔ THAT IS A REAL TRADE-OFF, recorded rather than hidden: the screen will
+     * announce itself as Casual Match when it is Ranked. The row NAMES are
+     * right either way, which is what the user navigates by; fixing the screen
+     * title needs a sibling link keyed on something other than the name, and
+     * that is a change to the lookup, not to this table. */
+    { 0x14009890dULL, -1, 3, "Casual Match", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_ROW, 0, g_ranked_match_rows, 3, NULL, 0 },
+
     { 0x140098986ULL, -1, 0, "Casual Match", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_VALUE, 0x344, NULL, 0, g_casual_match_values,
       (int)(sizeof(g_casual_match_values) / sizeof(g_casual_match_values[0])) },
