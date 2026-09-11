@@ -8,6 +8,47 @@ everything else.
 across three runs). Treating it as a campaign with a checklist is the fix; doing
 one screen per run is what let the count drift.
 
+## ⭐⭐ "IF WE KNOW WHAT THE TEXT DRAWS, WHY NOT USE THAT INSTEAD OF THE TABLE?"
+
+User's question, 2026-09-10. It is the right question and the answer is
+measured, not assumed: **the drawn text is not reliable enough to REPLACE the
+tables, but it is the ideal CROSS-CHECK.**
+
+### Measurement 1 — coverage: 38%
+Of **580 value-axis movements** across every log, only **223 (38%)** have any
+text drawn at the same instant. Live text alone would leave nearly two thirds of
+value movements silent — worse than today.
+
+### Measurement 2 — accuracy: 25% WRONG, tested against a known-good set
+The decisive test. Lobby Settings row 8 is "Number of Players", whose values are
+`"2".."9"` — shipped and corpus-validated, so the right answer is known
+independently. If live text could replace the table, value position N must draw
+`str(N+1)`:
+
+    matched 12x · MISMATCHED 4x
+      pos 5 expected '6', drew 'Challenger'
+      pos 2 expected '3', drew 'Game Version'
+      pos 1 expected '2', drew 'Victory Condition'
+
+A **25% error rate** against data known to be correct. The wrong draws are other
+rows' objects on the same screen re-setting themselves.
+
+### Measurement 3 — object identity does NOT rescue it
+The obvious fix is to key on the object rather than the timestamp. It fails:
+object `2C507A70` holds `"3"`, `"4"`, `"5"` **and** `"Challenger"` within one
+screen. Addresses are per-run and one object serves different purposes across
+visits, so identity alone cannot say which row a string belongs to.
+
+### ⭐ So the right use is an AUDIT, not a replacement
+The table gives coverage (100% of movements, from the code the game itself
+indexes); the live text gives an independent opinion 38% of the time. Comparing
+them is exactly how the two wrong-value classes the user reported would have
+been caught by measurement instead of by ear — and it is the next piece of work.
+
+⚠ This also explains why my earlier pairing misreads kept happening: on these
+screens the "text near a movement" is very often a NEIGHBOURING row's object.
+Four times this session that produced a confident wrong reading.
+
 ## ⚠ THE 22:45 RUN DID NOT SETTLE THE PICKER — and the reason is unexplained
 
 The run delivered what was asked: **7 upward movements** on the picker (the
