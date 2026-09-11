@@ -501,6 +501,32 @@ void gt_instance_report(void);
  * same number is a contradiction, not a tie to be broken -- it returns FALSE. */
 BOOL gt_numbered_item(int n, char *out, int outlen);
 
+/* ⭐⭐ A SETTINGS SCREEN'S ROW VALUES, from the live object list.
+ *
+ * `labels` is the screen's row labels in row order. If the instance table holds
+ * them as a TRULY CONSECUTIVE run, the values follow immediately in the same
+ * order, and this returns the one for `row`.
+ *
+ * ⭐ It reaches three things no GMD table can: the button GLYPHS
+ * (`<ICON BTN_RB>` etc. -- gui_markup already names 132 such tokens), the
+ * RESOLUTION, and the display mode. Verified offline against every logged
+ * instance report: 3 blocks found, 3 correct, 0 wrong.
+ *
+ * ⛔⛔ CONSECUTIVE IS LOAD-BEARING, not tidiness. Requiring only that the labels
+ * appear IN ORDER passed on Sound Settings, where they sit at positions
+ * [0,4,5,6,7,8] with a caption and a menu item in between -- and the join then
+ * read from the wrong offset and produced "Music Volume -> Remix", "Announcer
+ * Volume -> Options". Every value wrong, all plausible, none detectable by ear.
+ *
+ * ⚠ It therefore REFUSES more often than it answers: measured at 3 of 9 reports
+ * where all the labels were present. A row that does not resolve keeps its
+ * position-only speech, which is true.
+ *
+ * ⚠ Prose and hint strips are skipped between values (help text can interleave),
+ * which is why this is not a fixed offset. */
+BOOL gt_row_value(const char *const *labels, int nlabels, int row,
+                  char *out, int outlen);
+
 /* ⭐⭐ THE FOCUS DIFFER: which field of a cGUIObjText marks it as SELECTED?
  *
  * The open question two screens now need (Casual Match's 8-item strip, the

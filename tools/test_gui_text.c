@@ -1140,6 +1140,84 @@ int main(void)
               d1_gone, d30);
     }
 
+    /* --- case 31: a settings row's VALUE from the live object list ----------
+     * ⛔ USER-REPORTED: "it still doesn't say anything when I change
+     * resolution." The join was verified offline and never wired in; the data
+     * was there the whole time. This fixture is the REAL PC Settings block from
+     * run-2026-09-11-0230, verbatim.
+     *
+     * ⚠ Note the block deliberately contains the traps: a caption ending in a
+     * period, a Confirm/Back hint strip, menu items BEFORE the row labels, and
+     * a duplicate "PC Settings" -- all of which must be handled. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static const char *const block[] = {
+            "PC Settings", "Options", "Quit", "Change the display mode.",
+            "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back",
+            "Music", "Network", "Credits", "PC Settings",
+            "Resolution", "Display", "VSync", "Default",
+            "1280x720", "Fullscreen", "Off",
+        };
+        static ULONGLONG objs[32];
+        for (size_t i = 0; i < sizeof block / sizeof block[0]; i++) {
+            objs[i] = GT_VTABLE_ADDR;
+            gt_test_settext_body(&objs[i], block[i], NULL, 0);
+        }
+        static const char *const labels[] = {
+            "Resolution", "Display", "VSync", "Default"
+        };
+        char v0[64] = { 0 }, v1[64] = { 0 }, v2[64] = { 0 }, v3[64] = { 0 };
+        BOOL r0 = gt_row_value(labels, 4, 0, v0, sizeof v0);
+        BOOL r1 = gt_row_value(labels, 4, 1, v1, sizeof v1);
+        BOOL r2 = gt_row_value(labels, 4, 2, v2, sizeof v2);
+        /* ⚠ "Default" has NO value; it must refuse rather than overrun onto
+         * whatever object follows. */
+        BOOL r3 = gt_row_value(labels, 4, 3, v3, sizeof v3);
+
+        char d[220];
+        snprintf(d, sizeof d, "0=%d'%s' 1=%d'%s' 2=%d'%s' 3=%d'%s'",
+                 (int)r0, v0, (int)r1, v1, (int)r2, v2, (int)r3, v3);
+        check("31. a settings row's value comes from the live object list",
+              r0 && !strcmp(v0, "1280x720") &&
+              r1 && !strcmp(v1, "Fullscreen") &&
+              r2 && !strcmp(v2, "Off") && !r3, d);
+    }
+
+    /* --- case 32: labels merely IN ORDER are REFUSED ------------------------
+     * ⛔⛔ THE SOUND SETTINGS BUG, as a test. Its row labels sit at positions
+     * [0,4,5,6,7,8] -- in order, but NOT consecutive, with a caption and menu
+     * items in between. Accepting that read from the wrong offset and produced
+     * "Music Volume -> Remix", "Announcer Volume -> Options": every value
+     * wrong, all plausible, none detectable by ear.
+     *
+     * ⚠ So this asserts a REFUSAL. Requiring consecutiveness is what makes the
+     * channel safe, and a change that relaxes it fails here. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static const char *const block[] = {
+            "Music Volume", "Adjust the volume of background music.",
+            "<SIZE 58><ICON CANCEL></SIZE>Back", "System",
+            "Sound Effects Volume", "Announcer Volume", "Game Volume",
+            "Challenger Jingle", "Default", "Remix", "Music", "Options",
+        };
+        static ULONGLONG objs[32];
+        for (size_t i = 0; i < sizeof block / sizeof block[0]; i++) {
+            objs[i] = GT_VTABLE_ADDR;
+            gt_test_settext_body(&objs[i], block[i], NULL, 0);
+        }
+        static const char *const labels[] = {
+            "Music Volume", "Sound Effects Volume", "Announcer Volume",
+            "Game Volume", "Challenger Jingle", "Default"
+        };
+        char v[64] = { 0 };
+        BOOL got = gt_row_value(labels, 6, 0, v, sizeof v);
+        char d[120];
+        snprintf(d, sizeof d, "returned %d, %s", (int)got, v);
+        check("32. labels in order but NOT consecutive are refused", !got, d);
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",

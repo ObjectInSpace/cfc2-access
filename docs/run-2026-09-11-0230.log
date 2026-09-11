@@ -1,0 +1,274 @@
+[01:57:27.206] === CFC2 Access -- Phase 1.3: unpacked image dump ===
+[01:57:27.206] worker thread started, pid=32084
+[01:57:27.270] speech: ready, backend=NVDA
+[01:57:27.271] image [t0]: base=0000000140000000, 10 readable sections
+[01:57:27.271] image [t0]:   rva=0x1000     size=16625664  code distinct=256/256 prot=0x80   packed
+[01:57:27.271] image [t0]:   rva=0xfdc000   size=2072576   code distinct=256/256 prot=0x80   packed
+[01:57:27.271] image [t0]:   rva=0x11d6000  size=28758016  code distinct=256/256 prot=0x80   packed
+[01:57:27.271] image [t0]:   rva=0x2d43000  size=745472    code distinct=1/256 prot=0x80   UNPACKED
+[01:57:27.271] image [t0]:   rva=0x2df9000  size=4096      code distinct=256/256 prot=0x80   packed
+[01:57:27.271] image [t0]:   rva=0x2dfa000  size=270336    code distinct=1/256 prot=0x80   UNPACKED
+[01:57:27.271] image [t0]:   rva=0x2e3c000  size=233472    code distinct=256/256 prot=0x80   packed
+[01:57:27.271] image [t0]:   rva=0x2e75000  size=270336    data distinct=254/256 prot=0x2    
+[01:57:27.271] image [t0]:   rva=0x2eb7000  size=13451264  code distinct=85/256 prot=0x40   UNPACKED
+[01:57:27.271] image [t0]:   rva=0x3b8b000  size=3952640   code distinct=256/256 prot=0x40   packed
+[01:57:27.796] image: unpacked after 515 ms -- section rva=0x1000 distinct=233/256 prot=0x20
+[01:57:27.797] image [unpacked]: base=0000000140000000, 10 readable sections
+[01:57:27.797] image [unpacked]:   rva=0x1000     size=16625664  code distinct=233/256 prot=0x20   UNPACKED
+[01:57:27.798] image [unpacked]:   rva=0xfdc000   size=2072576   data distinct=194/256 prot=0x2    
+[01:57:27.798] image [unpacked]:   rva=0x11d6000  size=28758016  data distinct=47/256 prot=0x4    
+[01:57:27.798] image [unpacked]:   rva=0x2d43000  size=745472    data distinct=1/256 prot=0x2    
+[01:57:27.798] image [unpacked]:   rva=0x2df9000  size=4096      data distinct=255/256 prot=0x2    
+[01:57:27.798] image [unpacked]:   rva=0x2dfa000  size=270336    data distinct=1/256 prot=0x2    
+[01:57:27.799] image [unpacked]:   rva=0x2e3c000  size=233472    code distinct=234/256 prot=0x20   UNPACKED
+[01:57:27.799] image [unpacked]:   rva=0x2e75000  size=270336    data distinct=254/256 prot=0x2    
+[01:57:27.799] image [unpacked]:   rva=0x2eb7000  size=13451264  code distinct=85/256 prot=0x40   UNPACKED
+[01:57:27.799] image [unpacked]:   rva=0x3b8b000  size=3952640   code distinct=256/256 prot=0x40   packed
+[01:57:27.799] probe: VirtualProtect OK (target 0000000140001000, old prot 0x20) -- detours should be installable
+[01:57:27.800] kbd: identity CONFIRMED in this process -- vtable+0x30 -> 0x140253220 and the class name reads "sKeyboard".
+[01:57:27.851] kbd: hooked the sKeyboard state builder at 0x140253750. It receives rcx=the instance and rdx=the state bitmap, so the instance pointer arrives as an ARGUMENT -- no memory search.
+[01:57:27.851] mc: identity CONFIRMED in this process -- both cursor helpers carry the expected prologue.
+[01:57:27.948] mc: hooked both menu cursor helpers -- vertical 0x14007cdc0, horizontal 0x14007c9f0. The screen object and the cursor pointer arrive as ARGUMENTS, so there is no memory search.
+[01:57:27.948] gt: identity CONFIRMED -- 0x1402fd6a0 carries the expected prologue and sits in the instance vtable's slot 13.
+[01:57:28.052] gt: hooked the cGUIObjText CONSTRUCTOR at 0x1402efc10. It has exactly ONE caller (the factory 0x1402ef980), so this counts EVERY object of this class that is ever built -- which is what tells a wrong hook target apart from a class the shell never instantiates.
+[01:57:28.247] gt: hooked 4 of 4 setText overloads (cGUIObjText slots 25/26, cGUIObjMessage slots 25/26). Each carries its own counter, so the log will name WHICH one the shell uses.
+[01:57:28.247] gt: ready -- ctor probe live and update hook installed. Detours DEREFERENCE NOTHING beyond a single guarded vptr read; all inspection happens on the worker thread under the fault guard.
+[01:57:28.248] dump: SKIPPED -- image never unpacked. Any dump taken now would be ciphertext that silently looks like a valid file.
+[01:57:28.248] phase 1.3 result: speech=YES protect=YES unpacked=YES sections_dumped=0
+[01:57:28.248] pad: OFF -- cfc2_pad.on is absent. sPad is inert for the shell (Kind=0, update never runs); create that file only for in-game work.
+[01:57:28.349] kbd: ⛔ the builder has not run yet -- no state has been captured, so nothing can be concluded about key state.
+[01:57:28.349] memsafe: fault guard armed (self-test passed)
+[01:57:28.349] gmdfind: excluding own stack 00000000029C0000..0000000002BC0000 and own module 00007FF96CA60000..00007FF96CAAB000
+[01:57:29.967] gmdfind: walked 2323 regions; scanned 582 private (1618824 KB) in 1609 ms; 1 candidate(s); guard absorbed 0 fault(s)
+[01:57:29.967] gmdfind:  candidate 0: array_base=000000003B7100A0 form=LIVE_TABLE probes=64/64 geometry=2016/2016 pairs pad=0xcdcdcdcd region=000000003B450000+524288KB
+[01:57:29.978] gmdfind: ⭐ CLOSED LOOP -- followed labelOffset to "STATS_PWS2_06_NAME", re-hashed those bytes, hashes MATCH the entry. This is the GMD label array.
+[01:57:29.990] gmdfind: string blob was NOT at the usual +0x140000 -- found at +0xd0000 this run (it moves)
+[01:57:29.990] gmdfind: ⭐⭐ TEXT RESOLVED (live) -- "LANG_NAME_JAPANESE" = "Japanese [jp]", via a pointer at entry+0xd0000. We can READ the shell's messages. (matched shipped variant 1 of 4, English)
+[01:57:30.005] gmdtext:   blob at entries+0xd0000 is "eng"  <== matches config.ini
+[01:57:30.005] gmdtext: ⭐⭐ blob resolved at entries+0xd0000; 4165 messages readable. Table language: eng (matches config.ini).
+[01:57:30.007] mc: the cursor helpers have not run yet -- nothing can be concluded about menu movement.
+[01:57:31.917] heartbeat 1 (alive 2 s)
+[01:57:31.917] gt: 2 CONSTRUCTED; setText ran 0 time(s), 0 string(s) captured; 0 guarded read(s) faulted.  ⛔ Objects exist but setText NEVER RAN: the class is right and 0x1402f0b50 is not how its text is assigned. Find the other writer.
+[01:57:33.931] heartbeat 2 (alive 4 s)
+[01:57:35.946] heartbeat 3 (alive 6 s)
+[01:57:35.946] kbd: builder ran 0 times; instance=0000000000000000 state=0000000000000000 offset=(not captured)
+[01:57:35.946] gt: 2 CONSTRUCTED; setText ran 0 time(s), 0 string(s) captured; 0 guarded read(s) faulted.  ⛔ Objects exist but setText NEVER RAN: the class is right and 0x1402f0b50 is not how its text is assigned. Find the other writer.
+[01:57:38.763] kbd: CAPTURED instance=0000000029058990 state=0000000029058AC8 after 3 builder calls.
+[01:57:38.763] kbd: ⭐⭐ state - instance == 0x138, exactly as the disassembly predicted. The offline model is CONFIRMED in live memory.
+[01:57:38.764] kbd: down=[(none)]  pressed=[(none)]  released=[(none)]  (engine Trg=[(none)])
+[01:57:39.985] heartbeat 5 (alive 10 s)
+[01:57:39.985] gt: ⚠ focus recorder INCONCLUSIVE -- 0 string(s) recorded but the cursor hook never notified us (0 movements). Nothing can be concluded about per-row captions.
+[01:57:39.985] gt: === INSTANCE SET: 0 live text object(s), 0 dropped (table full) ===
+[01:57:39.985] gt: of 0 object(s): 0 still LIVE, 0 stale; current move seq 0.
+[01:57:39.985] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[01:57:43.033] gt: * TEXT SET on 000000002BDD11D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[01:57:44.049] gt: 3 CONSTRUCTED; setText ran 63 time(s), 63 string(s) captured; 0 guarded read(s) faulted.
+[01:57:44.049] gt:   by overload: cGUIObjText.25=63 .26=0  cGUIObjMessage.25=0 .26=0
+[01:57:45.369] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[01:57:45.471] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[01:57:46.083] gt: 5 CONSTRUCTED; setText ran 186 time(s), 186 string(s) captured; 0 guarded read(s) faulted.
+[01:57:46.083] gt:   by overload: cGUIObjText.25=186 .26=0  cGUIObjMessage.25=0 .26=0
+[01:57:47.505] gt: * TEXT SET on 000000002C2815B0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:57:47.708] mc: the helpers ARE running (2 calls so far). The hook is live.
+[01:57:48.115] gt: 26 CONSTRUCTED; setText ran 263 time(s), 263 string(s) captured; 0 guarded read(s) faulted.
+[01:57:48.115] gt:   by overload: cGUIObjText.25=263 .26=0  cGUIObjMessage.25=0 .26=0
+[01:57:48.930] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:57:49.054] gmdtext: blob region: base=000000003B7E0000 size=520640 KB state=0x1000 protect=0x4 type=0x20000
+[01:57:49.054] gmdtext: ⭐ indexed 4165 string offsets in one pass; blob spans 000000003B7E00A0..000000003B7FA0A0 (106496 bytes) and is validated ONCE -- per-string reads no longer call VirtualQuery.
+[01:57:49.060] mcspeak: spoke "Online Play, 2 of 6. Play online using a network connection."
+[01:57:49.060] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=0000000140097A59 screen=000000002BD999D0 cursor=000000002BD99D00
+[01:57:49.162] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:57:50.281] heartbeat 10 (alive 20 s)
+[01:57:50.281] kbd: builder ran 694 times; instance=0000000029058990 state=0000000029058AC8 offset=0x138 CONFIRMED
+[01:57:50.281] gt: 26 CONSTRUCTED; setText ran 265 time(s), 265 string(s) captured; 0 guarded read(s) faulted.
+[01:57:50.281] gt:   by overload: cGUIObjText.25=265 .26=0  cGUIObjMessage.25=0 .26=0
+[01:57:50.281] gt: === FOCUS RECORD: 14 distinct string(s) across 1 cursor movement(s), 0 dropped (buffer full) ===
+[01:57:50.281] gt:   [move 0] strip 000000002BDD11D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[01:57:50.281] gt:   [move 0] PROSE 000000002BD88520: "Now loading..."
+[01:57:50.282] gt:   [move 0] strip 000000002BDD11D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[01:57:50.282] gt:   [move 0] strip 000000002BDD0950: "<FONT 2>Main Menu</FONT>"
+[01:57:50.282] gt:   [move 0] PROSE 000000002BDB7240: "Offline Play"
+[01:57:50.282] gt:   [move 0] PROSE 000000002BDEE330: "Online Play"
+[01:57:50.282] gt:   [move 0] PROSE 000000002BD96C10: "Museum"
+[01:57:50.282] gt:   [move 0] PROSE 000000002C207AA0: "Fighter Awards"
+[01:57:50.282] gt:   [move 0] PROSE 000000002BD894F0: "Options"
+[01:57:50.282] gt:   [move 0] PROSE 000000002BDFDB50: "Quit"
+[01:57:50.284] gt:   [move 0] PROSE 000000002BD8B8C0: "Play offline."
+[01:57:50.284] gt:   [move 0] strip 000000002C2815B0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:57:50.284] gt:   [move 1] PROSE 000000002BD8B8C0: "Play online using a network connection."
+[01:57:50.284] gt:   [move 1] strip 000000002C2815B0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:57:50.284] gt: of 14 string(s): 2 arrived after a cursor movement, 9 were prose captions.
+[01:57:50.284] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[01:57:50.284] gt: === INSTANCE SET: 11 live text object(s), 0 dropped (table full) ===
+[01:57:50.284] gt:   000000002BDD11D0 STALE [move 0, 253 set(s)] "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[01:57:50.286] gt:   000000002BD88520 STALE [move 0, 1 set(s)] "Now loading..."
+[01:57:50.286] gt:   000000002BDD0950 LIVE  [move 0, 1 set(s)] "<FONT 2>Main Menu</FONT>"
+[01:57:50.286] gt:   000000002BDB7240 LIVE  [move 0, 1 set(s)] "Offline Play"
+[01:57:50.286] gt:   000000002BDEE330 LIVE  [move 0, 1 set(s)] "Online Play"
+[01:57:50.287] gt:   000000002BD96C10 LIVE  [move 0, 1 set(s)] "Museum"
+[01:57:50.287] gt:   000000002C207AA0 LIVE  [move 0, 1 set(s)] "Fighter Awards"
+[01:57:50.287] gt:   000000002BD894F0 LIVE  [move 0, 1 set(s)] "Options"
+[01:57:50.287] gt:   000000002BDFDB50 LIVE  [move 0, 1 set(s)] "Quit"
+[01:57:50.287] gt:   000000002BD8B8C0 LIVE  [move 1, 2 set(s)] "Play online using a network connection."
+[01:57:50.287] gt:   000000002C2815B0 LIVE  [move 1, 2 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:57:50.287] gt: of 11 object(s): 9 still LIVE, 2 stale; current move seq 1.
+[01:57:50.287] gt: ⭐ reclaimed 2 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[01:57:50.287] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[01:57:52.321] gt: 26 CONSTRUCTED; setText ran 265 time(s), 265 string(s) captured; 0 guarded read(s) faulted.
+[01:57:52.321] gt:   by overload: cGUIObjText.25=265 .26=0  cGUIObjMessage.25=0 .26=0
+[01:57:53.240] mcspeak: spoke "Museum, 3 of 6. Browse various art galleries or listen to the game soundtracks."
+[01:57:53.240] mc: vertical   cursor 1 -> 2  (item 3 of 6, range 0..5, step +1)  caller=0000000140097A59 screen=000000002BD999D0 cursor=000000002BD99D00
+[01:57:53.443] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:57:53.449] mcspeak: spoke "Fighter Awards, 4 of 6. View your in-game challenges and play status."
+[01:57:53.449] mc: vertical   cursor 2 -> 3  (item 4 of 6, range 0..5, step +1)  caller=0000000140097A59 screen=000000002BD999D0 cursor=000000002BD99D00
+[01:57:53.550] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:57:54.160] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:57:54.165] mcspeak: caption AMBIGUOUS, not spoken: "Change various in-game settings."
+[01:57:54.166] mcspeak: spoke "Options, 5 of 6"
+[01:57:54.166] mc: vertical   cursor 3 -> 4  (item 5 of 6, range 0..5, step +1)  caller=0000000140097A59 screen=000000002BD999D0 cursor=000000002BD99D00
+[01:57:54.269] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:57:54.370] gt: 26 CONSTRUCTED; setText ran 271 time(s), 271 string(s) captured; 0 guarded read(s) faulted.
+[01:57:54.370] gt:   by overload: cGUIObjText.25=271 .26=0  cGUIObjMessage.25=0 .26=0
+[01:57:54.777] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[01:57:54.879] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[01:57:55.185] gt: * TEXT SET on 000000002BD85970: "Credits"
+[01:57:56.200] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:57:56.206] mcspeak: spoke "Music, 2 of 5. Change various sound-related settings."
+[01:57:56.206] mc: vertical   cursor 0 -> 1  (item 2 of 5, range 0..4, step +1)  caller=00000001400A20FC screen=000000002BD9BE80 cursor=000000002BD9C1B0
+[01:57:56.206] gt: * TEXT SET on 000000002C2815B0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:57:56.308] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:57:56.409] gt: 43 CONSTRUCTED; setText ran 285 time(s), 285 string(s) captured; 0 guarded read(s) faulted.
+[01:57:56.409] gt:   by overload: cGUIObjText.25=285 .26=0  cGUIObjMessage.25=0 .26=0
+[01:57:56.613] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:57:56.618] mcspeak: spoke "Network, 3 of 5. Configure your network settings."
+[01:57:56.618] mc: vertical   cursor 1 -> 2  (item 3 of 5, range 0..4, step +1)  caller=00000001400A20FC screen=000000002BD9BE80 cursor=000000002BD9C1B0
+[01:57:56.720] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:57:57.535] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:57:57.540] mcspeak: spoke "PC Settings, 4 of 5. Adjust PC-specific settings."
+[01:57:57.540] mc: vertical   cursor 2 -> 3  (item 4 of 5, range 0..4, step +1)  caller=00000001400A20FC screen=000000002BD9BE80 cursor=000000002BD9C1B0
+[01:57:57.643] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:57:58.151] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[01:57:58.252] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[01:57:58.354] gt: * TEXT SET on 000000002BD85970: "Credits"
+[01:57:58.456] gt: * TEXT SET on 000000002C2815B0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:57:58.456] gt: 122 CONSTRUCTED; setText ran 317 time(s), 317 string(s) captured; 0 guarded read(s) faulted.
+[01:57:58.456] gt:   by overload: cGUIObjText.25=317 .26=0  cGUIObjMessage.25=0 .26=0
+[01:57:58.864] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[01:57:58.874] mcspeak: spoke "Display, 2 of 4"
+[01:57:58.875] mc: vertical   cursor 0 -> 1  (item 2 of 4, range 0..3, step +1)  caller=00000001400A1715 screen=000000002C2900A0 cursor=000000002C2903D0
+[01:57:58.975] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[01:58:00.503] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:58:00.513] mcspeak: spoke "Display, Fullscreen, 3 of 3"
+[01:58:00.513] mc: horizontal cursor 1 -> 2  (item 3 of 3, range 0..2, step +1)  caller=00000001400A1757 screen=000000002C2900A0 cursor=000000002C2903DC
+[01:58:00.513] gt: * TEXT SET on 000000002BD8E4D0: "Off"
+[01:58:00.513] heartbeat 15 (alive 30 s)
+[01:58:00.513] gt: 122 CONSTRUCTED; setText ran 325 time(s), 325 string(s) captured; 0 guarded read(s) faulted.
+[01:58:00.513] gt:   by overload: cGUIObjText.25=325 .26=0  cGUIObjMessage.25=0 .26=0
+[01:58:00.514] gt: === FOCUS RECORD: 48 distinct string(s) across 9 cursor movement(s), 10 dropped (buffer full) ===
+[01:58:00.514] gt:   [move 2] PROSE 000000002BD8B8C0: "Browse various art galleries or listen to the game soundtracks."
+[01:58:00.514] gt:   [move 2] strip 000000002C2815B0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:58:00.514] gt:   [move 3] PROSE 000000002BD8B8C0: "View your in-game challenges and play status."
+[01:58:00.514] gt:   [move 3] strip 000000002C2815B0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:58:00.514] gt:   [move 4] PROSE 000000002BD8B8C0: "Change various in-game settings."
+[01:58:00.515] gt:   [move 4] strip 000000002C2815B0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:58:00.515] gt:   [move 4] PROSE 000000002BDD0950: "Options"
+[01:58:00.515] gt:   [move 4] PROSE 000000002BDB7240: "System"
+[01:58:00.516] gt:   [move 4] PROSE 000000002C2803F0: "Music"
+[01:58:00.516] gt:   [move 4] PROSE 000000002BD9B800: "Network"
+[01:58:00.516] gt:   [move 4] PROSE 000000002C207AA0: "PC Settings"
+[01:58:00.516] gt:   [move 4] PROSE 000000002BD85970: "Credits"
+[01:58:00.516] gt:   [move 5] PROSE 000000002BDD0950: "Options"
+[01:58:00.516] gt:   [move 5] PROSE 000000002BDB7240: "System"
+[01:58:00.516] gt:   [move 5] PROSE 000000002C2803F0: "Music"
+[01:58:00.516] gt:   [move 5] PROSE 000000002BD9B800: "Network"
+[01:58:00.516] gt:   [move 5] PROSE 000000002C207AA0: "PC Settings"
+[01:58:00.516] gt:   [move 5] PROSE 000000002BD85970: "Credits"
+[01:58:00.517] gt:   [move 5] PROSE 000000002BD8B8C0: "Change various sound-related settings."
+[01:58:00.517] gt:   [move 5] strip 000000002C2815B0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:58:00.517] gt:   [move 6] PROSE 000000002BDD0950: "Options"
+[01:58:00.517] gt:   [move 6] PROSE 000000002BDB7240: "System"
+[01:58:00.517] gt:   [move 6] PROSE 000000002C2803F0: "Music"
+[01:58:00.517] gt:   [move 6] PROSE 000000002BD9B800: "Network"
+[01:58:00.517] gt:   [move 6] PROSE 000000002C207AA0: "PC Settings"
+[01:58:00.517] gt:   [move 6] PROSE 000000002BD85970: "Credits"
+[01:58:00.517] gt:   [move 6] PROSE 000000002BD8B8C0: "Configure your network settings."
+[01:58:00.517] gt:   [move 6] strip 000000002C2815B0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:58:00.517] gt:   [move 7] PROSE 000000002BDD0950: "Options"
+[01:58:00.517] gt:   [move 7] PROSE 000000002BDB7240: "System"
+[01:58:00.518] gt:   [move 7] PROSE 000000002C2803F0: "Music"
+[01:58:00.518] gt:   [move 7] PROSE 000000002BD9B800: "Network"
+[01:58:00.518] gt:   [move 7] PROSE 000000002C207AA0: "PC Settings"
+[01:58:00.518] gt:   [move 7] PROSE 000000002BD85970: "Credits"
+[01:58:00.518] gt:   [move 7] PROSE 000000002BD8B8C0: "Adjust PC-specific settings."
+[01:58:00.518] gt:   [move 7] strip 000000002C2815B0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:58:00.518] gt:   [move 7] PROSE 000000002BDD0950: "Options"
+[01:58:00.518] gt:   [move 7] PROSE 000000002BDB7240: "System"
+[01:58:00.520] gt:   [move 7] PROSE 000000002C2803F0: "Music"
+[01:58:00.520] gt:   [move 7] PROSE 000000002BD9B800: "Network"
+[01:58:00.520] gt:   [move 7] PROSE 000000002C207AA0: "PC Settings"
+[01:58:00.520] gt:   [move 7] PROSE 000000002BD85970: "Credits"
+[01:58:00.520] gt:   [move 7] PROSE 000000002C2C1FB0: "PC Settings"
+[01:58:00.520] gt:   [move 7] PROSE 000000002BDD7B80: "Resolution"
+[01:58:00.520] gt:   [move 7] PROSE 000000002C20AF10: "Display"
+[01:58:00.520] gt:   [move 7] PROSE 000000002C2A0D30: "VSync"
+[01:58:00.520] gt:   [move 7] PROSE 000000002BD8EE30: "Default"
+[01:58:00.520] gt:   [move 7] PROSE 000000002C20A5B0: "1280x720"
+[01:58:00.520] gt: of 48 string(s): 48 arrived after a cursor movement, 42 were prose captions.
+[01:58:00.520] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[01:58:00.520] gt: === INSTANCE SET: 22 live text object(s), 0 dropped (table full) ===
+[01:58:00.521] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[01:58:00.521] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[01:58:00.521] gt:   000000002BDD0950 LIVE  [move 7, 6 set(s)] "Options"
+[01:58:00.521] gt:   000000002BDB7240 LIVE  [move 7, 6 set(s)] "System"
+[01:58:00.521] gt:   000000002BDEE330 STALE [move 0, 1 set(s)] "Online Play"
+[01:58:00.521] gt:   000000002BD96C10 STALE [move 0, 1 set(s)] "Museum"
+[01:58:00.521] gt:   000000002C207AA0 LIVE  [move 7, 6 set(s)] "PC Settings"
+[01:58:00.521] gt:   000000002BD894F0 STALE [move 0, 1 set(s)] "Options"
+[01:58:00.522] gt:   000000002BDFDB50 LIVE  [move 0, 1 set(s)] "Quit"
+[01:58:00.522] gt:   000000002BD8B8C0 LIVE  [move 8, 10 set(s)] "Change the display mode."
+[01:58:00.523] gt:   000000002C2815B0 LIVE  [move 8, 10 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:58:00.523] gt:   000000002C2803F0 LIVE  [move 7, 5 set(s)] "Music"
+[01:58:00.523] gt:   000000002BD9B800 LIVE  [move 7, 5 set(s)] "Network"
+[01:58:00.523] gt:   000000002BD85970 LIVE  [move 7, 5 set(s)] "Credits"
+[01:58:00.523] gt:   000000002C2C1FB0 LIVE  [move 7, 1 set(s)] "PC Settings"
+[01:58:00.523] gt:   000000002BDD7B80 LIVE  [move 7, 1 set(s)] "Resolution"
+[01:58:00.524] gt:   000000002C20AF10 LIVE  [move 7, 1 set(s)] "Display"
+[01:58:00.524] gt:   000000002C2A0D30 LIVE  [move 7, 1 set(s)] "VSync"
+[01:58:00.524] gt:   000000002BD8EE30 LIVE  [move 7, 1 set(s)] "Default"
+[01:58:00.524] gt:   000000002C20A5B0 LIVE  [move 9, 3 set(s)] "1280x720"
+[01:58:00.525] gt:   000000002C2A03D0 LIVE  [move 9, 3 set(s)] "Fullscreen"
+[01:58:00.525] gt:   000000002BD8E4D0 LIVE  [move 9, 3 set(s)] "Off"
+[01:58:00.525] gt: of 22 object(s): 17 still LIVE, 5 stale; current move seq 9.
+[01:58:00.525] gt: ⭐ reclaimed 5 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[01:58:00.525] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[01:58:00.628] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[01:58:01.236] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[01:58:01.244] mcspeak: caption not in the corpus, not spoken: "Off"
+[01:58:01.246] mcspeak: spoke "Display, Borderless Windowed, 2 of 3"
+[01:58:01.246] mc: horizontal cursor 2 -> 1  (item 2 of 3, range 0..2, step -1)  caller=00000001400A1757 screen=000000002C2900A0 cursor=000000002C2903DC
+[01:58:01.348] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:58:01.755] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[01:58:01.760] mcspeak: spoke "Resolution, 1 of 4. Change the resolution."
+[01:58:01.760] mc: vertical   cursor 1 -> 0  (item 1 of 4, range 0..3, step -1)  caller=00000001400A1715 screen=000000002C2900A0 cursor=000000002C2903D0
+[01:58:01.760] gt: * TEXT SET on 000000002C2815B0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[01:58:01.863] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[01:58:02.473] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[01:58:02.479] mcspeak: value quote SUPPRESSED on a settings axis (row 0): "Off" cannot be attributed to this row.
+[01:58:02.480] mcspeak: spoke "Resolution, 5 of 21"
+[01:58:02.480] mc: horizontal cursor 6 -> 7  (item 5 of 21, range 3..23, step +1)  caller=00000001400A1757 screen=000000002C2900A0 cursor=000000002C2903D8
+[01:58:02.480] gt: * TEXT SET on 000000002BD8E4D0: "Off"
+[01:58:02.583] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[01:58:02.583] gt: 122 CONSTRUCTED; setText ran 336 time(s), 336 string(s) captured; 0 guarded read(s) faulted.
+[01:58:02.583] gt:   by overload: cGUIObjText.25=336 .26=0  cGUIObjMessage.25=0 .26=0
+[01:58:03.398] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[01:58:03.404] mcspeak: spoke "Resolution, 4 of 21"
+[01:58:03.404] mc: horizontal cursor 7 -> 6  (item 4 of 21, range 3..23, step -1)  caller=00000001400A1757 screen=000000002C2900A0 cursor=000000002C2903D8
+[01:58:03.507] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:58:04.116] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[01:58:04.123] mcspeak: spoke "Resolution, 3 of 21"
+[01:58:04.124] mc: horizontal cursor 6 -> 5  (item 3 of 21, range 3..23, step -1)  caller=00000001400A1757 screen=000000002C2900A0 cursor=000000002C2903D8
+[01:58:04.227] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[01:58:04.633] gt: 122 CONSTRUCTED; setText ran 342 time(s), 342 string(s) captured; 0 guarded read(s) faulted.
+[01:58:04.633] gt:   by overload: cGUIObjText.25=342 .26=0  cGUIObjMessage.25=0 .26=0
+[01:58:05.750] kbd: down=[0x12 0xa4]  pressed=[0x12 0xa4]  released=[(none)]  (engine Trg=[(none)])
+[01:58:06.157] kbd: down=[0x12 0x73 0xa4]  pressed=[0x73]  released=[(none)]  (engine Trg=[0x73])

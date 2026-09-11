@@ -981,6 +981,64 @@ static BOOL text_has_number_prefix(const char *s, int n)
            strncmp(s, bare, strlen(bare)) == 0;
 }
 
+/* Is this object's text a plausible VALUE, or screen furniture to skip?
+ * ⚠ Deliberately strict: help captions end in punctuation or run long, and hint
+ * strips carry Confirm/Back. Everything else is a candidate. */
+static BOOL rv_usable(const char *s)
+{
+    size_t n;
+    if (!s || !s[0])
+        return FALSE;
+    n = strlen(s);
+    if (n > 40)
+        return FALSE;
+    if (s[n - 1] == '.' || s[n - 1] == '!' || s[n - 1] == '?')
+        return FALSE;
+    if (strstr(s, "Confirm") || strstr(s, "Back"))
+        return FALSE;
+    return TRUE;
+}
+
+BOOL gt_row_value(const char *const *labels, int nlabels, int row,
+                  char *out, int outlen)
+{
+    if (out && outlen > 0) out[0] = 0;
+    if ((!g_installed && !g_focus_test_mode) || !labels || nlabels <= 0 ||
+        row < 0 || row >= nlabels || !out || outlen <= 0)
+        return FALSE;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return FALSE;
+
+    volatile int found = 0;
+    LONG n = g_inst_count;
+    /* Find a CONSECUTIVE run of the row labels. See the header for why merely
+     * "in order" is not enough. */
+    for (LONG start = 0; start + nlabels <= n && !found; start++) {
+        int k;
+        for (k = 0; k < nlabels; k++) {
+            if (strcmp(g_inst[start + k].text, labels[k]) != 0)
+                break;
+        }
+        if (k != nlabels)
+            continue;
+        /* The values follow, skipping prose and hint strips. */
+        int want = row, i;
+        for (i = start + nlabels; i < n; i++) {
+            if (!rv_usable(g_inst[i].text))
+                continue;
+            if (want-- == 0) {
+                strncpy(out, g_inst[i].text, (size_t)outlen - 1);
+                out[outlen - 1] = 0;
+                found = 1;
+                break;
+            }
+        }
+    }
+    InterlockedExchange(&g_inst_busy, 0);
+    if (!found) out[0] = 0;
+    return found ? TRUE : FALSE;
+}
+
 BOOL gt_numbered_item(int n, char *out, int outlen)
 {
     if (out && outlen > 0) out[0] = 0;

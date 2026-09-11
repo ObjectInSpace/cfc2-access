@@ -1542,6 +1542,52 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
                 } else {
                     out->why = MC_UNNAMED_TEXT_UNREADABLE;
                 }
+            } else if (sib && sib->labels && sib->nlabels > 0 &&
+                       !out->is_level) {
+                /* ⭐⭐ NO TABLE FOR THIS ROW -- ask the LIVE OBJECT LIST.
+                 *
+                 * ⛔ USER-REPORTED: "it still doesn't say anything when I change
+                 * resolution." Correct, and the reason was that the join was
+                 * verified offline and never wired in. The 02:30 run shows the
+                 * data was there the whole time -- the PC Settings block reads
+                 * Resolution/Display/VSync/Default then "1280x720",
+                 * "Fullscreen", "Off".
+                 *
+                 * ⭐ This reaches what no GMD table can: the resolution, the
+                 * display mode, and the button GLYPHS (<ICON BTN_RB> and
+                 * friends, which gm_speak already turns into words).
+                 *
+                 * ⚠ Level rows are excluded -- their position IS the value and
+                 * they are already spoken as a level. */
+                /* ⚠ The table stores GMD INDICES; gt_row_value matches on the
+                 * live strings, so resolve them here. Bounded and on the worker
+                 * thread, so the cost is a handful of table reads. */
+                char lbuf[8][64];
+                const char *lptr[8];
+                int nl = sib->nlabels <= 8 ? sib->nlabels : 8;
+                int gotall = 1;
+                for (int li = 0; li < nl; li++) {
+                    if (sib->labels[li] == MC_LABEL_UNKNOWN ||
+                        !gmd_text_by_index(sib->labels[li], lbuf[li],
+                                           sizeof(lbuf[li])) || !lbuf[li][0]) {
+                        gotall = 0;
+                        break;
+                    }
+                    lptr[li] = lbuf[li];
+                }
+                char rvtext[128];
+                if (gotall && nl == sib->nlabels &&
+                    gt_row_value(lptr, nl, row,
+                                 rvtext, sizeof(rvtext)) && rvtext[0]) {
+                    char spoken[GM_OUT_MAX];
+                    gm_speak(rvtext, spoken, sizeof(spoken));
+                    if (spoken[0] && !gm_has_residue(spoken)) {
+                        _snprintf(out->item, sizeof(out->item), "%s", spoken);
+                        out->item[sizeof(out->item) - 1] = '\0';
+                        out->named = TRUE;
+                        out->why = MC_NAMED_OK;
+                    }
+                }
             }
         } else {
             out->why = MC_UNNAMED_ROW_UNDERIVABLE;
