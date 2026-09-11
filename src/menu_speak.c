@@ -1491,6 +1491,27 @@ void menu_speak_probe_picker(const mc_move *m, const char *cap)
 
     const char *p = strchr(K_PICKER, cap[0]);
     int cappos = p ? (int)(p - K_PICKER) + 1 : -1;
+
+    /* ⛔ A caption more than one position away is NOT this movement's character.
+     * The 22:45 run logged '0' against positions 35 and 36 (delta -34/-35)
+     * because the picker set no text at all that visit and the channel handed
+     * back a stale caption from before the screen was entered. Logging those as
+     * evidence would pollute the very measurement this probe exists to make --
+     * the direction question turns on a delta of +1 vs -1. */
+    if (cappos > 0) {
+        /* ⚠ Distance measured ROUND THE RING: this list wraps, so 36 -> 1 is a
+         * step of one, not 35. Treating the wrap as "far away" would discard
+         * exactly the movements the user makes most at the ends of the list. */
+        int d = cappos - pos;
+        if (d >  18) d -= 36;
+        if (d < -18) d += 36;
+        if (d < -1 || d > 1) {
+            log_line("mcspeak: [PICKERPROBE] position %d: ignoring a STALE "
+                     "caption '%c' (position %d, %d away) -- the picker set no "
+                     "text for this movement.", pos, cap[0], cappos, d);
+            return;
+        }
+    }
     log_line("mcspeak: [PICKERPROBE] moved to position %d (which holds '%c'), "
              "caption was '%c' = position %d, delta %d, step %+d. ⚠ NOT SPOKEN. "
              "▶ Collect a few UPWARD movements: if delta stays -1 the caption "

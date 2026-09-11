@@ -8,6 +8,36 @@ everything else.
 across three runs). Treating it as a campaign with a checklist is the fix; doing
 one screen per run is what let the count drift.
 
+## ⚠ THE 22:45 RUN DID NOT SETTLE THE PICKER — and the reason is unexplained
+
+The run delivered what was asked: **7 upward movements** on the picker (the
+data every previous run lacked). But it cannot answer the direction question,
+because **the picker set NO character text at all** — zero `TEXT SET` lines
+across its entire 15-movement window.
+
+The three `[PICKERPROBE]` lines that did fire quote `'0'` against positions 35
+and 36, i.e. a stale caption left over from before the screen was entered, not a
+neighbouring character. That is why their delta reads -34/-35 rather than the
+consistent -1 seen earlier.
+
+⚠ **I cannot explain why it was silent, and checked the two obvious causes:**
+- pacing is comparable (median gap 0.31 s vs 0.21 s in the 19:13 run);
+- position coverage is not the issue (both runs span positions 1..36).
+
+⛔ So this is an honest "not established", not a finding. The 19:13 run's picker
+cycled all 36 characters; this one cycled none, under similar conditions.
+Something about the screen's state differs and no log line so far names it.
+
+⚠ The ID display (`0x14008a91b`) also produced nothing across its 8 movements —
+consistent with the earlier 105-movement measurement, and expected, because no
+characters were ENTERED this visit. Entering is the action that makes its slots
+write.
+
+▶ What a run still needs: on the picker, move up and down and **watch for the
+`[PICKERPROBE]` lines to appear at all**. If they do not, the screen is not
+drawing characters and the direction question is moot for that visit. Then
+**confirm a character** two or three times so the ID slots write.
+
 ## ⛔⛔ THE TARGET IS 100% (user, 2026-09-10) — what that actually costs
 
 The user will not move to the games until the shell is complete. So "no route"
