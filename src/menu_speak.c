@@ -2467,17 +2467,35 @@ void menu_speak_check_modal(void)
     char text[GT_CAPTION_MAX];
     char flat[GT_CAPTION_MAX];
 
-    if (!gt_latest_text(text, (int)sizeof(text)) || !text[0])
-        return;
-
-    if (!menu_speak_is_modal_prompt(text, modal_resolve)) {
-        /* ⚠ Clear the guard once OTHER text has appeared, so the same dialog
-         * opened a second time speaks again. Without this it announces once per
-         * session, which looks exactly like a broken feature. */
-        if (last[0] && strcmp(last, text) != 0)
+    /* ⛔⛔ SCAN FOR A MATCH, DO NOT TAKE THE NEWEST.
+     *
+     * The first version asked gt_latest_text() for the most recent prose and
+     * tested that. It never fired once in the game, because the dialog sets its
+     * text in this order:
+     *     "If you exit the application, ..."   then "Yes"   then "No"
+     * All three are prose, so "the newest" is always "No" and the prompt is
+     * never looked at. Measured in the user's run: the prompt was in the record
+     * and the mod said nothing.
+     *
+     * ⚠ My end-to-end test passed anyway because it planted ONLY the prompt --
+     * a fixture that omits the very strings that break the code. The screen's
+     * real neighbours are part of the input, not noise to be left out. */
+    {
+        int i, found = 0;
+        for (i = 0; gt_prose_at(i, text, (int)sizeof(text)); i++) {
+            if (menu_speak_is_modal_prompt(text, modal_resolve)) {
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            /* ⚠ Nothing on screen is a prompt: clear the guard so the same
+             * dialog opened again speaks again. */
             last[0] = '\0';
-        return;
+            return;
+        }
     }
+
     if (strcmp(last, text) == 0)
         return;                         /* already announced this appearance */
     _snprintf(last, sizeof(last), "%s", text);

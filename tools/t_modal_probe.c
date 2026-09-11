@@ -25,6 +25,22 @@ int main(void)
     memset(o,0,sizeof o); o[0] = GT_VTABLE_ADDR;
     gt_test_settext_body(o, P, NULL, 0);
 
+    /* ⛔⛔ AND THE STRINGS THE DIALOG SETS *AFTER* THE PROMPT.
+     *
+     * The first version of this probe planted ONLY the prompt and PASSED, while
+     * the shipping code did nothing in the game every single time. The real
+     * dialog sets the prompt, then "Yes", then "No" -- all prose -- so a reader
+     * that takes "the newest prose" gets "No" and never looks at the prompt.
+     *
+     * ⭐ A fixture that omits the screen's own neighbours omits the very input
+     * that breaks the code. These two lines are the difference between a test
+     * that proves something and one that agrees with me. */
+    static ULONGLONG oy[GT_CLASS_SIZE/8], on[GT_CLASS_SIZE/8];
+    memset(oy, 0, sizeof oy); oy[0] = GT_VTABLE_ADDR;
+    memset(on, 0, sizeof on); on[0] = GT_VTABLE_ADDR;
+    gt_test_settext_body(oy, "Yes", NULL, 0);
+    gt_test_settext_body(on, "No",  NULL, 0);
+
     /* ⛔⛔ ADVANCE THE MOVEMENT SEQUENCE PAST THE RECORD.
      *
      * Without this the test is worthless: in a fresh process the record's stamp
@@ -36,16 +52,22 @@ int main(void)
     gt_note_focus_move();
     gt_note_focus_move();
 
+    /* The SHIPPING scan: walk the prose newest-first until one MATCHES. */
     char got[512];
-    if (!gt_latest_text(got, sizeof got) || strcmp(got, P) != 0) {
-        printf("FAIL  gt_latest_text did not return the prompt: \"%s\"\n", got);
-        bad++;
-    } else printf("ok    gt_latest_text returns the prompt with no movement\n");
+    int i, found = 0;
+    for (i = 0; gt_prose_at(i, got, sizeof got); i++)
+        if (menu_speak_is_modal_prompt(got, res)) { found = 1; break; }
 
-    /* 2. it is recognised */
-    if (!menu_speak_is_modal_prompt(got, res)) {
-        printf("FAIL  the prompt was not recognised\n"); bad++;
-    } else printf("ok    recognised as a modal prompt\n");
+    if (!found) {
+        printf("FAIL  the prompt was never found by the scan\n"); bad++;
+    } else if (i == 0) {
+        /* ⛔ If it is at index 0 the fixture is not reproducing the dialog, and
+         * a "newest prose only" reader would pass -- which is the bug. */
+        printf("FAIL  found at index 0 -- fixture not reproducing the dialog\n");
+        bad++;
+    } else {
+        printf("ok    prompt found at index %d, past \"No\" and \"Yes\"\n", i);
+    }
 
     /* 3. and flattens to what the user hears */
     char flat[512];

@@ -831,20 +831,28 @@ void gt_test_focus_clear(void) { g_focus_count = 0; }
  *
  * ⚠ Needed because the quit dialogs produce ZERO cursor movements, so every
  * movement-stamped channel is structurally blind to them. */
-BOOL gt_latest_text(char *out, int outlen)
+BOOL gt_prose_at(int nth, char *out, int outlen)
 {
     BOOL got = FALSE;
+    int  seen = 0;
 
-    if (!out || outlen <= 0)
+    if (!out || outlen <= 0 || nth < 0)
         return FALSE;
     out[0] = '\0';
     if (!g_installed && !g_focus_test_mode)
         return FALSE;
     if (InterlockedCompareExchange(&g_focus_busy, 1, 0) != 0)
         return FALSE;
+    /* ⛔⛔ NEWEST-FIRST, BUT ENUMERABLE. Returning ONLY the newest prose was the
+     * bug that made the modal announcer do nothing in the game: the quit dialog
+     * sets the prompt, then "Yes", then "No" -- all prose -- so "the newest" is
+     * always "No" and the prompt is never examined. The caller has to be able to
+     * look PAST the most recent string. */
     for (LONG i = g_focus_count - 1; i >= 0; i--) {
         /* Prose only -- a markup strip is a button hint, never a prompt. */
         if (g_focus[i].text[0] && strchr(g_focus[i].text, '<') == NULL) {
+            if (seen++ < nth)
+                continue;
             strncpy(out, g_focus[i].text, (size_t)outlen - 1);
             out[outlen - 1] = '\0';
             got = TRUE;
