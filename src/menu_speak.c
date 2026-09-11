@@ -2163,6 +2163,23 @@ void menu_speak_probe_rest(const mc_move *m)
     if (!s || s->kind != MC_SETTINGS_VALUE)
         return;
 
+    /* ⛔⛔ GATE ON THE CALLER, not merely on "row 0 of a settings screen".
+     *
+     * Row 0 is the GAME LIST on exactly two screens; everywhere else it is
+     * Language, Music Volume, Microphone, Resolution... This probe was firing
+     * on EIGHTEEN different callers across the logs -- 16 times on PC Settings
+     * alone -- announcing "IF the mapping holds, this is Capcom Fighting Jam"
+     * while the user moved through display languages.
+     *
+     * ⚠ Nothing was ever SPOKEN, so this never reached the ear. But it polluted
+     * the logs that every offline audit in this project reads, and a diagnostic
+     * that cries wolf on 16 screens is worse than no diagnostic.
+     *
+     * ⭐ Same rule the speaking path already follows (case 25): the caller list
+     * is the key, because row 0 means different things on different screens. */
+    if (s->caller != 0x1400b1bd9ULL && s->caller != 0x140098986ULL)
+        return;
+
     int row = 0;
     if (!menu_speak_derive_row(m->screen, m->cursor, s->values_off, 0, &row))
         return;

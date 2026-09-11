@@ -1008,6 +1008,41 @@ int main(void)
               ok, "one or more mappings misclassified");
     }
 
+    /* --- case 28: the ROM probe is caller-gated, like the speaking path -----
+     * ⛔⛔ MEASURED: it was firing on EIGHTEEN callers across the logs -- 16
+     * times on PC Settings -- logging "IF the mapping holds, this is Capcom
+     * Fighting Jam" while the user moved through display languages. Row 0 is
+     * the game list on exactly TWO screens.
+     *
+     * ⚠ Nothing was spoken, so it never reached the ear; it polluted the logs
+     * every offline audit here reads. A diagnostic that cries wolf on 16
+     * screens is worse than no diagnostic.
+     *
+     * ⚠ Asserted through the SCREEN TABLE rather than by calling the probe:
+     * menu_speak_probe_rest() needs a live GMD and a real screen pointer, so a
+     * direct call would test nothing. The property that matters is that the two
+     * game-list value sites are distinguishable from the other value sites, and
+     * that is checkable here. */
+    {
+        const mc_screen *sg = menu_speak_lookup(0x1400b1bd9ULL);
+        const mc_screen *cm = menu_speak_lookup_n(0x140098986ULL, 8);
+        /* Three value sites that must NOT be treated as game lists. */
+        const mc_screen *lang = menu_speak_lookup_n(0x1400a3431ULL, 14);
+        const mc_screen *pc   = menu_speak_lookup_n(0x1400a1757ULL, 3);
+        const mc_screen *net  = menu_speak_lookup_n(0x14009f4c1ULL, 2);
+
+        int ok = sg && cm &&
+                 sg->caller == 0x1400b1bd9ULL && cm->caller == 0x140098986ULL;
+        /* None of the others may share those callers. */
+        const mc_screen *others[3]; others[0]=lang; others[1]=pc; others[2]=net;
+        for (int i = 0; i < 3; i++)
+            if (others[i] && (others[i]->caller == 0x1400b1bd9ULL ||
+                              others[i]->caller == 0x140098986ULL))
+                ok = 0;
+        check("28. only the two game-list callers can be ROM-probed", ok,
+              "select=%d casual=%d", sg != NULL, cm != NULL);
+    }
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");
