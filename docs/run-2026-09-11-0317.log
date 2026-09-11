@@ -1,0 +1,933 @@
+[03:16:50.130] === CFC2 Access -- Phase 1.3: unpacked image dump ===
+[03:16:50.130] worker thread started, pid=34360
+[03:16:50.195] speech: ready, backend=NVDA
+[03:16:50.197] image [t0]: base=0000000140000000, 10 readable sections
+[03:16:50.197] image [t0]:   rva=0x1000     size=16625664  code distinct=256/256 prot=0x80   packed
+[03:16:50.197] image [t0]:   rva=0xfdc000   size=2072576   code distinct=256/256 prot=0x80   packed
+[03:16:50.197] image [t0]:   rva=0x11d6000  size=28758016  code distinct=256/256 prot=0x80   packed
+[03:16:50.197] image [t0]:   rva=0x2d43000  size=745472    code distinct=1/256 prot=0x80   UNPACKED
+[03:16:50.197] image [t0]:   rva=0x2df9000  size=4096      code distinct=256/256 prot=0x80   packed
+[03:16:50.197] image [t0]:   rva=0x2dfa000  size=270336    code distinct=1/256 prot=0x80   UNPACKED
+[03:16:50.197] image [t0]:   rva=0x2e3c000  size=233472    code distinct=256/256 prot=0x80   packed
+[03:16:50.198] image [t0]:   rva=0x2e75000  size=270336    data distinct=254/256 prot=0x2    
+[03:16:50.198] image [t0]:   rva=0x2eb7000  size=13451264  code distinct=85/256 prot=0x40   UNPACKED
+[03:16:50.198] image [t0]:   rva=0x3b8b000  size=3952640   code distinct=256/256 prot=0x40   packed
+[03:16:50.721] image: unpacked after 531 ms -- section rva=0x1000 distinct=233/256 prot=0x20
+[03:16:50.722] image [unpacked]: base=0000000140000000, 10 readable sections
+[03:16:50.723] image [unpacked]:   rva=0x1000     size=16625664  code distinct=233/256 prot=0x20   UNPACKED
+[03:16:50.723] image [unpacked]:   rva=0xfdc000   size=2072576   data distinct=194/256 prot=0x2    
+[03:16:50.723] image [unpacked]:   rva=0x11d6000  size=28758016  data distinct=47/256 prot=0x4    
+[03:16:50.723] image [unpacked]:   rva=0x2d43000  size=745472    data distinct=1/256 prot=0x2    
+[03:16:50.723] image [unpacked]:   rva=0x2df9000  size=4096      data distinct=255/256 prot=0x2    
+[03:16:50.723] image [unpacked]:   rva=0x2dfa000  size=270336    data distinct=1/256 prot=0x2    
+[03:16:50.723] image [unpacked]:   rva=0x2e3c000  size=233472    code distinct=234/256 prot=0x20   UNPACKED
+[03:16:50.724] image [unpacked]:   rva=0x2e75000  size=270336    data distinct=254/256 prot=0x2    
+[03:16:50.724] image [unpacked]:   rva=0x2eb7000  size=13451264  code distinct=85/256 prot=0x40   UNPACKED
+[03:16:50.724] image [unpacked]:   rva=0x3b8b000  size=3952640   code distinct=256/256 prot=0x40   packed
+[03:16:50.724] probe: VirtualProtect OK (target 0000000140001000, old prot 0x20) -- detours should be installable
+[03:16:50.724] kbd: identity CONFIRMED in this process -- vtable+0x30 -> 0x140253220 and the class name reads "sKeyboard".
+[03:16:50.775] kbd: hooked the sKeyboard state builder at 0x140253750. It receives rcx=the instance and rdx=the state bitmap, so the instance pointer arrives as an ARGUMENT -- no memory search.
+[03:16:50.775] mc: identity CONFIRMED in this process -- both cursor helpers carry the expected prologue.
+[03:16:50.870] mc: hooked both menu cursor helpers -- vertical 0x14007cdc0, horizontal 0x14007c9f0. The screen object and the cursor pointer arrive as ARGUMENTS, so there is no memory search.
+[03:16:50.870] gt: identity CONFIRMED -- 0x1402fd6a0 carries the expected prologue and sits in the instance vtable's slot 13.
+[03:16:50.976] gt: hooked the cGUIObjText CONSTRUCTOR at 0x1402efc10. It has exactly ONE caller (the factory 0x1402ef980), so this counts EVERY object of this class that is ever built -- which is what tells a wrong hook target apart from a class the shell never instantiates.
+[03:16:51.165] gt: hooked 4 of 4 setText overloads (cGUIObjText slots 25/26, cGUIObjMessage slots 25/26). Each carries its own counter, so the log will name WHICH one the shell uses.
+[03:16:51.165] gt: ready -- ctor probe live and update hook installed. Detours DEREFERENCE NOTHING beyond a single guarded vptr read; all inspection happens on the worker thread under the fault guard.
+[03:16:51.165] dump: SKIPPED -- image never unpacked. Any dump taken now would be ciphertext that silently looks like a valid file.
+[03:16:51.166] phase 1.3 result: speech=YES protect=YES unpacked=YES sections_dumped=0
+[03:16:51.166] pad: OFF -- cfc2_pad.on is absent. sPad is inert for the shell (Kind=0, update never runs); create that file only for in-game work.
+[03:16:51.267] kbd: ⛔ the builder has not run yet -- no state has been captured, so nothing can be concluded about key state.
+[03:16:51.267] memsafe: fault guard armed (self-test passed)
+[03:16:51.267] gmdfind: excluding own stack 0000000002A40000..0000000002C40000 and own module 00007FF9635A0000..00007FF9635EB000
+[03:16:52.826] gmdfind: walked 2321 regions; scanned 582 private (1615208 KB) in 1547 ms; 1 candidate(s); guard absorbed 0 fault(s)
+[03:16:52.826] gmdfind:  candidate 0: array_base=000000003B7100A0 form=LIVE_TABLE probes=64/64 geometry=2016/2016 pairs pad=0xcdcdcdcd region=000000003B450000+524288KB
+[03:16:52.831] gmdfind: ⭐ CLOSED LOOP -- followed labelOffset to "STATS_PWS2_06_NAME", re-hashed those bytes, hashes MATCH the entry. This is the GMD label array.
+[03:16:52.836] gmdfind: ⭐⭐ TEXT RESOLVED (live) -- "LANG_NAME_JAPANESE" = "Japonais [jp]", via a pointer at entry+0x140000. We can READ the shell's messages. (matched shipped variant 2 of 4, a non-English locale)
+[03:16:52.842] gmdtext:   blob at entries+0x140000 is "fre"
+[03:16:52.851] gmdtext:   blob at entries+0x100000 is "eng"  <== matches config.ini
+[03:16:52.851] gmdtext: ⭐⭐ blob resolved at entries+0x100000; 4165 messages readable. Table language: eng (matches config.ini).
+[03:16:52.851] mc: the cursor helpers have not run yet -- nothing can be concluded about menu movement.
+[03:16:54.762] heartbeat 1 (alive 2 s)
+[03:16:54.762] gt: 2 CONSTRUCTED; setText ran 0 time(s), 0 string(s) captured; 0 guarded read(s) faulted.  ⛔ Objects exist but setText NEVER RAN: the class is right and 0x1402f0b50 is not how its text is assigned. Find the other writer.
+[03:16:56.777] heartbeat 2 (alive 4 s)
+[03:16:57.582] kbd: CAPTURED instance=0000000029058990 state=0000000029058AC8 after 6 builder calls.
+[03:16:57.582] kbd: ⭐⭐ state - instance == 0x138, exactly as the disassembly predicted. The offline model is CONFIRMED in live memory.
+[03:16:57.584] kbd: down=[(none)]  pressed=[(none)]  released=[(none)]  (engine Trg=[(none)])
+[03:16:58.802] heartbeat 3 (alive 6 s)
+[03:16:58.802] kbd: builder ran 79 times; instance=0000000029058990 state=0000000029058AC8 offset=0x138 CONFIRMED
+[03:16:58.802] gt: 2 CONSTRUCTED; setText ran 0 time(s), 0 string(s) captured; 0 guarded read(s) faulted.  ⛔ Objects exist but setText NEVER RAN: the class is right and 0x1402f0b50 is not how its text is assigned. Find the other writer.
+[03:17:02.861] heartbeat 5 (alive 10 s)
+[03:17:02.863] gt: ⚠ focus recorder INCONCLUSIVE -- 0 string(s) recorded but the cursor hook never notified us (0 movements). Nothing can be concluded about per-row captions.
+[03:17:02.863] gt: === INSTANCE SET: 0 live text object(s), 0 dropped (table full) ===
+[03:17:02.863] gt: of 0 object(s): 0 still LIVE, 0 stale; current move seq 0.
+[03:17:02.863] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[03:17:02.863] layout: === FIELD DUMP of live text objects (0 in set) ===
+[03:17:02.863] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[03:17:02.863] layout: 0 object(s) dumped of 0 in the set (short text only).
+[03:17:02.863] layout: ⚠ NOTHING was dumped -- no conclusion is available from this poll, which is NOT the same as a negative result.
+[03:17:03.777] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:03.981] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:04.998] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[03:17:05.099] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[03:17:05.200] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[03:17:05.404] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:05.506] kbd: down=[0x26 0x27]  pressed=[0x26 0x27]  released=[(none)]  (engine Trg=[(none)])
+[03:17:05.608] kbd: down=[(none)]  pressed=[(none)]  released=[0x26 0x27]  (engine Trg=[(none)])
+[03:17:05.710] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[03:17:05.813] kbd: down=[0x25 0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:05.915] kbd: down=[0x25 0x27 0x28]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[03:17:05.915] gt: * TEXT SET on 000000002BDD11D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[03:17:06.017] kbd: down=[(none)]  pressed=[(none)]  released=[0x25 0x27 0x28]  (engine Trg=[(none)])
+[03:17:06.526] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[03:17:06.628] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[03:17:06.933] gt: 3 CONSTRUCTED; setText ran 63 time(s), 63 string(s) captured; 0 guarded read(s) faulted.
+[03:17:06.933] gt:   by overload: cGUIObjText.25=63 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:07.035] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[03:17:07.137] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[03:17:07.441] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[03:17:07.543] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[03:17:07.848] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[03:17:07.949] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[03:17:08.965] gt: 5 CONSTRUCTED; setText ran 186 time(s), 186 string(s) captured; 0 guarded read(s) faulted.
+[03:17:08.965] gt:   by overload: cGUIObjText.25=186 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:09.878] gt: * TEXT SET on 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:10.182] mc: the helpers ARE running (4 calls so far). The hook is live.
+[03:17:10.993] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:11.052] gmdtext: blob region: base=000000003B810000 size=520448 KB state=0x1000 protect=0x4 type=0x20000
+[03:17:11.052] gmdtext: ⭐ indexed 4165 string offsets in one pass; blob spans 000000003B8100A0..000000003B82A0A0 (106496 bytes) and is validated ONCE -- per-string reads no longer call VirtualQuery.
+[03:17:11.056] mcspeak: spoke "Online Play, 2 of 6. Play online using a network connection."
+[03:17:11.056] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=0000000140097A59 screen=000000002C205960 cursor=000000002C205C90
+[03:17:11.056] gt: 26 CONSTRUCTED; setText ran 239 time(s), 239 string(s) captured; 0 guarded read(s) faulted.
+[03:17:11.056] gt:   by overload: cGUIObjText.25=239 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:11.158] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:11.867] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[03:17:11.968] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[03:17:12.880] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:12.885] mcspeak: spoke "Ranked Match, 2 of 6. Test your skills in a competitive match. The results will affect your rank."
+[03:17:12.885] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=000000014009BA21 screen=000000002C2821D0 cursor=000000002C282500
+[03:17:12.986] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:13.088] heartbeat 10 (alive 20 s)
+[03:17:13.088] kbd: builder ran 937 times; instance=0000000029058990 state=0000000029058AC8 offset=0x138 CONFIRMED
+[03:17:13.088] gt: 43 CONSTRUCTED; setText ran 250 time(s), 250 string(s) captured; 0 guarded read(s) faulted.
+[03:17:13.088] gt:   by overload: cGUIObjText.25=250 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:13.089] gt: === FOCUS RECORD: 25 distinct string(s) across 2 cursor movement(s), 0 dropped (buffer full) ===
+[03:17:13.089] gt:   [move 0] strip 000000002BDD11D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[03:17:13.089] gt:   [move 0] PROSE 000000002BDFB040: "Now loading..."
+[03:17:13.089] gt:   [move 0] strip 000000002BDD11D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[03:17:13.089] gt:   [move 0] strip 000000002BDB5D90: "<FONT 2>Main Menu</FONT>"
+[03:17:13.089] gt:   [move 0] PROSE 000000002BDEE590: "Offline Play"
+[03:17:13.089] gt:   [move 0] PROSE 000000002BD96D80: "Online Play"
+[03:17:13.089] gt:   [move 0] PROSE 000000002C202DE0: "Museum"
+[03:17:13.089] gt:   [move 0] PROSE 000000002BD8BB10: "Fighter Awards"
+[03:17:13.090] gt:   [move 0] PROSE 000000002BDF9630: "Options"
+[03:17:13.090] gt:   [move 0] PROSE 000000002BDD7160: "Quit"
+[03:17:13.090] gt:   [move 0] PROSE 000000002BDFD350: "Play offline."
+[03:17:13.090] gt:   [move 0] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:13.090] gt:   [move 1] PROSE 000000002BDFD350: "Play online using a network connection."
+[03:17:13.090] gt:   [move 1] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:13.090] gt:   [move 1] PROSE 000000002BD85700: "Online Play"
+[03:17:13.090] gt:   [move 1] PROSE 000000002BDF7560: "Casual Match"
+[03:17:13.090] gt:   [move 1] PROSE 000000002BDD2320: "Ranked Match"
+[03:17:13.090] gt:   [move 1] PROSE 000000002BDB75F0: "Custom Match"
+[03:17:13.090] gt:   [move 1] PROSE 000000002BDEF9B0: "Ranked Leaderboard"
+[03:17:13.092] gt:   [move 1] PROSE 000000002BD99090: "High Score Challenge"
+[03:17:13.092] gt:   [move 1] PROSE 000000002C208C70: "High Score Challenge Leaderboard"
+[03:17:13.092] gt:   [move 1] PROSE 000000002BDFD350: "Play a friendly match against other players."
+[03:17:13.092] gt:   [move 1] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:13.092] gt:   [move 2] PROSE 000000002BDFD350: "Test your skills in a competitive match. The results will affect your rank."
+[03:17:13.092] gt:   [move 2] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:13.092] gt: of 25 string(s): 13 arrived after a cursor movement, 18 were prose captions.
+[03:17:13.092] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[03:17:13.093] gt: === INSTANCE SET: 18 live text object(s), 0 dropped (table full) ===
+[03:17:13.093] gt:   000000002BDD11D0 STALE [move 0, 227 set(s)] "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[03:17:13.093] gt:   000000002BDFB040 STALE [move 0, 1 set(s)] "Now loading..."
+[03:17:13.093] gt:   000000002BDB5D90 STALE [move 0, 1 set(s)] "<FONT 2>Main Menu</FONT>"
+[03:17:13.093] gt:   000000002BDEE590 LIVE  [move 0, 1 set(s)] "Offline Play"
+[03:17:13.093] gt:   000000002BD96D80 STALE [move 0, 1 set(s)] "Online Play"
+[03:17:13.093] gt:   000000002C202DE0 STALE [move 0, 1 set(s)] "Museum"
+[03:17:13.093] gt:   000000002BD8BB10 STALE [move 0, 1 set(s)] "Fighter Awards"
+[03:17:13.093] gt:   000000002BDF9630 STALE [move 0, 1 set(s)] "Options"
+[03:17:13.095] gt:   000000002BDD7160 STALE [move 0, 1 set(s)] "Quit"
+[03:17:13.095] gt:   000000002BDFD350 LIVE  [move 2, 4 set(s)] "Test your skills in a competitive match. The results will affect your "
+[03:17:13.095] gt:   000000002BD9B8C0 LIVE  [move 2, 4 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:13.096] gt:   000000002BD85700 LIVE  [move 1, 1 set(s)] "Online Play"
+[03:17:13.096] gt:   000000002BDF7560 LIVE  [move 1, 1 set(s)] "Casual Match"
+[03:17:13.096] gt:   000000002BDD2320 LIVE  [move 1, 1 set(s)] "Ranked Match"
+[03:17:13.096] gt:   000000002BDB75F0 LIVE  [move 1, 1 set(s)] "Custom Match"
+[03:17:13.096] gt:   000000002BDEF9B0 LIVE  [move 1, 1 set(s)] "Ranked Leaderboard"
+[03:17:13.096] gt:   000000002BD99090 LIVE  [move 1, 1 set(s)] "High Score Challenge"
+[03:17:13.096] gt:   000000002C208C70 LIVE  [move 1, 1 set(s)] "High Score Challenge Leaderboard"
+[03:17:13.096] gt: of 18 object(s): 10 still LIVE, 8 stale; current move seq 2.
+[03:17:13.097] gt: ⭐ reclaimed 8 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[03:17:13.097] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[03:17:13.097] layout: === FIELD DUMP of live text objects (18 in set) ===
+[03:17:13.097] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[03:17:13.097] layout:   000000002BDEE590 "Offline Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44474000 +0x044:43400000 +0x04c:3f800000 +0x050:0000000b +0x054:00040010 +0x058:bf800000 +0x060:0001000f +0x068:2c201800 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c8213e8 +0x0a0:c2340000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43ed0000 +0x104:42a00000 +0x10c:07000000 +0x140:00000009 +0x148:01020c10 +0x154:ffffffff +0x160:00000003 +0x164:ffffffff +0x16c:07000000 +0x184:07000000 +0x208:2bde0000
+[03:17:13.098] layout:   000000002BD85700 "Online Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43600000 +0x044:42580000 +0x04c:3f800000 +0x050:00000002 +0x054:02000011 +0x058:bf800000 +0x060:3001000b +0x068:2c205f10 +0x080:2bdfbdc0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c820578 +0x0a0:42000000 +0x0a4:bf800000 +0x0ac:3f800000 +0x0c0:3c835ff0 +0x0d0:290cc240 +0x0e0:43b8ddde +0x0e4:42951111 +0x0e8:2c201130 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000034 +0x0fc:00000034 +0x100:44680000 +0x104:42a00000 +0x138:00000514 +0x13c:00000001 +0x140:00040008 +0x144:00000002 +0x148:01020c00 +0x14c:00030000 +0x150:3c8353a0 +0x154:ffffffff
+[03:17:13.098] layout:   000000002BDF7560 "Casual Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43400000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:4001000a +0x064:40ff9696 +0x068:2c201800 +0x078:2bdee590 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:c2a1ffff +0x0c8:3c837970 +0x0d0:290cdf20 +0x0d8:290cba98 +0x0e0:4355b05b +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00008be0 +0x10c:00800420 +0x110:2bdf76c8 +0x118:2bdd2488
+[03:17:13.098] layout:   000000002BDD2320 "Ranked Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43880000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x064:3f800000 +0x068:2bd89640 +0x078:2bd963a0 +0x080:2bdee7e0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cc5c0 +0x0d8:290cb7f8 +0x0e0:43638e38 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000a080 +0x10c:00800420 +0x110:2bdd2488 +0x118:2bdb6148 +0x120:00001270 +0x124:008000a0
+[03:17:13.098] layout:   000000002BDB75F0 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43b00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdf7ea0 +0x078:2c202e50 +0x080:2bd965f0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:02020001 +0x0c8:bf800000 +0x0d0:290ce9d8 +0x0d8:290cb520 +0x0e0:436416c1 +0x0e4:42616c17 +0x0e8:2bdebdd0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000b940 +0x10c:00800420 +0x110:2bdb7758 +0x118:2bdefb18
+[03:17:13.100] layout:   000000002BDEF9B0 "Ranked Leaderboard" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43d80000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdd2c60 +0x078:2bd8ac90 +0x080:2c2030a0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:3c55dff0 +0x0c8:3c821340 +0x0d0:290ced20 +0x0d8:290cb280 +0x0e0:43a5c71d +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000d6e0 +0x10c:00800660 +0x110:2bdefb18 +0x118:2bd991f8 +0x120:000018bc +0x124:008000e4
+[03:17:13.100] layout:   000000002BD99090 "High Score Challenge" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44000000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdb96a0 +0x078:2bdf94f0 +0x080:2bd8aee0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cf068 +0x0d8:290cb018 +0x0e0:43abbbba +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000f840 +0x10c:008006c0 +0x110:2bd991f8 +0x118:2c208dd8 +0x120:00001cec +0x124:008000ec +0x128:2bd99228
+[03:17:13.100] layout:   000000002C208C70 "High Score Challenge Lea" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44140000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2828a0 +0x078:2bdd5bf0 +0x080:2bdf9740 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ccbe0 +0x0d8:290cade8 +0x0e0:440b3332 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00012a80 +0x10c:00800ae0 +0x110:2c208dd8 +0x118:2bdd0f58 +0x120:00002334 +0x124:00800170 +0x128:2c208e08
+[03:17:13.100] layout: 8 object(s) dumped of 18 in the set (short text only).
+[03:17:13.812] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[03:17:14.016] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[03:17:14.218] gt: * TEXT SET on 000000002C2C48A0: "Plasma Sword"
+[03:17:14.425] mcspeak: [ROMPROBE] RESTING on cursor index 0 (position 1 of 8) -- IF the mapping rom=2*game+version holds, this is "Capcom vs. SNK: Millennium Fight 2000 Pro" [cvs1] / "Capcom vs. SNK: Millennium Fight 2000 Pro" [cvs1u]. ⚠ NOT SPOKEN: compare against the game actually on screen before trusting it.
+[03:17:14.728] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:14.730] mcspeak: [ROMPROBE] RESTING on cursor index 4 (position 5 of 8) -- IF the mapping rom=2*game+version holds, this is "Power Stone" [pws1] / "Power Stone" [pws1u]. ⚠ NOT SPOKEN: compare against the game actually on screen before trusting it.
+[03:17:14.732] mcspeak: spoke "2 of 3"
+[03:17:14.732] mcspeak: [DISCOVERY] unknown screen -- caller=0x14009885e  items=3  axis=vertical  (screen=000000002BDFE1C0).
+[03:17:14.732] mcspeak: [DISCOVERY] candidate sweep is OFF (create cfc2_discover.on next to the exe to enable it). Unknown screens are still logged; naming is better served by the caption channel -- see tools/name_screens.py.
+[03:17:14.732] mc: vertical   cursor 0 -> 1  (item 2 of 3, range 0..2, step +1)  caller=000000014009885E screen=000000002BDFE1C0 cursor=0000000006D7FC50
+[03:17:14.833] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:15.036] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:15.036] mcspeak: spoke "3 of 3"
+[03:17:15.036] mcspeak: [DISCOVERY] unknown screen -- caller=0x1400988bf  items=3  axis=vertical  (screen=000000002BDFE1C0).
+[03:17:15.036] mc: vertical   cursor 1 -> 2  (item 3 of 3, range 0..2, step +1)  caller=00000001400988BF screen=000000002BDFE1C0 cursor=0000000006D7FC50
+[03:17:15.139] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:15.139] gt: 117 CONSTRUCTED; setText ran 775 time(s), 775 string(s) captured; 0 guarded read(s) faulted.
+[03:17:15.139] gt:   by overload: cGUIObjText.25=775 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:15.342] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:15.342] mcspeak: ⚠ screen "Casual Match" expects 4 items but this one has 3 -- NOT using the label table for it. Speaking position only, which is still correct.
+[03:17:15.343] mcspeak: spoke "3 of 3"
+[03:17:15.343] mc: vertical   cursor 1 -> 2  (item 3 of 3, range 0..2, step +1)  caller=000000014009890D screen=000000002BDFE1C0 cursor=000000002BDFE4F4
+[03:17:15.446] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:16.259] kbd: down=[0x1b]  pressed=[0x1b]  released=[(none)]  (engine Trg=[(none)])
+[03:17:16.360] kbd: down=[(none)]  pressed=[(none)]  released=[0x1b]  (engine Trg=[(none)])
+[03:17:16.462] gt: * TEXT SET on 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:17.172] gt: 117 CONSTRUCTED; setText ran 1310 time(s), 1310 string(s) captured; 0 guarded read(s) faulted.
+[03:17:17.172] gt:   by overload: cGUIObjText.25=1310 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:17.275] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:17.278] mcspeak: spoke "Custom Match, 3 of 6"
+[03:17:17.278] mc: vertical   cursor 1 -> 2  (item 3 of 6, range 0..5, step +1)  caller=000000014009BA21 screen=000000002C2821D0 cursor=000000002C282500
+[03:17:17.380] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:18.092] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:18.096] mcspeak: spoke "Ranked Leaderboard, 4 of 6"
+[03:17:18.096] mc: vertical   cursor 2 -> 3  (item 4 of 6, range 0..5, step +1)  caller=000000014009BA21 screen=000000002C2821D0 cursor=000000002C282500
+[03:17:18.198] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:19.213] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[03:17:19.216] mcspeak: spoke "Custom Match, 3 of 6"
+[03:17:19.216] mc: vertical   cursor 3 -> 2  (item 3 of 6, range 0..5, step -1)  caller=000000014009BA21 screen=000000002C2821D0 cursor=000000002C282500
+[03:17:19.216] gt: 117 CONSTRUCTED; setText ran 1316 time(s), 1316 string(s) captured; 0 guarded read(s) faulted.
+[03:17:19.216] gt:   by overload: cGUIObjText.25=1316 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:19.318] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[03:17:21.251] gt: 117 CONSTRUCTED; setText ran 1316 time(s), 1316 string(s) captured; 0 guarded read(s) faulted.
+[03:17:21.251] gt:   by overload: cGUIObjText.25=1316 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:22.876] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:22.879] mcspeak: spoke "Ranked Leaderboard, 4 of 6"
+[03:17:22.879] mc: vertical   cursor 2 -> 3  (item 4 of 6, range 0..5, step +1)  caller=000000014009BA21 screen=000000002C2821D0 cursor=000000002C282500
+[03:17:22.981] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:23.287] heartbeat 15 (alive 30 s)
+[03:17:23.287] gt: 117 CONSTRUCTED; setText ran 1318 time(s), 1318 string(s) captured; 0 guarded read(s) faulted.
+[03:17:23.287] gt:   by overload: cGUIObjText.25=1318 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:23.287] gt: === FOCUS RECORD: 48 distinct string(s) across 9 cursor movement(s), 895 dropped (buffer full) ===
+[03:17:23.287] gt:   [move 2] PROSE 000000002C2792B0: "Ranked Match"
+[03:17:23.287] gt:   [move 2] PROSE 000000002C2C12F0: "Game"
+[03:17:23.287] gt:   [move 2] PROSE 000000002C297ED0: "Game Version"
+[03:17:23.287] gt:   [move 2] PROSE 000000002C2B5D80: "Cross-region Matchmaking"
+[03:17:23.287] gt:   [move 2] PROSE 000000002C2C2260: "One-button Special Moves"
+[03:17:23.289] gt:   [move 2] PROSE 000000002C2C2890: "Capcom Vs. SNK Pro"
+[03:17:23.289] gt:   [move 2] PROSE 000000002C2B6BF0: "Capcom Vs. SNK 2"
+[03:17:23.289] gt:   [move 2] PROSE 000000002C299D80: "Capcom Fighting Evolution"
+[03:17:23.289] gt:   [move 2] PROSE 000000002C2E10B0: "Street Fighter Alpha 3 Upper"
+[03:17:23.289] gt:   [move 2] PROSE 000000002C2D1CB0: "Power Stone"
+[03:17:23.289] gt:   [move 2] PROSE 000000002C2A7D50: "Power Stone 2"
+[03:17:23.289] gt:   [move 2] PROSE 000000002BDCB910: "Project Justice"
+[03:17:23.289] gt:   [move 2] PROSE 000000002C2C48A0: "Plasma Sword"
+[03:17:23.290] gt:   [move 2] PROSE 000000002C2B5720: "Either"
+[03:17:23.290] gt:   [move 2] PROSE 000000002C2C1C00: "Off"
+[03:17:23.290] gt:   [move 2] PROSE 000000002C2C2890: "Capcom Vs. SNK Pro"
+[03:17:23.290] gt:   [move 2] PROSE 000000002C2B6BF0: "Capcom Vs. SNK 2"
+[03:17:23.290] gt:   [move 2] PROSE 000000002C299D80: "Capcom Fighting Evolution"
+[03:17:23.290] gt:   [move 2] PROSE 000000002C2E10B0: "Street Fighter Alpha 3 Upper"
+[03:17:23.290] gt:   [move 2] PROSE 000000002C2D1CB0: "Power Stone"
+[03:17:23.290] gt:   [move 2] PROSE 000000002C2A7D50: "Power Stone 2"
+[03:17:23.290] gt:   [move 2] PROSE 000000002BDCB910: "Project Justice"
+[03:17:23.290] gt:   [move 2] PROSE 000000002C2C48A0: "Plasma Sword"
+[03:17:23.290] gt:   [move 2] PROSE 000000002BDFD350: "Choose one or more games to play."
+[03:17:23.290] gt:   [move 2] strip 000000002BD9B8C0: "<SIZE 58><ICON BTN_X></SIZE>Check Rules <SIZE 58><ICON BTN_Y></SIZE>Select Game <SIZE 58><"
+[03:17:23.291] gt:   [move 2] PROSE 000000002C2C2890: "Capcom Vs. SNK Pro"
+[03:17:23.291] gt:   [move 2] PROSE 000000002C2B6BF0: "Capcom Vs. SNK 2"
+[03:17:23.291] gt:   [move 2] PROSE 000000002C299D80: "Capcom Fighting Evolution"
+[03:17:23.291] gt:   [move 2] PROSE 000000002C2E10B0: "Street Fighter Alpha 3 Upper"
+[03:17:23.291] gt:   [move 2] PROSE 000000002C2D1CB0: "Power Stone"
+[03:17:23.291] gt:   [move 2] PROSE 000000002C2A7D50: "Power Stone 2"
+[03:17:23.291] gt:   [move 2] PROSE 000000002BDCB910: "Project Justice"
+[03:17:23.291] gt:   [move 2] PROSE 000000002C2C48A0: "Plasma Sword"
+[03:17:23.292] gt:   [move 2] PROSE 000000002C2C2890: "Capcom Vs. SNK Pro"
+[03:17:23.292] gt:   [move 2] PROSE 000000002C2B6BF0: "Capcom Vs. SNK 2"
+[03:17:23.292] gt:   [move 2] PROSE 000000002C299D80: "Capcom Fighting Evolution"
+[03:17:23.292] gt:   [move 2] PROSE 000000002C2E10B0: "Street Fighter Alpha 3 Upper"
+[03:17:23.292] gt:   [move 2] PROSE 000000002C2D1CB0: "Power Stone"
+[03:17:23.292] gt:   [move 2] PROSE 000000002C2A7D50: "Power Stone 2"
+[03:17:23.292] gt:   [move 2] PROSE 000000002BDCB910: "Project Justice"
+[03:17:23.292] gt:   [move 2] PROSE 000000002C2C48A0: "Plasma Sword"
+[03:17:23.292] gt:   [move 2] PROSE 000000002C2C2890: "Capcom Vs. SNK Pro"
+[03:17:23.292] gt:   [move 2] PROSE 000000002C2B6BF0: "Capcom Vs. SNK 2"
+[03:17:23.292] gt:   [move 2] PROSE 000000002C299D80: "Capcom Fighting Evolution"
+[03:17:23.292] gt:   [move 2] PROSE 000000002C2E10B0: "Street Fighter Alpha 3 Upper"
+[03:17:23.294] gt:   [move 2] PROSE 000000002C2D1CB0: "Power Stone"
+[03:17:23.294] gt:   [move 2] PROSE 000000002C2A7D50: "Power Stone 2"
+[03:17:23.294] gt:   [move 2] PROSE 000000002BDCB910: "Project Justice"
+[03:17:23.294] gt: of 48 string(s): 48 arrived after a cursor movement, 47 were prose captions.
+[03:17:23.294] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[03:17:23.294] gt: === INSTANCE SET: 34 live text object(s), 0 dropped (table full) ===
+[03:17:23.294] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:23.295] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:23.295] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:23.295] gt:   000000002BDEE590 LIVE  [move 0, 1 set(s)] "Offline Play"
+[03:17:23.295] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:23.295] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:23.295] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:23.295] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:23.295] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:23.295] gt:   000000002BDFD350 LIVE  [move 9, 12 set(s)] "View leaderboards based on the League Points earned in ranked matches."
+[03:17:23.295] gt:   000000002BD9B8C0 LIVE  [move 9, 12 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:23.296] gt:   000000002BD85700 LIVE  [move 1, 1 set(s)] "Online Play"
+[03:17:23.296] gt:   000000002BDF7560 LIVE  [move 1, 1 set(s)] "Casual Match"
+[03:17:23.296] gt:   000000002BDD2320 LIVE  [move 1, 1 set(s)] "Ranked Match"
+[03:17:23.296] gt:   000000002BDB75F0 LIVE  [move 1, 1 set(s)] "Custom Match"
+[03:17:23.296] gt:   000000002BDEF9B0 LIVE  [move 1, 1 set(s)] "Ranked Leaderboard"
+[03:17:23.296] gt:   000000002BD99090 LIVE  [move 1, 1 set(s)] "High Score Challenge"
+[03:17:23.296] gt:   000000002C208C70 LIVE  [move 1, 1 set(s)] "High Score Challenge Leaderboard"
+[03:17:23.297] gt:   000000002C2792B0 STALE [move 2, 1 set(s)] "Ranked Match"
+[03:17:23.297] gt:   000000002C2C12F0 STALE [move 2, 1 set(s)] "Game"
+[03:17:23.297] gt:   000000002C297ED0 STALE [move 2, 1 set(s)] "Game Version"
+[03:17:23.297] gt:   000000002C2B5D80 STALE [move 2, 1 set(s)] "Cross-region Matchmaking"
+[03:17:23.297] gt:   000000002C2C2260 STALE [move 2, 1 set(s)] "One-button Special Moves"
+[03:17:23.297] gt:   000000002C2C2890 STALE [move 5, 129 set(s)] "Capcom Vs. SNK Pro"
+[03:17:23.299] gt:   000000002C2B6BF0 STALE [move 5, 129 set(s)] "Capcom Vs. SNK 2"
+[03:17:23.299] gt:   000000002C299D80 STALE [move 5, 129 set(s)] "Capcom Fighting Evolution"
+[03:17:23.299] gt:   000000002C2E10B0 STALE [move 5, 129 set(s)] "Street Fighter Alpha 3 Upper"
+[03:17:23.299] gt:   000000002C2D1CB0 STALE [move 5, 129 set(s)] "Power Stone"
+[03:17:23.299] gt:   000000002C2A7D50 STALE [move 5, 129 set(s)] "Power Stone 2"
+[03:17:23.299] gt:   000000002BDCB910 STALE [move 5, 129 set(s)] "Project Justice"
+[03:17:23.299] gt:   000000002C2C48A0 STALE [move 5, 129 set(s)] "Plasma Sword"
+[03:17:23.299] gt:   000000002C2B5720 STALE [move 5, 5 set(s)] "Either"
+[03:17:23.300] gt:   000000002C2C1C00 STALE [move 5, 5 set(s)] "Off"
+[03:17:23.300] gt:   000000002BDC9B40 STALE [move 5, 5 set(s)] "Off"
+[03:17:23.300] gt: of 34 object(s): 10 still LIVE, 24 stale; current move seq 9.
+[03:17:23.300] gt: ⭐ reclaimed 24 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[03:17:23.300] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[03:17:23.300] layout: === FIELD DUMP of live text objects (34 in set) ===
+[03:17:23.300] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[03:17:23.300] layout:   000000002BDEE590 "Offline Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44474000 +0x044:43400000 +0x04c:3f800000 +0x050:0000000b +0x054:00040010 +0x058:bf800000 +0x060:0001000f +0x068:2c201800 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c8213e8 +0x0a0:c2340000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43ed0000 +0x104:42a00000 +0x10c:07000000 +0x140:00000009 +0x148:01020c10 +0x154:ffffffff +0x160:00000003 +0x164:ffffffff +0x16c:07000000 +0x184:07000000 +0x208:2bde0000
+[03:17:23.301] layout:   000000002BD85700 "Online Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43600000 +0x044:42580000 +0x04c:3f800000 +0x050:00000002 +0x054:02000011 +0x058:bf800000 +0x060:3001000b +0x068:2c205f10 +0x080:2bdfbdc0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c820578 +0x0a0:42000000 +0x0a4:bf800000 +0x0ac:3f800000 +0x0c0:3c835ff0 +0x0d0:290cc240 +0x0e0:43b8ddde +0x0e4:42951111 +0x0e8:2c201130 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000034 +0x0fc:00000034 +0x100:44680000 +0x104:42a00000 +0x138:00000514 +0x13c:00000001 +0x140:00040008 +0x144:00000002 +0x148:01020c00 +0x14c:00030000 +0x150:3c8353a0 +0x154:ffffffff
+[03:17:23.301] layout:   000000002BDF7560 "Casual Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43400000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:4001000a +0x064:40ff9696 +0x068:2c201800 +0x078:2bdee590 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:c2a1ffff +0x0c8:3c837970 +0x0d0:290cdf20 +0x0d8:290cba98 +0x0e0:4355b05b +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00008be0 +0x10c:00800420 +0x110:2bdf76c8 +0x118:2bdd2488
+[03:17:23.302] layout:   000000002BDD2320 "Ranked Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43880000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x064:3f800000 +0x068:2bd89640 +0x078:2bd963a0 +0x080:2bdee7e0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cc5c0 +0x0d8:290cb7f8 +0x0e0:43638e38 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000a080 +0x10c:00800420 +0x110:2bdd2488 +0x118:2bdb6148 +0x120:00001270 +0x124:008000a0
+[03:17:23.302] layout:   000000002BDB75F0 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43b00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdf7ea0 +0x078:2c202e50 +0x080:2bd965f0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:02020001 +0x0c8:bf800000 +0x0d0:290ce9d8 +0x0d8:290cb520 +0x0e0:436416c1 +0x0e4:42616c17 +0x0e8:2bdebdd0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000b940 +0x10c:00800420 +0x110:2bdb7758 +0x118:2bdefb18
+[03:17:23.302] layout:   000000002BDEF9B0 "Ranked Leaderboard" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43d80000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdd2c60 +0x078:2bd8ac90 +0x080:2c2030a0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:3c55dff0 +0x0c8:3c821340 +0x0d0:290ced20 +0x0d8:290cb280 +0x0e0:43a5c71d +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000d6e0 +0x10c:00800660 +0x110:2bdefb18 +0x118:2bd991f8 +0x120:000018bc +0x124:008000e4
+[03:17:23.302] layout:   000000002BD99090 "High Score Challenge" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44000000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdb96a0 +0x078:2bdf94f0 +0x080:2bd8aee0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cf068 +0x0d8:290cb018 +0x0e0:43abbbba +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000f840 +0x10c:008006c0 +0x110:2bd991f8 +0x118:2c208dd8 +0x120:00001cec +0x124:008000ec +0x128:2bd99228
+[03:17:23.304] layout:   000000002C208C70 "High Score Challenge Lea" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44140000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2828a0 +0x078:2bdd5bf0 +0x080:2bdf9740 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ccbe0 +0x0d8:290cade8 +0x0e0:440b3332 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00012a80 +0x10c:00800ae0 +0x110:2c208dd8 +0x118:2bdd0f58 +0x120:00002334 +0x124:00800170 +0x128:2c208e08
+[03:17:23.304] layout: 8 object(s) dumped of 34 in the set (short text only).
+[03:17:24.012] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[03:17:24.017] mcspeak: spoke "Custom Match, 3 of 6. Create your own lobby with your own game rules and battle other players."
+[03:17:24.017] mc: vertical   cursor 3 -> 2  (item 3 of 6, range 0..5, step -1)  caller=000000014009BA21 screen=000000002C2821D0 cursor=000000002C282500
+[03:17:24.119] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[03:17:25.336] gt: 117 CONSTRUCTED; setText ran 1320 time(s), 1320 string(s) captured; 0 guarded read(s) faulted.
+[03:17:25.336] gt:   by overload: cGUIObjText.25=1320 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:26.147] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:26.150] mcspeak: spoke "Ranked Leaderboard, 4 of 6. View leaderboards based on the League Points earned in ranked matches."
+[03:17:26.150] mc: vertical   cursor 2 -> 3  (item 4 of 6, range 0..5, step +1)  caller=000000014009BA21 screen=000000002C2821D0 cursor=000000002C282500
+[03:17:26.251] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:26.960] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[03:17:26.963] mcspeak: spoke "High Score Challenge, 5 of 6"
+[03:17:26.963] mc: vertical   cursor 3 -> 4  (item 5 of 6, range 0..5, step +1)  caller=000000014009BA21 screen=000000002C2821D0 cursor=000000002C282500
+[03:17:27.065] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:27.369] gt: 117 CONSTRUCTED; setText ran 1324 time(s), 1324 string(s) captured; 0 guarded read(s) faulted.
+[03:17:27.371] gt:   by overload: cGUIObjText.25=1324 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:27.880] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[03:17:27.882] mcspeak: spoke "Ranked Leaderboard, 4 of 6"
+[03:17:27.884] mc: vertical   cursor 4 -> 3  (item 4 of 6, range 0..5, step -1)  caller=000000014009BA21 screen=000000002C2821D0 cursor=000000002C282500
+[03:17:28.086] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[03:17:28.290] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[03:17:28.294] mcspeak: spoke "Custom Match, 3 of 6. Create your own lobby with your own game rules and battle other players."
+[03:17:28.294] mc: vertical   cursor 3 -> 2  (item 3 of 6, range 0..5, step -1)  caller=000000014009BA21 screen=000000002C2821D0 cursor=000000002C282500
+[03:17:28.397] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[03:17:29.412] gt: 117 CONSTRUCTED; setText ran 1328 time(s), 1328 string(s) captured; 0 guarded read(s) faulted.
+[03:17:29.412] gt:   by overload: cGUIObjText.25=1328 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:30.428] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[03:17:30.529] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[03:17:31.443] gt: 196 CONSTRUCTED; setText ran 1334 time(s), 1334 string(s) captured; 0 guarded read(s) faulted.
+[03:17:31.443] gt:   by overload: cGUIObjText.25=1334 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:31.750] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:31.753] mcspeak: spoke "Join Lobby, 2 of 3. Select game rules and join another player's lobby."
+[03:17:31.753] mc: vertical   cursor 0 -> 1  (item 2 of 3, range 0..2, step +1)  caller=0000000140083E09 screen=000000002BD8C840 cursor=000000002BD8CB70
+[03:17:31.854] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:33.480] heartbeat 20 (alive 40 s)
+[03:17:33.480] gt: 196 CONSTRUCTED; setText ran 1336 time(s), 1336 string(s) captured; 0 guarded read(s) faulted.
+[03:17:33.480] gt:   by overload: cGUIObjText.25=1336 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:33.480] gt: === FOCUS RECORD: 18 distinct string(s) across 15 cursor movement(s), 895 dropped (buffer full) ===
+[03:17:33.480] gt:   [move 10] PROSE 000000002BDFD350: "Create your own lobby with your own game rules and battle other players."
+[03:17:33.480] gt:   [move 10] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:33.480] gt:   [move 11] PROSE 000000002BDFD350: "View leaderboards based on the League Points earned in ranked matches."
+[03:17:33.481] gt:   [move 11] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:33.481] gt:   [move 12] PROSE 000000002BDFD350: "Compete for high scores under set rules."
+[03:17:33.481] gt:   [move 12] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:33.481] gt:   [move 13] PROSE 000000002BDFD350: "View leaderboards based on the League Points earned in ranked matches."
+[03:17:33.481] gt:   [move 13] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:33.481] gt:   [move 14] PROSE 000000002BDFD350: "Create your own lobby with your own game rules and battle other players."
+[03:17:33.481] gt:   [move 14] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:33.481] gt:   [move 14] PROSE 000000002C2ACA80: "Custom Match"
+[03:17:33.482] gt:   [move 14] PROSE 000000002C250340: "Create Lobby"
+[03:17:33.482] gt:   [move 14] PROSE 000000002C2E6D80: "Join Lobby"
+[03:17:33.482] gt:   [move 14] PROSE 000000002C2CA7C0: "Search Lobby ID"
+[03:17:33.482] gt:   [move 14] PROSE 000000002BDFD350: "Select game rules and create your own lobby."
+[03:17:33.482] gt:   [move 14] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:33.482] gt:   [move 15] PROSE 000000002BDFD350: "Select game rules and join another player's lobby."
+[03:17:33.482] gt:   [move 15] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:33.483] gt: of 18 string(s): 18 arrived after a cursor movement, 11 were prose captions.
+[03:17:33.483] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[03:17:33.483] gt: === INSTANCE SET: 38 live text object(s), 0 dropped (table full) ===
+[03:17:33.483] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:33.483] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:33.484] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:33.484] gt:   000000002BDEE590 LIVE  [move 0, 1 set(s)] "Offline Play"
+[03:17:33.484] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:33.484] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:33.484] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:33.484] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:33.484] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:33.484] gt:   000000002BDFD350 LIVE  [move 15, 19 set(s)] "Select game rules and join another player's lobby."
+[03:17:33.486] gt:   000000002BD9B8C0 LIVE  [move 15, 19 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:33.486] gt:   000000002BD85700 LIVE  [move 1, 1 set(s)] "Online Play"
+[03:17:33.486] gt:   000000002BDF7560 LIVE  [move 1, 1 set(s)] "Casual Match"
+[03:17:33.486] gt:   000000002BDD2320 LIVE  [move 1, 1 set(s)] "Ranked Match"
+[03:17:33.486] gt:   000000002BDB75F0 LIVE  [move 1, 1 set(s)] "Custom Match"
+[03:17:33.487] gt:   000000002BDEF9B0 LIVE  [move 1, 1 set(s)] "Ranked Leaderboard"
+[03:17:33.487] gt:   000000002BD99090 LIVE  [move 1, 1 set(s)] "High Score Challenge"
+[03:17:33.487] gt:   000000002C208C70 LIVE  [move 1, 1 set(s)] "High Score Challenge Leaderboard"
+[03:17:33.487] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:33.487] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:33.487] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:33.487] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:33.487] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:33.488] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:33.488] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:33.488] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:33.488] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:33.488] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:33.488] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:33.488] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:33.488] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:33.488] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:33.488] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:33.488] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:33.488] gt:   000000002C2ACA80 LIVE  [move 14, 1 set(s)] "Custom Match"
+[03:17:33.488] gt:   000000002C250340 LIVE  [move 14, 1 set(s)] "Create Lobby"
+[03:17:33.489] gt:   000000002C2E6D80 LIVE  [move 14, 1 set(s)] "Join Lobby"
+[03:17:33.489] gt:   000000002C2CA7C0 LIVE  [move 14, 1 set(s)] "Search Lobby ID"
+[03:17:33.489] gt: of 38 object(s): 14 still LIVE, 24 stale; current move seq 15.
+[03:17:33.489] gt: ⭐ reclaimed 24 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[03:17:33.489] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[03:17:33.489] layout: === FIELD DUMP of live text objects (38 in set) ===
+[03:17:33.489] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[03:17:33.489] layout:   000000002BDEE590 "Offline Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44474000 +0x044:43400000 +0x04c:3f800000 +0x050:0000000b +0x054:00040010 +0x058:bf800000 +0x060:0001000f +0x068:2c201800 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c8213e8 +0x0a0:c2340000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43ed0000 +0x104:42a00000 +0x10c:07000000 +0x140:00000009 +0x148:01020c10 +0x154:ffffffff +0x160:00000003 +0x164:ffffffff +0x16c:07000000 +0x184:07000000 +0x208:2bde0000
+[03:17:33.491] layout:   000000002BD85700 "Online Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43600000 +0x044:42580000 +0x04c:3f800000 +0x050:00000002 +0x054:02000011 +0x058:bf800000 +0x060:3001000b +0x068:2c205f10 +0x080:2bdfbdc0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c820578 +0x0a0:42000000 +0x0a4:bf800000 +0x0ac:3f800000 +0x0c0:3c835ff0 +0x0d0:290cc240 +0x0e0:43b8ddde +0x0e4:42951111 +0x0e8:2c201130 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000034 +0x0fc:00000034 +0x100:44680000 +0x104:42a00000 +0x138:00000514 +0x13c:00000001 +0x140:00040008 +0x144:00000002 +0x148:01020c00 +0x14c:00030000 +0x150:3c8353a0 +0x154:ffffffff
+[03:17:33.491] layout:   000000002BDF7560 "Casual Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43400000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:4001000a +0x064:40ff9696 +0x068:2c201800 +0x078:2bdee590 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:c2a1ffff +0x0c8:3c837970 +0x0d0:290cdf20 +0x0d8:290cba98 +0x0e0:4355b05b +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00008be0 +0x10c:00800420 +0x110:2bdf76c8 +0x118:2bdd2488
+[03:17:33.491] layout:   000000002BDD2320 "Ranked Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43880000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x064:3f800000 +0x068:2bd89640 +0x078:2bd963a0 +0x080:2bdee7e0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cc5c0 +0x0d8:290cb7f8 +0x0e0:43638e38 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000a080 +0x10c:00800420 +0x110:2bdd2488 +0x118:2bdb6148 +0x120:00001270 +0x124:008000a0
+[03:17:33.492] layout:   000000002BDB75F0 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43b00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdf7ea0 +0x078:2c202e50 +0x080:2bd965f0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:02020001 +0x0c8:bf800000 +0x0d0:290ce9d8 +0x0d8:290cb520 +0x0e0:436416c1 +0x0e4:42616c17 +0x0e8:2bdebdd0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000b940 +0x10c:00800420 +0x110:2bdb7758 +0x118:2bdefb18
+[03:17:33.492] layout:   000000002BDEF9B0 "Ranked Leaderboard" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43d80000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdd2c60 +0x078:2bd8ac90 +0x080:2c2030a0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:3c55dff0 +0x0c8:3c821340 +0x0d0:290ced20 +0x0d8:290cb280 +0x0e0:43a5c71d +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000d6e0 +0x10c:00800660 +0x110:2bdefb18 +0x118:2bd991f8 +0x120:000018bc +0x124:008000e4
+[03:17:33.492] layout:   000000002BD99090 "High Score Challenge" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44000000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdb96a0 +0x078:2bdf94f0 +0x080:2bd8aee0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cf068 +0x0d8:290cb018 +0x0e0:43abbbba +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000f840 +0x10c:008006c0 +0x110:2bd991f8 +0x118:2c208dd8 +0x120:00001cec +0x124:008000ec +0x128:2bd99228
+[03:17:33.492] layout:   000000002C208C70 "High Score Challenge Lea" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44140000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2828a0 +0x078:2bdd5bf0 +0x080:2bdf9740 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ccbe0 +0x0d8:290cade8 +0x0e0:440b3332 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00012a80 +0x10c:00800ae0 +0x110:2c208dd8 +0x118:2bdd0f58 +0x120:00002334 +0x124:00800170 +0x128:2c208e08
+[03:17:33.493] layout:   000000002C2ACA80 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43c08000 +0x04c:3f800000 +0x050:00000009 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2c2b9ee0 +0x080:2c2c66a0 +0x088:2bd8c840 +0x090:3bac20f0 +0x098:3bdc3e90 +0x0a4:c31b0000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:290cd078 +0x0d8:290cd430 +0x0e0:436416c1 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ff000000 +0x0f8:00000020 +0x0fc:00000020 +0x100:442f0000 +0x104:42800000 +0x108:000025e0 +0x10c:00800420 +0x110:2bdec2f8 +0x118:2c2e6e88 +0x120:000024a4 +0x124:0080009c +0x128:2c208d90 +0x130:2c2504d8 +0x138:0000095f
+[03:17:33.493] layout:   000000002C250340 "Create Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:43df0000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2d76b0 +0x078:2c2bd330 +0x080:2c2c9750 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ca720 +0x0d8:290cbe88 +0x0e0:43582d84 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00015de0 +0x10c:00800420 +0x110:2c2504a8 +0x118:2c2e6ee8 +0x120:0000273c +0x124:00800098 +0x128:2c2504d8
+[03:17:33.493] layout:   000000002C2E6D80 "Join Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44038000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f0c70 +0x078:2c300280 +0x080:2c2d8040 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cd270 +0x0d8:290ca988 +0x0e0:432e38e4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00002a00 +0x10c:00800360 +0x110:2c2acb88 +0x118:2bd85868 +0x120:00002974 +0x124:0080007c +0x128:2c2e6f18
+[03:17:33.493] layout:   000000002C2CA7C0 "Search Lobby ID" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44178000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2be560 +0x078:2c250df0 +0x080:2c2f1600 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c7578 +0x0d8:290c79a0 +0x0e0:438349f5 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00018300 +0x10c:008004e0 +0x110:2c2ca928 +0x118:2bdfd4b8 +0x120:00002c4c +0x124:008000b0 +0x128:2c2ca958
+[03:17:33.494] layout: 12 object(s) dumped of 38 in the set (short text only).
+[03:17:34.104] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[03:17:34.107] mcspeak: spoke "Create Lobby, 1 of 3. Select game rules and create your own lobby."
+[03:17:34.107] mc: vertical   cursor 1 -> 0  (item 1 of 3, range 0..2, step -1)  caller=0000000140083E09 screen=000000002BD8C840 cursor=000000002BD8CB70
+[03:17:34.209] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[03:17:34.716] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:34.721] mcspeak: spoke "Join Lobby, 2 of 3. Select game rules and join another player's lobby."
+[03:17:34.721] mc: vertical   cursor 0 -> 1  (item 2 of 3, range 0..2, step +1)  caller=0000000140083E09 screen=000000002BD8C840 cursor=000000002BD8CB70
+[03:17:34.822] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:35.331] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:35.334] mcspeak: spoke "Search Lobby ID, 3 of 3. Search for another player's lobby by its lobby ID."
+[03:17:35.334] mc: vertical   cursor 1 -> 2  (item 3 of 3, range 0..2, step +1)  caller=0000000140083E09 screen=000000002BD8C840 cursor=000000002BD8CB70
+[03:17:35.436] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:35.538] gt: 196 CONSTRUCTED; setText ran 1342 time(s), 1342 string(s) captured; 0 guarded read(s) faulted.
+[03:17:35.538] gt:   by overload: cGUIObjText.25=1342 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:36.045] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[0x26])
+[03:17:36.048] mcspeak: spoke "Join Lobby, 2 of 3"
+[03:17:36.049] mc: vertical   cursor 2 -> 1  (item 2 of 3, range 0..2, step -1)  caller=0000000140083E09 screen=000000002BD8C840 cursor=000000002BD8CB70
+[03:17:36.252] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[03:17:37.065] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:37.168] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:37.371] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:37.374] mcspeak: caption AMBIGUOUS, not spoken: "Choose a game version."
+[03:17:37.375] mcspeak: spoke "Game Version, 2 of 6"
+[03:17:37.375] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=000000014008E799 screen=000000002C2D8FD0 cursor=000000002C2D9304
+[03:17:37.476] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:37.579] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[03:17:37.582] mcspeak: caption not in the corpus, not spoken: "On"
+[03:17:37.583] mcspeak: spoke "Cross-region Matchmaking, 3 of 6"
+[03:17:37.583] mc: vertical   cursor 1 -> 2  (item 3 of 6, range 0..5, step +1)  caller=000000014008E799 screen=000000002C2D8FD0 cursor=000000002C2D9304
+[03:17:37.583] gt: * TEXT SET on 000000002C257650: "On"
+[03:17:37.583] gt: 275 CONSTRUCTED; setText ran 1373 time(s), 1373 string(s) captured; 0 guarded read(s) faulted.
+[03:17:37.583] gt:   by overload: cGUIObjText.25=1373 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:37.685] gt: * TEXT SET on 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:37.786] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:38.498] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[03:17:38.501] mcspeak: spoke "Comment, 4 of 6. Choose a lobby comment."
+[03:17:38.502] mc: vertical   cursor 2 -> 3  (item 4 of 6, range 0..5, step +1)  caller=000000014008E799 screen=000000002C2D8FD0 cursor=000000002C2D9304
+[03:17:38.602] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[03:17:38.908] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[0x27])
+[03:17:38.913] mcspeak: caption not in the corpus, not spoken: "Any"
+[03:17:38.914] mcspeak: spoke "Comment, Everyone is welcome!, 2 of 9"
+[03:17:38.914] mc: horizontal cursor 0 -> 1  (item 2 of 9, range 0..8, step +1)  caller=000000014008E813 screen=000000002C2D8FD0 cursor=000000002C2D9318
+[03:17:38.914] gt: * TEXT SET on 000000002C257650: "On"
+[03:17:39.118] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[03:17:39.626] gt: 275 CONSTRUCTED; setText ran 1389 time(s), 1389 string(s) captured; 0 guarded read(s) faulted.
+[03:17:39.626] gt:   by overload: cGUIObjText.25=1389 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:39.830] kbd: down=[0x25]  pressed=[0x25]  released=[(none)]  (engine Trg=[(none)])
+[03:17:39.835] mcspeak: spoke "Comment, Any, 1 of 9"
+[03:17:39.835] mc: horizontal cursor 1 -> 0  (item 1 of 9, range 0..8, step -1)  caller=000000014008E813 screen=000000002C2D8FD0 cursor=000000002C2D9318
+[03:17:40.041] kbd: down=[(none)]  pressed=[(none)]  released=[0x25]  (engine Trg=[(none)])
+[03:17:40.548] kbd: down=[0x12 0xa4]  pressed=[0x12 0xa4]  released=[(none)]  (engine Trg=[(none)])
+[03:17:40.650] kbd: down=[(none)]  pressed=[(none)]  released=[0x12 0xa4]  (engine Trg=[(none)])
+[03:17:41.666] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:17:41.666] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:43.694] heartbeat 25 (alive 50 s)
+[03:17:43.694] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:17:43.694] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:43.694] gt: === FOCUS RECORD: 48 distinct string(s) across 24 cursor movement(s), 904 dropped (buffer full) ===
+[03:17:43.694] gt:   [move 16] PROSE 000000002BDFD350: "Select game rules and create your own lobby."
+[03:17:43.694] gt:   [move 16] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:43.694] gt:   [move 17] PROSE 000000002BDFD350: "Select game rules and join another player's lobby."
+[03:17:43.694] gt:   [move 17] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:43.695] gt:   [move 18] PROSE 000000002BDFD350: "Search for another player's lobby by its lobby ID."
+[03:17:43.695] gt:   [move 18] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:43.695] gt:   [move 19] PROSE 000000002BDFD350: "Select game rules and join another player's lobby."
+[03:17:43.695] gt:   [move 19] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:43.695] gt:   [move 19] PROSE 000000002C25D680: "Join Lobby"
+[03:17:43.695] gt:   [move 19] PROSE 000000002C2BF2F0: "Game"
+[03:17:43.696] gt:   [move 19] PROSE 000000002C2DA180: "Game Version"
+[03:17:43.696] gt:   [move 19] PROSE 000000002C2EB660: "Cross-region Matchmaking"
+[03:17:43.697] gt:   [move 19] PROSE 000000002C304450: "Comment"
+[03:17:43.697] gt:   [move 19] PROSE 000000002C2F6540: "Event Mode"
+[03:17:43.697] gt:   [move 19] PROSE 000000002C320640: "One-button Special Moves"
+[03:17:43.697] gt:   [move 19] PROSE 000000002C2D9820: "Any"
+[03:17:43.697] gt:   [move 19] PROSE 000000002C2EAD00: "Either"
+[03:17:43.697] gt:   [move 19] PROSE 000000002C303AF0: "Off"
+[03:17:43.697] gt:   [move 19] PROSE 000000002C2F5BE0: "Any"
+[03:17:43.697] gt:   [move 19] PROSE 000000002C2CFBD0: "On (Quick Match)"
+[03:17:43.697] gt:   [move 19] PROSE 000000002C257650: "On"
+[03:17:43.698] gt:   [move 19] PROSE 000000002BDFD350: "Choose the game you want to play."
+[03:17:43.698] gt:   [move 19] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:43.698] gt:   [move 20] PROSE 000000002C2D9820: "Any"
+[03:17:43.698] gt:   [move 20] PROSE 000000002C2EAD00: "Either"
+[03:17:43.698] gt:   [move 20] PROSE 000000002C303AF0: "Off"
+[03:17:43.698] gt:   [move 20] PROSE 000000002C2F5BE0: "Any"
+[03:17:43.698] gt:   [move 20] PROSE 000000002C2CFBD0: "On (Quick Match)"
+[03:17:43.698] gt:   [move 20] PROSE 000000002C257650: "On"
+[03:17:43.698] gt:   [move 20] PROSE 000000002BDFD350: "Choose a game version."
+[03:17:43.699] gt:   [move 20] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:43.699] gt:   [move 21] PROSE 000000002C2D9820: "Any"
+[03:17:43.699] gt:   [move 21] PROSE 000000002C2EAD00: "Either"
+[03:17:43.699] gt:   [move 21] PROSE 000000002C303AF0: "Off"
+[03:17:43.699] gt:   [move 21] PROSE 000000002C2F5BE0: "Any"
+[03:17:43.699] gt:   [move 21] PROSE 000000002C2CFBD0: "On (Quick Match)"
+[03:17:43.699] gt:   [move 21] PROSE 000000002C257650: "On"
+[03:17:43.699] gt:   [move 21] PROSE 000000002BDFD350: "Turn cross-region matchmaking on or off."
+[03:17:43.699] gt:   [move 21] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:43.700] gt:   [move 22] PROSE 000000002C2D9820: "Any"
+[03:17:43.700] gt:   [move 22] PROSE 000000002C2EAD00: "Either"
+[03:17:43.700] gt:   [move 22] PROSE 000000002C303AF0: "Off"
+[03:17:43.700] gt:   [move 22] PROSE 000000002C2F5BE0: "Any"
+[03:17:43.700] gt:   [move 22] PROSE 000000002C2CFBD0: "On (Quick Match)"
+[03:17:43.700] gt:   [move 22] PROSE 000000002C257650: "On"
+[03:17:43.700] gt:   [move 22] PROSE 000000002BDFD350: "Choose a lobby comment."
+[03:17:43.700] gt:   [move 22] strip 000000002BD9B8C0: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:43.701] gt:   [move 23] PROSE 000000002C2D9820: "Any"
+[03:17:43.701] gt: of 48 string(s): 48 arrived after a cursor movement, 40 were prose captions.
+[03:17:43.701] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[03:17:43.701] gt: === INSTANCE SET: 51 live text object(s), 0 dropped (table full) ===
+[03:17:43.701] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:43.701] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:43.701] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:43.702] gt:   000000002BDEE590 LIVE  [move 0, 1 set(s)] "Offline Play"
+[03:17:43.702] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:43.702] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:43.702] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:43.702] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:43.702] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:43.702] gt:   000000002BDFD350 LIVE  [move 22, 27 set(s)] "Choose a lobby comment."
+[03:17:43.703] gt:   000000002BD9B8C0 LIVE  [move 22, 27 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:43.703] gt:   000000002BD85700 LIVE  [move 1, 1 set(s)] "Online Play"
+[03:17:43.703] gt:   000000002BDF7560 LIVE  [move 1, 1 set(s)] "Casual Match"
+[03:17:43.703] gt:   000000002BDD2320 LIVE  [move 1, 1 set(s)] "Ranked Match"
+[03:17:43.703] gt:   000000002BDB75F0 LIVE  [move 1, 1 set(s)] "Custom Match"
+[03:17:43.704] gt:   000000002BDEF9B0 LIVE  [move 1, 1 set(s)] "Ranked Leaderboard"
+[03:17:43.704] gt:   000000002BD99090 LIVE  [move 1, 1 set(s)] "High Score Challenge"
+[03:17:43.704] gt:   000000002C208C70 LIVE  [move 1, 1 set(s)] "High Score Challenge Leaderboard"
+[03:17:43.704] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:43.704] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:43.704] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:43.704] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:43.705] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:43.705] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:43.705] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:43.705] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:43.705] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:43.705] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:43.705] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:43.705] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:43.705] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:43.706] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:43.706] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:43.706] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:43.706] gt:   000000002C2ACA80 LIVE  [move 14, 1 set(s)] "Custom Match"
+[03:17:43.706] gt:   000000002C250340 LIVE  [move 14, 1 set(s)] "Create Lobby"
+[03:17:43.706] gt:   000000002C2E6D80 LIVE  [move 14, 1 set(s)] "Join Lobby"
+[03:17:43.707] gt:   000000002C2CA7C0 LIVE  [move 14, 1 set(s)] "Search Lobby ID"
+[03:17:43.707] gt:   000000002C25D680 LIVE  [move 19, 1 set(s)] "Join Lobby"
+[03:17:43.707] gt:   000000002C2BF2F0 LIVE  [move 19, 1 set(s)] "Game"
+[03:17:43.707] gt:   000000002C2DA180 LIVE  [move 19, 1 set(s)] "Game Version"
+[03:17:43.707] gt:   000000002C2EB660 LIVE  [move 19, 1 set(s)] "Cross-region Matchmaking"
+[03:17:43.707] gt:   000000002C304450 LIVE  [move 19, 1 set(s)] "Comment"
+[03:17:43.708] gt:   000000002C2F6540 LIVE  [move 19, 1 set(s)] "Event Mode"
+[03:17:43.708] gt:   000000002C320640 LIVE  [move 19, 1 set(s)] "One-button Special Moves"
+[03:17:43.708] gt:   000000002C2D9820 LIVE  [move 24, 6 set(s)] "Any"
+[03:17:43.708] gt:   000000002C2EAD00 LIVE  [move 24, 6 set(s)] "Either"
+[03:17:43.708] gt:   000000002C303AF0 LIVE  [move 24, 6 set(s)] "Off"
+[03:17:43.709] gt:   000000002C2F5BE0 LIVE  [move 24, 6 set(s)] "Any"
+[03:17:43.709] gt:   000000002C2CFBD0 LIVE  [move 24, 6 set(s)] "On (Quick Match)"
+[03:17:43.709] gt:   000000002C257650 LIVE  [move 24, 6 set(s)] "On"
+[03:17:43.709] gt: of 51 object(s): 27 still LIVE, 24 stale; current move seq 24.
+[03:17:43.709] gt: ⭐ reclaimed 24 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[03:17:43.709] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[03:17:43.709] layout: === FIELD DUMP of live text objects (51 in set) ===
+[03:17:43.710] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[03:17:43.710] layout:   000000002BDEE590 "Offline Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44474000 +0x044:43400000 +0x04c:3f800000 +0x050:0000000b +0x054:00040010 +0x058:bf800000 +0x060:0001000f +0x068:2c201800 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c8213e8 +0x0a0:c2340000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43ed0000 +0x104:42a00000 +0x10c:07000000 +0x140:00000009 +0x148:01020c10 +0x154:ffffffff +0x160:00000003 +0x164:ffffffff +0x16c:07000000 +0x184:07000000 +0x208:2bde0000
+[03:17:43.710] layout:   000000002BDFD350 "Choose a lobby comment." +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:42c00000 +0x044:446e8000 +0x04c:3f800000 +0x050:00000003 +0x054:02010019 +0x060:00010005 +0x068:2bd8ddb8 +0x078:2bd9b8c0 +0x080:2c282080 +0x088:2bdfcc30 +0x090:3bb0c1a0 +0x098:3bc11c70 +0x0a0:42c00000 +0x0a4:c0c00000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c5a20 +0x0d8:290c5160 +0x0e0:43ceaaab +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:45700000 +0x104:42900000 +0x108:000032a0 +0x10c:00800780 +0x110:2bdd8878 +0x118:2bd9ba28 +0x120:000003a8 +0x124:00800108 +0x128:2bdfd4e8 +0x130:2bd9b9e0
+[03:17:43.711] layout:   000000002BD85700 "Online Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43600000 +0x044:42580000 +0x04c:3f800000 +0x050:00000002 +0x054:02000011 +0x058:bf800000 +0x060:3001000b +0x068:2c205f10 +0x080:2bdfbdc0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c820578 +0x0a0:42000000 +0x0a4:bf800000 +0x0ac:3f800000 +0x0c0:3c835ff0 +0x0d0:290cc240 +0x0e0:43b8ddde +0x0e4:42951111 +0x0e8:2c201130 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000034 +0x0fc:00000034 +0x100:44680000 +0x104:42a00000 +0x138:00000514 +0x13c:00000001 +0x140:00040008 +0x144:00000002 +0x148:01020c00 +0x14c:00030000 +0x150:3c8353a0 +0x154:ffffffff
+[03:17:43.711] layout:   000000002BDF7560 "Casual Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43400000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:4001000a +0x064:40ff9696 +0x068:2c201800 +0x078:2bdee590 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:c2a1ffff +0x0c8:3c837970 +0x0d0:290cdf20 +0x0d8:290cba98 +0x0e0:4355b05b +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00008be0 +0x10c:00800420 +0x110:2bdf76c8 +0x118:2bdd2488
+[03:17:43.711] layout:   000000002BDD2320 "Ranked Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43880000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x064:3f800000 +0x068:2bd89640 +0x078:2bd963a0 +0x080:2bdee7e0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cc5c0 +0x0d8:290cb7f8 +0x0e0:43638e38 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000a080 +0x10c:00800420 +0x110:2bdd2488 +0x118:2bdb6148 +0x120:00001270 +0x124:008000a0
+[03:17:43.712] layout:   000000002BDB75F0 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43b00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdf7ea0 +0x078:2c202e50 +0x080:2bd965f0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:02020001 +0x0c8:bf800000 +0x0d0:290ce9d8 +0x0d8:290cb520 +0x0e0:436416c1 +0x0e4:42616c17 +0x0e8:2bdebdd0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000b940 +0x10c:00800420 +0x110:2bdb7758 +0x118:2bdefb18
+[03:17:43.712] layout:   000000002BDEF9B0 "Ranked Leaderboard" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43d80000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdd2c60 +0x078:2bd8ac90 +0x080:2c2030a0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:3c55dff0 +0x0c8:3c821340 +0x0d0:290ced20 +0x0d8:290cb280 +0x0e0:43a5c71d +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000d6e0 +0x10c:00800660 +0x110:2bdefb18 +0x118:2bd991f8 +0x120:000018bc +0x124:008000e4
+[03:17:43.712] layout:   000000002BD99090 "High Score Challenge" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44000000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdb96a0 +0x078:2bdf94f0 +0x080:2bd8aee0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cf068 +0x0d8:290cb018 +0x0e0:43abbbba +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000f840 +0x10c:008006c0 +0x110:2bd991f8 +0x118:2c208dd8 +0x120:00001cec +0x124:008000ec +0x128:2bd99228
+[03:17:43.712] layout:   000000002C208C70 "High Score Challenge Lea" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44140000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2828a0 +0x078:2bdd5bf0 +0x080:2bdf9740 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ccbe0 +0x0d8:290cade8 +0x0e0:440b3332 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00012a80 +0x10c:00800ae0 +0x110:2c208dd8 +0x118:2bdd0f58 +0x120:00002334 +0x124:00800170 +0x128:2c208e08
+[03:17:43.713] layout:   000000002C2ACA80 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43c08000 +0x04c:3f800000 +0x050:00000009 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2c2b9ee0 +0x080:2c2c66a0 +0x088:2bd8c840 +0x090:3bac20f0 +0x098:3bdc3e90 +0x0a4:c31b0000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:290cd078 +0x0d8:290cd430 +0x0e0:436416c1 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ff000000 +0x0f8:00000020 +0x0fc:00000020 +0x100:442f0000 +0x104:42800000 +0x108:000025e0 +0x10c:00800420 +0x110:2c2cb638 +0x118:2c2e6e88 +0x120:000024a4 +0x124:0080009c +0x128:2c208d90 +0x130:2c2504d8 +0x138:0000095f
+[03:17:43.713] layout:   000000002C250340 "Create Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:43df0000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2d76b0 +0x078:2c2bd330 +0x080:2c2c9750 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ca720 +0x0d8:290cbe88 +0x0e0:43582d84 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00015de0 +0x10c:00800420 +0x110:2c2504a8 +0x118:2c2e6ee8 +0x120:0000273c +0x124:00800098 +0x128:2c2504d8
+[03:17:43.713] layout:   000000002C2E6D80 "Join Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44038000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f0c70 +0x078:2c300280 +0x080:2c2d8040 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cd270 +0x0d8:290ca988 +0x0e0:432e38e4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00002a00 +0x10c:00800360 +0x110:2c2acb88 +0x118:2bd85868 +0x120:00002974 +0x124:0080007c +0x128:2c2e6f18
+[03:17:43.714] layout:   000000002C2CA7C0 "Search Lobby ID" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44178000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2be560 +0x078:2c250df0 +0x080:2c2f1600 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c7578 +0x0d8:290c79a0 +0x0e0:438349f5 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00018300 +0x10c:008004e0 +0x110:2c2ca928 +0x118:2c2da2e8 +0x120:00002c4c +0x124:008000b0 +0x128:2c2ca958
+[03:17:43.714] layout:   000000002C25D680 "Join Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43848000 +0x04c:3f800000 +0x050:00000009 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2c31b3d8 +0x080:2c31b890 +0x088:2c2d8fd0 +0x090:3bac20f0 +0x098:3bdc1f80 +0x0a4:c3898000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:290c7348 +0x0d8:290ca608 +0x0e0:432e38e4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ff000000 +0x0f8:00000020 +0x0fc:00000020 +0x100:442f0000 +0x104:42800000 +0x108:00002220 +0x10c:00800360 +0x110:2c2eb998 +0x118:2c2cb638 +0x120:00000904 +0x124:0080007c +0x128:2c2f5d00 +0x130:2c2bf488 +0x138:00000adf
+[03:17:43.714] layout:   000000002C2BF2F0 "Game" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:43a30000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f26a0 +0x078:2c2d9820 +0x080:2c2d96d0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c7c08 +0x0d8:290c5320 +0x0e0:42bd82d9 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:00014460 +0x10c:00800180 +0x110:2c2bf458 +0x118:2c2cfcd8 +0x120:00000a34 +0x124:0080003c +0x128:2c2bf488
+[03:17:43.715] layout:   000000002C2DA180 "Game Version" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:43cb0000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2cc690 +0x078:2c2ead00 +0x080:2c2eabb0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c6318 +0x0d8:290c9338 +0x0e0:43602d84 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:00019860 +0x10c:00800420 +0x110:2c2da2e8 +0x118:2c310858 +0x120:00002ef8 +0x124:00800098 +0x128:2c2da318
+[03:17:43.715] layout:   000000002C2EB660 "Cross-region Matchmaking" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:43f30000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c254110 +0x078:2c303af0 +0x080:2c3039a0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c8500 +0x0d8:290c9840 +0x0e0:43d293e9 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:0001ca40 +0x10c:408008a0 +0x110:2c2eb7c8 +0x118:2c3045b8 +0x120:00003530 +0x124:4080012c +0x128:2c2eb7f8
+[03:17:43.715] layout:   000000002C304450 "Comment" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:440d8000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c312870 +0x078:2c2f5be0 +0x080:2c2f5a90 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cdc10 +0x0d8:290c9bf8 +0x0e0:43182d82 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:0001e1e0 +0x10c:408002a0 +0x110:2c3045b8 +0x118:2c2f66a8 +0x120:00003824 +0x124:40800064 +0x128:2c3045e8
+[03:17:43.715] layout:   000000002C2F6540 "Event Mode" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:44218000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2dd610 +0x078:2c2cfbd0 +0x080:2c2cfa80 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c8998 +0x0d8:290cbec0 +0x0e0:433f7779 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:0001f7a0 +0x10c:00800360 +0x110:2c2f66a8 +0x118:2c2cfd38 +0x120:00003aa4 +0x124:00800084 +0x128:2c2f66d8
+[03:17:43.716] layout:   000000002C320640 "One-button Special Moves" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:44358000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2eeaf0 +0x078:2c257650 +0x080:2c257500 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c89d0 +0x0d8:290c9d80 +0x0e0:43d48887 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:00023640 +0x10c:00800840 +0x110:2c3207a8 +0x118:2bdfd4b8 +0x120:00004278 +0x124:00800120 +0x128:2c3207d8
+[03:17:43.716] layout:   000000002C2D9820 "Any" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:43a30000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f26a0 +0x080:2c2d96d0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c99c8 +0x0d8:290c90d0 +0x0e0:42755556 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00001c80 +0x10c:00800120 +0x110:2c2d9988 +0x118:2c2eae08 +0x120:000005e8 +0x124:00800030 +0x128:2c2d99b8 +0x130:2c2eae98
+[03:17:43.716] layout:   000000002C2EAD00 "Either" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:43cb0000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2cc690 +0x080:2c2eabb0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c60b0 +0x0d8:290c9fe8 +0x0e0:42b55556 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00001da0 +0x10c:00800240 +0x110:2c2d9928 +0x118:2c2dc288 +0x120:00000724 +0x124:0080005c +0x128:2c2eae98 +0x130:2c303c88
+[03:17:43.716] layout:   000000002C303AF0 "Off" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:43f30000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c254110 +0x080:2c3039a0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c56d8 +0x0d8:290c5fd0 +0x0e0:42555555 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00005820 +0x10c:00800120 +0x110:2c303c58 +0x118:2c2f5d48 +0x120:00000808 +0x124:0080002c +0x128:2c303c88 +0x130:2c2f5d78
+[03:17:43.717] layout:   000000002C2F5BE0 "Any" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:440d8000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c312870 +0x080:2c2f5a90 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c6580 +0x0d8:290cab10 +0x0e0:42755556 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00005dc0 +0x10c:00800120 +0x110:2c2f5d48 +0x118:2c2ec4f8 +0x120:000008b8 +0x124:40800030 +0x128:2c2f5d78 +0x130:2c25d7a0
+[03:17:43.717] layout:   000000002C2CFBD0 "On (Quick Match)" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:44218000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2dd610 +0x080:2c2cfa80 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c59b0 +0x0d8:290cc010 +0x0e0:43904445 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:000145e0 +0x10c:40800540 +0x110:2c2bf3f8 +0x118:2c252d88 +0x120:00002f90 +0x124:408000c0 +0x128:2c2da2a0 +0x130:2c2eb7f8
+[03:17:43.717] layout:   000000002C257650 "On" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:44358000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2eeaf0 +0x080:2c257500 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ca138 +0x0d8:290c9108 +0x0e0:42438e39 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00006480 +0x10c:408000c0 +0x110:2c2577b8 +0x118:2c2db5f8 +0x120:00000cc0 +0x124:40800020 +0x128:2bd858b0 +0x130:2bd85898
+[03:17:43.717] layout: 26 object(s) dumped of 51 in the set (short text only).
+[03:17:45.746] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:17:45.746] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:47.779] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:17:47.779] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:49.806] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:17:49.807] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:51.836] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:17:51.836] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:53.867] heartbeat 30 (alive 60 s)
+[03:17:53.867] kbd: builder ran 2585 times; instance=0000000029058990 state=0000000029058AC8 offset=0x138 CONFIRMED
+[03:17:53.867] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:17:53.867] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:53.867] gt: === FOCUS RECORD: 0 distinct string(s) across 24 cursor movement(s), 904 dropped (buffer full) ===
+[03:17:53.867] gt: of 0 string(s): 0 arrived after a cursor movement, 0 were prose captions.
+[03:17:53.867] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[03:17:53.867] gt: === INSTANCE SET: 51 live text object(s), 0 dropped (table full) ===
+[03:17:53.868] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:53.868] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:53.868] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:53.868] gt:   000000002BDEE590 LIVE  [move 0, 1 set(s)] "Offline Play"
+[03:17:53.868] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:53.868] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:53.868] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:53.868] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:53.869] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:17:53.869] gt:   000000002BDFD350 LIVE  [move 22, 27 set(s)] "Choose a lobby comment."
+[03:17:53.869] gt:   000000002BD9B8C0 LIVE  [move 22, 27 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:17:53.869] gt:   000000002BD85700 LIVE  [move 1, 1 set(s)] "Online Play"
+[03:17:53.869] gt:   000000002BDF7560 LIVE  [move 1, 1 set(s)] "Casual Match"
+[03:17:53.869] gt:   000000002BDD2320 LIVE  [move 1, 1 set(s)] "Ranked Match"
+[03:17:53.869] gt:   000000002BDB75F0 LIVE  [move 1, 1 set(s)] "Custom Match"
+[03:17:53.869] gt:   000000002BDEF9B0 LIVE  [move 1, 1 set(s)] "Ranked Leaderboard"
+[03:17:53.871] gt:   000000002BD99090 LIVE  [move 1, 1 set(s)] "High Score Challenge"
+[03:17:53.871] gt:   000000002C208C70 LIVE  [move 1, 1 set(s)] "High Score Challenge Leaderboard"
+[03:17:53.871] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:53.871] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:53.871] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:53.871] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:53.871] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:17:53.871] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:53.871] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:53.872] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:53.872] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:53.872] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:53.872] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:53.872] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:53.872] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:53.872] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:53.872] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:53.872] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:17:53.872] gt:   000000002C2ACA80 LIVE  [move 14, 1 set(s)] "Custom Match"
+[03:17:53.873] gt:   000000002C250340 LIVE  [move 14, 1 set(s)] "Create Lobby"
+[03:17:53.873] gt:   000000002C2E6D80 LIVE  [move 14, 1 set(s)] "Join Lobby"
+[03:17:53.873] gt:   000000002C2CA7C0 LIVE  [move 14, 1 set(s)] "Search Lobby ID"
+[03:17:53.873] gt:   000000002C25D680 LIVE  [move 19, 1 set(s)] "Join Lobby"
+[03:17:53.873] gt:   000000002C2BF2F0 LIVE  [move 19, 1 set(s)] "Game"
+[03:17:53.873] gt:   000000002C2DA180 LIVE  [move 19, 1 set(s)] "Game Version"
+[03:17:53.874] gt:   000000002C2EB660 LIVE  [move 19, 1 set(s)] "Cross-region Matchmaking"
+[03:17:53.874] gt:   000000002C304450 LIVE  [move 19, 1 set(s)] "Comment"
+[03:17:53.874] gt:   000000002C2F6540 LIVE  [move 19, 1 set(s)] "Event Mode"
+[03:17:53.874] gt:   000000002C320640 LIVE  [move 19, 1 set(s)] "One-button Special Moves"
+[03:17:53.875] gt:   000000002C2D9820 LIVE  [move 24, 6 set(s)] "Any"
+[03:17:53.875] gt:   000000002C2EAD00 LIVE  [move 24, 6 set(s)] "Either"
+[03:17:53.875] gt:   000000002C303AF0 LIVE  [move 24, 6 set(s)] "Off"
+[03:17:53.875] gt:   000000002C2F5BE0 LIVE  [move 24, 6 set(s)] "Any"
+[03:17:53.875] gt:   000000002C2CFBD0 LIVE  [move 24, 6 set(s)] "On (Quick Match)"
+[03:17:53.875] gt:   000000002C257650 LIVE  [move 24, 6 set(s)] "On"
+[03:17:53.875] gt: of 51 object(s): 27 still LIVE, 24 stale; current move seq 24.
+[03:17:53.875] gt: ⭐ reclaimed 24 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[03:17:53.876] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[03:17:53.876] layout: === FIELD DUMP of live text objects (51 in set) ===
+[03:17:53.876] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[03:17:53.876] layout:   000000002BDEE590 "Offline Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44474000 +0x044:43400000 +0x04c:3f800000 +0x050:0000000b +0x054:00040010 +0x058:bf800000 +0x060:0001000f +0x068:2c201800 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c8213e8 +0x0a0:c2340000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43ed0000 +0x104:42a00000 +0x10c:07000000 +0x140:00000009 +0x148:01020c10 +0x154:ffffffff +0x160:00000003 +0x164:ffffffff +0x16c:07000000 +0x184:07000000 +0x208:2bde0000
+[03:17:53.876] layout:   000000002BDFD350 "Choose a lobby comment." +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:42c00000 +0x044:446e8000 +0x04c:3f800000 +0x050:00000003 +0x054:02010019 +0x060:00010005 +0x068:2bd8ddb8 +0x078:2bd9b8c0 +0x080:2c282080 +0x088:2bdfcc30 +0x090:3bb0c1a0 +0x098:3bc11c70 +0x0a0:42c00000 +0x0a4:c0c00000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c5a20 +0x0d8:290c5160 +0x0e0:43ceaaab +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:45700000 +0x104:42900000 +0x108:000032a0 +0x10c:00800780 +0x110:2bdd8878 +0x118:2bd9ba28 +0x120:000003a8 +0x124:00800108 +0x128:2bdfd4e8 +0x130:2bd9b9e0
+[03:17:53.877] layout:   000000002BD85700 "Online Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43600000 +0x044:42580000 +0x04c:3f800000 +0x050:00000002 +0x054:02000011 +0x058:bf800000 +0x060:3001000b +0x068:2c205f10 +0x080:2bdfbdc0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c820578 +0x0a0:42000000 +0x0a4:bf800000 +0x0ac:3f800000 +0x0c0:3c835ff0 +0x0d0:290cc240 +0x0e0:43b8ddde +0x0e4:42951111 +0x0e8:2c201130 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000034 +0x0fc:00000034 +0x100:44680000 +0x104:42a00000 +0x138:00000514 +0x13c:00000001 +0x140:00040008 +0x144:00000002 +0x148:01020c00 +0x14c:00030000 +0x150:3c8353a0 +0x154:ffffffff
+[03:17:53.877] layout:   000000002BDF7560 "Casual Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43400000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:4001000a +0x064:40ff9696 +0x068:2c201800 +0x078:2bdee590 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:c2a1ffff +0x0c8:3c837970 +0x0d0:290cdf20 +0x0d8:290cba98 +0x0e0:4355b05b +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00008be0 +0x10c:00800420 +0x110:2bdf76c8 +0x118:2bdd2488
+[03:17:53.877] layout:   000000002BDD2320 "Ranked Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43880000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x064:3f800000 +0x068:2bd89640 +0x078:2bd963a0 +0x080:2bdee7e0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cc5c0 +0x0d8:290cb7f8 +0x0e0:43638e38 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000a080 +0x10c:00800420 +0x110:2bdd2488 +0x118:2bdb6148 +0x120:00001270 +0x124:008000a0
+[03:17:53.879] layout:   000000002BDB75F0 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43b00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdf7ea0 +0x078:2c202e50 +0x080:2bd965f0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:02020001 +0x0c8:bf800000 +0x0d0:290ce9d8 +0x0d8:290cb520 +0x0e0:436416c1 +0x0e4:42616c17 +0x0e8:2bdebdd0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000b940 +0x10c:00800420 +0x110:2bdb7758 +0x118:2bdefb18
+[03:17:53.879] layout:   000000002BDEF9B0 "Ranked Leaderboard" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43d80000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdd2c60 +0x078:2bd8ac90 +0x080:2c2030a0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:3c55dff0 +0x0c8:3c821340 +0x0d0:290ced20 +0x0d8:290cb280 +0x0e0:43a5c71d +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000d6e0 +0x10c:00800660 +0x110:2bdefb18 +0x118:2bd991f8 +0x120:000018bc +0x124:008000e4
+[03:17:53.879] layout:   000000002BD99090 "High Score Challenge" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44000000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdb96a0 +0x078:2bdf94f0 +0x080:2bd8aee0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cf068 +0x0d8:290cb018 +0x0e0:43abbbba +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000f840 +0x10c:008006c0 +0x110:2bd991f8 +0x118:2c208dd8 +0x120:00001cec +0x124:008000ec +0x128:2bd99228
+[03:17:53.879] layout:   000000002C208C70 "High Score Challenge Lea" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44140000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2828a0 +0x078:2bdd5bf0 +0x080:2bdf9740 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ccbe0 +0x0d8:290cade8 +0x0e0:440b3332 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00012a80 +0x10c:00800ae0 +0x110:2c208dd8 +0x118:2bdd0f58 +0x120:00002334 +0x124:00800170 +0x128:2c208e08
+[03:17:53.880] layout:   000000002C2ACA80 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43c08000 +0x04c:3f800000 +0x050:00000009 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2c2b9ee0 +0x080:2c2c66a0 +0x088:2bd8c840 +0x090:3bac20f0 +0x098:3bdc3e90 +0x0a4:c31b0000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:290cd078 +0x0d8:290cd430 +0x0e0:436416c1 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ff000000 +0x0f8:00000020 +0x0fc:00000020 +0x100:442f0000 +0x104:42800000 +0x108:000025e0 +0x10c:00800420 +0x110:2c2cb638 +0x118:2c2e6e88 +0x120:000024a4 +0x124:0080009c +0x128:2c208d90 +0x130:2c2504d8 +0x138:0000095f
+[03:17:53.880] layout:   000000002C250340 "Create Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:43df0000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2d76b0 +0x078:2c2bd330 +0x080:2c2c9750 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ca720 +0x0d8:290cbe88 +0x0e0:43582d84 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00015de0 +0x10c:00800420 +0x110:2c2504a8 +0x118:2c2e6ee8 +0x120:0000273c +0x124:00800098 +0x128:2c2504d8
+[03:17:53.880] layout:   000000002C2E6D80 "Join Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44038000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f0c70 +0x078:2c300280 +0x080:2c2d8040 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cd270 +0x0d8:290ca988 +0x0e0:432e38e4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00002a00 +0x10c:00800360 +0x110:2c2acb88 +0x118:2bd85868 +0x120:00002974 +0x124:0080007c +0x128:2c2e6f18
+[03:17:53.880] layout:   000000002C2CA7C0 "Search Lobby ID" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44178000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2be560 +0x078:2c250df0 +0x080:2c2f1600 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c7578 +0x0d8:290c79a0 +0x0e0:438349f5 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00018300 +0x10c:008004e0 +0x110:2c2ca928 +0x118:2c2da2e8 +0x120:00002c4c +0x124:008000b0 +0x128:2c2ca958
+[03:17:53.880] layout:   000000002C25D680 "Join Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43848000 +0x04c:3f800000 +0x050:00000009 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2c31b3d8 +0x080:2c31b890 +0x088:2c2d8fd0 +0x090:3bac20f0 +0x098:3bdc1f80 +0x0a4:c3898000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:290c7348 +0x0d8:290ca608 +0x0e0:432e38e4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ff000000 +0x0f8:00000020 +0x0fc:00000020 +0x100:442f0000 +0x104:42800000 +0x108:00002220 +0x10c:00800360 +0x110:2c2eb998 +0x118:2c2cb638 +0x120:00000904 +0x124:0080007c +0x128:2c2f5d00 +0x130:2c2bf488 +0x138:00000adf
+[03:17:53.881] layout:   000000002C2BF2F0 "Game" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:43a30000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f26a0 +0x078:2c2d9820 +0x080:2c2d96d0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c7c08 +0x0d8:290c5320 +0x0e0:42bd82d9 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:00014460 +0x10c:00800180 +0x110:2c2bf458 +0x118:2c2cfcd8 +0x120:00000a34 +0x124:0080003c +0x128:2c2bf488
+[03:17:53.881] layout:   000000002C2DA180 "Game Version" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:43cb0000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2cc690 +0x078:2c2ead00 +0x080:2c2eabb0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c6318 +0x0d8:290c9338 +0x0e0:43602d84 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:00019860 +0x10c:00800420 +0x110:2c2da2e8 +0x118:2c310858 +0x120:00002ef8 +0x124:00800098 +0x128:2c2da318
+[03:17:53.881] layout:   000000002C2EB660 "Cross-region Matchmaking" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:43f30000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c254110 +0x078:2c303af0 +0x080:2c3039a0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c8500 +0x0d8:290c9840 +0x0e0:43d293e9 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:0001ca40 +0x10c:408008a0 +0x110:2c2eb7c8 +0x118:2c3045b8 +0x120:00003530 +0x124:4080012c +0x128:2c2eb7f8
+[03:17:53.881] layout:   000000002C304450 "Comment" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:440d8000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c312870 +0x078:2c2f5be0 +0x080:2c2f5a90 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cdc10 +0x0d8:290c9bf8 +0x0e0:43182d82 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:0001e1e0 +0x10c:408002a0 +0x110:2c3045b8 +0x118:2c2f66a8 +0x120:00003824 +0x124:40800064 +0x128:2c3045e8
+[03:17:53.881] layout:   000000002C2F6540 "Event Mode" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:44218000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2dd610 +0x078:2c2cfbd0 +0x080:2c2cfa80 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c8998 +0x0d8:290cbec0 +0x0e0:433f7779 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:0001f7a0 +0x10c:00800360 +0x110:2c2f66a8 +0x118:2c2cfd38 +0x120:00003aa4 +0x124:00800084 +0x128:2c2f66d8
+[03:17:53.883] layout:   000000002C320640 "One-button Special Moves" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:44358000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2eeaf0 +0x078:2c257650 +0x080:2c257500 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c89d0 +0x0d8:290c9d80 +0x0e0:43d48887 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:00023640 +0x10c:00800840 +0x110:2c3207a8 +0x118:2bdfd4b8 +0x120:00004278 +0x124:00800120 +0x128:2c3207d8
+[03:17:53.883] layout:   000000002C2D9820 "Any" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:43a30000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f26a0 +0x080:2c2d96d0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c99c8 +0x0d8:290c90d0 +0x0e0:42755556 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00001c80 +0x10c:00800120 +0x110:2c2d9988 +0x118:2c2eae08 +0x120:000005e8 +0x124:00800030 +0x128:2c2d99b8 +0x130:2c2eae98
+[03:17:53.883] layout:   000000002C2EAD00 "Either" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:43cb0000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2cc690 +0x080:2c2eabb0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c60b0 +0x0d8:290c9fe8 +0x0e0:42b55556 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00001da0 +0x10c:00800240 +0x110:2c2d9928 +0x118:2c2dc288 +0x120:00000724 +0x124:0080005c +0x128:2c2eae98 +0x130:2c303c88
+[03:17:53.883] layout:   000000002C303AF0 "Off" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:43f30000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c254110 +0x080:2c3039a0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c56d8 +0x0d8:290c5fd0 +0x0e0:42555555 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00005820 +0x10c:00800120 +0x110:2c303c58 +0x118:2c2f5d48 +0x120:00000808 +0x124:0080002c +0x128:2c303c88 +0x130:2c2f5d78
+[03:17:53.884] layout:   000000002C2F5BE0 "Any" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:440d8000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c312870 +0x080:2c2f5a90 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c6580 +0x0d8:290cab10 +0x0e0:42755556 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00005dc0 +0x10c:00800120 +0x110:2c2f5d48 +0x118:2c2ec4f8 +0x120:000008b8 +0x124:40800030 +0x128:2c2f5d78 +0x130:2c25d7a0
+[03:17:53.884] layout:   000000002C2CFBD0 "On (Quick Match)" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:44218000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2dd610 +0x080:2c2cfa80 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c59b0 +0x0d8:290cc010 +0x0e0:43904445 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:000145e0 +0x10c:40800540 +0x110:2c2bf3f8 +0x118:2c252d88 +0x120:00002f90 +0x124:408000c0 +0x128:2c2da2a0 +0x130:2c2eb7f8
+[03:17:53.884] layout:   000000002C257650 "On" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:44358000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2eeaf0 +0x080:2c257500 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ca138 +0x0d8:290c9108 +0x0e0:42438e39 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00006480 +0x10c:408000c0 +0x110:2c2577b8 +0x118:2c2db5f8 +0x120:00000cc0 +0x124:40800020 +0x128:2bd858b0 +0x130:2bd85898
+[03:17:53.884] layout: 26 object(s) dumped of 51 in the set (short text only).
+[03:17:55.914] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:17:55.914] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:57.942] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:17:57.942] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:17:59.973] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:17:59.973] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:18:02.001] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:18:02.001] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:18:04.032] heartbeat 35 (alive 70 s)
+[03:18:04.032] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:18:04.032] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:18:04.032] gt: === FOCUS RECORD: 0 distinct string(s) across 24 cursor movement(s), 904 dropped (buffer full) ===
+[03:18:04.032] gt: of 0 string(s): 0 arrived after a cursor movement, 0 were prose captions.
+[03:18:04.032] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[03:18:04.033] gt: === INSTANCE SET: 51 live text object(s), 0 dropped (table full) ===
+[03:18:04.033] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:04.033] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:04.033] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:04.033] gt:   000000002BDEE590 LIVE  [move 0, 1 set(s)] "Offline Play"
+[03:18:04.033] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:04.034] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:04.034] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:04.034] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:04.034] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:04.034] gt:   000000002BDFD350 LIVE  [move 22, 27 set(s)] "Choose a lobby comment."
+[03:18:04.034] gt:   000000002BD9B8C0 LIVE  [move 22, 27 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:18:04.034] gt:   000000002BD85700 LIVE  [move 1, 1 set(s)] "Online Play"
+[03:18:04.034] gt:   000000002BDF7560 LIVE  [move 1, 1 set(s)] "Casual Match"
+[03:18:04.035] gt:   000000002BDD2320 LIVE  [move 1, 1 set(s)] "Ranked Match"
+[03:18:04.035] gt:   000000002BDB75F0 LIVE  [move 1, 1 set(s)] "Custom Match"
+[03:18:04.035] gt:   000000002BDEF9B0 LIVE  [move 1, 1 set(s)] "Ranked Leaderboard"
+[03:18:04.035] gt:   000000002BD99090 LIVE  [move 1, 1 set(s)] "High Score Challenge"
+[03:18:04.035] gt:   000000002C208C70 LIVE  [move 1, 1 set(s)] "High Score Challenge Leaderboard"
+[03:18:04.035] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:18:04.036] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:18:04.036] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:18:04.036] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:18:04.036] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:18:04.037] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:04.037] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:04.037] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:04.037] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:04.037] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:04.037] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:04.037] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:04.037] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:04.038] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:04.038] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:04.038] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:04.038] gt:   000000002C2ACA80 LIVE  [move 14, 1 set(s)] "Custom Match"
+[03:18:04.038] gt:   000000002C250340 LIVE  [move 14, 1 set(s)] "Create Lobby"
+[03:18:04.038] gt:   000000002C2E6D80 LIVE  [move 14, 1 set(s)] "Join Lobby"
+[03:18:04.038] gt:   000000002C2CA7C0 LIVE  [move 14, 1 set(s)] "Search Lobby ID"
+[03:18:04.039] gt:   000000002C25D680 LIVE  [move 19, 1 set(s)] "Join Lobby"
+[03:18:04.039] gt:   000000002C2BF2F0 LIVE  [move 19, 1 set(s)] "Game"
+[03:18:04.039] gt:   000000002C2DA180 LIVE  [move 19, 1 set(s)] "Game Version"
+[03:18:04.039] gt:   000000002C2EB660 LIVE  [move 19, 1 set(s)] "Cross-region Matchmaking"
+[03:18:04.039] gt:   000000002C304450 LIVE  [move 19, 1 set(s)] "Comment"
+[03:18:04.039] gt:   000000002C2F6540 LIVE  [move 19, 1 set(s)] "Event Mode"
+[03:18:04.039] gt:   000000002C320640 LIVE  [move 19, 1 set(s)] "One-button Special Moves"
+[03:18:04.039] gt:   000000002C2D9820 LIVE  [move 24, 6 set(s)] "Any"
+[03:18:04.040] gt:   000000002C2EAD00 LIVE  [move 24, 6 set(s)] "Either"
+[03:18:04.040] gt:   000000002C303AF0 LIVE  [move 24, 6 set(s)] "Off"
+[03:18:04.040] gt:   000000002C2F5BE0 LIVE  [move 24, 6 set(s)] "Any"
+[03:18:04.040] gt:   000000002C2CFBD0 LIVE  [move 24, 6 set(s)] "On (Quick Match)"
+[03:18:04.040] gt:   000000002C257650 LIVE  [move 24, 6 set(s)] "On"
+[03:18:04.040] gt: of 51 object(s): 27 still LIVE, 24 stale; current move seq 24.
+[03:18:04.040] gt: ⭐ reclaimed 24 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[03:18:04.040] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[03:18:04.042] layout: === FIELD DUMP of live text objects (51 in set) ===
+[03:18:04.042] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[03:18:04.042] layout:   000000002BDEE590 "Offline Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44474000 +0x044:43400000 +0x04c:3f800000 +0x050:0000000b +0x054:00040010 +0x058:bf800000 +0x060:0001000f +0x068:2c201800 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c8213e8 +0x0a0:c2340000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43ed0000 +0x104:42a00000 +0x10c:07000000 +0x140:00000009 +0x148:01020c10 +0x154:ffffffff +0x160:00000003 +0x164:ffffffff +0x16c:07000000 +0x184:07000000 +0x208:2bde0000
+[03:18:04.042] layout:   000000002BDFD350 "Choose a lobby comment." +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:42c00000 +0x044:446e8000 +0x04c:3f800000 +0x050:00000003 +0x054:02010019 +0x060:00010005 +0x068:2bd8ddb8 +0x078:2bd9b8c0 +0x080:2c282080 +0x088:2bdfcc30 +0x090:3bb0c1a0 +0x098:3bc11c70 +0x0a0:42c00000 +0x0a4:c0c00000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c5a20 +0x0d8:290c5160 +0x0e0:43ceaaab +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:45700000 +0x104:42900000 +0x108:000032a0 +0x10c:00800780 +0x110:2bdd8878 +0x118:2bd9ba28 +0x120:000003a8 +0x124:00800108 +0x128:2bdfd4e8 +0x130:2bd9b9e0
+[03:18:04.043] layout:   000000002BD85700 "Online Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43600000 +0x044:42580000 +0x04c:3f800000 +0x050:00000002 +0x054:02000011 +0x058:bf800000 +0x060:3001000b +0x068:2c205f10 +0x080:2bdfbdc0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c820578 +0x0a0:42000000 +0x0a4:bf800000 +0x0ac:3f800000 +0x0c0:3c835ff0 +0x0d0:290cc240 +0x0e0:43b8ddde +0x0e4:42951111 +0x0e8:2c201130 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000034 +0x0fc:00000034 +0x100:44680000 +0x104:42a00000 +0x138:00000514 +0x13c:00000001 +0x140:00040008 +0x144:00000002 +0x148:01020c00 +0x14c:00030000 +0x150:3c8353a0 +0x154:ffffffff
+[03:18:04.043] layout:   000000002BDF7560 "Casual Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43400000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:4001000a +0x064:40ff9696 +0x068:2c201800 +0x078:2bdee590 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:c2a1ffff +0x0c8:3c837970 +0x0d0:290cdf20 +0x0d8:290cba98 +0x0e0:4355b05b +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00008be0 +0x10c:00800420 +0x110:2bdf76c8 +0x118:2bdd2488
+[03:18:04.043] layout:   000000002BDD2320 "Ranked Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43880000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x064:3f800000 +0x068:2bd89640 +0x078:2bd963a0 +0x080:2bdee7e0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cc5c0 +0x0d8:290cb7f8 +0x0e0:43638e38 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000a080 +0x10c:00800420 +0x110:2bdd2488 +0x118:2bdb6148 +0x120:00001270 +0x124:008000a0
+[03:18:04.043] layout:   000000002BDB75F0 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43b00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdf7ea0 +0x078:2c202e50 +0x080:2bd965f0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:02020001 +0x0c8:bf800000 +0x0d0:290ce9d8 +0x0d8:290cb520 +0x0e0:436416c1 +0x0e4:42616c17 +0x0e8:2bdebdd0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000b940 +0x10c:00800420 +0x110:2bdb7758 +0x118:2bdefb18
+[03:18:04.044] layout:   000000002BDEF9B0 "Ranked Leaderboard" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43d80000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdd2c60 +0x078:2bd8ac90 +0x080:2c2030a0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:3c55dff0 +0x0c8:3c821340 +0x0d0:290ced20 +0x0d8:290cb280 +0x0e0:43a5c71d +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000d6e0 +0x10c:00800660 +0x110:2bdefb18 +0x118:2bd991f8 +0x120:000018bc +0x124:008000e4
+[03:18:04.044] layout:   000000002BD99090 "High Score Challenge" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44000000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdb96a0 +0x078:2bdf94f0 +0x080:2bd8aee0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cf068 +0x0d8:290cb018 +0x0e0:43abbbba +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000f840 +0x10c:008006c0 +0x110:2bd991f8 +0x118:2c208dd8 +0x120:00001cec +0x124:008000ec +0x128:2bd99228
+[03:18:04.045] layout:   000000002C208C70 "High Score Challenge Lea" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44140000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2828a0 +0x078:2bdd5bf0 +0x080:2bdf9740 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ccbe0 +0x0d8:290cade8 +0x0e0:440b3332 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00012a80 +0x10c:00800ae0 +0x110:2c208dd8 +0x118:2bdd0f58 +0x120:00002334 +0x124:00800170 +0x128:2c208e08
+[03:18:04.045] layout:   000000002C2ACA80 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43c08000 +0x04c:3f800000 +0x050:00000009 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2c2b9ee0 +0x080:2c2c66a0 +0x088:2bd8c840 +0x090:3bac20f0 +0x098:3bdc3e90 +0x0a4:c31b0000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:290cd078 +0x0d8:290cd430 +0x0e0:436416c1 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ff000000 +0x0f8:00000020 +0x0fc:00000020 +0x100:442f0000 +0x104:42800000 +0x108:000025e0 +0x10c:00800420 +0x110:2c2cb638 +0x118:2c2e6e88 +0x120:000024a4 +0x124:0080009c +0x128:2c208d90 +0x130:2c2504d8 +0x138:0000095f
+[03:18:04.045] layout:   000000002C250340 "Create Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:43df0000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2d76b0 +0x078:2c2bd330 +0x080:2c2c9750 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ca720 +0x0d8:290cbe88 +0x0e0:43582d84 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00015de0 +0x10c:00800420 +0x110:2c2504a8 +0x118:2c2e6ee8 +0x120:0000273c +0x124:00800098 +0x128:2c2504d8
+[03:18:04.046] layout:   000000002C2E6D80 "Join Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44038000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f0c70 +0x078:2c300280 +0x080:2c2d8040 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cd270 +0x0d8:290ca988 +0x0e0:432e38e4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00002a00 +0x10c:00800360 +0x110:2c2acb88 +0x118:2bd85868 +0x120:00002974 +0x124:0080007c +0x128:2c2e6f18
+[03:18:04.046] layout:   000000002C2CA7C0 "Search Lobby ID" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44178000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2be560 +0x078:2c250df0 +0x080:2c2f1600 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c7578 +0x0d8:290c79a0 +0x0e0:438349f5 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00018300 +0x10c:008004e0 +0x110:2c2ca928 +0x118:2c2da2e8 +0x120:00002c4c +0x124:008000b0 +0x128:2c2ca958
+[03:18:04.046] layout:   000000002C25D680 "Join Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43848000 +0x04c:3f800000 +0x050:00000009 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2c31b3d8 +0x080:2c31b890 +0x088:2c2d8fd0 +0x090:3bac20f0 +0x098:3bdc1f80 +0x0a4:c3898000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:290c7348 +0x0d8:290ca608 +0x0e0:432e38e4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ff000000 +0x0f8:00000020 +0x0fc:00000020 +0x100:442f0000 +0x104:42800000 +0x108:00002220 +0x10c:00800360 +0x110:2c2eb998 +0x118:2c2cb638 +0x120:00000904 +0x124:0080007c +0x128:2c2f5d00 +0x130:2c2bf488 +0x138:00000adf
+[03:18:04.047] layout:   000000002C2BF2F0 "Game" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:43a30000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f26a0 +0x078:2c2d9820 +0x080:2c2d96d0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c7c08 +0x0d8:290c5320 +0x0e0:42bd82d9 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:00014460 +0x10c:00800180 +0x110:2c2bf458 +0x118:2c2cfcd8 +0x120:00000a34 +0x124:0080003c +0x128:2c2bf488
+[03:18:04.047] layout:   000000002C2DA180 "Game Version" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:43cb0000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2cc690 +0x078:2c2ead00 +0x080:2c2eabb0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c6318 +0x0d8:290c9338 +0x0e0:43602d84 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:00019860 +0x10c:00800420 +0x110:2c2da2e8 +0x118:2c310858 +0x120:00002ef8 +0x124:00800098 +0x128:2c2da318
+[03:18:04.047] layout:   000000002C2EB660 "Cross-region Matchmaking" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:43f30000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c254110 +0x078:2c303af0 +0x080:2c3039a0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c8500 +0x0d8:290c9840 +0x0e0:43d293e9 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:0001ca40 +0x10c:408008a0 +0x110:2c2eb7c8 +0x118:2c3045b8 +0x120:00003530 +0x124:4080012c +0x128:2c2eb7f8
+[03:18:04.048] layout:   000000002C304450 "Comment" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:440d8000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c312870 +0x078:2c2f5be0 +0x080:2c2f5a90 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cdc10 +0x0d8:290c9bf8 +0x0e0:43182d82 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:0001e1e0 +0x10c:408002a0 +0x110:2c3045b8 +0x118:2c2f66a8 +0x120:00003824 +0x124:40800064 +0x128:2c3045e8
+[03:18:04.048] layout:   000000002C2F6540 "Event Mode" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:44218000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2dd610 +0x078:2c2cfbd0 +0x080:2c2cfa80 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c8998 +0x0d8:290cbec0 +0x0e0:433f7779 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:0001f7a0 +0x10c:00800360 +0x110:2c2f66a8 +0x118:2c2cfd38 +0x120:00003aa4 +0x124:00800084 +0x128:2c2f66d8
+[03:18:04.048] layout:   000000002C320640 "One-button Special Moves" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:44358000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2eeaf0 +0x078:2c257650 +0x080:2c257500 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c89d0 +0x0d8:290c9d80 +0x0e0:43d48887 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:00023640 +0x10c:00800840 +0x110:2c3207a8 +0x118:2bdfd4b8 +0x120:00004278 +0x124:00800120 +0x128:2c3207d8
+[03:18:04.049] layout:   000000002C2D9820 "Any" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:43a30000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f26a0 +0x080:2c2d96d0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c99c8 +0x0d8:290c90d0 +0x0e0:42755556 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00001c80 +0x10c:00800120 +0x110:2c2d9988 +0x118:2c2eae08 +0x120:000005e8 +0x124:00800030 +0x128:2c2d99b8 +0x130:2c2eae98
+[03:18:04.049] layout:   000000002C2EAD00 "Either" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:43cb0000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2cc690 +0x080:2c2eabb0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c60b0 +0x0d8:290c9fe8 +0x0e0:42b55556 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00001da0 +0x10c:00800240 +0x110:2c2d9928 +0x118:2c2dc288 +0x120:00000724 +0x124:0080005c +0x128:2c2eae98 +0x130:2c303c88
+[03:18:04.049] layout:   000000002C303AF0 "Off" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:43f30000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c254110 +0x080:2c3039a0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c56d8 +0x0d8:290c5fd0 +0x0e0:42555555 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00005820 +0x10c:00800120 +0x110:2c303c58 +0x118:2c2f5d48 +0x120:00000808 +0x124:0080002c +0x128:2c303c88 +0x130:2c2f5d78
+[03:18:04.049] layout:   000000002C2F5BE0 "Any" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:440d8000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c312870 +0x080:2c2f5a90 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c6580 +0x0d8:290cab10 +0x0e0:42755556 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00005dc0 +0x10c:00800120 +0x110:2c2f5d48 +0x118:2c2ec4f8 +0x120:000008b8 +0x124:40800030 +0x128:2c2f5d78 +0x130:2c25d7a0
+[03:18:04.049] layout:   000000002C2CFBD0 "On (Quick Match)" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:44218000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2dd610 +0x080:2c2cfa80 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c59b0 +0x0d8:290cc010 +0x0e0:43904445 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:000145e0 +0x10c:40800540 +0x110:2c2bf3f8 +0x118:2c252d88 +0x120:00002f90 +0x124:408000c0 +0x128:2c2da2a0 +0x130:2c2eb7f8
+[03:18:04.051] layout:   000000002C257650 "On" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:44358000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2eeaf0 +0x080:2c257500 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ca138 +0x0d8:290c9108 +0x0e0:42438e39 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00006480 +0x10c:008000c0 +0x110:2c2577b8 +0x118:2bdd5128 +0x120:00000cc0 +0x124:40800020 +0x128:2bd858b0 +0x130:2bd85898
+[03:18:04.051] layout: 26 object(s) dumped of 51 in the set (short text only).
+[03:18:06.079] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:18:06.079] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:18:08.108] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:18:08.110] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:18:10.136] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:18:10.137] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:18:12.168] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:18:12.168] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:18:14.200] heartbeat 40 (alive 80 s)
+[03:18:14.200] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:18:14.200] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:18:14.200] gt: === FOCUS RECORD: 0 distinct string(s) across 24 cursor movement(s), 904 dropped (buffer full) ===
+[03:18:14.200] gt: of 0 string(s): 0 arrived after a cursor movement, 0 were prose captions.
+[03:18:14.201] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[03:18:14.201] gt: === INSTANCE SET: 51 live text object(s), 0 dropped (table full) ===
+[03:18:14.201] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:14.201] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:14.201] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:14.201] gt:   000000002BDEE590 LIVE  [move 0, 1 set(s)] "Offline Play"
+[03:18:14.201] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:14.202] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:14.202] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:14.202] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:14.202] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[03:18:14.202] gt:   000000002BDFD350 LIVE  [move 22, 27 set(s)] "Choose a lobby comment."
+[03:18:14.202] gt:   000000002BD9B8C0 LIVE  [move 22, 27 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[03:18:14.202] gt:   000000002BD85700 LIVE  [move 1, 1 set(s)] "Online Play"
+[03:18:14.203] gt:   000000002BDF7560 LIVE  [move 1, 1 set(s)] "Casual Match"
+[03:18:14.203] gt:   000000002BDD2320 LIVE  [move 1, 1 set(s)] "Ranked Match"
+[03:18:14.203] gt:   000000002BDB75F0 LIVE  [move 1, 1 set(s)] "Custom Match"
+[03:18:14.204] gt:   000000002BDEF9B0 LIVE  [move 1, 1 set(s)] "Ranked Leaderboard"
+[03:18:14.206] gt:   000000002BD99090 LIVE  [move 1, 1 set(s)] "High Score Challenge"
+[03:18:14.206] gt:   000000002C208C70 LIVE  [move 1, 1 set(s)] "High Score Challenge Leaderboard"
+[03:18:14.206] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:18:14.206] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:18:14.206] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:18:14.206] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:18:14.207] gt:   0000000000000000 STALE [move 2, 0 set(s)] ""
+[03:18:14.207] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:14.207] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:14.207] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:14.207] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:14.207] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:14.207] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:14.207] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:14.207] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:14.207] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:14.208] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:14.208] gt:   0000000000000000 STALE [move 5, 0 set(s)] ""
+[03:18:14.208] gt:   000000002C2ACA80 LIVE  [move 14, 1 set(s)] "Custom Match"
+[03:18:14.208] gt:   000000002C250340 LIVE  [move 14, 1 set(s)] "Create Lobby"
+[03:18:14.208] gt:   000000002C2E6D80 LIVE  [move 14, 1 set(s)] "Join Lobby"
+[03:18:14.208] gt:   000000002C2CA7C0 LIVE  [move 14, 1 set(s)] "Search Lobby ID"
+[03:18:14.209] gt:   000000002C25D680 LIVE  [move 19, 1 set(s)] "Join Lobby"
+[03:18:14.209] gt:   000000002C2BF2F0 LIVE  [move 19, 1 set(s)] "Game"
+[03:18:14.209] gt:   000000002C2DA180 LIVE  [move 19, 1 set(s)] "Game Version"
+[03:18:14.209] gt:   000000002C2EB660 LIVE  [move 19, 1 set(s)] "Cross-region Matchmaking"
+[03:18:14.209] gt:   000000002C304450 LIVE  [move 19, 1 set(s)] "Comment"
+[03:18:14.209] gt:   000000002C2F6540 LIVE  [move 19, 1 set(s)] "Event Mode"
+[03:18:14.210] gt:   000000002C320640 LIVE  [move 19, 1 set(s)] "One-button Special Moves"
+[03:18:14.210] gt:   000000002C2D9820 LIVE  [move 24, 6 set(s)] "Any"
+[03:18:14.210] gt:   000000002C2EAD00 LIVE  [move 24, 6 set(s)] "Either"
+[03:18:14.210] gt:   000000002C303AF0 LIVE  [move 24, 6 set(s)] "Off"
+[03:18:14.210] gt:   000000002C2F5BE0 LIVE  [move 24, 6 set(s)] "Any"
+[03:18:14.210] gt:   000000002C2CFBD0 LIVE  [move 24, 6 set(s)] "On (Quick Match)"
+[03:18:14.210] gt:   000000002C257650 LIVE  [move 24, 6 set(s)] "On"
+[03:18:14.210] gt: of 51 object(s): 27 still LIVE, 24 stale; current move seq 24.
+[03:18:14.210] gt: ⭐ reclaimed 24 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[03:18:14.210] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[03:18:14.211] layout: === FIELD DUMP of live text objects (51 in set) ===
+[03:18:14.211] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[03:18:14.211] layout:   000000002BDEE590 "Offline Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44474000 +0x044:43400000 +0x04c:3f800000 +0x050:0000000b +0x054:00040010 +0x058:bf800000 +0x060:0001000f +0x068:2c201800 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c8213e8 +0x0a0:c2340000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43ed0000 +0x104:42a00000 +0x10c:07000000 +0x140:00000009 +0x148:01020c10 +0x154:ffffffff +0x160:00000003 +0x164:ffffffff +0x16c:07000000 +0x184:07000000 +0x208:2bde0000
+[03:18:14.211] layout:   000000002BDFD350 "Choose a lobby comment." +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:42c00000 +0x044:446e8000 +0x04c:3f800000 +0x050:00000003 +0x054:02010019 +0x060:00010005 +0x068:2bd8ddb8 +0x078:2bd9b8c0 +0x080:2c282080 +0x088:2bdfcc30 +0x090:3bb0c1a0 +0x098:3bc11c70 +0x0a0:42c00000 +0x0a4:c0c00000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c5a20 +0x0d8:290c5160 +0x0e0:43ceaaab +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:45700000 +0x104:42900000 +0x108:000032a0 +0x10c:00800780 +0x110:2bdd8878 +0x118:2bd9ba28 +0x120:000003a8 +0x124:00800108 +0x128:2bdfd4e8 +0x130:2bd9b9e0
+[03:18:14.212] layout:   000000002BD85700 "Online Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43600000 +0x044:42580000 +0x04c:3f800000 +0x050:00000002 +0x054:02000011 +0x058:bf800000 +0x060:3001000b +0x068:2c205f10 +0x080:2bdfbdc0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c820578 +0x0a0:42000000 +0x0a4:bf800000 +0x0ac:3f800000 +0x0c0:3c835ff0 +0x0d0:290cc240 +0x0e0:43b8ddde +0x0e4:42951111 +0x0e8:2c201130 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000034 +0x0fc:00000034 +0x100:44680000 +0x104:42a00000 +0x138:00000514 +0x13c:00000001 +0x140:00040008 +0x144:00000002 +0x148:01020c00 +0x14c:00030000 +0x150:3c8353a0 +0x154:ffffffff
+[03:18:14.212] layout:   000000002BDF7560 "Casual Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43400000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:4001000a +0x064:40ff9696 +0x068:2c201800 +0x078:2bdee590 +0x080:2bdb6420 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:c2a1ffff +0x0c8:3c837970 +0x0d0:290cdf20 +0x0d8:290cba98 +0x0e0:4355b05b +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00008be0 +0x10c:00800420 +0x110:2bdf76c8 +0x118:2bdd2488
+[03:18:14.213] layout:   000000002BDD2320 "Ranked Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43880000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x064:3f800000 +0x068:2bd89640 +0x078:2bd963a0 +0x080:2bdee7e0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cc5c0 +0x0d8:290cb7f8 +0x0e0:43638e38 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000a080 +0x10c:00800420 +0x110:2bdd2488 +0x118:2bdb6148 +0x120:00001270 +0x124:008000a0
+[03:18:14.213] layout:   000000002BDB75F0 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43b00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdf7ea0 +0x078:2c202e50 +0x080:2bd965f0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:02020001 +0x0c8:bf800000 +0x0d0:290ce9d8 +0x0d8:290cb520 +0x0e0:436416c1 +0x0e4:42616c17 +0x0e8:2bdebdd0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000b940 +0x10c:00800420 +0x110:2bdb7758 +0x118:2bdefb18
+[03:18:14.213] layout:   000000002BDEF9B0 "Ranked Leaderboard" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43d80000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdd2c60 +0x078:2bd8ac90 +0x080:2c2030a0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:3c55dff0 +0x0c8:3c821340 +0x0d0:290ced20 +0x0d8:290cb280 +0x0e0:43a5c71d +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000d6e0 +0x10c:00800660 +0x110:2bdefb18 +0x118:2bd991f8 +0x120:000018bc +0x124:008000e4
+[03:18:14.213] layout:   000000002BD99090 "High Score Challenge" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44000000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdb96a0 +0x078:2bdf94f0 +0x080:2bd8aee0 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cf068 +0x0d8:290cb018 +0x0e0:43abbbba +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000f840 +0x10c:008006c0 +0x110:2bd991f8 +0x118:2c208dd8 +0x120:00001cec +0x124:008000ec +0x128:2bd99228
+[03:18:14.214] layout:   000000002C208C70 "High Score Challenge Lea" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44140000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2828a0 +0x078:2bdd5bf0 +0x080:2bdf9740 +0x088:2c2821d0 +0x090:3c55dab0 +0x098:3c821420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ccbe0 +0x0d8:290cade8 +0x0e0:440b3332 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00012a80 +0x10c:00800ae0 +0x110:2c208dd8 +0x118:2bdd0f58 +0x120:00002334 +0x124:00800170 +0x128:2c208e08
+[03:18:14.214] layout:   000000002C2ACA80 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43c08000 +0x04c:3f800000 +0x050:00000009 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2c2b9ee0 +0x080:2c2c66a0 +0x088:2bd8c840 +0x090:3bac20f0 +0x098:3bdc3e90 +0x0a4:c31b0000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:290cd078 +0x0d8:290cd430 +0x0e0:436416c1 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ff000000 +0x0f8:00000020 +0x0fc:00000020 +0x100:442f0000 +0x104:42800000 +0x108:000025e0 +0x10c:00800420 +0x110:2c2cb638 +0x118:2c2e6e88 +0x120:000024a4 +0x124:0080009c +0x128:2c208d90 +0x130:2c2504d8 +0x138:0000095f
+[03:18:14.214] layout:   000000002C250340 "Create Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:43df0000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2d76b0 +0x078:2c2bd330 +0x080:2c2c9750 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ca720 +0x0d8:290cbe88 +0x0e0:43582d84 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00015de0 +0x10c:00800420 +0x110:2c2504a8 +0x118:2c2e6ee8 +0x120:0000273c +0x124:00800098 +0x128:2c2504d8
+[03:18:14.214] layout:   000000002C2E6D80 "Join Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44038000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f0c70 +0x078:2c300280 +0x080:2c2d8040 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cd270 +0x0d8:290ca988 +0x0e0:432e38e4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00002a00 +0x10c:00800360 +0x110:2c2acb88 +0x118:2bd85868 +0x120:00002974 +0x124:0080007c +0x128:2c2e6f18
+[03:18:14.214] layout:   000000002C2CA7C0 "Search Lobby ID" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44178000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2be560 +0x078:2c250df0 +0x080:2c2f1600 +0x088:2bd8c840 +0x090:3c5934d0 +0x098:3c7d1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c7578 +0x0d8:290c79a0 +0x0e0:438349f5 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00018300 +0x10c:008004e0 +0x110:2c2ca928 +0x118:2c2da2e8 +0x120:00002c4c +0x124:008000b0 +0x128:2c2ca958
+[03:18:14.216] layout:   000000002C25D680 "Join Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43848000 +0x04c:3f800000 +0x050:00000009 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2c31b3d8 +0x080:2c31b890 +0x088:2c2d8fd0 +0x090:3bac20f0 +0x098:3bdc1f80 +0x0a4:c3898000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:290c7348 +0x0d8:290ca608 +0x0e0:432e38e4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ff000000 +0x0f8:00000020 +0x0fc:00000020 +0x100:442f0000 +0x104:42800000 +0x108:00002220 +0x10c:00800360 +0x110:2c2eb998 +0x118:2c2cb638 +0x120:00000904 +0x124:0080007c +0x128:2c2f5d00 +0x130:2c2bf488 +0x138:00000adf
+[03:18:14.216] layout:   000000002C2BF2F0 "Game" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:43a30000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f26a0 +0x078:2c2d9820 +0x080:2c2d96d0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c7c08 +0x0d8:290c5320 +0x0e0:42bd82d9 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:00014460 +0x10c:00800180 +0x110:2c2bf458 +0x118:2c2cfcd8 +0x120:00000a34 +0x124:0080003c +0x128:2c2bf488
+[03:18:14.216] layout:   000000002C2DA180 "Game Version" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:43cb0000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2cc690 +0x078:2c2ead00 +0x080:2c2eabb0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c6318 +0x0d8:290c9338 +0x0e0:43602d84 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:00019860 +0x10c:00800420 +0x110:2c2da2e8 +0x118:2c310858 +0x120:00002ef8 +0x124:00800098 +0x128:2c2da318
+[03:18:14.216] layout:   000000002C2EB660 "Cross-region Matchmaking" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:43f30000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c254110 +0x078:2c303af0 +0x080:2c3039a0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c8500 +0x0d8:290c9840 +0x0e0:43d293e9 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:0001ca40 +0x10c:408008a0 +0x110:2c2eb7c8 +0x118:2c3045b8 +0x120:00003530 +0x124:4080012c +0x128:2c2eb7f8
+[03:18:14.217] layout:   000000002C304450 "Comment" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:440d8000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c312870 +0x078:2c2f5be0 +0x080:2c2f5a90 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290cdc10 +0x0d8:290c9bf8 +0x0e0:43182d82 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:0001e1e0 +0x10c:408002a0 +0x110:2c3045b8 +0x118:2c2f66a8 +0x120:00003824 +0x124:40800064 +0x128:2c3045e8
+[03:18:14.217] layout:   000000002C2F6540 "Event Mode" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:44218000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2dd610 +0x078:2c2cfbd0 +0x080:2c2cfa80 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c8998 +0x0d8:290cbec0 +0x0e0:433f7779 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:0001f7a0 +0x10c:00800360 +0x110:2c2f66a8 +0x118:2c2cfd38 +0x120:00003aa4 +0x124:00800084 +0x128:2c2f66d8
+[03:18:14.217] layout:   000000002C320640 "One-button Special Moves" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43a00000 +0x044:44358000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2eeaf0 +0x078:2c257650 +0x080:2c257500 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d06d8 +0x0a0:c4200000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c89d0 +0x0d8:290c9d80 +0x0e0:43d48887 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:43dc0000 +0x104:42a00000 +0x108:00023640 +0x10c:00800840 +0x110:2c3207a8 +0x118:2bdfd4b8 +0x120:00004278 +0x124:00800120 +0x128:2c3207d8
+[03:18:14.218] layout:   000000002C2D9820 "Any" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:43a30000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2f26a0 +0x080:2c2d96d0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c99c8 +0x0d8:290c90d0 +0x0e0:42755556 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00001c80 +0x10c:00800120 +0x110:2c2d9988 +0x118:2c2eae08 +0x120:000005e8 +0x124:00800030 +0x128:2c2d99b8 +0x130:2c2eae98
+[03:18:14.218] layout:   000000002C2EAD00 "Either" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:43cb0000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2cc690 +0x080:2c2eabb0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c60b0 +0x0d8:290c9fe8 +0x0e0:42b55556 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00001da0 +0x10c:00800240 +0x110:2c2d9928 +0x118:2c2dc288 +0x120:00000724 +0x124:0080005c +0x128:2c2eae98 +0x130:2c303c88
+[03:18:14.218] layout:   000000002C303AF0 "Off" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:43f30000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c254110 +0x080:2c3039a0 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c56d8 +0x0d8:290c5fd0 +0x0e0:42555555 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00005820 +0x10c:00800120 +0x110:2c303c58 +0x118:2c2f5d48 +0x120:00000808 +0x124:0080002c +0x128:2c303c88 +0x130:2c2f5d78
+[03:18:14.218] layout:   000000002C2F5BE0 "Any" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:440d8000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c312870 +0x080:2c2f5a90 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c6580 +0x0d8:290cab10 +0x0e0:42755556 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00005dc0 +0x10c:00800120 +0x110:2c2f5d48 +0x118:2c2ec4f8 +0x120:000008b8 +0x124:40800030 +0x128:2c2f5d78 +0x130:2c25d7a0
+[03:18:14.219] layout:   000000002C2CFBD0 "On (Quick Match)" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:44218000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2dd610 +0x080:2c2cfa80 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290c59b0 +0x0d8:290cc010 +0x0e0:43904445 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:000145e0 +0x10c:40800540 +0x110:2c2bf3f8 +0x118:2c252d88 +0x120:00002f90 +0x124:408000c0 +0x128:2c2da2a0 +0x130:2c2eb7f8
+[03:18:14.219] layout:   000000002C257650 "On" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:4450c000 +0x044:44358000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2eeaf0 +0x080:2c257500 +0x088:2c2d8fd0 +0x090:3c5934d0 +0x098:3c7d0710 +0x0a0:c2fa0000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:290ca138 +0x0d8:290c9108 +0x0e0:42438e39 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44320000 +0x104:42a00000 +0x108:00006480 +0x10c:008000c0 +0x110:2c2577b8 +0x118:2bdd5128 +0x120:00000cc0 +0x124:40800020 +0x128:2bd858b0 +0x130:2bd85898
+[03:18:14.219] layout: 26 object(s) dumped of 51 in the set (short text only).
+[03:18:16.248] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:18:16.249] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:18:18.277] gt: 275 CONSTRUCTED; setText ran 1395 time(s), 1395 string(s) captured; 0 guarded read(s) faulted.
+[03:18:18.278] gt:   by overload: cGUIObjText.25=1395 .26=0  cGUIObjMessage.25=0 .26=0
+[03:18:19.498] kbd: down=[0x12 0xa4]  pressed=[0x12 0xa4]  released=[(none)]  (engine Trg=[(none)])
+[03:18:19.701] kbd: down=[0x12 0x72 0x73 0xa4]  pressed=[0x72 0x73]  released=[(none)]  (engine Trg=[0x72])
+[03:18:19.801] kbd: ⛔ could not READ the state block (fault or no pointer). Nothing is concluded.
