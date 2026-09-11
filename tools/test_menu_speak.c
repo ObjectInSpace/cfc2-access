@@ -1069,6 +1069,40 @@ int main(void)
               eight != NULL);
     }
 
+    /* --- case 30: a settings row with NO value table names no value ---------
+     * ⛔⛔ USER-REPORTED 2026-09-11: "the values in the options submenus are not
+     * correct". Measured in the logs, the mod was appending ANOTHER ROW'S
+     * value:
+     *     "Coin Button, 1 of 6, English [en]"
+     *     "Menu Button, 1 of 7, English [en]"
+     *     "Announcer Volume, 1 of 10, Remix"
+     *     "Game, 3 of 9, First to 4"
+     *
+     * The live-quote path claimed a guard of "a caption stamped with THIS
+     * movement", which is NOT the same as "belongs to this row" -- several rows
+     * write text during one movement and the channel returns whichever came
+     * last.
+     *
+     * ⚠ Asserted on the DATA, not by staging a caption (the harness has no live
+     * caption channel): System's button rows 1-3 must have NO value variant, so
+     * there is nothing for a quote to be checked against and the path must stay
+     * silent. If someone adds a variant for them later, this case fails and
+     * they must re-establish the labels first -- the buttons are controller
+     * GLYPHS with no GMD run, which is why no variant exists. */
+    {
+        const mc_screen *v = menu_speak_lookup(0x1400a3431ULL);
+        int any = 0;
+        for (int i = 0; v && i < v->nvalues; i++)
+            if (v->values[i].row >= 1 && v->values[i].row <= 3)
+                any = 1;
+        /* Row 0 (Language) and row 4 (Data Collection) DO have variants -- the
+         * positive control, so this cannot pass on an empty table. */
+        const mc_value_set *lang = menu_speak_values_for(v, 0, 14);
+        check("30. System's button rows have no value variant to mis-speak",
+              v && !any && lang && lang->count == 14,
+              "buttons=%d lang=%d", any, lang != NULL);
+    }
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");

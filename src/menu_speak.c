@@ -2000,14 +2000,44 @@ void menu_speak(const mc_move *m)
                  * line, no markup -- see is_value_shaped), and only for a
                  * caption stamped with THIS movement, which gt_take_caption
                  * already enforces. */
-                char spoken[GM_OUT_MAX];
-                gm_speak(cap, spoken, sizeof(spoken));
-                if (spoken[0] && !gm_has_residue(spoken)) {
-                    size_t used = strlen(line);
-                    _snprintf(line + used, sizeof(line) - used - 1,
-                              ", %s", spoken);
-                    line[sizeof(line) - 1] = '\0';
-                }
+                /* ⛔⛔ USER-REPORTED, 2026-09-11: "the values in the options
+                 * submenus are not correct". They were right, and the fourth
+                 * guard above was the hole. Measured in the logs:
+                 *
+                 *   "Coin Button, 1 of 6, English [en]"
+                 *   "Menu Button, 1 of 7, English [en]"
+                 *   "Announcer Volume, 1 of 10, Remix"
+                 *   "Game, 3 of 9, First to 4"
+                 *
+                 * Each appends ANOTHER ROW'S value. "Stamped with this
+                 * movement" is not the same as "belongs to this row": on a
+                 * settings screen several rows write text during one movement,
+                 * and gt_take_caption returns whichever arrived last.
+                 *
+                 * ⭐ THE FIX: only quote text that could actually be a value of
+                 * THIS row. If the row has a shipped value set, the quote must
+                 * be one of ITS labels; the value is then named by the table
+                 * anyway, so the quote only fires for rows with NO table -- and
+                 * for those there is nothing to check against, so it is
+                 * refused. A wrong value spoken confidently is worse than a
+                 * position, which is the whole premise of this file. */
+                /* ⛔ SO THIS PATH IS NOW SILENT ON A SETTINGS VALUE AXIS.
+                 *
+                 * It cannot tell whose value it is holding, and nothing
+                 * available here can: the caption channel keys on the movement,
+                 * not on the row. Rows WITH a shipped value set are named by
+                 * the table (which is checked against the corpus); rows without
+                 * one now say "Menu Button, 3 of 7" -- true, and not a claim
+                 * about a value belonging to a different setting.
+                 *
+                 * ⚠ This LOSES the legitimate case it was built for -- quoting
+                 * a generated value like "1024x768" or a volume step, which no
+                 * table can ever cover. That is a real cost, taken knowingly:
+                 * a wrong value is worse than a missing one, and the user heard
+                 * the wrong values before I measured them. */
+                log_line("mcspeak: value quote SUPPRESSED on a settings axis "
+                         "(row %d): \"%.40s\" cannot be attributed to this row.",
+                         sp.row, cap);
             } else if (id.result == PROMPT_ID_AMBIGUOUS) {
                 /* Logged, never spoken: the string belongs to more than one
                  * screen, so naming one would be a guess. */
