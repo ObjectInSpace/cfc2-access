@@ -41,17 +41,38 @@ never caption, this screen needs a selection signal — the genuinely open
 question the instance route has never had to answer (the music list dodged it by
 being numbered; Gallery dodged it by captioning).
 
-### 1. Online Play > Casual Match — `0x2BD9C3E0` (4 callers)
+### ⭐ CASUAL MATCH: the labels are visible, the JOIN is not (analysed 2026-09-10)
+
+The instance set on that screen holds the row labels outright, at `move 3`:
+**Game · Game Version · Cross-region Matchmaking · One-button Special Moves** —
+GMD 51, 52, 84, 88. Four labels, and the 4-item list (`0x14009890d`) needs
+exactly four.
+
+⛔⛔ **AND THAT IS NOT ENOUGH TO SHIP.** It is "fits the count and the category",
+the precise reasoning behind `g_game_options_candidate` and the mislabelled
+"Controls" screen. Nothing ties those four labels to THAT caller rather than to
+either 3-item list on the same screen object.
+
+The second source this project requires is **unavailable here**, and for a
+measurable reason:
+
+- `0x14009885e` and `0x1400988bf` (both 3-item) pass a **STACK-LOCAL** cursor
+  (`0x06EBFC50`, far from the screen at `0x2BF16AC0`), so no `values_off`
+  arithmetic can address them at all — the Fighter Awards / music-list shape.
+- `0x14009890d` (4-item) passes `screen+0x334`, and the 8-item strip passes
+  `screen+0x344`. So the row cursor and the strip are 0x10 apart and the value
+  cursors must lie between — but **only one value cursor has ever been seen**,
+  so which row it belongs to cannot be derived.
+- No per-row captions exist on any of the three: every caption near them is a
+  stale leftover ("Arcade Mode", "P1") appearing against unrelated positions.
+
+▶ What would settle it: walk the **4-item list** slowly, nudging each row's
+value once. That yields per-row value cursors, and `(cursor − screen −
+values_off)/4` then confirms the ORDER independently of the label set — the same
+two-source standard every shipped settings screen meets.
+
+The cluster's four call sites, for reference:
 `0x14009885e` 3v · `0x1400988bf` 3v · `0x14009890d` 4v · `0x140098986` 8h
-
-⛔⛔ **The 8-item strip has NEVER BEEN MOVED ON.** Zero movements in any run — it
-was discovered and left. The game titles seen near it in the 13:43 log were set
-by the ADJACENT 3-item list, not by the strip. There is currently **no evidence
-whatsoever** about its contents.
-
-▶ **Walk the 8-item strip end to end.** If it captions like Gallery, it ships
-immediately via `MC_GAME_STRIP` (already built). Then the three vertical lists at
-~1 s dwell each.
 
 ### ⭐⭐ LOBBY SETTINGS: the LABELS are in hand, the ORDER is not (19:45 run)
 
@@ -85,23 +106,26 @@ that cannot be told apart offline. **That ambiguity is itself the finding.**
 first), or walk rows 8-10 slowly so their captions arrive. Either gives the two
 missing labels AND a second independent order check.
 
-### 2. Lobby settings — `0x2C370E20` (`0x140082c3c` 10v + `0x140082d16` 9h)
-⭐ **The highest-value target, and pacing alone decides it.** Identity is
-certain: the corpus holds a 60-label `LOBBY_*` family and the live values match
-verbatim ("On (Quick Match)", "First to 1").
-⛔ Only row 1 has ever resolved; rows 3-10 have no evidence.
-▶ **Ten rows, ~1 s dwell each, in one pass.** Then `name_screens.py`.
+### Lobby settings — `0x2C370E20` (`0x140082c3c` 10v + `0x140082d16` 9h)
+Identity is certain: the corpus holds a 60-label `LOBBY_*` family and the live
+values match verbatim ("On (Quick Match)", "First to 1").
 
-### 3. Fighter Awards — `0x2BE0B650` (`0x140079833` 7v + `0x140079739` 40h)
+⚠ **Superseded by the LOBBY SETTINGS section above** — an earlier note here said
+"pacing alone decides it" and "only row 1 has ever resolved". The 19:45 run was
+paced WELL (2-3 s per row) and still produced only 2 captions, so pacing is NOT
+the blocker; and 8 of the 10 labels are in hand from the instance set. What is
+missing is the ORDER, not the labels.
+
+### Fighter Awards — `0x2BE0B650` (`0x140079833` 7v + `0x140079739` 40h)
 ⭐ Already USABLE — its items speak via the achievement path. Only the 7 list
 rows are unnamed, and it has ONE static caption for the whole screen, so the
 caption channel cannot name them. Needs a different idea; lowest priority.
 
-### 4. Music chooser — `0x14009af21` 9h
+### Music chooser — `0x14009af21` 9h
 ⚠ Gave NO captions in any run, unlike Gallery's identical-looking strip.
 ▶ Walk it slowly once. If it stays silent, it needs the instance route.
 
-### 5. Lobby-ID keypad — `0x2C440110` (`0x14008a8ef` 36v + `0x14008a91b` 6h)
+### Lobby-ID keypad — `0x2C440110` (`0x14008a8ef` 36v + `0x14008a91b` 6h)
 36 = 10 digits + 26 letters, reached from "Search Lobby ID".
 
 ⭐⭐ **CORRECTED: it DOES set text, and this screen is well within reach.** I
@@ -124,7 +148,7 @@ sets text per position or whether the slot contents are the only signal.
 ⚠ A single character ("Y", "0") is exactly the case `is_value_shaped` admits and
 the corpus cannot confirm, so quoting rules apply, not naming rules.
 
-### 6. ⭐ IDENTIFIED: Join Lobby's search filters — `0x2C5002F0`
+### ✅ SHIPPED: Join Lobby's search filters — `0x2C5002F0`
 (`0x14008e799` 6v + `0x14008e813` 3h)
 
 Entered from **"Join Lobby"** (the trail is in the 19:13 log), and row 6's own
@@ -139,10 +163,11 @@ help text, exactly like Select Game, so this needs a **MAP**, not a base.
 
 ▶ One sighting at one position is not a map. Walk all 6 rows at ~1 s dwell.
 
-### 7. Unknown — `0x1400ac059` 8h, standalone.
-Identify by ENTRY POINT on the next run, never by shape.
+### ✅ SHIPPED: `0x1400ac059` 8h — the Ranked Leaderboard's game strip.
+Identified by ENTRY POINT (reached from "Ranked Leaderboard") and it captions
+one title per movement, like Gallery. `MC_GAME_STRIP`, no map needed.
 
-### 8. Consent dialog — `0x140087cda` 3h
+### Consent dialog — `0x140087cda` 3h
 ⛔ Sets no item text at all. No pacing fixes it; needs the GUI tree.
 
 ## ⭐⭐ ROWS OR VALUES? — what the run actually has to cover
