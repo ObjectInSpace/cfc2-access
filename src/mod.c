@@ -426,6 +426,25 @@ static DWORD WINAPI worker(LPVOID param)
                 break;
             Sleep(100);
 
+            /* ⭐⭐⭐ THE MODAL CHECK RUNS AT 100 ms, NOT ON THE 2 s BEAT.
+             *
+             * ⛔⛔ MEASURED FAILURE, user-reported as "I just didn't hear the
+             * Yes or No when moving": on the 2 s beat the user pressed arrows
+             * SIX times between two polls, the index went 0 -> 1 and back, and
+             * the guard -- correctly -- saw no change and said nothing. The
+             * announcement only arrived when a press happened to land near a
+             * poll boundary.
+             *
+             * A selection the user moves several times a second cannot be
+             * watched on a 2 s clock. Same lesson as the layout probe and the
+             * focus differ: the cadence has to fit what the screen DOES.
+             *
+             * ⚠ Cheap enough to run at this rate: it walks the focus record
+             * (bounded, 48 entries) and returns immediately on every screen
+             * that has no "Yes" widget, which is all of them but this dialog. */
+            if (gt_ok)
+                menu_speak_check_modal();
+
             /* Watch the verified static path continuously. The last open
              * question -- is that field the selection? -- is then answered by
              * simply navigating the menus, with no protocol for the user to
