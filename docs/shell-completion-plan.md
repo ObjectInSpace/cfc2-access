@@ -403,7 +403,26 @@ help text, exactly like Select Game, so this needs a **MAP**, not a base.
 Identified by ENTRY POINT (reached from "Ranked Leaderboard") and it captions
 one title per movement, like Gallery. `MC_GAME_STRIP`, no map needed.
 
-### Consent dialog — `0x140087cda` 3h
+### ⛔ Consent dialog — DISASSEMBLED, and there is no label table
+
+`0x140087cda`: cursor at `[rbx+0x340]`, count from `[rbx+0x344]`. The confirm
+path indexes a table at **`0x141206b78`** by that cursor — `(13, 15, 14, 0, …)`,
+exactly three entries for a 3-item dialog, which looks promising.
+
+⛔ They are NOT GMD indices. 13/15/14 name "Arabic [ar]", "Confirm", "Any" —
+incoherent as consent buttons. And the table feeds `0x14007ea30`, which
+**150 call sites across the shell use**, including Fighter Awards' renderer,
+already established as a layout/animation setter rather than a text path.
+
+⭐ So this agrees with the original finding by a second route: the dialog sets no
+item text, and its buttons come from layout data. `SYS_WINDOW_YES2/NO2/PP` fit
+the count and the category — and fitting is exactly what got that guess reverted
+once already.
+
+▶ The remaining route is the GUI tree (the dialog's constructed button objects),
+not the message corpus.
+
+### (superseded) Consent dialog — `0x140087cda` 3h
 ⛔ Sets no item text at all. No pacing fixes it; needs the GUI tree.
 
 ## ⭐⭐ ROWS OR VALUES? — what the run actually has to cover
