@@ -305,7 +305,30 @@ paced WELL (2-3 s per row) and still produced only 2 captions, so pacing is NOT
 the blocker; and 8 of the 10 labels are in hand from the instance set. What is
 missing is the ORDER, not the labels.
 
-### Fighter Awards — `0x2BE0B650` (`0x140079833` 7v + `0x140079739` 40h)
+### ✅ Fighter Awards — ALREADY DONE, and the "7 unnamed rows" was my error
+
+⛔ I listed "the 7 list rows are unnamed" as outstanding work for days. They are
+not. Per run:
+
+    00:53   0 named / 8 bare     (before the achievement path shipped)
+    17:32   3 named / 0 bare
+    19:13  19 named / 2 bare     "The Year We Made Contact, 2 of 7"
+
+The list's rows ARE achievements -- a scrolling window over the 40-item grid,
+which the code confirms (the handler's `0x2aaaaaab` multiplier is a divide-by-3
+for the 3-column grid). They speak through the `ACHIEVEMENT_*` branch.
+
+⚠ The historical bare lines are all pre-fix, exactly like the music list's. ⭐
+**Ranking silence across ALL logs keeps resurrecting solved screens** -- that is
+now twice. Always measure on the newest run that visited the screen.
+
+⚠ And the disassembly confirms there is no row-label table to find: the only
+per-index table in that path (`0x1411fb070`) holds packed bitfields
+(0, 0, 65536, 0, 131072, …) indexed by `[rcx+0x354]`, a layout/mode field, and
+is stored to `+0x340`. Layout parameters, not labels -- correctly so, because
+the rows are achievement titles supplied as live text.
+
+### (superseded) Fighter Awards — `0x2BE0B650` (`0x140079833` 7v + `0x140079739` 40h)
 ⭐ Already USABLE — its items speak via the achievement path. Only the 7 list
 rows are unnamed, and it has ONE static caption for the whole screen, so the
 caption channel cannot name them. Needs a different idea; lowest priority.
