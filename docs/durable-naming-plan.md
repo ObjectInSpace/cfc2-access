@@ -10,30 +10,74 @@ from moving before checking. The cost of a plan is one turn.
 
 ---
 
-## ⛔⛔ THE HEADLINE MEASUREMENT: the caption channel is dead in most sessions
+## ⛔⛔ RETRACTED: "the caption channel is dead in most sessions"
 
-Across every archived run, the resolved GMD table reported its own language:
+**The first version of this file led with a wrong measurement, and it was mine.**
+It claimed 26 non-English sessions against 11 English, from log lines reading
+`matched shipped variant 2 of 4, a non-English locale`.
 
-    variant 1 of 4, English            11 sightings
-    variant 2 of 4, a non-English locale   21
-    variant 3 of 4, a non-English locale    1
-    variant 4 of 4, a non-English locale    4
+⛔ Those lines do NOT report the session's language. They come from
+`verify_text_variant()` (`src/gmd_find.c:793-801`) and say which of a PROBE
+STRING's four shipped variants matched while verifying the table — a detail of
+table verification, not a language census. `gmd_probes.h:125` holds that
+4-variant list.
 
-**26 non-English against 11 English.** And `src/prompt_table.h` is generated
-from `menu_eng` ALONE (`tools/gen_prompt_table.py:89` — `if
-name.endswith("menu_eng")`), while `prompt_identify()` compares captured text
-to it with `memcmp` after trimming (`src/prompt_id.c:20-37`). Exact bytes.
+⭐ The lines that actually report language say
+`Table language: eng (matches config.ini)`, and they say **eng in 38 of 38
+archived runs**. `config.ini` in the game directory really does hold
+`Language=eng`. So language selection has been working, and the caption channel
+has NOT been silently failing.
 
-⭐ So in a non-English session **every caption lookup misses**, and a miss is
-indistinguishable from "this screen has no caption". That is not a hypothetical
-localisation nicety: it is the channel that named most of the 45 caption-derived
-rows, silently failing in the majority of observed runs.
+⚠ Generalisable: I read a verification detail as a measurement, then made it the
+headline of a plan. The check that would have caught it is the one this project
+already uses everywhere else — ask what PRODUCED the line before counting it.
 
-⚠ This also means some of this session's "the caption channel is structurally
-blind on this screen" conclusions may be *language* misses rather than screen
-properties. Training Options is NOT one of them — its run resolved English
-(variant 1) and still produced zero captions — but the general claim needs
-re-checking per screen against that run's reported variant.
+## The REAL language gap, measured
+
+Three separate English-only dependencies, none of which has bitten yet because
+every observed session was English:
+
+1. **`g_lang_by_idx0` lists 5 of 14 languages** (`src/gmd_find.c:1350`): eng,
+   fre, ita, ger, pol. Its own comment says so — "Only the ASCII-renderable
+   locales are listed." `gmd_text_language()` returns NULL for the other nine,
+   so the live table cannot be IDENTIFIED, and therefore cannot be matched
+   against the player's setting. The fallback logs "item names will be in the
+   WRONG LANGUAGE" and serves the first blob it recognises.
+2. **`prompt_table.h` is generated from `menu_eng` alone**
+   (`tools/gen_prompt_table.py:89`), and `prompt_identify()` compares captured
+   text with `memcmp` after trimming (`src/prompt_id.c:20-37`). Exact bytes, so
+   every caption misses in the other 13 languages.
+3. **`gui_text.c:1574` and `:1633` anchor on the literal `"Yes"`** to find the
+   modal dialog's parent. In any non-English session the quit dialog loses its
+   selection readout entirely.
+
+## ⭐⭐ TWO FINDINGS THAT MAKE THIS CHEAP
+
+**All 14 tables are structurally identical**: 4165 labels, same set, same order
+in every one (measured). So **GMD indices are portable across languages** —
+row and value maps need NO per-language work, and a per-language prompt table
+is a pure text swap with no index remapping.
+
+**Index 0 self-identifies 13 of 14 uniquely** (`LANG_NAME_JAPANESE` in each
+table's own language):
+
+    jpn 日本語 [jp]       eng Japanese [jp]      fre Japonais [jp]
+    ita Giapponese [jp]   ger Japanisch [jp]     spa Japonés [jp]
+    oth Japonés [jp]  ← COLLIDES with spa       kor 일본어 [jp]
+    pol Japoński [jp]     por Japonês [jp]       rus Японский [jp]
+    chT 日文[jp]          chS 日语               ara اليابانية [jp]
+
+⭐ **The collision is real and must be resolved, not deferred**: `menu_oth` is
+Spanish (Mexico) (`tools/extract_gmd.py:32` maps it to `spanish_mx`), and
+`LANG_NAME_SPANISH2` = "Spanish (Mexico) [es-MX]" is one of the 14 options the
+Language row offers. A player can select it.
+
+⭐ **The tiebreaker is affordable.** spa and oth differ at **813 of 4165**
+labels, the earliest at index 29 (`SYS_WINDOW_YES2`: `Aceptar` vs
+`Sí, acepto`). `skip_strings()` already walks N NUL-terminated strings under a
+guard, so reaching index 29 is 29 short hops — NOT the 4165-entry index build
+that `read_index0` exists to avoid. The 12-second-stall rule is not violated by
+a bounded walk.
 
 ---
 
@@ -120,9 +164,17 @@ strings on the worker thread — the exact cost `gen_prompt_table.py`'s header
 says it exists to avoid. So (b) needs a runtime index built once and cached,
 which is real work, not a flag.
 
-▶ **Recommendation: (a) first**, because it is mechanical and testable offline,
-and it restores the channel in 26-of-37 observed sessions immediately. Revisit
-(b) only if the table size becomes a problem.
+▶ **Recommendation: (a)**, because it is mechanical and testable offline.
+
+⚠ Its urgency is LOWER than the first version of this file claimed: the
+retracted measurement said it would fix 26 of 37 sessions, and the truth is
+that every observed session was English, so this fixes nothing that is
+currently broken. It is insurance for the moment the player changes language —
+which is exactly what the user asked for — not a live bug.
+
+⛔ **And it must come SECOND, after part 0 below.** A 14-language prompt table
+keyed on text is useless if the mod resolved the wrong blob to begin with:
+identification is upstream of selection, and selection is upstream of captions.
 
 ### The check that must accompany it
 `check_markup_parity.py` proves the C markup speaker matches a Python oracle
@@ -187,13 +239,27 @@ They are not a general replacement for 45 caption-derived maps.
 
 ## ▶ ORDER OF WORK
 
+⭐ The order is a DEPENDENCY order, not a preference: identification →
+selection → captions. Doing them out of order builds each layer on an
+unverified one below it.
+
+0. **Complete `g_lang_by_idx0` to 14 languages**, with the index-29 tiebreaker
+   for spa/oth. This is the foundation: until the live table can be identified,
+   nothing downstream can be trusted to be in the player's language. Smallest
+   of the three changes and the only one that is purely additive data.
 1. **Part 2(a)** — 14-language prompt table + per-language collision analysis.
-   Offline, mechanical, testable, and it un-breaks the channel in most sessions.
-2. **Part 1** — the discriminator, using `gmd_text_by_index()` so it is
-   language-safe from the start. Needs one run capturing both 8-row pause
+   Depends on 0, because a text table is only correct for the blob actually
+   resolved.
+2. **The `"Yes"` literal** (`gui_text.c:1574`, `:1633`) → `gmd_text_by_index()`
+   of `SYS_WINDOW_YES` (25). Small, and it removes the last hardcoded English
+   string in a read path.
+3. **Part 1** — the same-caller discriminator, using `gmd_text_by_index()` so
+   it is language-safe from the start. Needs one run capturing both 8-row pause
    variants.
-3. **Part 3.2** — the coordinate AUDIT of all shipped maps, as a tool. Then
+4. **Part 3.2** — the coordinate AUDIT of all shipped maps, as a tool. Then
    decide per screen whether anything migrates.
+
+⚠ Steps 0-2 are offline and testable with no game launch. Step 3 needs a run.
 
 ⚠ Each step ships only with: `test_screen_maps.py` green, all 16 runners green
 (**check EXIT CODES, not output text** — these suites print "FAIL" in normal

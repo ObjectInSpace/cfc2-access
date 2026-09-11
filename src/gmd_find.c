@@ -1342,19 +1342,84 @@ int gmd_test_label_count(void) { return GMD_LABEL_COUNT; }
  * renders it in its OWN language, uniquely. Matching it identifies the table
  * without any live-language lookup.
  *
- * Only the ASCII-renderable locales are listed. A table whose index 0 matches
- * none of them returns NULL, which the caller must treat as "unknown", never as
- * "fine" -- an unrecognised table is exactly the situation that produced a
- * confident wrong language in the first place.
+ * A table whose index 0 matches none of them returns NULL, which the caller
+ * must treat as "unknown", never as "fine" -- an unrecognised table is exactly
+ * the situation that produced a confident wrong language in the first place.
+ *
+ * ⭐⭐ ALL FOURTEEN ARE LISTED (2026-09-11). Previously only the five
+ * "ASCII-renderable" locales were, so gmd_text_language() returned NULL for
+ * Japanese, Spanish x2, Korean, Portuguese, Russian, Chinese x2 and Arabic --
+ * nine of fourteen. The consequence was not cosmetic: the blob resolver matches
+ * the table's language against config.ini, so an unidentifiable table cannot be
+ * SELECTED, and the fallback path logs "item names will be in the WRONG
+ * LANGUAGE" and serves whichever blob it happened to recognise.
+ *
+ * ⚠ The strings are stored as UTF-8 BYTES, compared with strcmp against bytes
+ * read from the blob, so the renderability of the terminal is irrelevant --
+ * that was the unexamined premise behind "ASCII-renderable only". Lengths are
+ * 6-23 bytes, well inside read_index0()'s 128-byte buffer.
+ *
+ * ⛔⛔ SPANISH COLLIDES WITH ITSELF: menu_spa and menu_oth BOTH render index 0
+ * as "Japon\xc3\xa9s [jp]". menu_oth is Spanish (Mexico) -- tools/extract_gmd.py
+ * maps it to spanish_mx, and LANG_NAME_SPANISH2 ("Spanish (Mexico) [es-MX]")
+ * is one of the fourteen the Language row offers, so a player can select it.
+ * Index 0 alone cannot tell them apart; lang_tiebreak_spa_oth() does, below.
  */
 static const struct { const char *code; const char *idx0; } g_lang_by_idx0[] = {
+    { "jpn", "\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e [jp]" },
     { "eng", "Japanese [jp]"    },
     { "fre", "Japonais [jp]"    },
     { "ita", "Giapponese [jp]"  },
     { "ger", "Japanisch [jp]"   },
+    /* ⚠ spa and oth share this string -- resolved by the tiebreaker, not here.
+     * Listed as "spa" so an unrecognised-language refusal never fires for a
+     * Spanish table; the tiebreaker then decides WHICH Spanish. */
+    { "spa", "Japon\xc3\xa9s [jp]" },
+    { "kor", "\xec\x9d\xbc\xeb\xb3\xb8\xec\x96\xb4 [jp]" },
     { "pol", "Japo\xc5\x84ski [jp]" },
+    { "por", "Japon\xc3\xaas [jp]" },
+    { "rus", "\xd0\xaf\xd0\xbf\xd0\xbe\xd0\xbd\xd1\x81\xd0\xba\xd0\xb8\xd0\xb9 [jp]" },
+    { "chT", "\xe6\x97\xa5\xe6\x96\x87[jp]" },
+    { "chS", "\xe6\x97\xa5\xe8\xaf\xad" },
+    { "ara", "\xd8\xa7\xd9\x84\xd9\x8a\xd8\xa7\xd8\xa8\xd8\xa7\xd9\x86\xd9\x8a\xd8\xa9 [jp]" },
 };
 #define NLANG_BY_IDX0 (int)(sizeof(g_lang_by_idx0) / sizeof(g_lang_by_idx0[0]))
+
+/* ⭐⭐ SPAIN vs MEXICO, decided at index 29 (SYS_WINDOW_YES2).
+ *
+ * The two Spanish tables differ at 813 of 4165 labels; index 29 is the
+ * earliest, and it is a short string:
+ *
+ *     menu_spa  "Aceptar"
+ *     menu_oth  "S\xc3\xad, acepto"
+ *
+ * ⚠ WHY A WALK AND NOT AN INDEX BUILD. read_index0() deliberately avoids
+ * building the offset index because doing it per candidate cost TWELVE SECONDS
+ * in a live session -- the probe loop tries a blob, asks its language, and
+ * moves on. skip_strings() walks 29 short NUL-terminated strings under the
+ * fault guard instead, which is bounded and cheap. Do not "improve" this into
+ * a gmd_text_by_index() call: that rebuilds the whole index.
+ *
+ * Returns "spa", "oth", or NULL when the string reads as neither -- and NULL
+ * must stay a refusal, not a default to "spa". Guessing which Spanish is the
+ * same class of error as guessing the language.
+ */
+static const char *lang_tiebreak_spa_oth(void)
+{
+    const BYTE *at;
+    char s[64];
+
+    if (!g_text_blob)
+        return NULL;
+    at = skip_strings(g_text_blob, 29);
+    if (!at || !read_cstr(at, s, sizeof(s)) || !s[0])
+        return NULL;
+    if (strcmp(s, "Aceptar") == 0)
+        return "spa";
+    if (strcmp(s, "S\xc3\xad, acepto") == 0)
+        return "oth";
+    return NULL;
+}
 
 /* Read index 0 WITHOUT building the offset index.
  *
@@ -1379,8 +1444,20 @@ const char *gmd_text_language(void)
     if (!read_index0(idx0, sizeof(idx0)) || !idx0[0])
         return NULL;
     for (int i = 0; i < NLANG_BY_IDX0; i++) {
-        if (strcmp(idx0, g_lang_by_idx0[i].idx0) == 0)
-            return g_lang_by_idx0[i].code;
+        if (strcmp(idx0, g_lang_by_idx0[i].idx0) != 0)
+            continue;
+        /* ⭐⭐ TWO tables share the Spanish index-0 string, so a match on it is
+         * not yet an identification. Ask index 29 which Spanish this is.
+         *
+         * ⛔ A tiebreaker that cannot read returns NULL and that NULL is
+         * PROPAGATED, not softened into "spa". "Probably Spain" is the same
+         * shape of guess as "probably French", which is the bug this whole
+         * language check exists for: the caller compares the result against
+         * config.ini, so a wrong code selects a wrong blob CONFIDENTLY, while
+         * NULL merely means "unknown" and refuses. */
+        if (strcmp(g_lang_by_idx0[i].code, "spa") == 0)
+            return lang_tiebreak_spa_oth();
+        return g_lang_by_idx0[i].code;
     }
     return NULL;
 }

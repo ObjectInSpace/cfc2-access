@@ -104,6 +104,78 @@ int main(void)
     check("3. the two tables' index-0 strings genuinely differ",
           strcmp(a, b) != 0, "both read %s", a);
 
+    /* --- case 4: a NON-LATIN table identifies itself ----------------------
+     * ⭐⭐ WHY THIS CASE EXISTS. g_lang_by_idx0 listed only the five
+     * "ASCII-renderable" locales, so nine of fourteen languages returned NULL
+     * and could not be selected against config.ini. The premise behind that
+     * limit was wrong: the strings are compared as UTF-8 BYTES, and the
+     * terminal's renderability has nothing to do with it.
+     *
+     * Russian and Arabic are planted as the bytes the shipped tables hold. */
+    plant(fr, cap, "\xd0\xaf\xd0\xbf\xd0\xbe\xd0\xbd\xd1\x81\xd0\xba\xd0\xb8\xd0\xb9 [jp]",
+          N, "ru");
+    gmd_test_set_blob((BYTE *)fr, N);
+    const char *lru = gmd_text_language();
+    plant(en, cap, "\xd8\xa7\xd9\x84\xd9\x8a\xd8\xa7\xd8\xa8\xd8\xa7\xd9\x86\xd9\x8a\xd8\xa9 [jp]",
+          N, "ar");
+    gmd_test_set_blob((BYTE *)en, N);
+    const char *lar = gmd_text_language();
+    check("4. non-Latin tables identify themselves (rus, ara)",
+          lru && lar && strcmp(lru, "rus") == 0 && strcmp(lar, "ara") == 0,
+          "russian=%s arabic=%s", lru ? lru : "(null)", lar ? lar : "(null)");
+
+    /* --- case 5: the TWO SPANISH tables are told apart ---------------------
+     * ⛔⛔ menu_spa and menu_oth render index 0 IDENTICALLY ("Japon\xc3\xa9s
+     * [jp]"), and menu_oth is Spanish (Mexico) -- a language the player can
+     * actually select. Index 0 alone therefore cannot identify a Spanish
+     * table, and picking one would select the wrong blob confidently.
+     *
+     * The tiebreaker reads index 29 (SYS_WINDOW_YES2): "Aceptar" in Spain's
+     * table, "S\xc3\xad, acepto" in Mexico's. plant() writes index 0 then
+     * "<tag>_N" filler, so index 29 must be overwritten deliberately. */
+    {
+        /* Build a blob whose index 0 is Spanish and whose index 29 is the
+         * Spain string, then the same with the Mexico string. */
+        const char *ES = "Japon\xc3\xa9s [jp]";
+        for (int variant = 0; variant < 2; variant++) {
+            const char *i29 = variant ? "S\xc3\xad, acepto" : "Aceptar";
+            char *p = fr;
+            SIZE_T pos = 0;
+            int k = _snprintf(p, cap, "%s", ES);
+            pos += (SIZE_T)k + 1;
+            for (int i = 1; i < N; i++) {
+                const char *s = (i == 29) ? i29 : "x";
+                k = _snprintf(p + pos, cap - pos, "%s", s);
+                pos += (SIZE_T)k + 1;
+            }
+            gmd_test_set_blob((BYTE *)fr, N);
+            const char *got = gmd_text_language();
+            const char *want = variant ? "oth" : "spa";
+            check(variant ? "5b. Spanish (Mexico) resolves to oth"
+                          : "5a. Spanish (Spain) resolves to spa",
+                  got && strcmp(got, want) == 0,
+                  "wanted %s, got %s", want, got ? got : "(null)");
+        }
+
+        /* ⭐ AND AN UNREADABLE TIEBREAK MUST REFUSE, not default to Spain.
+         * Index 0 says Spanish; index 29 says something the tiebreaker does
+         * not recognise. Returning "spa" here would be the guess that this
+         * whole check exists to prevent. */
+        char *p = fr;
+        SIZE_T pos = 0;
+        int k = _snprintf(p, cap, "%s", ES);
+        pos += (SIZE_T)k + 1;
+        for (int i = 1; i < N; i++) {
+            const char *s = (i == 29) ? "Zzzz" : "x";
+            k = _snprintf(p + pos, cap - pos, "%s", s);
+            pos += (SIZE_T)k + 1;
+        }
+        gmd_test_set_blob((BYTE *)fr, N);
+        const char *amb = gmd_text_language();
+        check("5c. an unrecognised index 29 refuses rather than guessing Spain",
+              amb == NULL, "got %s", amb ? amb : "(null)");
+    }
+
     VirtualFree(fr, 0, MEM_RELEASE);
     VirtualFree(en, 0, MEM_RELEASE);
 
