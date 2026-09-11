@@ -244,7 +244,49 @@ sentence as the Start Button binding.
 changed during the session — which is the feature working, not noise — but it
 means the values are genuinely dynamic and cannot be baked into a table.
 
-### ⭐⭐ THE FILTERED JOIN IS VERIFIED OFFLINE — 6 of 6 reports
+### ⛔⛔ CAN IT REPLACE THE TABLES? NO — it is a SUPPLEMENT, and here is the test
+
+User's question, 2026-09-11. Answered by running the join against every screen
+rather than only the two it was found on:
+
+    System        ✅ correct (Language, 3 button glyphs, Data Collection)
+    PC Settings   ✅ correct (Resolution, Display, VSync)
+    Network       ⚠ partial  (Microphone -> 'On', Voice Chat Volume -> '5')
+    Sound         ⛔ WRONG ON EVERY ROW
+    Lobby Settings ⛔ never captured as a block at all
+
+⛔⛔ **Sound Settings is the disproof.** The join produces:
+
+    Music Volume         -> 'Remix'        (that is Challenger Jingle's value)
+    Sound Effects Volume -> 'Music'        (a MENU ITEM)
+    Announcer Volume     -> 'Options'      (a MENU ITEM)
+    Challenger Jingle    -> 'Network'      (a MENU ITEM)
+
+Every row wrong, and wrong in the most dangerous way: plausible short strings a
+blind user cannot distinguish from a real value.
+
+⭐ **The cause is structural, not a tuning problem.** The volume sliders draw NO
+text at all, so the "skip prose, take the Nth remaining" rule falls straight
+through them and lands on whatever object comes next — which on that screen is
+the Options menu itself. A filter cannot fix a missing element; there is nothing
+to skip TO.
+
+⚠ And the bare numbers that do appear ('0' x87, '2' x17, '5' x4) carry no
+identity — nothing distinguishes a volume level from a player count or a lobby
+round setting.
+
+### ⭐ SO THE ANSWER IS: ADD IT WHERE IT IS PROVEN, KEEP THE TABLES
+- the tables cover **every** row and are corpus-validated; this channel covers
+  four screens and silently corrupts a fifth;
+- but it reaches THREE things no table can: the button glyphs, the resolution,
+  and the display mode — all previously written off as unreachable.
+
+▶ So it ships as an ADDITIONAL source for rows that have no value set, gated to
+the screens where it is verified, and never as a replacement for a shipped
+table. ⛔ The Sound result is exactly why it must be gated per screen rather
+than enabled generally.
+
+### ⭐⭐ THE FILTERED JOIN IS VERIFIED OFFLINE — 6 of 6 reports (System, PC)
 
 Skipping prose (ends in punctuation, or > 40 chars) and hint strips, then taking
 the Nth remaining object after the row-label block:
