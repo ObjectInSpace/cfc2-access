@@ -45,6 +45,35 @@ static const struct icon_row ICONS[] = {
     { "CFG_X", "X" },
     { "CFG_Y", "Y" },
     { "C_2", "down" },
+    /* ⭐⭐ NUMPAD MOTION NOTATION, added 2026-09-11 for the in-game MOVE LIST.
+     *
+     * The move list draws its inputs as these tokens -- Hadoken is
+     * `<ICON C_236>+<ICON C_P>` -- and nine of them were UNKNOWN, so a blind
+     * player got the move NAME and nothing about how to perform it. That is the
+     * half of the screen that matters.
+     *
+     * ⚠ The digits are keypad directions (1=down-back ... 9=up-forward), the
+     * standard fighting-game notation, so the reading is mechanical rather than
+     * a guess: 236 is down, down-forward, forward.
+     *
+     * ⭐ Spoken as the MOTION a player performs, not as digits. "quarter circle
+     * forward" is what a move list or a human would say; "two three six" would
+     * be a transcription of the glyph rather than a reading of it. A sighted
+     * player sees an arc, not three numbers.
+     *
+     * ⚠ Not in the GMD: these tokens appear in ZERO corpus strings, so the
+     * corpus cannot confirm them. Numpad notation is unambiguous and
+     * universal in this genre, which is why it is safe to name mechanically --
+     * but it is derived from the notation, not measured from the game. */
+    { "C_3", "down-forward" },
+    { "C_28", "down then up" },
+    { "C_2T", "charge down" },
+    { "C_236", "quarter circle forward" },
+    { "C_214", "quarter circle back" },
+    { "C_623", "dragon punch" },
+    { "C_421", "reverse dragon punch" },
+    { "C_41236", "half circle forward" },
+    { "C_63214", "half circle back" },
     { "C_4", "back" },
     { "C_4T", "charge back" },
     { "C_5", "neutral" },

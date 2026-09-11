@@ -112,6 +112,32 @@ int main(void)
           "Any Direction but <SIZE 58><ICON C_8></SIZE>",
           "Any Direction but up");
 
+    /* --- ⭐⭐ THE MOVE LIST's numpad motion notation. ------------------------
+     * Real strings from the in-game move list (run-2026-09-11-0330). Nine of
+     * these tokens were UNKNOWN, so the screen spoke a move's NAME and nothing
+     * about how to perform it -- the half that matters to a player.
+     *
+     * ⚠ Spoken as the MOTION, not as digits: a sighted player sees an arc, so
+     * "quarter circle forward" is a reading and "two three six" would be a
+     * transcription of the glyph. */
+    check("move list: Hadoken input",
+          "<SIZE 58><ICON C_236></SIZE>+<SIZE 58><ICON C_P></SIZE>",
+          "quarter circle forward plus punch");
+    check("move list: Shoryuken input",
+          "<SIZE 58><ICON C_623></SIZE>+<SIZE 58><ICON C_HP></SIZE>",
+          "dragon punch plus heavy punch");
+    check("move list: half circle",
+          "<SIZE 58><ICON C_41236></SIZE>+<SIZE 58><ICON C_P></SIZE>",
+          "half circle forward plus punch");
+    /* ⚠ A charge move: the notation distinguishes holding from tapping, and a
+     * player who cannot see the glyph has no other way to know. */
+    /* ⚠ The "; " is the parser's normal icon/text separator, not a defect --
+     * my first expectation here omitted it and the test caught me, not the
+     * code. */
+    check("move list: charge",
+          "<SIZE 58><ICON C_4T></SIZE>Charge <SIZE 58><ICON C_6></SIZE>",
+          "charge back Charge; forward");
+
     /* --- Robustness. These are not corpus shapes; they are what a bounded
      * parser must survive without corrupting anything. --- */
 
