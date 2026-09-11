@@ -55,10 +55,15 @@ EXPECTED = {
     # across four runs; the other five are MC_LABEL_UNKNOWN and stay that way --
     # the instance set offers plausible labels but no positions, and the 21:00
     # run DISPROVED the ordering it implied.
+    # ⭐ All ten rows. Rows 5-10 came from captions; rows 1-4 from the row
+    # renderer's first-value table at 0x141205e30, which validates itself
+    # against those six (each is table[i]-1). Rows 1 and 4 are NOT table[i]-1 --
+    # their value runs skip a filter-only "Any" -- so their labels are the ones
+    # Lobby Filters' captions independently established.
     "g_create_lobby_rows": [
-        "<UNKNOWN>", "<UNKNOWN>", "<UNKNOWN>", "<UNKNOWN>", "Event Mode",
-        "One-button Special Moves", "Victory Condition", "Number of Players",
-        "Game Start Privilege", "Passcode",
+        "Game", "Game Version", "Cross-region Matchmaking", "Comment",
+        "Event Mode", "One-button Special Moves", "Victory Condition",
+        "Number of Players", "Game Start Privilege", "Passcode",
     ],
     # Join Lobby > search filters. Five of six named by their own captions in
     # the 19:45 run; position 2 never produced one and is MC_LABEL_UNKNOWN.

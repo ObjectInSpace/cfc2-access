@@ -270,9 +270,38 @@ static const mc_value_set g_create_lobby_values[] = {
  * at positions 1-4, which is exactly LOBBY_NUM_00..07 ("2".."9"). The row label
  * and the value family corroborate each other, and the instance set shows
  * "Number of Players" on this screen. */
+/* ⭐⭐⭐ ALL TEN ROWS, and the last four came from the DISASSEMBLY, not a run.
+ *
+ * The row renderer at 0x140083040 does, per row:
+ *     mov edx, [rbx + row*4 + 0x1205e30]   <- a table of FIRST-VALUE indices
+ *     add edx, [r15 + row*4 + 0x33c]       <- plus that row's value cursor
+ *     call 0x14007b7e0                     <- returns the string
+ *
+ * So `0x141205e30` holds, per row, the GMD index its VALUE LIST starts at:
+ *     14, 53, 85, 95, 107, 89, 115, 127, 137, 111
+ *
+ * ⭐ THE TABLE VALIDATES ITSELF against the six rows captions already
+ * established: rows 5-10 are each exactly table[i] - 1 --
+ *   107-1 = LOBBY_EVENT · 89-1 = LOBBY_SPMOVE · 115-1 = LOBBY_ROUND
+ *   127-1 = LOBBY_NUM   · 137-1 = LOBBY_PERM  · 111-1 = LOBBY_PASS
+ * Six independent confirmations that this is the right table, read from the
+ * instructions rather than inferred from position.
+ *
+ * ⚠ BUT `table[i] - 1` IS NOT A UNIVERSAL RULE, and two rows prove it:
+ *   - row 4 -> 95 is LOBBY_TITLE_01 ("Everyone is welcome!"); its label is
+ *     LOBBY_TITLE (93, "Comment"), because value _00 ("Any") is a FILTER-only
+ *     option this screen skips. Confirmed by the same label being Lobby
+ *     Filters' row 4, which a caption established.
+ *   - row 1 -> 14 is GAME_NAME_ANY, i.e. the value list is GAME NAMES; its
+ *     label is GAME_TITLE (51), the same label Lobby Filters' row 1 carries
+ *     and which a caption established there.
+ * Rows 2 and 3 are clean: 53-1 = GAME_VERSION, 85-1 = LOBBY_AREA.
+ *
+ * ⛔ So the table gives the VALUE RUN, and the row label is derived from it --
+ * checked against the six known rows, never assumed from the arithmetic alone.
+ * That is why this ships as a map of verified labels and not as a computation. */
 static const int g_create_lobby_rows[] = {
-    MC_LABEL_UNKNOWN, MC_LABEL_UNKNOWN, MC_LABEL_UNKNOWN, MC_LABEL_UNKNOWN,
-    106, 88, 114, 126, 136, 110
+     51,  52,  84,  93, 106, 88, 114, 126, 136, 110
 };
 
 /* ⛔ NO VALUE VARIANTS FOR THIS SCREEN, deliberately.
