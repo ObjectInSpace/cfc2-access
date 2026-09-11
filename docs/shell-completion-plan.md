@@ -176,9 +176,36 @@ other text channel here was opened. That is real work, not a lookup.
 an incomplete one, and it should be recorded as UNFINISHED rather than shipped
 as correct.
 
-⚠ Volume rows are a different case: those values are GENERATED numbers, and the
-quote path that used to speak them is now suppressed. They need the number read
-from the screen object, not a label.
+### ⭐ RESOLUTION AND VOLUME ARE A DIFFERENT, EASIER PROBLEM THAN THE GLYPHS
+
+⚠ The generated rows — Resolution (21 values), the volume sliders (10-11),
+Input Delay (11) — are NOT the same case as the button bindings, and should not
+be filed together:
+
+- a **glyph** has no string anywhere: not in the GMD, not in the instance set,
+  not in any log. It needs a new capture channel.
+- a **generated number** is a STRING the game composes, and the only reason it
+  is unavailable is that nothing captures it — plus, for resolution, the list is
+  ENUMERABLE from the display itself.
+
+Established for Resolution specifically:
+- `MENU_OP_PC_RESO` (218) is followed immediately by `MENU_OP_PC_DISP` (219),
+  so there is **no value run in the corpus** — confirming these are composed at
+  runtime, exactly as the shipped note said.
+- No resolution-shaped string (`1920x1080` etc.) has EVER been drawn in any
+  log; 32 movements on that row produced only VSync's "On"/"Off" bleeding in.
+- ⭐ But the live per-row COUNT is readable: `0x1400a172e` reads
+  `[screen + row*4 + 0x358]` as the max index and `+0x378` beside it. So the
+  mod already knows the row has 21 values.
+
+⚠ Windows reports **24** display modes on this machine against the game's 21,
+so enumerating modes and indexing by position would be a "fits the shape" guess
+— the three-mode difference is exactly where it would go wrong silently.
+
+▶ The honest route for these is the same new capture channel the glyphs need:
+whatever composes "1920x1080" writes it somewhere. That single channel would
+close resolution, volumes, Input Delay AND the button glyphs together, which is
+why it is worth building properly rather than special-casing one row.
 
 ## ⭐⭐ THE 01:30 RUN: Options confirmed, and Fighter Awards' shape solved
 
