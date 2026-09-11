@@ -1187,7 +1187,17 @@ length. That is a real lead, not a guess: MC_GAME_STRIP already corroborates
 titles that way, and the strip's contents ARE ROM-table titles (confirmed in
 its instance dump).
 
-## ▶ THE QUIT CONFIRMATION PROMPT -- NO DATA EXISTS YET
+## ▶ THE QUIT CONFIRMATION PROMPT (superseded below -- see "MEASURED")
+
+⚠⚠ THE SECTION BELOW IS WRONG IN ITS HEADLINE and is kept because the reasoning
+it records is still right. "No data exists" was MY SEARCH's failure, not the
+game's: I looked for CURSOR MOVEMENTS and found none, and concluded the dialog
+had never been seen. It had -- eight times across five runs -- as TEXT. Searching
+for the wrong artefact and reporting a clean negative is the same mistake as
+[[a-log-cannot-show-code-written-after-it]] in a different coat. See the
+MEASURED section at the end of this file.
+
+## ▶ (superseded) THE QUIT CONFIRMATION PROMPT -- NO DATA EXISTS YET
 
 User-reported: "we still lack speech for the yes/no prompt when
 quitting/exiting." Correct, and the reason is simply that **it has never
@@ -1208,3 +1218,60 @@ Museum's Gallery/Music selector.
 left/right ONCE on the prompt and cancel out. That single movement records the
 caller, the count, the axis and the cursor offset -- everything the consent
 dialog needed. ⚠ Do NOT confirm the quit; cancelling still logs the movement.
+
+---
+
+# ⛔⛔ MEASURED: THE QUIT DIALOGS DO NOT USE THE CURSOR HELPERS
+
+The user captured both quit dialogs deliberately (main-menu Quit and the
+pause-menu Quit), and the result is a STRUCTURAL finding, not a missing map.
+
+## What the run shows
+
+    13:07:38.077  spoke "Quit, 6 of 6. Exit the application."
+    13:07:38.689  ENTER pressed
+    13:07:38.997  TEXT SET: "No"
+    13:07:39.406  DOWN pressed
+    13:07:39.715  UP pressed          <- engine Trg registered it
+    13:07:41.248  ENTER pressed
+    (no cursor movement logged at any point)
+
+**3 arrow presses on the dialog, 0 cursor movements.** The only two movements
+in the whole run are the main menu, before and after. The pause-menu quit
+dialog (run-...-0330, 02:13) is identical: 8 arrow presses, 0 movements.
+
+⭐ So these dialogs do NOT go through `0x14007cdc0` / `0x14007c9f0`, the two
+generic cursor helpers that every other shell menu uses and on which this mod's
+entire speech pipeline is built. The engine registers the keypress (`Trg` is
+set) but the selection is moved by the dialog's own code.
+
+## ⛔ AND ONLY "No" IS EVER DRAWN
+
+Eight sightings across five runs (2026-09-09-23, -10-00, -10-19 x2, -11-03 x2,
+-11-13 x2) and **every single one is "No"**. "Yes" is never set as text.
+Consistent with the dialog drawing only the non-default option, or drawing both
+once at construction and redrawing one. Either way, one text object and no
+movement cannot say which option is SELECTED.
+
+## ⚠ AND THE EARLIER "no data exists" CLAIM WAS MY SEARCH'S FAULT
+
+I searched for cursor movements after "Quit", found none, and reported that the
+dialog had never appeared in any log. It had appeared eight times -- as TEXT. A
+clean negative from the wrong search looks exactly like a real one.
+
+## ▶ WHAT WOULD ACTUALLY BE NEEDED
+
+This needs a signal the mod does not currently have. In rough order of promise:
+
+1. **The layout probe on the dialog.** If "Yes" and "No" are both live objects
+   with coordinates, the SELECTED one may be distinguishable by a field that
+   differs between them (the focus differ can compare them across a keypress,
+   which is exactly what it is for). ⭐ This is the cheapest next step and needs
+   one short run with `cfc2_layout.on` and `cfc2_focusdiff.on`.
+2. **A different cursor path.** If the dialog has its own selection variable,
+   the differential heap approach that found the menu cursor would find it --
+   but that is a large investigation for one dialog.
+
+⚠ NOT shippable from the corpus. SYS_WINDOW_YES/NO (25/26) is an obvious
+2-label run and naming the dialog from it would state a SELECTION the mod
+cannot observe -- worse than silence on a prompt that quits the game.
