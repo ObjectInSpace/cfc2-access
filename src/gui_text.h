@@ -501,6 +501,58 @@ void gt_instance_report(void);
  * same number is a contradiction, not a tie to be broken -- it returns FALSE. */
 BOOL gt_numbered_item(int n, char *out, int outlen);
 
+/* ⭐⭐ THE FOCUS DIFFER: which field of a cGUIObjText marks it as SELECTED?
+ *
+ * The open question two screens now need (Casual Match's 8-item strip, the
+ * lobby-ID keypad): the instance set holds one object per row, but nothing says
+ * WHICH is focused. Music dodged this by being numbered; Gallery dodged it by
+ * captioning. These do neither.
+ *
+ * ⛔ THIS IS NOT ROUTE 3 AGAIN, and the distinction is the whole design.
+ * Route 3 closed on a SOLID negative -- 1789 objects, full ±128-byte windows,
+ * one hop out, complete passes, different screens, ZERO changes. But every one
+ * of those objects was reached from the name POOL, i.e. parsed `menu.arc` file
+ * data: the layout TEMPLATE, static by design. Its own closing note says the
+ * root must come from "the GUI system's own instance list, not the layout
+ * data". These objects come from setText -- the game CONSTRUCTED them.
+ *
+ * ⭐ And route 3's other lesson is built in: it anchored on what it could FIND
+ * rather than what CHANGES. This anchors on objects already proven to change
+ * (their text is re-set as the user navigates) and asks only WHERE.
+ *
+ * HOW IT WORKS. On each cursor movement, snapshot GT_CLASS_SIZE bytes of every
+ * live tracked object, then report the offsets that changed since the previous
+ * movement, per object.
+ *
+ * ⚠⚠ THE SAME-SCREEN CONTROL IS MANDATORY and is route 3's direct lesson:
+ * without it "everything that merely ticks looks like a signal". Animation
+ * phase, timers and frame counters change on EVERY movement. So the report
+ * separates:
+ *   - offsets that changed on the object the cursor MOVED TO, and
+ *   - offsets that changed on objects it did not touch (the control).
+ * A selection marker changes on the first set and NOT the second. Anything
+ * changing on both is a ticker and is named as one.
+ *
+ * ⚠ LOGGED, NEVER SPOKEN. A changed offset is a candidate, not a finding --
+ * exactly as route 3's window dump was.
+ *
+ * Opt-in: `cfc2_focusdiff.on` next to the exe. It costs a 528-byte guarded read
+ * per tracked object per movement, so it does not run in an ordinary session. */
+void gt_focus_diff_enable(BOOL on);
+
+/* Test seam: how many OBJECTS the last diff reported as changed, or -1 if the
+ * differ did not run at all.
+ *
+ * ⭐⭐ -1 and 0 must not look alike. "The differ was gated off and never
+ * executed" and "the differ ran and found nothing changed" are completely
+ * different facts, and a case asserting only "it did not crash" passes on both
+ * -- which is exactly what happened when this was first written: the shipping
+ * gate required g_installed, the test never set it, and case 29 passed while
+ * executing none of the code it named. */
+int gt_test_focus_diff_changed(void);
+void gt_focus_diff_note_move(void);
+void gt_focus_diff_report(void);
+
 /* --- test seams ----------------------------------------------------------
  * ⭐⭐ The stand-in must NOT re-derive what the shipping code derives. A
  * harness that recomputes the mechanism under test leaves the suite green with

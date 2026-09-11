@@ -1014,6 +1014,90 @@ int main(void)
               resident_mid > 8 && lost == 0 && fresh_ok > 0, d);
     }
 
+    /* --- case 28: the focus differ is OFF unless enabled -------------------
+     * ⚠ It reads 528 bytes per tracked object per movement. An opt-in that
+     * silently defaults ON would put that cost in every player's session, which
+     * is the mistake the DISCOVERY sweep made twice (it stalled live sessions
+     * for 37 s and then 11.9 s). Asserted, not assumed. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        gt_focus_diff_enable(FALSE);
+        static ULONGLONG a[GT_CLASS_SIZE / 8];
+        a[0] = GT_VTABLE_ADDR;
+        gt_test_settext_body(a, "Power Stone", NULL, 0);
+        gt_note_focus_move();
+        gt_focus_diff_note_move();
+        /* ⭐ -1 means it never ran. Asserting "TRUE" here would pass whether or
+         * not the gate worked, which is the shape of green this suite exists to
+         * refuse. */
+        char d28[80];
+        snprintf(d28, sizeof d28, "last=%d (-1 = never ran)",
+                 gt_test_focus_diff_changed());
+        check("28. the focus differ does NOT run when disabled",
+              gt_test_focus_diff_changed() == -1, d28);
+    }
+
+    /* --- case 29: a TICKER is distinguishable from a FOCUS marker ----------
+     * ⭐⭐ THE WHOLE POINT OF THE DESIGN, and route 3's direct lesson: without a
+     * same-screen control, "everything that merely ticks looks like a signal".
+     *
+     * Two objects. One field changes on BOTH (a ticker -- animation phase, a
+     * frame counter); another changes on ONE only (a focus candidate). The
+     * differ must report both objects as changed in the ticker case, so a
+     * reader can tell the two apart from the counts alone.
+     *
+     * ⚠ Asserted through the SHIPPING entry point, not a reimplementation --
+     * the harness must not supply the mechanism under test. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        gt_focus_diff_enable(TRUE);
+
+        static ULONGLONG o1[GT_CLASS_SIZE / 8], o2[GT_CLASS_SIZE / 8];
+        memset(o1, 0, sizeof o1); memset(o2, 0, sizeof o2);
+        o1[0] = o2[0] = GT_VTABLE_ADDR;
+        gt_test_settext_body(o1, "Power Stone", NULL, 0);
+        gt_test_settext_body(o2, "Plasma Sword", NULL, 0);
+
+        /* First look: establishes baselines, reports nothing. */
+        gt_note_focus_move();
+        gt_focus_diff_note_move();
+
+        /* A ticker: the same field moves on BOTH objects -> 2 changed. */
+        o1[8] = 1; o2[8] = 1;
+        gt_note_focus_move();
+        gt_focus_diff_note_move();
+        int ticker = gt_test_focus_diff_changed();
+
+        /* A focus marker: one field moves on ONE object only -> 1 changed. */
+        o1[12] = 0xFF;
+        gt_note_focus_move();
+        gt_focus_diff_note_move();
+        int focus = gt_test_focus_diff_changed();
+
+        /* And no change at all -> 0 changed, distinct from "never ran". */
+        gt_note_focus_move();
+        gt_focus_diff_note_move();
+        int quiet = gt_test_focus_diff_changed();
+
+        gt_focus_diff_enable(FALSE);
+
+        /* ⭐⭐ THE DISCRIMINATION IS THE ASSERTION. 2 / 1 / 0 are the three
+         * readings a real run must be able to produce, and they are exactly
+         * what tells a ticker from a focus marker from an absent signal. A case
+         * asserting only "it did not crash" cannot tell them apart -- and the
+         * first version of this case did precisely that, passing while the
+         * differ never executed at all (the shipping gate required g_installed,
+         * which no test sets). */
+        char d29[120];
+        snprintf(d29, sizeof d29, "ticker=%d focus=%d quiet=%d (want 2/1/0)",
+                 ticker, focus, quiet);
+        check("29. a ticker (2), a focus marker (1) and silence (0) are "
+              "distinguishable",
+              ticker == 2 && focus == 1 && quiet == 0, d29);
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",

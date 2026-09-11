@@ -320,6 +320,16 @@ static DWORD WINAPI worker(LPVOID param)
                  "This is the step that names the remaining screens.");
     }
 
+    /* ⭐ The focus differ rides on the gt hook -- without the instance set
+     * there is nothing to diff -- so it is gated on gt_ok as well as its own
+     * file. See gui_text.h for what it measures and why it is not route 3. */
+    if (gt_ok) {
+        BOOL fd_on = opt_in_file_present("cfc2_focusdiff.on");
+        gt_focus_diff_enable(fd_on);
+        if (fd_on)
+            gt_focus_diff_report();
+    }
+
     /* ⚠ OPT-IN. The offline tools (disasm.py, find_callers.py,
      * build_riprefs.py, analyze_dump.py) all read this dump, and it is the
      * machinery that cracked sPad, sKeyboard and the cursor chokepoint -- so it
@@ -622,6 +632,13 @@ static DWORD WINAPI worker(LPVOID param)
          * been spoken yet, which reads as "captions randomly stop working".
          * They are ~150 lines apart, so the dependency is stated here rather
          * than left to be noticed. */
+        /* ⭐ The focus differ samples PER MOVEMENT, not per beat -- a beat
+         * cadence would miss most movements. It no-ops unless the cursor moved
+         * since the last poll, and unless cfc2_focusdiff.on exists. It runs
+         * HERE, on the worker, because the cursor hook must stay two atomics. */
+        if (gt_ok)
+            gt_focus_diff_note_move();
+
         if (gt_ok && (beat == 10 || beat % 5 == 0))
             gt_focus_report();
 

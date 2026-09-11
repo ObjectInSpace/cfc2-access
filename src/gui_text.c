@@ -1014,6 +1014,139 @@ BOOL gt_numbered_item(int n, char *out, int outlen)
     return TRUE;
 }
 
+/* --- the focus differ (see gui_text.h) ----------------------------------- */
+
+#define FD_MAX 16          /* objects tracked per screen; a strip has 8-9 */
+
+typedef struct {
+    void *obj;
+    unsigned char snap[GT_CLASS_SIZE];
+    BOOL  have;
+} fd_entry;
+
+static fd_entry     g_fd[FD_MAX];
+static volatile LONG g_fd_on;
+/* -1 = the differ has not run. See gt_test_focus_diff_changed(). */
+static volatile LONG g_fd_last = -1;
+
+/* ⚠ The opt-in FILE is checked by mod.c, which owns that helper, and the answer
+ * is handed in here -- the same shape as the gt hook's own switch. Duplicating
+ * the file check in this translation unit would give two places for the switch
+ * to disagree. */
+void gt_focus_diff_enable(BOOL on) { InterlockedExchange(&g_fd_on, on ? 1 : 0); }
+
+static BOOL fd_enabled(void) { return g_fd_on == 1; }
+
+/* ⚠⚠ CALLED FROM THE WORKER THREAD, never the render thread. The cursor hook
+ * runs on the game's render thread and its contract is "two atomics and nothing
+ * else"; this does guarded reads of 528 bytes per object plus logging, which has
+ * no business there. gt_note_focus_move() already advances g_move_seq from the
+ * hook, so the worker can tell a movement happened by watching that counter --
+ * which is exactly what mc_poll_and_log's caption path already relies on.
+ *
+ * ⚠ A movement missed because two happened inside one poll costs one sample,
+ * not a wrong one: the snapshot is always compared against the previous
+ * snapshot, never against an assumed position. */
+void gt_focus_diff_note_move(void)
+{
+    if (!fd_enabled() || (!g_installed && !g_focus_test_mode))
+        return;
+    /* Only when the cursor actually moved since the last look. */
+    static LONG last_seen = -1;
+    LONG seq = g_move_seq;
+    if (seq == last_seen)
+        return;
+    last_seen = seq;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return;
+
+    /* ⭐ Report BEFORE re-snapshotting, so each line describes the movement
+     * that just happened rather than the one before it. */
+    /* ⚠ volatile across MEM_GUARDED's longjmp -- see gt_numbered_item for the
+     * same hazard; -Wclobbered caught both. */
+    volatile int changed_objs = 0;
+    LONG n = g_inst_count;
+    for (volatile LONG i = 0; i < n && i < FD_MAX; i++) {
+        void *o = g_inst[i].obj;
+        if (!o || ((ULONG_PTR)o & 7u))
+            continue;
+        /* ⚠ Validate exactly as everything else here does: an entry survives
+         * until eviction, and a freed object's bytes are not this screen's. */
+        volatile ULONGLONG vptr = 0;
+        volatile BOOL faulted = FALSE;
+        if (mem_readable_run(o, sizeof(ULONGLONG)) < sizeof(ULONGLONG))
+            continue;
+        MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)o);
+        if (faulted || (vptr != GT_VTABLE_ADDR && vptr != GT_VTABLE_MSG))
+            continue;
+        if (mem_readable_run(o, GT_CLASS_SIZE) < GT_CLASS_SIZE)
+            continue;
+
+        unsigned char cur[GT_CLASS_SIZE];
+        if (!mem_copy(cur, o, GT_CLASS_SIZE))
+            continue;
+
+        /* Find this object's previous snapshot. */
+        fd_entry *e = NULL;
+        for (int k = 0; k < FD_MAX; k++) {
+            if (g_fd[k].have && g_fd[k].obj == o) { e = &g_fd[k]; break; }
+        }
+        if (!e) {
+            for (int k = 0; k < FD_MAX; k++) {
+                if (!g_fd[k].have) { e = &g_fd[k]; break; }
+            }
+            if (!e) continue;                 /* table full: skip, never evict */
+            e->obj = o; e->have = TRUE;
+            memcpy(e->snap, cur, GT_CLASS_SIZE);
+            continue;                         /* nothing to diff yet */
+        }
+
+        /* Report the changed offsets for this object, as OFFSETS -- the raw
+         * measurement. Naming a field would be a claim; this is evidence. */
+        char line[400];
+        int used = 0, nch = 0;
+        for (int off = 0; off < GT_CLASS_SIZE && used < (int)sizeof(line) - 24;
+             off += 4) {
+            if (memcmp(e->snap + off, cur + off, 4) == 0)
+                continue;
+            nch++;
+            used += _snprintf(line + used, sizeof(line) - used - 1,
+                              "%s+0x%03x:%08x->%08x", used ? " " : "",
+                              off, *(unsigned *)(e->snap + off),
+                              *(unsigned *)(cur + off));
+        }
+        line[sizeof(line) - 1] = '\0';
+        if (nch) {
+            changed_objs++;
+            log_line("fdiff:   %p \"%.28s\" %d dword(s): %s",
+                     o, g_inst[i].text, nch, line);
+        }
+        memcpy(e->snap, cur, GT_CLASS_SIZE);
+    }
+
+    /* ⭐⭐ THE CONTROL, stated every time. If EVERY object changed, what
+     * changed is a ticker (animation phase, a frame counter) and says nothing
+     * about focus. A selection marker moves on ONE object -- or on two, the one
+     * leaving focus and the one entering it. */
+    InterlockedExchange(&g_fd_last, changed_objs);
+    log_line("fdiff: move %ld -- %d of %ld tracked object(s) changed. ▶ READ IT "
+             "LIKE THIS: 1-2 changed = a focus candidate; ALL changed = a "
+             "ticker, not focus; 0 changed = selection is not a field of these "
+             "objects and lives on a parent or in the animation system.",
+             g_move_seq, changed_objs, n < FD_MAX ? n : FD_MAX);
+
+    InterlockedExchange(&g_inst_busy, 0);
+}
+
+void gt_focus_diff_report(void)
+{
+    if (!fd_enabled())
+        return;
+    log_line("fdiff: the focus differ is ON (cfc2_focusdiff.on). It logs which "
+             "bytes of each live text object change per cursor movement. "
+             "⚠ Nothing here is spoken; it is a measurement.");
+}
+
 void gt_focus_report(void)
 {
     LONG n, dropped, notes;
@@ -1652,6 +1785,8 @@ BOOL gt_test_inspect(const void *buf, SIZE_T len, int *text_offset)
 /* Test seams for the instance set. The table is static and object-keyed, so a
  * test must be able to ask "how many objects?" and "what does THIS one say?" --
  * asserting the log text instead would test the formatter, not the table. */
+int gt_test_focus_diff_changed(void) { return (int)g_fd_last; }
+
 int gt_test_instance_count(void)
 {
     return (int)g_inst_count;
@@ -1687,6 +1822,11 @@ void gt_test_reset(void)
     /* ⚠ The focus channel too. A case that inherits the previous case's
      * records would assert against evidence it did not produce -- and would
      * PASS while testing nothing, which is the worst shape of green. */
+    /* ⚠ The differ's state too: a case inheriting the previous case's snapshots
+     * would diff against another fixture's bytes and report changes nobody
+     * made. Same reasoning as the focus channel's reset below. */
+    g_fd_last = -1; g_fd_on = 0;
+    for (int i = 0; i < FD_MAX; i++) { g_fd[i].obj = NULL; g_fd[i].have = FALSE; }
     g_inst_count = 0; g_inst_evicted = 0; g_inst_busy = 0;
     for (int i = 0; i < GT_INST_MAX; i++) {
         g_inst[i].obj = NULL; g_inst[i].text[0] = 0;
