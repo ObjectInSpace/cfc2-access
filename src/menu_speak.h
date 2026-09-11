@@ -382,6 +382,11 @@ BOOL menu_speak_test_value_shaped(const char *s);
  * display on the same screen. */
 BOOL menu_speak_test_char_picker(const char *s, int position);
 
+/* ⭐ Logs what a character-picker movement carried, so one run can settle
+ * whether the caption lags the cursor or names the position being LEFT. Logged
+ * only, never spoken -- see the long note at char_picker_matches(). */
+void menu_speak_probe_picker(const mc_move *m, const char *cap);
+
 /* Test seam: would this caption be suppressed as the SCREEN's rather than the
  * row's? A caption that does not change as the cursor moves describes the
  * screen, and repeating it after every movement is noise -- Fighter Awards sets

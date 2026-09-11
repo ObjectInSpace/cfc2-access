@@ -1374,15 +1374,70 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
  * numbering is: two independent sources (the cursor's position and the text the
  * game drew) must agree, or nothing is spoken. A mismatch yields the bare
  * position, which is always true. */
+static const char *const K_PICKER = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
 static BOOL char_picker_matches(const char *s, int position)
 {
-    static const char *const K = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     if (!s || position < 1 || position > 36)
         return FALSE;
     /* Exactly one character, and it must be the one this position holds. */
     if (s[0] == '\0' || s[1] != '\0')
         return FALSE;
-    return s[0] == K[position - 1];
+    return s[0] == K_PICKER[position - 1];
+}
+
+/* ⛔⛔ WHY THE PICKER IS STILL SILENT, and what one run would settle.
+ *
+ * Measured over 88 movements: the caption this screen delivers is ALWAYS the
+ * character of a NEIGHBOURING position -- 20 of 20 usable samples were exactly
+ * one position off, never the right one. So char_picker_matches() rejects every
+ * caption, which is correct behaviour (a wrong character spoken confidently is
+ * the failure this file exists to prevent) and leaves the screen speaking bare
+ * positions.
+ *
+ * ⚠⚠ THE DIRECTION IS UNRESOLVED AND THAT IS WHY NOTHING IS SHIPPED. Every one
+ * of those 20 samples was a step of -1. The two candidate rules --
+ *   (a) the caption lags the cursor by one movement, or
+ *   (b) the game sets the character of the position being LEFT
+ * predict the SAME character going down and OPPOSITE characters going up. The
+ * logs contain only FOUR upward movements and none of them carried a character
+ * at all, so the data cannot separate them.
+ *
+ * ⛔ Picking one would be a coin flip that speaks the wrong letter half the
+ * time while sounding authoritative -- worse than silence on a screen where the
+ * user is spelling out a code.
+ *
+ * ▶ ONE RUN SETTLES IT: move UP through several picker positions. This probe
+ * logs what each movement carried, so the direction falls out by inspection. */
+/* Log what this movement carried, then answer whether it may be spoken.
+ * ⚠ Two jobs in one call deliberately: the probe must see EVERY caption the
+ * picker delivers, including (especially) the ones the match rejects -- those
+ * are the samples that settle the direction. */
+static BOOL char_picker_probe_then_match(const mc_move *m, const char *cap,
+                                         int position)
+{
+    menu_speak_probe_picker(m, cap);
+    return char_picker_matches(cap, position);
+}
+
+void menu_speak_probe_picker(const mc_move *m, const char *cap)
+{
+    if (!m || !cap || !cap[0] || cap[1] != '\0')
+        return;
+    int pos   = m->new_index - m->min_index + 1;
+    int total = m->max_index - m->min_index + 1;
+    if (total != 36 || pos < 1 || pos > 36)
+        return;
+
+    const char *p = strchr(K_PICKER, cap[0]);
+    int cappos = p ? (int)(p - K_PICKER) + 1 : -1;
+    log_line("mcspeak: [PICKERPROBE] moved to position %d (which holds '%c'), "
+             "caption was '%c' = position %d, delta %d, step %+d. ⚠ NOT SPOKEN. "
+             "▶ Collect a few UPWARD movements: if delta stays -1 the caption "
+             "lags the cursor; if it flips to +1 the game names the position "
+             "being LEFT.",
+             pos, K_PICKER[pos - 1], cap[0], cappos,
+             cappos > 0 ? cappos - pos : 0, m->step);
 }
 
 /* Test seam: the picker's position/character agreement check. */
@@ -1625,7 +1680,7 @@ void menu_speak(const mc_move *m)
                     line[sizeof(line) - 1] = '\0';
                 }
             } else if (!sp.named && sp.char_picker &&
-                       char_picker_matches(cap, sp.position)) {
+                       char_picker_probe_then_match(m, cap, sp.position)) {
                 /* ⭐⭐ A CHARACTER PICKER: the caption IS the character.
                  *
                  * The lobby-ID keypad (0x14008a8ef, 36 items) sets the
