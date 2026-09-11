@@ -264,6 +264,23 @@ static const int g_ingame_av_rows[] = {
     575, 580, 583, 4114, 592, 593, 168
 };
 
+/* ⭐⭐ IN-GAME DISPLAY & SOUND values. values_off = 0x398, derived from the
+ * cursor addresses: rows 0-5 sit at +0x398, 39c, 3a0, 3a4, 3a8, 3ac.
+ *
+ * ⭐ Row 2 (Display Size) is EXACT: 5 live values and SCREEN_SIZE_00..04 is
+ * exactly five -- Full, Full (4:3), Original, Original (4:3), Wide.
+ *
+ * ⛔ Row 0 (Wallpaper) is NOT shipped: the row has FIVE live values but
+ * WALLPAPER_00..03 is only four, and index 580 is SCREEN_FILTER -- the next
+ * ROW's label, not a fifth wallpaper. A count that disagrees with the family is
+ * a count nobody has explained, and indexing past it would speak "Display
+ * Filter" as a wallpaper name.
+ * ⛔ Row 1 (Display Filter) likewise: 9 live values, SCREEN_FILTER_00..01 is
+ * two. */
+static const mc_value_set g_ingame_av_values[] = {
+    { 2, 5, 584 },   /* Display Size: Full .. Wide -- MEASURED */
+};
+
 /* ⭐⭐⭐ IN-GAME KEYBOARD SETTINGS (0x14009ec58), 16 rows -- reached from the
  * pause menu's "Controller Settings".
  *
@@ -855,6 +872,16 @@ static const mc_screen g_screens[] = {
      * cursor position IS the setting, same as the Options volume sliders. */
     { 0x14009c755ULL, -1, 7, "Display & Sound Settings", MC_VERIFIED_LIVE_TEXT,
       MC_LIST, 0, g_ingame_av_rows, 7, NULL, 0, 0 },
+
+    /* ⭐⭐ The in-game AV screen's VALUE axis. Same screen object as the row
+     * site above -- five call sites share 0x2C498050, which is why the axes
+     * must be told apart by cursor OFFSET and not by screen.
+     * ⭐ Rows 4-5 (Music Volume, Sound Effects Volume) are LEVELS: 11 values
+     * each, and the position IS the setting. */
+    { 0x14009c7a3ULL, -1, 0, "Display & Sound Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x398, NULL, 0, g_ingame_av_values,
+      (int)(sizeof(g_ingame_av_values) / sizeof(g_ingame_av_values[0])),
+      0x30u },
 
     /* ⭐⭐⭐ IN-GAME KEYBOARD SETTINGS, 16 rows. See g_kbd_settings_rows: two
      * captions anchor it and the live object list supplies the rest, with the

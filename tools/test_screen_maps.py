@@ -188,6 +188,9 @@ EXPECTED_VALUES = {
         (2, 2): ["Off", "On"],
         (3, 3): ["On", "Off", "Either"],
     },
+    "g_ingame_av_values": {
+        (2, 5): ["Full", "Full (4:3)", "Original", "Original (4:3)", "Wide"],
+    },
     "g_create_lobby_values": {
         (1, 2): ["Japanese Version", "English Version"],
         (2, 2): ["Off", "On"],
