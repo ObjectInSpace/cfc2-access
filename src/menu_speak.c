@@ -210,6 +210,38 @@ static const int g_lobby_filter_rows[] = {
     51, 52, 84, 93, 106, 88
 };
 
+/* ⭐⭐⭐ THE IN-GAME PAUSE MENU (0x1400a749d), 8 rows. The first screen in this
+ * project that sits BEHIND the emulated ROM -- and the shell's cursor hooks
+ * drive it normally, which was the open question the run answered.
+ *
+ * Every row named by its OWN caption, 20 sightings:
+ *   1 'Return to the game.'                        -> CONTINUE     250
+ *   2 'Displays the marquee card.'                 -> INST_CARD   1070
+ *   3 'View the move list.'                        -> COMMAND_LIST 253
+ *   4 "Set the game's controls."                   -> PAD_SETTING  226
+ *   5 'Change various display and sound settings.' -> DISPLAY_SOUND_SETTINGS 574
+ *   6 'Load your quick save data.'                 -> LOAD         254
+ *   7 'Save your current game to the quick save slot.' -> SAVE     255
+ *   8 'Exit the game.'                             -> QUIT         256
+ *
+ * ⛔ THE PREDICTED CLUSTER WAS WRONG, and usefully so. docs/naming-screens-
+ * generally.md predicted "250-256, 7 items: Resume, Restart, How to Play, Move
+ * List, Load Quick Save, Quick Save, Quit" -- a clean contiguous run, which is
+ * exactly what made it convincing. The real screen has EIGHT rows, RESTART and
+ * HOW_TO_PLAY are not on it at all, and two of its labels (INST_CARD 1070,
+ * DISPLAY_SOUND_SETTINGS 574) sit hundreds of indices away. No base could have
+ * reached it; only the captions could.
+ *
+ * ⚠ Row 4 is PAD_SETTING (226) and not PAD_SETTING_XB (227): both read
+ * "Controller Settings" and the caption HELP_OP_PAD is shared by three platform
+ * variants, so the caption alone cannot separate them. 226 is the non-suffixed
+ * base label, the same convention every other row here follows.
+ * ⚠ Row 8 is QUIT (256), not EXIT (42): both read "Quit", and 256 sits with the
+ * rest of this screen's family. */
+static const int g_pause_menu_rows[] = {
+    250, 1070, 253, 226, 574, 254, 255, 256
+};
+
 /* See MC_TEST_CALLER: a map that deliberately keeps one row UNKNOWN so the
  * sentinel path stays covered now that no shipped screen has a gap. */
 static const int g_sentinel_test_rows[] = { 51, MC_LABEL_UNKNOWN, 84 };
@@ -761,6 +793,13 @@ static const mc_screen g_screens[] = {
      * 8-item horizontal game strips, different channels, separate evidence. */
     { 0x1400ac059ULL, -1, 8, "Ranked Leaderboard", MC_VERIFIED_LIVE_TEXT,
       MC_GAME_STRIP, 0, NULL, 0, NULL, 0 },
+
+    /* ⭐⭐⭐ THE IN-GAME PAUSE MENU. See g_pause_menu_rows: all 8 rows named by
+     * their own captions across 20 sightings. ⚠ The first screen behind the
+     * emulated ROM that this mod names -- the shell's cursor hooks fire there
+     * normally, so it needed no new mechanism at all. */
+    { 0x1400a749dULL, -1, 8, "Pause Menu", MC_VERIFIED_LIVE_TEXT,
+      MC_LIST, 0, g_pause_menu_rows, 8, NULL, 0, 0 },
 
     /* ⭐⭐ THE LOBBY-ID KEYPAD's character picker (Search Lobby ID > Enter
      * Lobby ID), 36 items, vertical. Caller 0x14008a8ef.

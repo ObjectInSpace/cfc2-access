@@ -71,6 +71,13 @@ EXPECTED = {
     # POSITIONS -- dropping it would silently shift rows 3-6 up by one.
     # All six rows. Row 2 came from the renderer's first-value table at
     # 0x141206e30, which four caption-established rows validate (each table[i]-1).
+    # The IN-GAME pause menu (0x1400a749d). All 8 rows from their own captions,
+    # 20 sightings. NOT the predicted 250-256 contiguous run: it has eight rows,
+    # and INST_CARD (1070) / DISPLAY_SOUND_SETTINGS (574) are far from the rest.
+    "g_pause_menu_rows": [
+        "Resume", "Marquee Card", "Move List", "Controller Settings",
+        "Display & Sound Settings", "Load Quick Save", "Quick Save", "Quit",
+    ],
     "g_lobby_filter_rows": [
         "Game", "Game Version", "Cross-region Matchmaking", "Comment",
         "Event Mode", "One-button Special Moves",
