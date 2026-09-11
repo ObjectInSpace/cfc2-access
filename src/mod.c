@@ -154,6 +154,21 @@ static DWORD WINAPI worker(LPVOID param)
 
     log_init();
     log_line("=== CFC2 Access -- Phase 1.3: unpacked image dump ===");
+    /* ⛔⛔ THE BUILD STAMP. Twice now a run has been analysed against source the
+     * game was not running: once because `.\build.ps1` was used without
+     * -Deploy, once because the switch file was missing too. Both times the log
+     * looked exactly like a FAILED FEATURE -- bare positions, no diagnostics --
+     * and the first cost a full round trip before the DLL timestamps were
+     * checked.
+     *
+     * ⭐ A log that cannot say which build wrote it cannot be trusted to report
+     * on any change. This is the cheapest possible fix: the compiler's own
+     * timestamps, which cannot be stale by construction. Compare it against the
+     * build time before concluding ANYTHING from a run. See memory
+     * [[a-log-cannot-show-code-written-after-it]]. */
+    log_line("build: compiled " __DATE__ " " __TIME__
+             "  -- ⚠ if this predates the change you are testing, the game is "
+             "running a STALE DLL (build.ps1 -Deploy).");
     log_line("worker thread started, pid=%lu", GetCurrentProcessId());
 
     BOOL spoke = speech_init();
