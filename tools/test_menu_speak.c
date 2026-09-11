@@ -711,6 +711,75 @@ int main(void)
               (const void *)rowmap, linked);
     }
 
+    /* --- cases 20i-20k: ⛔⛔ ONE CALLER, TWO SCREENS, ONE SHARED VALUE AXIS
+     *
+     * USER-REPORTED, and the user named the consequence exactly: "the values
+     * won't be correct if the rows are wrong, and it's confusing to announce
+     * the wrong thing."
+     *
+     * 0x14009890d serves Casual Match (4 rows) and Ranked Match (3) -- measured
+     * by entry point over 17 visits, zero exceptions. They SHARE the value axis
+     * 0x140098986, which can carry only one `name`. So a sibling search keyed on
+     * the name returns the CASUAL row map even when the user is on RANKED, and
+     * names row 3 "One-button Special Moves" when the row is actually
+     * Cross-region Matchmaking: the wrong SETTING announced while it is changed.
+     *
+     * ⚠⚠ NOTE WHY A `matches > 1` GUARD WOULD NOT HAVE FIXED IT. The value
+     * entry's name matches the Casual row entry EXACTLY ONCE -- it looks
+     * unambiguous. The ambiguity is between the value axis and the row entries,
+     * not among the row entries. These cases pin the real rule: the live ROW
+     * COUNT decides. */
+    {
+        const mc_screen *casual = menu_speak_lookup_n(0x14009890dULL, 4);
+        const mc_screen *ranked = menu_speak_lookup_n(0x14009890dULL, 3);
+        const mc_screen *val    = menu_speak_lookup(0x140098986ULL);
+        int ok = casual && ranked && val &&
+                 casual != ranked &&
+                 casual->nlabels == 4 && ranked->nlabels == 3;
+        check("20i. one caller resolves to TWO screens by live row count",
+              ok, "casual=%p(%d) ranked=%p(%d) val=%p",
+              (const void *)casual, casual ? casual->nlabels : -1,
+              (const void *)ranked, ranked ? ranked->nlabels : -1,
+              (const void *)val);
+    }
+    {
+        /* 20g: the shared value axis must reach the map for the screen the user
+         * is actually ON, chosen by the row count seen on that screen object. */
+        const mc_screen *casual = menu_speak_lookup_n(0x14009890dULL, 4);
+        const mc_screen *ranked = menu_speak_lookup_n(0x14009890dULL, 3);
+        const mc_screen *val    = menu_speak_lookup(0x140098986ULL);
+        int scr_a = 0, scr_b = 0;      /* stand-ins for two screen objects */
+
+        menu_speak_reset_row_total();
+        menu_speak_note_row_total(&scr_a, 4);
+        const mc_screen *got_casual = menu_speak_sibling_row_for(val, &scr_a);
+
+        menu_speak_reset_row_total();
+        menu_speak_note_row_total(&scr_b, 3);
+        const mc_screen *got_ranked = menu_speak_sibling_row_for(val, &scr_b);
+
+        check("20j. the shared value axis follows the LIVE row count",
+              got_casual == casual && got_ranked == ranked,
+              "4rows->%s  3rows->%s",
+              got_casual == casual ? "Casual(ok)" :
+                  (got_casual == ranked ? "RANKED(wrong)" : "none"),
+              got_ranked == ranked ? "Ranked(ok)" :
+                  (got_ranked == casual ? "CASUAL(wrong)" : "none"));
+    }
+    {
+        /* 20h: ⛔ a count that matches NO map must yield NULL, not the first
+         * entry. Naming a row from a map that does not describe the screen is
+         * the failure mode; a bare position is always true. */
+        const mc_screen *val = menu_speak_lookup(0x140098986ULL);
+        int scr = 0;
+        menu_speak_reset_row_total();
+        menu_speak_note_row_total(&scr, 9);          /* neither 4 nor 3 */
+        const mc_screen *got = menu_speak_sibling_row_for(val, &scr);
+        menu_speak_reset_row_total();
+        check("20k. an unmatched row count names NOTHING rather than guessing",
+              got == NULL, "got=%p", (const void *)got);
+    }
+
     /* --- case 20e: a SCREEN caption is not repeated on every row ---------
      * ⛔⛔ Fighter Awards sets ONE caption -- "View all of your challenges." --
      * for all 40 grid positions and all 7 list rows. Once ACHIEVEMENT_*_NAME

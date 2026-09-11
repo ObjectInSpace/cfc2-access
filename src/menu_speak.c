@@ -1058,22 +1058,35 @@ static const mc_screen g_screens[] = {
      * was applied to a 3-row screen, which is the user-visible bug: the row
      * count appeared to change while arrowing.
      *
-     * ⚠ The VALUE axis needs no second entry -- its count is already 0 ("varies
-     * by row") and it finds its row map through the sibling NAME. But the name
-     * must MATCH for that link to work, so this row is deliberately named
-     * "Casual Match" rather than "Ranked Match".
+     * ⭐⭐ NAMED HONESTLY -- "Ranked Match", not "Casual Match".
      *
-     * ⛔ THAT IS A REAL TRADE-OFF, recorded rather than hidden: the screen will
-     * announce itself as Casual Match when it is Ranked. The row NAMES are
-     * right either way, which is what the user navigates by; fixing the screen
-     * title needs a sibling link keyed on something other than the name, and
-     * that is a change to the lookup, not to this table. */
-    { 0x14009890dULL, -1, 3, "Casual Match", MC_VERIFIED_LIVE_TEXT,
+     * An earlier version of this row carried the name "Casual Match" so the
+     * value axis could find its map through the sibling NAME link, and that was
+     * wrong twice over. The user named both faults: "the values won't be
+     * correct if the rows are wrong, and it's confusing to announce the wrong
+     * thing."
+     *
+     * ⛔⛔ The second fault was the serious one. With two same-named row
+     * entries, menu_speak_sibling_row() returned whichever came FIRST -- the
+     * 4-row map -- on BOTH screens, so on Ranked it named row 3 "One-button
+     * Special Moves" when the row is Cross-region Matchmaking. The mod would
+     * have announced the wrong SETTING while the user changed it.
+     *
+     * ⭐ The link is now keyed on the live ROW COUNT (see
+     * menu_speak_sibling_row_for), which is a fact the game supplies as an
+     * argument -- so the names no longer have to lie to keep the halves
+     * joined. */
+    { 0x14009890dULL, -1, 3, "Ranked Match", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_ROW, 0, g_ranked_match_rows, 3, NULL, 0 },
 
+    /* ⚠ sibling_caller = 0x14009890d: this VALUE axis is shared by Casual Match
+     * and Ranked Match, so its single `name` cannot identify which row map
+     * applies. The sibling search uses (this caller, live row count) instead --
+     * see menu_speak_sibling_row_for(). */
     { 0x140098986ULL, -1, 0, "Casual Match", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_VALUE, 0x344, NULL, 0, g_casual_match_values,
-      (int)(sizeof(g_casual_match_values) / sizeof(g_casual_match_values[0])) },
+      (int)(sizeof(g_casual_match_values) / sizeof(g_casual_match_values[0])),
+      0, 0, 0x14009890dULL },
 
     /* ⭐⭐ JOIN LOBBY > search filters. Two call sites, one screen object:
      * the vertical ROW selector and the horizontal VALUE selector.
@@ -1331,21 +1344,121 @@ const mc_screen *menu_speak_row(int i)
     return &g_screens[i];
 }
 
+/* ⭐⭐ THE LAST ROW-AXIS COUNT, per screen object.
+ *
+ * ⛔⛔ WHY THIS EXISTS. One caller (0x14009890d) serves BOTH Casual Match
+ * (4 rows) and Ranked Match (3), and the two share a VALUE axis. The value site
+ * finds its row map through the screen NAME, so with two same-named row entries
+ * the search returned whichever came first -- the 4-row map -- on BOTH screens.
+ * On Ranked that names row 3 "One-button Special Moves" when it is actually
+ * Cross-region Matchmaking: the mod announces the WRONG SETTING while the user
+ * changes it. User-reported: "the values won't be correct if the rows are
+ * wrong, and it's confusing to announce the wrong thing."
+ *
+ * ⭐ The row count is not guessed or read out of memory -- it arrives as an
+ * ARGUMENT to the row axis (`max_index`, measured at screen+0x334 across every
+ * log), so this only remembers what the game already told us.
+ *
+ * ⚠ KEYED ON THE SCREEN OBJECT, so a stale count cannot leak across screens: a
+ * different screen pointer yields no answer rather than a wrong one. The
+ * pointer is only COMPARED, never dereferenced.
+ *
+ * ⚠ Cross-movement state is a hazard in this file, so it is deliberately
+ * minimal: one pointer and one int, written only by the row axis, and read only
+ * to disambiguate same-named siblings. When it does not apply, the old
+ * name-only behaviour stands. */
+static const void *g_last_row_screen;
+static int         g_last_row_total;
+
+void menu_speak_note_row_total(const void *screen, int total)
+{
+    if (!screen || total <= 0)
+        return;
+    g_last_row_screen = screen;
+    g_last_row_total  = total;
+}
+
+void menu_speak_reset_row_total(void)
+{
+    g_last_row_screen = NULL;
+    g_last_row_total  = 0;
+}
+
 /* Find the MC_SETTINGS_ROW entry belonging to the same screen as `v`.
  *
  * ⭐ Matched on the screen NAME, so the two halves of one screen (the row
  * selector and the value selector) stay linked through one fact rather than a
- * second hand-copied address that could drift. */
-const mc_screen *menu_speak_sibling_row(const mc_screen *v)
+ * second hand-copied address that could drift.
+ *
+ * ⭐⭐ AND, when several row entries share that name, on the live ROW COUNT --
+ * which is what tells Casual Match (4) from Ranked Match (3). See
+ * menu_speak_note_row_total(). `screen` is the value movement's own screen
+ * pointer; pass NULL when it is not known and the name-only match stands. */
+const mc_screen *menu_speak_sibling_row_for(const mc_screen *v,
+                                            const void *screen)
 {
+    const mc_screen *first = NULL;
+    int matches = 0;
+
     if (!v || !v->name)
         return NULL;
     for (int i = 0; i < NSCREENS; i++) {
-        if (g_screens[i].kind == MC_SETTINGS_ROW &&
-            g_screens[i].name && strcmp(g_screens[i].name, v->name) == 0)
-            return &g_screens[i];
+        if (g_screens[i].kind != MC_SETTINGS_ROW || !g_screens[i].name ||
+            strcmp(g_screens[i].name, v->name) != 0)
+            continue;
+        matches++;
+        if (!first)
+            first = &g_screens[i];
     }
-    return NULL;
+    /* ⭐⭐ THE ROW COUNT WINS WHENEVER IT IS KNOWN FOR THIS SCREEN OBJECT, even
+     * when the name matched exactly once.
+     *
+     * ⚠⚠ THIS IS THE CASE THAT MATTERS, and it is not the obvious one. Casual
+     * Match and Ranked Match share a VALUE axis, and that axis can carry only
+     * ONE name. So on Ranked the value entry's name matches the CASUAL row
+     * entry -- a single, unambiguous-looking match that is nonetheless the
+     * WRONG MAP. Gating this on `matches > 1` would have missed exactly the bug
+     * it exists to fix: the ambiguity is between the value axis and the row
+     * entries, not among the row entries themselves.
+     *
+     * ⭐ The candidates are the row entries sharing the VALUE entry's CALLER-set
+     * -- i.e. every row entry this value axis could plausibly belong to. Rather
+     * than model that, take the simplest sound rule: among row entries whose
+     * name matches, or which were seen on this same screen object, prefer the
+     * one whose count equals the live row count. */
+    if (screen && screen == g_last_row_screen && g_last_row_total > 0) {
+        /* First choice: a same-named entry with the right count. */
+        for (int i = 0; i < NSCREENS; i++) {
+            if (g_screens[i].kind == MC_SETTINGS_ROW && g_screens[i].name &&
+                strcmp(g_screens[i].name, v->name) == 0 &&
+                g_screens[i].count == g_last_row_total)
+                return &g_screens[i];
+        }
+        /* ⭐ Second choice: the name does NOT match any entry with this count,
+         * which is the Ranked case -- the value axis says "Casual Match" while
+         * the screen has 3 rows. Fall back to the row entry sharing the value
+         * axis's CALLER pairing via `sibling_caller`, matched on count. */
+        if (v->sibling_caller) {
+            for (int i = 0; i < NSCREENS; i++) {
+                if (g_screens[i].kind == MC_SETTINGS_ROW &&
+                    g_screens[i].caller == v->sibling_caller &&
+                    g_screens[i].count == g_last_row_total)
+                    return &g_screens[i];
+            }
+        }
+        /* ⛔ A count is known and NOTHING matches it. The maps on file do not
+         * describe the screen in front of the user, so naming a row from any of
+         * them would be a guess. A bare position is always true. */
+        if (first && first->count != g_last_row_total)
+            return NULL;
+    }
+
+    return first;
+}
+
+const mc_screen *menu_speak_sibling_row(const mc_screen *v)
+{
+    return menu_speak_sibling_row_for(v, NULL);
 }
 
 /* The value-label variant for `row` whose count matches the LIVE count, or
@@ -1673,6 +1786,11 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
 
     if (s->kind == MC_SETTINGS_ROW) {
         out->axis = MC_AXIS_ROW;
+        /* ⭐⭐ REMEMBER HOW MANY ROWS THIS SCREEN HAS. The count arrives as an
+         * argument, and it is what tells two same-named screens apart later,
+         * when the VALUE axis needs to know which row map applies. See
+         * menu_speak_note_row_total(). */
+        menu_speak_note_row_total(m->screen, out->total);
         /* ⭐⭐ THE MAP. A settings/select screen's row labels are scattered
          * through the GMD (Select Game: 51, 52, 56), so the label comes from
          * an explicit per-index map, never from base+index -- which would land
@@ -1726,7 +1844,12 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
              * ⚠ The sibling is found by screen NAME, so the two halves of one
              * screen stay linked without a second hand-maintained address.
              * The VALUE itself is still not named -- see the table row. */
-            const mc_screen *sib = menu_speak_sibling_row(s);
+            /* ⚠ Pass THIS movement's screen object: when two row entries share
+             * a name (Casual Match 4 rows / Ranked Match 3), the live row count
+             * observed on this very screen is what picks the right map. Without
+             * it the search returns the first match and can name the row from
+             * the OTHER screen's map. */
+            const mc_screen *sib = menu_speak_sibling_row_for(s, m->screen);
             if (sib && sib->labels && row >= 0 && row < sib->nlabels) {
                 char text[128];
                 if (gmd_text_by_index(sib->labels[row], text, sizeof(text)) &&

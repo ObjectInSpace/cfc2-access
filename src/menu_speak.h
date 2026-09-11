@@ -226,6 +226,15 @@ typedef struct {
      * different ceilings -- and a ceiling that is too generous admits a blurb,
      * which the count check then rejects, silencing the whole screen. */
     int        coord_maxlen;
+    /* ⭐⭐ For a VALUE axis shared by two same-caller screens: the ROW axis's
+     * caller. Needed because a value entry carries only ONE name, so on the
+     * second screen its name matches the FIRST screen's row entry -- a single
+     * clean-looking match that is the wrong map. With this set, the sibling
+     * search can pick the row entry by (caller, live row count) instead.
+     *
+     * ⚠ Only Casual/Ranked Match need it today; 0 means "match by name", which
+     * is every other settings screen. */
+    ULONGLONG  sibling_caller;
 } mc_screen;
 
 /* What a movement should say. */
@@ -365,6 +374,22 @@ const mc_value_set *menu_speak_values_for(const mc_screen *s, int row,
 /* The MC_SETTINGS_ROW entry of the same screen as a value entry, or NULL --
  * so a value can name the row it belongs to. */
 const mc_screen *menu_speak_sibling_row(const mc_screen *v);
+
+/* ⭐⭐ The sibling row entry, disambiguated by the live ROW COUNT when several
+ * share a name -- which is what tells Casual Match (4 rows) from Ranked Match
+ * (3), since one caller serves both and they share a VALUE axis.
+ *
+ * ⛔ Returns NULL when the name is ambiguous and the count cannot decide. That
+ * is deliberate: naming the row from the wrong screen's map announces the wrong
+ * SETTING while the user changes it, and a bare position is always true. */
+const mc_screen *menu_speak_sibling_row_for(const mc_screen *v,
+                                            const void *screen);
+
+/* Record the row count the game reported for a screen object (row axis only).
+ * ⚠ Keyed on the screen POINTER, compared and never dereferenced, so a stale
+ * count cannot leak into a different screen. */
+void menu_speak_note_row_total(const void *screen, int total);
+void menu_speak_reset_row_total(void);
 
 /* Test seam: how many screens the table holds, and lookup by caller. */
 int  menu_speak_screen_count(void);
