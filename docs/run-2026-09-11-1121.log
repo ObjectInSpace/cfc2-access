@@ -1,0 +1,674 @@
+[11:21:06.618] === CFC2 Access -- Phase 1.3: unpacked image dump ===
+[11:21:06.619] build: compiled Sep 11 2026 11:07:28  -- ⚠ if this predates the change you are testing, the game is running a STALE DLL (build.ps1 -Deploy).
+[11:21:06.619] worker thread started, pid=32288
+[11:21:06.685] speech: ready, backend=NVDA
+[11:21:06.686] image [t0]: base=0000000140000000, 10 readable sections
+[11:21:06.687] image [t0]:   rva=0x1000     size=16625664  code distinct=256/256 prot=0x80   packed
+[11:21:06.687] image [t0]:   rva=0xfdc000   size=2072576   code distinct=256/256 prot=0x80   packed
+[11:21:06.687] image [t0]:   rva=0x11d6000  size=28758016  code distinct=256/256 prot=0x80   packed
+[11:21:06.687] image [t0]:   rva=0x2d43000  size=745472    code distinct=1/256 prot=0x80   UNPACKED
+[11:21:06.687] image [t0]:   rva=0x2df9000  size=4096      code distinct=256/256 prot=0x80   packed
+[11:21:06.687] image [t0]:   rva=0x2dfa000  size=270336    code distinct=1/256 prot=0x80   UNPACKED
+[11:21:06.687] image [t0]:   rva=0x2e3c000  size=233472    code distinct=256/256 prot=0x80   packed
+[11:21:06.687] image [t0]:   rva=0x2e75000  size=270336    data distinct=254/256 prot=0x2    
+[11:21:06.688] image [t0]:   rva=0x2eb7000  size=13451264  code distinct=85/256 prot=0x40   UNPACKED
+[11:21:06.688] image [t0]:   rva=0x3b8b000  size=3952640   code distinct=256/256 prot=0x40   packed
+[11:21:07.213] image: unpacked after 531 ms -- section rva=0x1000 distinct=233/256 prot=0x20
+[11:21:07.213] image [unpacked]: base=0000000140000000, 10 readable sections
+[11:21:07.214] image [unpacked]:   rva=0x1000     size=16625664  code distinct=233/256 prot=0x20   UNPACKED
+[11:21:07.214] image [unpacked]:   rva=0xfdc000   size=2072576   data distinct=194/256 prot=0x2    
+[11:21:07.214] image [unpacked]:   rva=0x11d6000  size=28758016  data distinct=35/256 prot=0x4    
+[11:21:07.214] image [unpacked]:   rva=0x2d43000  size=745472    data distinct=1/256 prot=0x2    
+[11:21:07.214] image [unpacked]:   rva=0x2df9000  size=4096      data distinct=255/256 prot=0x2    
+[11:21:07.214] image [unpacked]:   rva=0x2dfa000  size=270336    data distinct=1/256 prot=0x2    
+[11:21:07.215] image [unpacked]:   rva=0x2e3c000  size=233472    code distinct=234/256 prot=0x20   UNPACKED
+[11:21:07.215] image [unpacked]:   rva=0x2e75000  size=270336    data distinct=254/256 prot=0x2    
+[11:21:07.215] image [unpacked]:   rva=0x2eb7000  size=13451264  code distinct=85/256 prot=0x40   UNPACKED
+[11:21:07.215] image [unpacked]:   rva=0x3b8b000  size=3952640   code distinct=256/256 prot=0x40   packed
+[11:21:07.215] probe: VirtualProtect OK (target 0000000140001000, old prot 0x20) -- detours should be installable
+[11:21:07.215] kbd: identity CONFIRMED in this process -- vtable+0x30 -> 0x140253220 and the class name reads "sKeyboard".
+[11:21:07.256] kbd: hooked the sKeyboard state builder at 0x140253750. It receives rcx=the instance and rdx=the state bitmap, so the instance pointer arrives as an ARGUMENT -- no memory search.
+[11:21:07.256] mc: identity CONFIRMED in this process -- both cursor helpers carry the expected prologue.
+[11:21:07.350] mc: hooked both menu cursor helpers -- vertical 0x14007cdc0, horizontal 0x14007c9f0. The screen object and the cursor pointer arrive as ARGUMENTS, so there is no memory search.
+[11:21:07.351] gt: identity CONFIRMED -- 0x1402fd6a0 carries the expected prologue and sits in the instance vtable's slot 13.
+[11:21:07.444] gt: hooked the cGUIObjText CONSTRUCTOR at 0x1402efc10. It has exactly ONE caller (the factory 0x1402ef980), so this counts EVERY object of this class that is ever built -- which is what tells a wrong hook target apart from a class the shell never instantiates.
+[11:21:07.631] gt: hooked 4 of 4 setText overloads (cGUIObjText slots 25/26, cGUIObjMessage slots 25/26). Each carries its own counter, so the log will name WHICH one the shell uses.
+[11:21:07.631] gt: ready -- ctor probe live and update hook installed. Detours DEREFERENCE NOTHING beyond a single guarded vptr read; all inspection happens on the worker thread under the fault guard.
+[11:21:07.631] dump: SKIPPED -- image never unpacked. Any dump taken now would be ciphertext that silently looks like a valid file.
+[11:21:07.632] phase 1.3 result: speech=YES protect=YES unpacked=YES sections_dumped=0
+[11:21:07.632] pad: OFF -- cfc2_pad.on is absent. sPad is inert for the shell (Kind=0, update never runs); create that file only for in-game work.
+[11:21:07.733] kbd: ⛔ the builder has not run yet -- no state has been captured, so nothing can be concluded about key state.
+[11:21:07.733] memsafe: fault guard armed (self-test passed)
+[11:21:07.733] gmdfind: excluding own stack 00000000029A0000..0000000002BA0000 and own module 00007FF99A7C0000..00007FF99A80C000
+[11:21:09.262] gmdfind: walked 2326 regions; scanned 582 private (1615644 KB) in 1531 ms; 1 candidate(s); guard absorbed 0 fault(s)
+[11:21:09.262] gmdfind:  candidate 0: array_base=000000003B7100A0 form=LIVE_TABLE probes=64/64 geometry=2016/2016 pairs pad=0xcdcdcdcd region=000000003B450000+524288KB
+[11:21:09.269] gmdfind: ⭐ CLOSED LOOP -- followed labelOffset to "STATS_PWS2_06_NAME", re-hashed those bytes, hashes MATCH the entry. This is the GMD label array.
+[11:21:09.276] gmdfind: string blob was NOT at the usual +0x140000 -- found at +0xd0000 this run (it moves)
+[11:21:09.277] gmdfind: ⭐⭐ TEXT RESOLVED (live) -- "LANG_NAME_JAPANESE" = "Japanese [jp]", via a pointer at entry+0xd0000. We can READ the shell's messages. (matched shipped variant 1 of 4, English)
+[11:21:09.286] gmdtext:   blob at entries+0xd0000 is "eng"  <== matches config.ini
+[11:21:09.287] gmdtext: ⭐⭐ blob resolved at entries+0xd0000; 4165 messages readable. Table language: eng (matches config.ini).
+[11:21:09.287] mc: the cursor helpers have not run yet -- nothing can be concluded about menu movement.
+[11:21:11.198] heartbeat 1 (alive 2 s)
+[11:21:11.198] gt: 2 CONSTRUCTED; setText ran 0 time(s), 0 string(s) captured; 0 guarded read(s) faulted.  ⛔ Objects exist but setText NEVER RAN: the class is right and 0x1402f0b50 is not how its text is assigned. Find the other writer.
+[11:21:13.208] heartbeat 2 (alive 4 s)
+[11:21:15.222] heartbeat 3 (alive 6 s)
+[11:21:15.222] kbd: builder ran 0 times; instance=0000000000000000 state=0000000000000000 offset=(not captured)
+[11:21:15.222] gt: 2 CONSTRUCTED; setText ran 0 time(s), 0 string(s) captured; 0 guarded read(s) faulted.  ⛔ Objects exist but setText NEVER RAN: the class is right and 0x1402f0b50 is not how its text is assigned. Find the other writer.
+[11:21:15.724] kbd: CAPTURED instance=0000000029098990 state=0000000029098AC8 after 2 builder calls.
+[11:21:15.724] kbd: ⭐⭐ state - instance == 0x138, exactly as the disassembly predicted. The offline model is CONFIRMED in live memory.
+[11:21:15.725] kbd: down=[(none)]  pressed=[(none)]  released=[(none)]  (engine Trg=[(none)])
+[11:21:17.958] kbd: down=[0x12 0xa4]  pressed=[0x12 0xa4]  released=[(none)]  (engine Trg=[(none)])
+[11:21:18.162] kbd: down=[(none)]  pressed=[(none)]  released=[0x12 0xa4]  (engine Trg=[(none)])
+[11:21:19.278] heartbeat 5 (alive 10 s)
+[11:21:19.278] gt: ⚠ focus recorder INCONCLUSIVE -- 0 string(s) recorded but the cursor hook never notified us (0 movements). Nothing can be concluded about per-row captions.
+[11:21:19.280] gt: === INSTANCE SET: 0 live text object(s), 0 dropped (table full) ===
+[11:21:19.280] gt: of 0 object(s): 0 still LIVE, 0 stale; current move seq 0.
+[11:21:19.280] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[11:21:19.280] layout: === FIELD DUMP of live text objects (0 in set) ===
+[11:21:19.280] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[11:21:19.280] layout: 0 object(s) dumped of 0 in the set (short text only).
+[11:21:19.280] layout: ⚠ NOTHING was dumped -- no conclusion is available from this poll, which is NOT the same as a negative result.
+[11:21:20.298] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[11:21:20.298] gt: * TEXT SET on 000000002BE111D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[11:21:20.503] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[11:21:21.316] gt: 3 CONSTRUCTED; setText ran 66 time(s), 66 string(s) captured; 0 guarded read(s) faulted.
+[11:21:21.316] gt:   by overload: cGUIObjText.25=66 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:22.736] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:22.940] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:23.143] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[11:21:23.346] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[11:21:23.346] gt: 3 CONSTRUCTED; setText ran 187 time(s), 187 string(s) captured; 0 guarded read(s) faulted.
+[11:21:23.347] gt:   by overload: cGUIObjText.25=187 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:24.261] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[11:21:24.465] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[11:21:25.378] gt: 5 CONSTRUCTED; setText ran 310 time(s), 310 string(s) captured; 0 guarded read(s) faulted.
+[11:21:25.378] gt:   by overload: cGUIObjText.25=310 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:26.394] gt: * TEXT SET on 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:26.596] mc: the helpers ARE running (3 calls so far). The hook is live.
+[11:21:27.408] gt: 26 CONSTRUCTED; setText ran 362 time(s), 362 string(s) captured; 0 guarded read(s) faulted.
+[11:21:27.408] gt:   by overload: cGUIObjText.25=362 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:27.714] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[11:21:27.752] gmdtext: blob region: base=000000003B7E0000 size=520640 KB state=0x1000 protect=0x4 type=0x20000
+[11:21:27.752] gmdtext: ⭐ indexed 4165 string offsets in one pass; blob spans 000000003B7E00A0..000000003B7FA0A0 (106496 bytes) and is validated ONCE -- per-string reads no longer call VirtualQuery.
+[11:21:27.755] mcspeak: spoke "Online Play, 2 of 6. Play online using a network connection."
+[11:21:27.755] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=0000000140097A59 screen=000000002BE15EE0 cursor=000000002BE16210
+[11:21:27.856] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[11:21:28.365] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:28.367] mcspeak: spoke "Offline Play, 1 of 6. Play offline."
+[11:21:28.368] mc: vertical   cursor 1 -> 0  (item 1 of 6, range 0..5, step -1)  caller=0000000140097A59 screen=000000002BE15EE0 cursor=000000002BE16210
+[11:21:28.469] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:29.482] heartbeat 10 (alive 20 s)
+[11:21:29.482] kbd: builder ran 785 times; instance=0000000029098990 state=0000000029098AC8 offset=0x138 CONFIRMED
+[11:21:29.482] gt: 26 CONSTRUCTED; setText ran 366 time(s), 366 string(s) captured; 0 guarded read(s) faulted.
+[11:21:29.482] gt:   by overload: cGUIObjText.25=366 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:29.482] gt: === FOCUS RECORD: 16 distinct string(s) across 2 cursor movement(s), 0 dropped (buffer full) ===
+[11:21:29.482] gt:   [move 0] strip 000000002BE111D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[11:21:29.483] gt:   [move 0] PROSE 000000002BE2D490: "Now loading..."
+[11:21:29.483] gt:   [move 0] strip 000000002BE111D0: "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[11:21:29.483] gt:   [move 0] strip 000000002C241580: "<FONT 2>Main Menu</FONT>"
+[11:21:29.483] gt:   [move 0] PROSE 000000002BDC6BB0: "Offline Play"
+[11:21:29.483] gt:   [move 0] PROSE 000000002BE38BF0: "Online Play"
+[11:21:29.483] gt:   [move 0] PROSE 000000002BE121B0: "Museum"
+[11:21:29.483] gt:   [move 0] PROSE 000000002BDFC2E0: "Fighter Awards"
+[11:21:29.484] gt:   [move 0] PROSE 000000002BE2EE20: "Options"
+[11:21:29.484] gt:   [move 0] PROSE 000000002BDDBB10: "Quit"
+[11:21:29.484] gt:   [move 0] PROSE 000000002C2C1140: "Play offline."
+[11:21:29.484] gt:   [move 0] strip 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:29.484] gt:   [move 1] PROSE 000000002C2C1140: "Play online using a network connection."
+[11:21:29.484] gt:   [move 1] strip 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:29.484] gt:   [move 2] PROSE 000000002C2C1140: "Play offline."
+[11:21:29.484] gt:   [move 2] strip 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:29.484] gt: of 16 string(s): 4 arrived after a cursor movement, 10 were prose captions.
+[11:21:29.485] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[11:21:29.485] gt: === INSTANCE SET: 11 live text object(s), 0 dropped (table full) ===
+[11:21:29.485] gt:   000000002BE111D0 STALE [move 0, 352 set(s)] "<FONT 2>PRESS <SIZE 80><ICON DECIDE></SIZE> TO START</FONT>"
+[11:21:29.485] gt:   000000002BE2D490 STALE [move 0, 1 set(s)] "Now loading..."
+[11:21:29.485] gt:   000000002C241580 LIVE  [move 0, 1 set(s)] "<FONT 2>Main Menu</FONT>"
+[11:21:29.485] gt:   000000002BDC6BB0 LIVE  [move 0, 1 set(s)] "Offline Play"
+[11:21:29.485] gt:   000000002BE38BF0 LIVE  [move 0, 1 set(s)] "Online Play"
+[11:21:29.485] gt:   000000002BE121B0 LIVE  [move 0, 1 set(s)] "Museum"
+[11:21:29.486] gt:   000000002BDFC2E0 LIVE  [move 0, 1 set(s)] "Fighter Awards"
+[11:21:29.486] gt:   000000002BE2EE20 LIVE  [move 0, 1 set(s)] "Options"
+[11:21:29.486] gt:   000000002BDDBB10 LIVE  [move 0, 1 set(s)] "Quit"
+[11:21:29.486] gt:   000000002C2C1140 LIVE  [move 2, 3 set(s)] "Play offline."
+[11:21:29.486] gt:   000000002BE3D700 LIVE  [move 2, 3 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:29.486] gt: of 11 object(s): 9 still LIVE, 2 stale; current move seq 2.
+[11:21:29.487] gt: ⭐ reclaimed 2 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[11:21:29.487] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[11:21:29.487] layout: === FIELD DUMP of live text objects (11 in set) ===
+[11:21:29.487] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[11:21:29.488] layout:   000000002C241580 "<FONT 2>Main Menu</FONT>" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43600000 +0x044:42580000 +0x04c:3f800000 +0x050:00000002 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2bdd5390 +0x080:2bdc5430 +0x088:2be15ee0 +0x090:3c562360 +0x098:3c810578 +0x0a0:42000000 +0x0a4:bf800000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910e508 +0x0e0:43ae1112 +0x0e4:42951111 +0x0e8:000000b4 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000034 +0x0fc:00000034 +0x100:44680000 +0x104:42a00000 +0x138:00000478 +0x13c:00000001 +0x140:00040008 +0x144:00000002 +0x148:01020c00 +0x14c:00030000 +0x150:00000002 +0x154:ffffffff
+[11:21:29.488] layout:   000000002BDC6BB0 "Offline Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43400000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:4001000a +0x064:00000001 +0x068:2bdd90a0 +0x078:2bdfaec0 +0x080:2be10fe0 +0x088:2be15ee0 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00210ff0 +0x0c8:2be38740 +0x0d0:2910ed58 +0x0d8:2910cc88 +0x0e0:433a2223 +0x0e4:42616c17 +0x0e8:2bdd4f30 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00005760 +0x10c:00800420 +0x110:2bdc6d18 +0x118:2be38d58
+[11:21:29.489] layout:   000000002BE38BF0 "Online Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43880000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:3001000a +0x068:2c244e60 +0x078:2be2c040 +0x080:2bdfb110 +0x088:2be15ee0 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:3c76bff0 +0x0d0:2910ed90 +0x0d8:2910ca20 +0x0e0:4335b05c +0x0e4:42616c17 +0x0e8:2be2c030 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00006a80 +0x10c:008003c0 +0x110:2be38d58 +0x118:2be12318 +0x120:00000bb8 +0x124:0080008c
+[11:21:29.489] layout:   000000002BE121B0 "Museum" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43b00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:3001000a +0x068:2bdc74f0 +0x078:2bdda6f0 +0x080:2be2c290 +0x088:2be15ee0 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910e3b8 +0x0d8:2910c860 +0x0e0:430360b6 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00007740 +0x10c:00800240 +0x110:2be12318 +0x118:2bdfc448 +0x120:00000d58 +0x124:00800054 +0x128:2be12348
+[11:21:29.489] layout:   000000002BDFC2E0 "Fighter Awards" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43d80000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2be39530 +0x078:2c2464b0 +0x080:2bdda940 +0x088:2be15ee0 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910e968 +0x0d8:2910c630 +0x0e0:436c16c3 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00008d00 +0x10c:008004e0 +0x110:2bdfc448 +0x118:2be2ef88 +0x120:00001000 +0x124:008000b8 +0x128:2bdfc478
+[11:21:29.489] layout:   000000002BE2EE20 "Options" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44000000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2be12af0 +0x078:2bdcaa70 +0x080:2c246700 +0x088:2be15ee0 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910de40 +0x0d8:2910c3c8 +0x0e0:42fc16c2 +0x0e4:42616c17 +0x0e8:00000050 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00009c60 +0x10c:008002a0 +0x110:2be2ef88 +0x118:2bddbc78 +0x120:000011f8 +0x124:00800064
+[11:21:29.491] layout:   000000002BDDBB10 "Quit" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44140000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdfcc20 +0x078:2be3c4d0 +0x080:2bdcacc0 +0x088:2be15ee0 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910ddd0 +0x0d8:2910c208 +0x0e0:428bbbbc +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000a500 +0x10c:00800180 +0x110:2bddbc78 +0x118:2bdd7b88 +0x120:0000130c +0x124:40800040 +0x128:2bddbca8
+[11:21:29.491] layout:   000000002C2C1140 "Play offline." +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:42c00000 +0x044:446e8000 +0x04c:3f800000 +0x050:00000003 +0x054:02010019 +0x060:00010005 +0x068:2bdfe588 +0x078:2be3d700 +0x080:2bdcc670 +0x088:2c2c0a20 +0x090:3bcb1d70 +0x098:3bc569d0 +0x0a0:42c00000 +0x0a4:c0c00000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910d858 +0x0d8:2910cef0 +0x0e0:4339f49f +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:45700000 +0x104:42900000 +0x108:00001740 +0x10c:00800480 +0x110:2c2c12a8 +0x118:2be3d868 +0x120:00000228 +0x124:008000a8 +0x128:2c2c12d8 +0x130:2be3d898
+[11:21:29.491] layout: 8 object(s) dumped of 11 in the set (short text only).
+[11:21:30.404] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[11:21:30.406] mcspeak: spoke "Online Play, 2 of 6. Play online using a network connection."
+[11:21:30.406] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=0000000140097A59 screen=000000002BE15EE0 cursor=000000002BE16210
+[11:21:30.610] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[11:21:31.524] gt: 26 CONSTRUCTED; setText ran 368 time(s), 368 string(s) captured; 0 guarded read(s) faulted.
+[11:21:31.524] gt:   by overload: cGUIObjText.25=368 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:32.133] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[11:21:32.235] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[11:21:33.454] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[11:21:33.456] mcspeak: spoke "Ranked Match, 2 of 6. Test your skills in a competitive match. The results will affect your rank."
+[11:21:33.456] mc: vertical   cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=000000014009BA21 screen=000000002BE17380 cursor=000000002BE176B0
+[11:21:33.557] gt: 43 CONSTRUCTED; setText ran 379 time(s), 379 string(s) captured; 0 guarded read(s) faulted.
+[11:21:33.557] gt:   by overload: cGUIObjText.25=379 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:33.660] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[11:21:34.067] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[11:21:34.070] mcspeak: spoke "Custom Match, 3 of 6. Create your own lobby with your own game rules and battle other players."
+[11:21:34.070] mc: vertical   cursor 1 -> 2  (item 3 of 6, range 0..5, step +1)  caller=000000014009BA21 screen=000000002BE17380 cursor=000000002BE176B0
+[11:21:34.172] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[11:21:35.285] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[11:21:35.386] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[11:21:35.590] gt: 122 CONSTRUCTED; setText ran 387 time(s), 387 string(s) captured; 0 guarded read(s) faulted.
+[11:21:35.590] gt:   by overload: cGUIObjText.25=387 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:37.616] gt: 122 CONSTRUCTED; setText ran 387 time(s), 387 string(s) captured; 0 guarded read(s) faulted.
+[11:21:37.616] gt:   by overload: cGUIObjText.25=387 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:37.720] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[0x28])
+[11:21:37.722] mcspeak: spoke "Join Lobby, 2 of 3"
+[11:21:37.722] mc: vertical   cursor 0 -> 1  (item 2 of 3, range 0..2, step +1)  caller=0000000140083E09 screen=000000002BDCC7C0 cursor=000000002BDCCAF0
+[11:21:37.824] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[11:21:38.737] kbd: down=[0x28]  pressed=[0x28]  released=[(none)]  (engine Trg=[(none)])
+[11:21:38.740] mcspeak: spoke "Search Lobby ID, 3 of 3. Search for another player's lobby by its lobby ID."
+[11:21:38.740] mc: vertical   cursor 1 -> 2  (item 3 of 3, range 0..2, step +1)  caller=0000000140083E09 screen=000000002BDCC7C0 cursor=000000002BDCCAF0
+[11:21:38.842] kbd: down=[(none)]  pressed=[(none)]  released=[0x28]  (engine Trg=[(none)])
+[11:21:39.653] heartbeat 15 (alive 30 s)
+[11:21:39.653] gt: 122 CONSTRUCTED; setText ran 391 time(s), 391 string(s) captured; 0 guarded read(s) faulted.
+[11:21:39.653] gt:   by overload: cGUIObjText.25=391 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:39.653] gt: === FOCUS RECORD: 25 distinct string(s) across 7 cursor movement(s), 0 dropped (buffer full) ===
+[11:21:39.653] gt:   [move 3] PROSE 000000002C2C1140: "Play online using a network connection."
+[11:21:39.653] gt:   [move 3] strip 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:39.653] gt:   [move 3] PROSE 000000002BDD53B0: "Online Play"
+[11:21:39.654] gt:   [move 3] PROSE 000000002C242A30: "Casual Match"
+[11:21:39.654] gt:   [move 3] PROSE 000000002BDC70D0: "Ranked Match"
+[11:21:39.654] gt:   [move 3] PROSE 000000002BE38A80: "Custom Match"
+[11:21:39.654] gt:   [move 3] PROSE 000000002BE17CA0: "Ranked Leaderboard"
+[11:21:39.654] gt:   [move 3] PROSE 000000002BDF9FD0: "High Score Challenge"
+[11:21:39.654] gt:   [move 3] PROSE 000000002C2C22A0: "High Score Challenge Leaderboard"
+[11:21:39.654] gt:   [move 3] PROSE 000000002C2C1140: "Play a friendly match against other players."
+[11:21:39.654] gt:   [move 3] strip 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:39.655] gt:   [move 4] PROSE 000000002C2C1140: "Test your skills in a competitive match. The results will affect your rank."
+[11:21:39.655] gt:   [move 4] strip 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:39.655] gt:   [move 5] PROSE 000000002C2C1140: "Create your own lobby with your own game rules and battle other players."
+[11:21:39.655] gt:   [move 5] strip 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:39.655] gt:   [move 5] PROSE 000000002C2DD620: "Custom Match"
+[11:21:39.655] gt:   [move 5] PROSE 000000002BE0EA70: "Create Lobby"
+[11:21:39.655] gt:   [move 5] PROSE 000000002C326260: "Join Lobby"
+[11:21:39.656] gt:   [move 5] PROSE 000000002C30D690: "Search Lobby ID"
+[11:21:39.656] gt:   [move 5] PROSE 000000002C2C1140: "Select game rules and create your own lobby."
+[11:21:39.656] gt:   [move 5] strip 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:39.656] gt:   [move 6] PROSE 000000002C2C1140: "Select game rules and join another player's lobby."
+[11:21:39.656] gt:   [move 6] strip 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:39.656] gt:   [move 7] PROSE 000000002C2C1140: "Search for another player's lobby by its lobby ID."
+[11:21:39.657] gt:   [move 7] strip 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:39.657] gt: of 25 string(s): 25 arrived after a cursor movement, 18 were prose captions.
+[11:21:39.657] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[11:21:39.657] gt: === INSTANCE SET: 22 live text object(s), 0 dropped (table full) ===
+[11:21:39.657] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:21:39.657] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:21:39.657] gt:   000000002C241580 STALE [move 0, 1 set(s)] "<FONT 2>Main Menu</FONT>"
+[11:21:39.657] gt:   000000002BDC6BB0 STALE [move 0, 1 set(s)] "Offline Play"
+[11:21:39.657] gt:   000000002BE38BF0 STALE [move 0, 1 set(s)] "Online Play"
+[11:21:39.657] gt:   000000002BE121B0 STALE [move 0, 1 set(s)] "Museum"
+[11:21:39.658] gt:   000000002BDFC2E0 STALE [move 0, 1 set(s)] "Fighter Awards"
+[11:21:39.658] gt:   000000002BE2EE20 STALE [move 0, 1 set(s)] "Options"
+[11:21:39.658] gt:   000000002BDDBB10 STALE [move 0, 1 set(s)] "Quit"
+[11:21:39.658] gt:   000000002C2C1140 LIVE  [move 7, 10 set(s)] "Search for another player's lobby by its lobby ID."
+[11:21:39.658] gt:   000000002BE3D700 LIVE  [move 7, 10 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:39.658] gt:   000000002BDD53B0 LIVE  [move 3, 1 set(s)] "Online Play"
+[11:21:39.658] gt:   000000002C242A30 LIVE  [move 3, 1 set(s)] "Casual Match"
+[11:21:39.660] gt:   000000002BDC70D0 LIVE  [move 3, 1 set(s)] "Ranked Match"
+[11:21:39.660] gt:   000000002BE38A80 LIVE  [move 3, 1 set(s)] "Custom Match"
+[11:21:39.660] gt:   000000002BE17CA0 LIVE  [move 3, 1 set(s)] "Ranked Leaderboard"
+[11:21:39.660] gt:   000000002BDF9FD0 LIVE  [move 3, 1 set(s)] "High Score Challenge"
+[11:21:39.660] gt:   000000002C2C22A0 LIVE  [move 3, 1 set(s)] "High Score Challenge Leaderboard"
+[11:21:39.660] gt:   000000002C2DD620 LIVE  [move 5, 1 set(s)] "Custom Match"
+[11:21:39.661] gt:   000000002BE0EA70 LIVE  [move 5, 1 set(s)] "Create Lobby"
+[11:21:39.661] gt:   000000002C326260 LIVE  [move 5, 1 set(s)] "Join Lobby"
+[11:21:39.661] gt:   000000002C30D690 LIVE  [move 5, 1 set(s)] "Search Lobby ID"
+[11:21:39.661] gt: of 22 object(s): 13 still LIVE, 9 stale; current move seq 7.
+[11:21:39.661] gt: ⭐ reclaimed 9 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[11:21:39.662] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[11:21:39.662] layout: === FIELD DUMP of live text objects (22 in set) ===
+[11:21:39.662] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[11:21:39.663] layout:   000000002BDD53B0 "Online Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43600000 +0x044:42580000 +0x04c:3f800000 +0x050:00000002 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2be2b030 +0x080:2c2412b0 +0x088:2be17380 +0x090:3c562360 +0x098:3c810578 +0x0a0:42000000 +0x0a4:bf800000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c8:2bdd5db0 +0x0d0:2910c240 +0x0e0:43b8ddde +0x0e4:42951111 +0x0e8:3c8245b8 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f4:44578000 +0x0f8:00000034 +0x0fc:00000034 +0x100:44680000 +0x104:42a00000 +0x138:000005ef +0x13c:00000001 +0x140:00040008 +0x144:00000002 +0x148:01020c00 +0x14c:00030000
+[11:21:39.663] layout:   000000002C242A30 "Casual Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43400000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2be2e410 +0x078:2be161e0 +0x080:2be378b0 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:44d20ff0 +0x0c4:44220000 +0x0cc:3f800000 +0x0d0:2910df20 +0x0d8:2910ba98 +0x0e0:4355b05b +0x0e4:42616c17 +0x0e8:2c241360 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00008ca0 +0x10c:00800420 +0x110:2c242b98 +0x118:2bdc7238
+[11:21:39.663] layout:   000000002BDC70D0 "Ranked Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43880000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:3001000a +0x068:2bdd72b0 +0x078:2bdf6d80 +0x080:2be16430 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:2bdc6ff0 +0x0c8:0000003c +0x0cc:14000019 +0x0d0:2910c5c0 +0x0d8:2910b7f8 +0x0e0:43638e38 +0x0e4:42616c17 +0x0e8:2bdc5260 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000a140 +0x10c:00800420 +0x110:2bdc7238 +0x118:2bdd6168
+[11:21:39.664] layout:   000000002BE38A80 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43b00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c244e60 +0x078:2be2fa60 +0x080:2bdf6fd0 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:42000ff0 +0x0cc:07000000 +0x0d0:2910e9d8 +0x0d8:2910b520 +0x0e0:436416c1 +0x0e4:42616c17 +0x0e8:3c82c188 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000b940 +0x10c:00800420 +0x110:2be38be8 +0x118:2be17e08 +0x120:00001508
+[11:21:39.664] layout:   000000002BE17CA0 "Ranked Leaderboard" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43d80000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdc9920 +0x078:2bdda340 +0x080:2be2fcb0 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910ef50 +0x0d8:2910b280 +0x0e0:43a5c71d +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000d6e0 +0x10c:00800660 +0x110:2be17e08 +0x118:2bdfa138 +0x120:000018bc +0x124:008000e4 +0x128:2be17e38
+[11:21:39.664] layout:   000000002BDF9FD0 "High Score Challenge" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44000000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2be393c0 +0x078:2c2464b0 +0x080:2bdda590 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:02020001 +0x0c8:bf800000 +0x0d0:2910ee38 +0x0d8:2910b018 +0x0e0:43abbbba +0x0e4:42616c17 +0x0e8:2bdc60c0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000f840 +0x10c:008006c0 +0x110:2bdfa138 +0x118:2c2c2408
+[11:21:39.664] layout:   000000002C2C22A0 "High Score Challenge Lea" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44140000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2be185e0 +0x078:2bdcaf70 +0x080:2c246700 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910cbe0 +0x0d8:2910ade8 +0x0e0:440b3332 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00012a80 +0x10c:00800ae0 +0x110:2c2c2408 +0x118:2bdc5d08 +0x120:00002334 +0x124:00800170 +0x128:2c2c2438
+[11:21:39.665] layout:   000000002C2DD620 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43c08000 +0x04c:3f800000 +0x050:00000009 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2c2ea6e0 +0x080:2c309570 +0x088:2bdcc7c0 +0x090:3b9e1640 +0x098:3bdb3e90 +0x0a4:c31b0000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:2910cf28 +0x0d8:2910d628 +0x0e0:436416c1 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ff000000 +0x0f8:00000020 +0x0fc:00000020 +0x100:442f0000 +0x104:42800000 +0x108:000141c0 +0x10c:00800420 +0x110:2bdd91d8 +0x118:2be0ebd8 +0x120:000024a4 +0x124:0080009c +0x128:2c2c23c0 +0x130:2be0ec08 +0x138:000006a0
+[11:21:39.665] layout:   000000002BE0EA70 "Create Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:43df0000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c316f60 +0x078:2c2edb30 +0x080:2c30c620 +0x088:2bdcc7c0 +0x090:3c58ec20 +0x098:3c7c1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:29109fe8 +0x0d8:2910a9c0 +0x0e0:43582d84 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00015660 +0x10c:00800420 +0x110:2be0ebd8 +0x118:2c3263c8 +0x120:0000273c +0x124:00800098 +0x128:2be0ec08
+[11:21:39.665] layout:   000000002C326260 "Join Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44038000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c3316d0 +0x078:2c2ff330 +0x080:2c3178f0 +0x088:2bdcc7c0 +0x090:3c58ec20 +0x098:3c7c1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:29109c68 +0x0d8:2910d190 +0x0e0:432e38e4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00016800 +0x10c:00800360 +0x110:2c3263c8 +0x118:2c30d7f8 +0x120:00002974 +0x124:0080007c +0x128:2c3263f8
+[11:21:39.666] layout:   000000002C30D690 "Search Lobby ID" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44178000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2eed60 +0x078:2be0f520 +0x080:2c332060 +0x088:2bdcc7c0 +0x090:3c58ec20 +0x098:3c7c1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:29109d80 +0x0d8:29109610 +0x0e0:438349f5 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00017ee0 +0x10c:008004e0 +0x110:2c30d7f8 +0x118:2c2c1248 +0x120:00002c4c +0x124:008000b0 +0x128:2c30d828
+[11:21:39.666] layout: 11 object(s) dumped of 22 in the set (short text only).
+[11:21:40.784] kbd: down=[0x0d]  pressed=[0x0d]  released=[(none)]  (engine Trg=[(none)])
+[11:21:40.886] kbd: down=[(none)]  pressed=[(none)]  released=[0x0d]  (engine Trg=[(none)])
+[11:21:41.293] gt: * TEXT SET on 000000002C2EFD20: "0"
+[11:21:41.395] gt: * TEXT SET on 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:41.598] gt: * TEXT SET on 000000002C2EFD20: "0"
+[11:21:41.700] gt: 129 CONSTRUCTED; setText ran 406 time(s), 406 string(s) captured; 0 guarded read(s) faulted.
+[11:21:41.700] gt:   by overload: cGUIObjText.25=406 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:43.729] gt: 129 CONSTRUCTED; setText ran 406 time(s), 406 string(s) captured; 0 guarded read(s) faulted.
+[11:21:43.729] gt:   by overload: cGUIObjText.25=406 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:43.932] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:43.932] mcspeak: [PICKERPROBE] moved to position 2 (which holds '1'), caption was '0' = position 1, delta -1, step +1. ⚠ NOT SPOKEN. ▶ Collect a few UPWARD movements: if delta stays -1 the caption lags the cursor; if it flips to +1 the game names the position being LEFT.
+[11:21:43.932] mcspeak: caption not in the corpus, not spoken: "0"
+[11:21:43.932] mcspeak: spoke "2 of 36"
+[11:21:43.932] mc: vertical   cursor 0 -> 1  (item 2 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:44.136] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:44.643] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:44.643] mcspeak: spoke "3 of 36"
+[11:21:44.643] mc: vertical   cursor 1 -> 2  (item 3 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:44.846] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:45.759] gt: 129 CONSTRUCTED; setText ran 418 time(s), 418 string(s) captured; 0 guarded read(s) faulted.
+[11:21:45.760] gt:   by overload: cGUIObjText.25=418 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:46.368] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:46.369] mcspeak: spoke "4 of 36"
+[11:21:46.369] mc: vertical   cursor 2 -> 3  (item 4 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:46.572] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:46.979] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:46.979] mcspeak: spoke "5 of 36"
+[11:21:46.979] mc: vertical   cursor 3 -> 4  (item 5 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:47.182] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:47.386] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:47.386] mcspeak: spoke "6 of 36"
+[11:21:47.386] mc: vertical   cursor 4 -> 5  (item 6 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:47.489] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:47.693] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:47.693] mcspeak: spoke "7 of 36"
+[11:21:47.693] mc: vertical   cursor 5 -> 6  (item 7 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:47.796] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:47.796] gt: 129 CONSTRUCTED; setText ran 442 time(s), 442 string(s) captured; 0 guarded read(s) faulted.
+[11:21:47.796] gt:   by overload: cGUIObjText.25=442 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:47.898] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:47.899] mcspeak: spoke "8 of 36"
+[11:21:47.899] mc: vertical   cursor 6 -> 7  (item 8 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:48.102] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:48.204] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:48.204] mcspeak: spoke "9 of 36"
+[11:21:48.204] mc: vertical   cursor 7 -> 8  (item 9 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:48.306] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:48.409] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:48.409] mcspeak: spoke "10 of 36"
+[11:21:48.409] mc: vertical   cursor 8 -> 9  (item 10 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:48.511] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:48.611] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:48.613] mcspeak: spoke "11 of 36"
+[11:21:48.613] mc: vertical   cursor 9 -> 10  (item 11 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:48.714] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:48.816] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:48.816] mcspeak: spoke "12 of 36"
+[11:21:48.816] mc: vertical   cursor 10 -> 11  (item 12 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:48.918] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:49.021] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[0x26])
+[11:21:49.021] mcspeak: spoke "13 of 36"
+[11:21:49.021] mc: vertical   cursor 11 -> 12  (item 13 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:49.123] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:49.326] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:49.326] mcspeak: spoke "14 of 36"
+[11:21:49.326] mc: vertical   cursor 12 -> 13  (item 14 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:49.428] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:49.530] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:49.530] mcspeak: spoke "15 of 36"
+[11:21:49.530] mc: vertical   cursor 13 -> 14  (item 15 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:49.633] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:49.735] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:49.735] mcspeak: spoke "16 of 36"
+[11:21:49.735] mc: vertical   cursor 14 -> 15  (item 16 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:49.838] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:49.838] heartbeat 20 (alive 40 s)
+[11:21:49.838] gt: 129 CONSTRUCTED; setText ran 496 time(s), 496 string(s) captured; 0 guarded read(s) faulted.
+[11:21:49.838] gt:   by overload: cGUIObjText.25=496 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:49.838] gt: === FOCUS RECORD: 35 distinct string(s) across 22 cursor movement(s), 0 dropped (buffer full) ===
+[11:21:49.838] gt:   [move 7] PROSE 000000002C2EFAD0: "Enter Lobby ID"
+[11:21:49.838] gt:   [move 7] PROSE 000000002C327320: "0"
+[11:21:49.838] gt:   [move 7] PROSE 000000002C2C1140: "Input the lobby ID you'd like to search for."
+[11:21:49.838] gt:   [move 7] strip 000000002BE3D700: "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:49.840] gt:   [move 7] PROSE 000000002C327320: "0"
+[11:21:49.840] gt:   [move 8] PROSE 000000002C327320: "1"
+[11:21:49.840] gt:   [move 8] PROSE 000000002C340460: "0"
+[11:21:49.840] gt:   [move 9] PROSE 000000002C327320: "2"
+[11:21:49.840] gt:   [move 9] PROSE 000000002C340460: "0"
+[11:21:49.840] gt:   [move 10] PROSE 000000002C327320: "3"
+[11:21:49.840] gt:   [move 10] PROSE 000000002C340460: "0"
+[11:21:49.841] gt:   [move 11] PROSE 000000002C327320: "4"
+[11:21:49.841] gt:   [move 11] PROSE 000000002C340460: "0"
+[11:21:49.841] gt:   [move 12] PROSE 000000002C327320: "5"
+[11:21:49.841] gt:   [move 12] PROSE 000000002C340460: "0"
+[11:21:49.841] gt:   [move 13] PROSE 000000002C327320: "6"
+[11:21:49.841] gt:   [move 13] PROSE 000000002C340460: "0"
+[11:21:49.841] gt:   [move 14] PROSE 000000002C327320: "7"
+[11:21:49.841] gt:   [move 14] PROSE 000000002C340460: "0"
+[11:21:49.841] gt:   [move 15] PROSE 000000002C327320: "8"
+[11:21:49.842] gt:   [move 15] PROSE 000000002C340460: "0"
+[11:21:49.842] gt:   [move 16] PROSE 000000002C327320: "9"
+[11:21:49.842] gt:   [move 16] PROSE 000000002C340460: "0"
+[11:21:49.842] gt:   [move 17] PROSE 000000002C327320: "A"
+[11:21:49.842] gt:   [move 17] PROSE 000000002C340460: "0"
+[11:21:49.842] gt:   [move 18] PROSE 000000002C327320: "B"
+[11:21:49.842] gt:   [move 18] PROSE 000000002C340460: "0"
+[11:21:49.842] gt:   [move 19] PROSE 000000002C327320: "C"
+[11:21:49.842] gt:   [move 19] PROSE 000000002C340460: "0"
+[11:21:49.843] gt:   [move 20] PROSE 000000002C327320: "D"
+[11:21:49.843] gt:   [move 20] PROSE 000000002C340460: "0"
+[11:21:49.843] gt:   [move 21] PROSE 000000002C327320: "E"
+[11:21:49.843] gt:   [move 21] PROSE 000000002C340460: "0"
+[11:21:49.843] gt:   [move 22] PROSE 000000002C327320: "F"
+[11:21:49.844] gt:   [move 22] PROSE 000000002C340460: "0"
+[11:21:49.844] gt: of 35 string(s): 35 arrived after a cursor movement, 34 were prose captions.
+[11:21:49.844] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[11:21:49.844] gt: === INSTANCE SET: 29 live text object(s), 0 dropped (table full) ===
+[11:21:49.844] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:21:49.844] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:21:49.844] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:21:49.844] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:21:49.844] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:21:49.845] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:21:49.845] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:21:49.845] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:21:49.845] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:21:49.845] gt:   000000002C2C1140 LIVE  [move 7, 11 set(s)] "Input the lobby ID you'd like to search for."
+[11:21:49.845] gt:   000000002BE3D700 LIVE  [move 7, 11 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:21:49.846] gt:   000000002BDD53B0 LIVE  [move 3, 1 set(s)] "Online Play"
+[11:21:49.846] gt:   000000002C242A30 LIVE  [move 3, 1 set(s)] "Casual Match"
+[11:21:49.846] gt:   000000002BDC70D0 LIVE  [move 3, 1 set(s)] "Ranked Match"
+[11:21:49.846] gt:   000000002BE38A80 LIVE  [move 3, 1 set(s)] "Custom Match"
+[11:21:49.846] gt:   000000002BE17CA0 LIVE  [move 3, 1 set(s)] "Ranked Leaderboard"
+[11:21:49.846] gt:   000000002BDF9FD0 LIVE  [move 3, 1 set(s)] "High Score Challenge"
+[11:21:49.847] gt:   000000002C2C22A0 LIVE  [move 3, 1 set(s)] "High Score Challenge Leaderboard"
+[11:21:49.847] gt:   000000002C2DD620 LIVE  [move 5, 1 set(s)] "Custom Match"
+[11:21:49.847] gt:   000000002BE0EA70 LIVE  [move 5, 1 set(s)] "Create Lobby"
+[11:21:49.847] gt:   000000002C326260 LIVE  [move 5, 1 set(s)] "Join Lobby"
+[11:21:49.847] gt:   000000002C30D690 LIVE  [move 5, 1 set(s)] "Search Lobby ID"
+[11:21:49.847] gt:   000000002C2EFAD0 LIVE  [move 7, 1 set(s)] "Enter Lobby ID"
+[11:21:49.847] gt:   000000002C327320 LIVE  [move 22, 17 set(s)] "F"
+[11:21:49.847] gt:   000000002C340460 LIVE  [move 22, 17 set(s)] "0"
+[11:21:49.848] gt:   000000002C332C20 LIVE  [move 22, 17 set(s)] "0"
+[11:21:49.848] gt:   000000002C30E160 LIVE  [move 22, 17 set(s)] "0"
+[11:21:49.848] gt:   000000002BE0FD80 LIVE  [move 22, 17 set(s)] "0"
+[11:21:49.848] gt:   000000002C2EFD20 LIVE  [move 22, 17 set(s)] "0"
+[11:21:49.848] gt: of 29 object(s): 20 still LIVE, 9 stale; current move seq 22.
+[11:21:49.848] gt: ⭐ reclaimed 9 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[11:21:49.848] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[11:21:49.848] layout: === FIELD DUMP of live text objects (29 in set) ===
+[11:21:49.848] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[11:21:49.849] layout:   000000002C2C1140 "Input the lobby ID you'd" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:42c00000 +0x044:446e8000 +0x04c:3f800000 +0x050:00000003 +0x054:02010019 +0x060:00010005 +0x068:2bdfe588 +0x078:2be3d700 +0x080:2bdcc670 +0x088:2c2c0a20 +0x090:3bcb1d70 +0x098:3bc569d0 +0x0a0:42c00000 +0x0a4:c0c00000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910c010 +0x0d8:29109798 +0x0e0:44282d83 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:45700000 +0x104:42900000 +0x108:000068a0 +0x10c:00800d80 +0x110:2c2c12a8 +0x118:2c2efbd8 +0x120:00000958 +0x124:008001cc +0x128:2bdd5548 +0x130:2be3d898
+[11:21:49.849] layout:   000000002BDD53B0 "Online Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43600000 +0x044:42580000 +0x04c:3f800000 +0x050:00000002 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2be2b030 +0x080:2c2412b0 +0x088:2be17380 +0x090:3c562360 +0x098:3c810578 +0x0a0:42000000 +0x0a4:bf800000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c8:2bdd5db0 +0x0d0:2910c240 +0x0e0:43b8ddde +0x0e4:42951111 +0x0e8:3c8245b8 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f4:44578000 +0x0f8:00000034 +0x0fc:00000034 +0x100:44680000 +0x104:42a00000 +0x138:000005ef +0x13c:00000001 +0x140:00040008 +0x144:00000002 +0x148:01020c00 +0x14c:00030000
+[11:21:49.849] layout:   000000002C242A30 "Casual Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43400000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2be2e410 +0x078:2be161e0 +0x080:2be378b0 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:44d20ff0 +0x0c4:44220000 +0x0cc:3f800000 +0x0d0:2910df20 +0x0d8:2910ba98 +0x0e0:4355b05b +0x0e4:42616c17 +0x0e8:2c241360 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00008ca0 +0x10c:00800420 +0x110:2c242b98 +0x118:2bdc7238
+[11:21:49.849] layout:   000000002BDC70D0 "Ranked Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43880000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:3001000a +0x068:2bdd72b0 +0x078:2bdf6d80 +0x080:2be16430 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:2bdc6ff0 +0x0c8:0000003c +0x0cc:14000019 +0x0d0:2910c5c0 +0x0d8:2910b7f8 +0x0e0:43638e38 +0x0e4:42616c17 +0x0e8:2bdc5260 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000a140 +0x10c:00800420 +0x110:2bdc7238 +0x118:2bdd6168
+[11:21:49.849] layout:   000000002BE38A80 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43b00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c244e60 +0x078:2be2fa60 +0x080:2bdf6fd0 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:42000ff0 +0x0cc:07000000 +0x0d0:2910e9d8 +0x0d8:2910b520 +0x0e0:436416c1 +0x0e4:42616c17 +0x0e8:3c82c188 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000b940 +0x10c:00800420 +0x110:2be38be8 +0x118:2be17e08 +0x120:00001508
+[11:21:49.851] layout:   000000002BE17CA0 "Ranked Leaderboard" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43d80000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdc9920 +0x078:2bdda340 +0x080:2be2fcb0 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910ef50 +0x0d8:2910b280 +0x0e0:43a5c71d +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000d6e0 +0x10c:00800660 +0x110:2be17e08 +0x118:2bdfa138 +0x120:000018bc +0x124:008000e4 +0x128:2be17e38
+[11:21:49.851] layout:   000000002BDF9FD0 "High Score Challenge" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44000000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2be393c0 +0x078:2c2464b0 +0x080:2bdda590 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:02020001 +0x0c8:bf800000 +0x0d0:2910ee38 +0x0d8:2910b018 +0x0e0:43abbbba +0x0e4:42616c17 +0x0e8:2bdc60c0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000f840 +0x10c:008006c0 +0x110:2bdfa138 +0x118:2c2c2408
+[11:21:49.851] layout:   000000002C2C22A0 "High Score Challenge Lea" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44140000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2be185e0 +0x078:2bdcaf70 +0x080:2c246700 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910cbe0 +0x0d8:2910ade8 +0x0e0:440b3332 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00012a80 +0x10c:00800ae0 +0x110:2c2c2408 +0x118:2bdc5d08 +0x120:00002334 +0x124:00800170 +0x128:2c2c2438
+[11:21:49.852] layout:   000000002C2DD620 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43c08000 +0x04c:3f800000 +0x050:00000009 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2c2ea6e0 +0x080:2c309570 +0x088:2bdcc7c0 +0x090:3b9e1640 +0x098:3bdb3e90 +0x0a4:c31b0000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:2910cf28 +0x0d8:2910d628 +0x0e0:436416c1 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ff000000 +0x0f8:00000020 +0x0fc:00000020 +0x100:442f0000 +0x104:42800000 +0x108:000141c0 +0x10c:00800420 +0x110:2bdd91d8 +0x118:2be0ebd8 +0x120:000024a4 +0x124:0080009c +0x128:2c2c23c0 +0x130:2be0ec08 +0x138:000006a0
+[11:21:49.852] layout:   000000002BE0EA70 "Create Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:43df0000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c316f60 +0x078:2c2edb30 +0x080:2c30c620 +0x088:2bdcc7c0 +0x090:3c58ec20 +0x098:3c7c1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:29109fe8 +0x0d8:2910a9c0 +0x0e0:43582d84 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00015660 +0x10c:00800420 +0x110:2be0ebd8 +0x118:2c3263c8 +0x120:0000273c +0x124:00800098 +0x128:2be0ec08
+[11:21:49.852] layout:   000000002C326260 "Join Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44038000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c3316d0 +0x078:2c2ff330 +0x080:2c3178f0 +0x088:2bdcc7c0 +0x090:3c58ec20 +0x098:3c7c1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:29109c68 +0x0d8:2910d190 +0x0e0:432e38e4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00016800 +0x10c:00800360 +0x110:2c3263c8 +0x118:2c30d7f8 +0x120:00002974 +0x124:0080007c +0x128:2c3263f8
+[11:21:49.852] layout:   000000002C30D690 "Search Lobby ID" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44178000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2eed60 +0x078:2be0f520 +0x080:2c332060 +0x088:2bdcc7c0 +0x090:3c58ec20 +0x098:3c7c1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:29109d80 +0x0d8:29109610 +0x0e0:438349f5 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00017ee0 +0x10c:008004e0 +0x110:2c30d7f8 +0x118:2be3d868 +0x120:00002c4c +0x124:008000b0 +0x128:2c30d828
+[11:21:49.852] layout:   000000002C2EFAD0 "Enter Lobby ID" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43d00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:00010001 +0x068:2c30dbc0 +0x078:2c30e010 +0x080:2c3271d0 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4d00 +0x0a4:c2f80000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29109568 +0x0d8:29109760 +0x0e0:436f49f4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:440c0000 +0x104:42800000 +0x108:00007620 +0x10c:40800480 +0x110:2c2c1248 +0x118:2c242b98 +0x120:00002cfc +0x124:408000a4 +0x128:2c30d7b0 +0x138:000007f9
+[11:21:49.853] layout:   000000002C327320 "F" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44480000 +0x044:440b0000 +0x04c:3f800000 +0x050:0000000a +0x054:02000011 +0x058:bf800000 +0x060:00010000 +0x068:2c30dbf0 +0x078:2c340460 +0x080:2c30e010 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4d70 +0x0a0:c3200000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29108bc8 +0x0d8:29108b20 +0x0e0:419dddde +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:42800000 +0x104:42800000 +0x108:00001e60 +0x10c:00800060 +0x110:2c327858 +0x118:2c340568 +0x120:000006a4 +0x124:00800010 +0x128:2c2c12d8 +0x130:2c340580
+[11:21:49.853] layout:   000000002C340460 "0" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44580000 +0x044:440b0000 +0x04c:3f800000 +0x050:0000000c +0x054:02000011 +0x058:bf800000 +0x060:00010000 +0x068:2c30dc08 +0x078:2c332c20 +0x080:2c30e010 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4da8 +0x0a0:c2c00000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29109450 +0x0d8:29108c00 +0x0e0:41b05b06 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:42800000 +0x104:42800000 +0x108:00001ec0 +0x10c:00800060 +0x110:2c327428 +0x118:2c332d28 +0x120:000006b4 +0x124:00800010 +0x128:2c327440 +0x130:2c332d40
+[11:21:49.853] layout:   000000002C332C20 "0" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44680000 +0x044:440b0000 +0x04c:3f800000 +0x050:0000000b +0x054:02000011 +0x058:bf800000 +0x060:00010000 +0x068:2c30dc20 +0x078:2c30e160 +0x080:2c30e010 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4de0 +0x0a0:c2000000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29108ce0 +0x0d8:29108c38 +0x0e0:41b05b06 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:42800000 +0x104:42800000 +0x108:00001f20 +0x10c:00800060 +0x110:2c340568 +0x118:2c30e268 +0x120:000006c4 +0x124:00800010 +0x128:2c340580 +0x130:2c30e280
+[11:21:49.853] layout:   000000002C30E160 "0" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44780000 +0x044:440b0000 +0x04c:3f800000 +0x050:0000000d +0x054:02000011 +0x058:bf800000 +0x060:00010000 +0x068:2c30dc38 +0x078:2be0fd80 +0x080:2c30e010 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4e18 +0x0a0:42000000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29108e68 +0x0d8:29109098 +0x0e0:41b05b06 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:42800000 +0x104:42800000 +0x108:00001f80 +0x10c:00800060 +0x110:2c332d28 +0x118:2be0fe88 +0x120:000006d4 +0x124:00800010 +0x128:2c332d40 +0x130:2be0fea0
+[11:21:49.854] layout:   000000002BE0FD80 "0" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44840000 +0x044:440b0000 +0x04c:3f800000 +0x050:0000000e +0x054:02000011 +0x058:bf800000 +0x060:00010000 +0x068:2c30dc50 +0x078:2c2efd20 +0x080:2c30e010 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4e50 +0x0a0:42c00000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29108f48 +0x0d8:29108d18 +0x0e0:41b05b06 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:42800000 +0x104:42800000 +0x108:00001fe0 +0x10c:00800060 +0x110:2c30e268 +0x118:2c2efe28 +0x120:000006e4 +0x124:00800010 +0x128:2c30e280 +0x130:2c2efe40
+[11:21:49.854] layout:   000000002C2EFD20 "0" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:448c0000 +0x044:440b0000 +0x04c:3f800000 +0x050:0000000f +0x054:02000011 +0x058:bf800000 +0x060:00010000 +0x068:2c30dc68 +0x080:2c30e010 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4e88 +0x0a0:43200000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29108f10 +0x0d8:29108f80 +0x0e0:41b05b06 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:42800000 +0x104:42800000 +0x108:00002040 +0x10c:40800060 +0x110:2be0fe88 +0x118:2c2ffc78 +0x120:000006f4 +0x124:40800010 +0x128:2be0fea0 +0x130:2bdd5560 +0x138:000009f1
+[11:21:49.854] layout: 19 object(s) dumped of 29 in the set (short text only).
+[11:21:49.957] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:49.957] mcspeak: spoke "17 of 36"
+[11:21:49.957] mc: vertical   cursor 15 -> 16  (item 17 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:50.059] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:50.263] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:50.263] mcspeak: spoke "18 of 36"
+[11:21:50.263] mc: vertical   cursor 16 -> 17  (item 18 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:50.365] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:50.468] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:50.468] mcspeak: spoke "19 of 36"
+[11:21:50.468] mc: vertical   cursor 17 -> 18  (item 19 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:50.571] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:50.672] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:50.672] mcspeak: spoke "20 of 36"
+[11:21:50.672] mc: vertical   cursor 18 -> 19  (item 20 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:50.774] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:50.978] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:50.978] mcspeak: spoke "21 of 36"
+[11:21:50.978] mc: vertical   cursor 19 -> 20  (item 21 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:51.080] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:51.181] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[0x26])
+[11:21:51.181] mcspeak: spoke "22 of 36"
+[11:21:51.181] mc: vertical   cursor 20 -> 21  (item 22 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:51.385] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:51.487] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:51.487] mcspeak: spoke "23 of 36"
+[11:21:51.487] mc: vertical   cursor 21 -> 22  (item 23 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:51.589] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:51.691] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[0x26])
+[11:21:51.691] mcspeak: spoke "24 of 36"
+[11:21:51.691] mc: vertical   cursor 22 -> 23  (item 24 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:51.794] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:51.895] gt: 129 CONSTRUCTED; setText ran 544 time(s), 544 string(s) captured; 0 guarded read(s) faulted.
+[11:21:51.895] gt:   by overload: cGUIObjText.25=544 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:51.997] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:51.997] mcspeak: spoke "25 of 36"
+[11:21:51.997] mc: vertical   cursor 23 -> 24  (item 25 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:52.099] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:52.201] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:52.202] mcspeak: spoke "26 of 36"
+[11:21:52.202] mc: vertical   cursor 24 -> 25  (item 26 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:52.305] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:52.406] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:52.406] mcspeak: spoke "27 of 36"
+[11:21:52.406] mc: vertical   cursor 25 -> 26  (item 27 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:52.507] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:52.610] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:52.610] mcspeak: spoke "28 of 36"
+[11:21:52.610] mc: vertical   cursor 26 -> 27  (item 28 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:52.712] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:52.813] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:52.813] mcspeak: spoke "29 of 36"
+[11:21:52.813] mc: vertical   cursor 27 -> 28  (item 29 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:52.916] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:53.017] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:53.017] mcspeak: spoke "30 of 36"
+[11:21:53.017] mc: vertical   cursor 28 -> 29  (item 30 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:53.120] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:53.629] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:53.629] mcspeak: spoke "31 of 36"
+[11:21:53.630] mc: vertical   cursor 29 -> 30  (item 31 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:53.732] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:53.934] gt: 129 CONSTRUCTED; setText ran 586 time(s), 586 string(s) captured; 0 guarded read(s) faulted.
+[11:21:53.934] gt:   by overload: cGUIObjText.25=586 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:54.036] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:54.036] mcspeak: spoke "32 of 36"
+[11:21:54.036] mc: vertical   cursor 30 -> 31  (item 32 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:54.140] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:54.241] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:54.243] mcspeak: spoke "33 of 36"
+[11:21:54.243] mc: vertical   cursor 31 -> 32  (item 33 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:54.344] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:54.446] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:54.446] mcspeak: spoke "34 of 36"
+[11:21:54.446] mc: vertical   cursor 32 -> 33  (item 34 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:54.547] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:54.649] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:54.650] mcspeak: spoke "35 of 36"
+[11:21:54.650] mc: vertical   cursor 33 -> 34  (item 35 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:54.752] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:54.854] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:54.854] mcspeak: spoke "36 of 36"
+[11:21:54.854] mc: vertical   cursor 34 -> 35  (item 36 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:54.958] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:55.465] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:55.465] mcspeak: spoke "1 of 36"
+[11:21:55.465] mc: vertical   cursor 35 -> 0  (item 1 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327044
+[11:21:55.567] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:55.974] gt: 129 CONSTRUCTED; setText ran 622 time(s), 622 string(s) captured; 0 guarded read(s) faulted.
+[11:21:55.974] gt:   by overload: cGUIObjText.25=622 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:56.278] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[11:21:56.280] mcspeak: spoke "0, 2 of 6"
+[11:21:56.280] mc: horizontal cursor 0 -> 1  (item 2 of 6, range 0..5, step +1)  caller=000000014008A91B screen=000000002C326D10 cursor=000000002C327060
+[11:21:56.382] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[11:21:57.092] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[0x26])
+[11:21:57.092] mcspeak: spoke "2 of 36"
+[11:21:57.092] mc: vertical   cursor 0 -> 1  (item 2 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327048
+[11:21:57.295] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:57.701] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:21:57.701] mcspeak: spoke "3 of 36"
+[11:21:57.701] mc: vertical   cursor 1 -> 2  (item 3 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327048
+[11:21:57.804] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:21:58.007] gt: 129 CONSTRUCTED; setText ran 640 time(s), 640 string(s) captured; 0 guarded read(s) faulted.
+[11:21:58.007] gt:   by overload: cGUIObjText.25=640 .26=0  cGUIObjMessage.25=0 .26=0
+[11:21:58.516] mcspeak: caption not in the corpus, not spoken: "0"
+[11:21:58.516] mcspeak: spoke "0, 3 of 6"
+[11:21:58.516] mc: horizontal cursor 1 -> 2  (item 3 of 6, range 0..5, step +1)  caller=000000014008A91B screen=000000002C326D10 cursor=000000002C327060
+[11:21:59.329] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[11:21:59.331] mcspeak: spoke "0, 4 of 6"
+[11:21:59.332] mc: horizontal cursor 2 -> 3  (item 4 of 6, range 0..5, step +1)  caller=000000014008A91B screen=000000002C326D10 cursor=000000002C327060
+[11:21:59.432] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[11:21:59.939] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[11:21:59.942] mcspeak: spoke "0, 5 of 6"
+[11:21:59.942] mc: horizontal cursor 3 -> 4  (item 5 of 6, range 0..5, step +1)  caller=000000014008A91B screen=000000002C326D10 cursor=000000002C327060
+[11:22:00.043] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[11:22:00.043] heartbeat 25 (alive 50 s)
+[11:22:00.043] gt: 129 CONSTRUCTED; setText ran 658 time(s), 658 string(s) captured; 0 guarded read(s) faulted.
+[11:22:00.043] gt:   by overload: cGUIObjText.25=658 .26=0  cGUIObjMessage.25=0 .26=0
+[11:22:00.043] gt: === FOCUS RECORD: 48 distinct string(s) across 49 cursor movement(s), 1 dropped (buffer full) ===
+[11:22:00.044] gt:   [move 23] PROSE 000000002C327320: "G"
+[11:22:00.044] gt:   [move 23] PROSE 000000002C340460: "0"
+[11:22:00.044] gt:   [move 24] PROSE 000000002C327320: "H"
+[11:22:00.044] gt:   [move 24] PROSE 000000002C340460: "0"
+[11:22:00.044] gt:   [move 25] PROSE 000000002C327320: "I"
+[11:22:00.044] gt:   [move 25] PROSE 000000002C340460: "0"
+[11:22:00.044] gt:   [move 26] PROSE 000000002C327320: "J"
+[11:22:00.044] gt:   [move 26] PROSE 000000002C340460: "0"
+[11:22:00.044] gt:   [move 27] PROSE 000000002C327320: "K"
+[11:22:00.045] gt:   [move 27] PROSE 000000002C340460: "0"
+[11:22:00.045] gt:   [move 28] PROSE 000000002C327320: "L"
+[11:22:00.045] gt:   [move 28] PROSE 000000002C340460: "0"
+[11:22:00.045] gt:   [move 29] PROSE 000000002C327320: "M"
+[11:22:00.045] gt:   [move 29] PROSE 000000002C340460: "0"
+[11:22:00.045] gt:   [move 30] PROSE 000000002C327320: "N"
+[11:22:00.045] gt:   [move 30] PROSE 000000002C340460: "0"
+[11:22:00.045] gt:   [move 31] PROSE 000000002C327320: "O"
+[11:22:00.045] gt:   [move 31] PROSE 000000002C340460: "0"
+[11:22:00.045] gt:   [move 32] PROSE 000000002C327320: "P"
+[11:22:00.047] gt:   [move 32] PROSE 000000002C340460: "0"
+[11:22:00.047] gt:   [move 33] PROSE 000000002C327320: "Q"
+[11:22:00.047] gt:   [move 33] PROSE 000000002C340460: "0"
+[11:22:00.047] gt:   [move 34] PROSE 000000002C327320: "R"
+[11:22:00.047] gt:   [move 34] PROSE 000000002C340460: "0"
+[11:22:00.047] gt:   [move 35] PROSE 000000002C327320: "S"
+[11:22:00.047] gt:   [move 35] PROSE 000000002C340460: "0"
+[11:22:00.047] gt:   [move 36] PROSE 000000002C327320: "T"
+[11:22:00.047] gt:   [move 36] PROSE 000000002C340460: "0"
+[11:22:00.047] gt:   [move 37] PROSE 000000002C327320: "U"
+[11:22:00.047] gt:   [move 37] PROSE 000000002C340460: "0"
+[11:22:00.048] gt:   [move 38] PROSE 000000002C327320: "V"
+[11:22:00.048] gt:   [move 38] PROSE 000000002C340460: "0"
+[11:22:00.048] gt:   [move 39] PROSE 000000002C327320: "W"
+[11:22:00.048] gt:   [move 39] PROSE 000000002C340460: "0"
+[11:22:00.048] gt:   [move 40] PROSE 000000002C327320: "X"
+[11:22:00.048] gt:   [move 40] PROSE 000000002C340460: "0"
+[11:22:00.048] gt:   [move 41] PROSE 000000002C327320: "Y"
+[11:22:00.048] gt:   [move 41] PROSE 000000002C340460: "0"
+[11:22:00.048] gt:   [move 42] PROSE 000000002C327320: "Z"
+[11:22:00.049] gt:   [move 42] PROSE 000000002C340460: "0"
+[11:22:00.049] gt:   [move 45] PROSE 000000002C340460: "1"
+[11:22:00.049] gt:   [move 45] PROSE 000000002C332C20: "0"
+[11:22:00.049] gt:   [move 46] PROSE 000000002C340460: "2"
+[11:22:00.049] gt:   [move 46] PROSE 000000002C332C20: "0"
+[11:22:00.049] gt:   [move 47] PROSE 000000002C340460: "2"
+[11:22:00.049] gt:   [move 47] PROSE 000000002C332C20: "0"
+[11:22:00.049] gt:   [move 48] PROSE 000000002C340460: "2"
+[11:22:00.049] gt:   [move 48] PROSE 000000002C332C20: "0"
+[11:22:00.049] gt: of 48 string(s): 48 arrived after a cursor movement, 48 were prose captions.
+[11:22:00.049] gt: ▶ READ IT LIKE THIS: a DIFFERENT prose string stamped with each successive move number = per-row captions DO flow through setText. The same few strings repeating across many move numbers = they do NOT, and the existing cursor+GMD channel stays the only item-name source.
+[11:22:00.049] gt: === INSTANCE SET: 29 live text object(s), 0 dropped (table full) ===
+[11:22:00.051] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:22:00.051] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:22:00.051] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:22:00.051] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:22:00.051] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:22:00.051] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:22:00.051] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:22:00.051] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:22:00.051] gt:   0000000000000000 STALE [move 0, 0 set(s)] ""
+[11:22:00.051] gt:   000000002C2C1140 LIVE  [move 7, 11 set(s)] "Input the lobby ID you'd like to search for."
+[11:22:00.052] gt:   000000002BE3D700 LIVE  [move 7, 11 set(s)] "<SIZE 58><ICON DECIDE></SIZE>Confirm <SIZE 58><ICON CANCEL></SIZE>Back"
+[11:22:00.052] gt:   000000002BDD53B0 LIVE  [move 3, 1 set(s)] "Online Play"
+[11:22:00.052] gt:   000000002C242A30 LIVE  [move 3, 1 set(s)] "Casual Match"
+[11:22:00.052] gt:   000000002BDC70D0 LIVE  [move 3, 1 set(s)] "Ranked Match"
+[11:22:00.052] gt:   000000002BE38A80 LIVE  [move 3, 1 set(s)] "Custom Match"
+[11:22:00.052] gt:   000000002BE17CA0 LIVE  [move 3, 1 set(s)] "Ranked Leaderboard"
+[11:22:00.052] gt:   000000002BDF9FD0 LIVE  [move 3, 1 set(s)] "High Score Challenge"
+[11:22:00.052] gt:   000000002C2C22A0 LIVE  [move 3, 1 set(s)] "High Score Challenge Leaderboard"
+[11:22:00.052] gt:   000000002C2DD620 LIVE  [move 5, 1 set(s)] "Custom Match"
+[11:22:00.052] gt:   000000002BE0EA70 LIVE  [move 5, 1 set(s)] "Create Lobby"
+[11:22:00.053] gt:   000000002C326260 LIVE  [move 5, 1 set(s)] "Join Lobby"
+[11:22:00.053] gt:   000000002C30D690 LIVE  [move 5, 1 set(s)] "Search Lobby ID"
+[11:22:00.053] gt:   000000002C2EFAD0 LIVE  [move 7, 1 set(s)] "Enter Lobby ID"
+[11:22:00.053] gt:   000000002C327320 LIVE  [move 49, 44 set(s)] "0"
+[11:22:00.053] gt:   000000002C340460 LIVE  [move 49, 44 set(s)] "2"
+[11:22:00.054] gt:   000000002C332C20 LIVE  [move 49, 44 set(s)] "0"
+[11:22:00.054] gt:   000000002C30E160 LIVE  [move 49, 44 set(s)] "0"
+[11:22:00.054] gt:   000000002BE0FD80 LIVE  [move 49, 44 set(s)] "0"
+[11:22:00.054] gt:   000000002C2EFD20 LIVE  [move 49, 44 set(s)] "0"
+[11:22:00.054] gt: of 29 object(s): 20 still LIVE, 9 stale; current move seq 49.
+[11:22:00.054] gt: ⭐ reclaimed 9 dead slot(s) this pass -- eviction alone only fires when a NEW object needs a slot, so a screen that re-sets its resident objects never triggers it and the dead pile up.
+[11:22:00.054] gt: ▶ READ IT LIKE THIS: if the LIVE objects include one per menu row of the screen you are on, the instance route works and item names can come from here for ANY screen -- Gallery, the music list and the consent dialog included. If the live set is dominated by objects from OTHER screens, the next question is how the game marks the current one. ⚠ Nothing here is spoken; this is a measurement.
+[11:22:00.054] layout: === FIELD DUMP of live text objects (29 in set) ===
+[11:22:00.055] layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a known left-to-right (or top-to-bottom) order, look for an offset holding DISTINCT values that follow that order. Constant across all = chrome. Different every poll = a ticker. Neither is a coordinate.
+[11:22:00.055] layout:   000000002C2C1140 "Input the lobby ID you'd" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:42c00000 +0x044:446e8000 +0x04c:3f800000 +0x050:00000003 +0x054:02010019 +0x060:00010005 +0x068:2bdfe588 +0x078:2be3d700 +0x080:2bdcc670 +0x088:2c2c0a20 +0x090:3bcb1d70 +0x098:3bc569d0 +0x0a0:42c00000 +0x0a4:c0c00000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910c010 +0x0d8:29109798 +0x0e0:44282d83 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:45700000 +0x104:42900000 +0x108:000068a0 +0x10c:00800d80 +0x110:2c2c12a8 +0x118:2c2efbd8 +0x120:00000958 +0x124:008001cc +0x128:2bdd5548 +0x130:2be3d898
+[11:22:00.055] layout:   000000002BDD53B0 "Online Play" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43600000 +0x044:42580000 +0x04c:3f800000 +0x050:00000002 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2be2b030 +0x080:2c2412b0 +0x088:2be17380 +0x090:3c562360 +0x098:3c810578 +0x0a0:42000000 +0x0a4:bf800000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c8:2bdd5db0 +0x0d0:2910c240 +0x0e0:43b8ddde +0x0e4:42951111 +0x0e8:3c8245b8 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f4:44578000 +0x0f8:00000034 +0x0fc:00000034 +0x100:44680000 +0x104:42a00000 +0x138:000005ef +0x13c:00000001 +0x140:00040008 +0x144:00000002 +0x148:01020c00 +0x14c:00030000
+[11:22:00.055] layout:   000000002C242A30 "Casual Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43400000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2be2e410 +0x078:2be161e0 +0x080:2be378b0 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:44d20ff0 +0x0c4:44220000 +0x0cc:3f800000 +0x0d0:2910df20 +0x0d8:2910ba98 +0x0e0:4355b05b +0x0e4:42616c17 +0x0e8:2c241360 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00008ca0 +0x10c:00800420 +0x110:2c242b98 +0x118:2bdc7238
+[11:22:00.055] layout:   000000002BDC70D0 "Ranked Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43880000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:3001000a +0x068:2bdd72b0 +0x078:2bdf6d80 +0x080:2be16430 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:2bdc6ff0 +0x0c8:0000003c +0x0cc:14000019 +0x0d0:2910c5c0 +0x0d8:2910b7f8 +0x0e0:43638e38 +0x0e4:42616c17 +0x0e8:2bdc5260 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000a140 +0x10c:00800420 +0x110:2bdc7238 +0x118:2bdd6168
+[11:22:00.057] layout:   000000002BE38A80 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43b00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c244e60 +0x078:2be2fa60 +0x080:2bdf6fd0 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:42000ff0 +0x0cc:07000000 +0x0d0:2910e9d8 +0x0d8:2910b520 +0x0e0:436416c1 +0x0e4:42616c17 +0x0e8:3c82c188 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000b940 +0x10c:00800420 +0x110:2be38be8 +0x118:2be17e08 +0x120:00001508
+[11:22:00.057] layout:   000000002BE17CA0 "Ranked Leaderboard" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:43d80000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2bdc9920 +0x078:2bdda340 +0x080:2be2fcb0 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910ef50 +0x0d8:2910b280 +0x0e0:43a5c71d +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000d6e0 +0x10c:00800660 +0x110:2be17e08 +0x118:2bdfa138 +0x120:000018bc +0x124:008000e4 +0x128:2be17e38
+[11:22:00.057] layout:   000000002BDF9FD0 "High Score Challenge" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44000000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2be393c0 +0x078:2c2464b0 +0x080:2bdda590 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0c4:02020001 +0x0c8:bf800000 +0x0d0:2910ee38 +0x0d8:2910b018 +0x0e0:43abbbba +0x0e4:42616c17 +0x0e8:2bdc60c0 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:0000f840 +0x10c:008006c0 +0x110:2bdfa138 +0x118:2c2c2408
+[11:22:00.058] layout:   000000002C2C22A0 "High Score Challenge Lea" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43bc0000 +0x044:44140000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2be185e0 +0x078:2bdcaf70 +0x080:2c246700 +0x088:2be17380 +0x090:3c562360 +0x098:3c811420 +0x0a0:c3e90000 +0x0a4:c2300000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:2910cbe0 +0x0d8:2910ade8 +0x0e0:440b3332 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:447a0000 +0x104:42a00000 +0x108:00012a80 +0x10c:00800ae0 +0x110:2c2c2408 +0x118:2bdc5d08 +0x120:00002334 +0x124:00800170 +0x128:2c2c2438
+[11:22:00.058] layout:   000000002C2DD620 "Custom Match" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43c08000 +0x04c:3f800000 +0x050:00000009 +0x054:02000011 +0x058:bf800000 +0x060:0001000b +0x068:2c2ea6e0 +0x080:2c309570 +0x088:2bdcc7c0 +0x090:3b9e1640 +0x098:3bdb3e90 +0x0a4:c31b0000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:2910cf28 +0x0d8:2910d628 +0x0e0:436416c1 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ff000000 +0x0f8:00000020 +0x0fc:00000020 +0x100:442f0000 +0x104:42800000 +0x108:000141c0 +0x10c:00800420 +0x110:2bdd91d8 +0x118:2be0ebd8 +0x120:000024a4 +0x124:0080009c +0x128:2c2c23c0 +0x130:2be0ec08 +0x138:000006a0
+[11:22:00.058] layout:   000000002BE0EA70 "Create Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:43df0000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c316f60 +0x078:2c2edb30 +0x080:2c30c620 +0x088:2bdcc7c0 +0x090:3c58ec20 +0x098:3c7c1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:29109fe8 +0x0d8:2910a9c0 +0x0e0:43582d84 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00015660 +0x10c:00800420 +0x110:2be0ebd8 +0x118:2c3263c8 +0x120:0000273c +0x124:00800098 +0x128:2be0ec08
+[11:22:00.058] layout:   000000002C326260 "Join Lobby" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44038000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c3316d0 +0x078:2c2ff330 +0x080:2c3178f0 +0x088:2bdcc7c0 +0x090:3c58ec20 +0x098:3c7c1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:29109c68 +0x0d8:2910d190 +0x0e0:432e38e4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00016800 +0x10c:00800360 +0x110:2c3263c8 +0x118:2c30d7f8 +0x120:00002974 +0x124:0080007c +0x128:2c3263f8
+[11:22:00.058] layout:   000000002C30D690 "Search Lobby ID" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:43f70000 +0x044:44178000 +0x04c:3f800000 +0x050:00000007 +0x054:02000011 +0x058:bf800000 +0x060:0001000a +0x068:2c2eed60 +0x078:2be0f520 +0x080:2c332060 +0x088:2bdcc7c0 +0x090:3c58ec20 +0x098:3c7c1120 +0x0a0:c3e90000 +0x0a4:c2200000 +0x0ac:3f800000 +0x0c0:00000ff0 +0x0d0:29109d80 +0x0d8:29109610 +0x0e0:438349f5 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:fff2f2f2 +0x0f8:00000020 +0x0fc:00000020 +0x100:44660000 +0x104:42a00000 +0x108:00017ee0 +0x10c:008004e0 +0x110:2c30d7f8 +0x118:2be3d868 +0x120:00002c4c +0x124:008000b0 +0x128:2c30d828
+[11:22:00.058] layout:   000000002C2EFAD0 "Enter Lobby ID" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44700000 +0x044:43d00000 +0x04c:3f800000 +0x050:00000008 +0x054:02000011 +0x058:bf800000 +0x060:00010001 +0x068:2c30dbc0 +0x078:2c30e010 +0x080:2c3271d0 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4d00 +0x0a4:c2f80000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29109568 +0x0d8:29109760 +0x0e0:436f49f4 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:440c0000 +0x104:42800000 +0x108:00007620 +0x10c:40800480 +0x110:2c2c1248 +0x118:2c242b98 +0x120:00002cfc +0x124:408000a4 +0x128:2c30d7b0 +0x138:000007f9
+[11:22:00.059] layout:   000000002C327320 "0" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44480000 +0x044:440b0000 +0x04c:3f800000 +0x050:0000000a +0x054:02000011 +0x058:bf800000 +0x060:00010000 +0x068:2c30dbf0 +0x078:2c340460 +0x080:2c30e010 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4d70 +0x0a0:c3200000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29108df8 +0x0d8:29108d50 +0x0e0:41b05b06 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:42800000 +0x104:42800000 +0x108:00001e60 +0x10c:00800060 +0x110:2c327858 +0x118:2c340568 +0x120:000006a4 +0x124:00800010 +0x128:2c2c12d8 +0x130:2c340580
+[11:22:00.059] layout:   000000002C340460 "2" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44580000 +0x044:440b0000 +0x04c:3f800000 +0x050:0000000c +0x054:02000011 +0x058:bf800000 +0x060:00010000 +0x068:2c30dc08 +0x078:2c332c20 +0x080:2c30e010 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4da8 +0x0a0:c2c00000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29108ce0 +0x0d8:29108c38 +0x0e0:41b05b06 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:42800000 +0x104:42800000 +0x108:00001ec0 +0x10c:00800060 +0x110:2c327428 +0x118:2c332d28 +0x120:000006b4 +0x124:00800010 +0x128:2c327440 +0x130:2c332d40
+[11:22:00.059] layout:   000000002C332C20 "0" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44680000 +0x044:440b0000 +0x04c:3f800000 +0x050:0000000b +0x054:02000011 +0x058:bf800000 +0x060:00010000 +0x068:2c30dc20 +0x078:2c30e160 +0x080:2c30e010 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4de0 +0x0a0:c2000000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29108bc8 +0x0d8:29108b20 +0x0e0:41b05b06 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:42800000 +0x104:42800000 +0x108:00001f20 +0x10c:00800060 +0x110:2c340568 +0x118:2c30e268 +0x120:000006c4 +0x124:00800010 +0x128:2c340580 +0x130:2c30e280
+[11:22:00.059] layout:   000000002C30E160 "0" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44780000 +0x044:440b0000 +0x04c:3f800000 +0x050:0000000d +0x054:02000011 +0x058:bf800000 +0x060:00010000 +0x068:2c30dc38 +0x078:2be0fd80 +0x080:2c30e010 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4e18 +0x0a0:42000000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29108ab0 +0x0d8:29108a08 +0x0e0:41b05b06 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:42800000 +0x104:42800000 +0x108:00001f80 +0x10c:00800060 +0x110:2c332d28 +0x118:2be0fe88 +0x120:000006d4 +0x124:00800010 +0x128:2c332d40 +0x130:2be0fea0
+[11:22:00.060] layout:   000000002BE0FD80 "0" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:44840000 +0x044:440b0000 +0x04c:3f800000 +0x050:0000000e +0x054:02000011 +0x058:bf800000 +0x060:00010000 +0x068:2c30dc50 +0x078:2c2efd20 +0x080:2c30e010 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4e50 +0x0a0:42c00000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29108fb8 +0x0d8:29108ea0 +0x0e0:41b05b06 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:42800000 +0x104:42800000 +0x108:00001fe0 +0x10c:00800060 +0x110:2c30e268 +0x118:2c2efe28 +0x120:000006e4 +0x124:00800010 +0x128:2c30e280 +0x130:2c2efe40
+[11:22:00.060] layout:   000000002C2EFD20 "0" +0x010:3f800000 +0x024:3f800000 +0x038:3f800000 +0x040:448c0000 +0x044:440b0000 +0x04c:3f800000 +0x050:0000000f +0x054:02000011 +0x058:bf800000 +0x060:00010000 +0x068:2c30dc68 +0x080:2c30e010 +0x088:2c326d10 +0x090:3c5f22c0 +0x098:3c4a4e88 +0x0a0:43200000 +0x0ac:3f800000 +0x0c0:00000ff5 +0x0d0:29108c00 +0x0d8:29108928 +0x0e0:41b05b06 +0x0e4:42616c17 +0x0ec:ffffffff +0x0f0:ffffffff +0x0f8:00000020 +0x0fc:00000020 +0x100:42800000 +0x104:42800000 +0x108:00002040 +0x10c:40800060 +0x110:2be0fe88 +0x118:2c2ffc78 +0x120:000006f4 +0x124:40800010 +0x128:2be0fea0 +0x130:2bdd5560 +0x138:00000c55
+[11:22:00.060] layout: 19 object(s) dumped of 29 in the set (short text only).
+[11:22:00.569] kbd: down=[0x27]  pressed=[0x27]  released=[(none)]  (engine Trg=[(none)])
+[11:22:00.571] mcspeak: spoke "0, 6 of 6"
+[11:22:00.572] mc: horizontal cursor 4 -> 5  (item 6 of 6, range 0..5, step +1)  caller=000000014008A91B screen=000000002C326D10 cursor=000000002C327060
+[11:22:00.672] kbd: down=[(none)]  pressed=[(none)]  released=[0x27]  (engine Trg=[(none)])
+[11:22:02.096] gt: 129 CONSTRUCTED; setText ran 664 time(s), 664 string(s) captured; 0 guarded read(s) faulted.
+[11:22:02.096] gt:   by overload: cGUIObjText.25=664 .26=0  cGUIObjMessage.25=0 .26=0
+[11:22:03.819] mcspeak: [PICKERPROBE] moved to position 2 (which holds '1'), caption was '1' = position 2, delta 0, step +1. ⚠ NOT SPOKEN. ▶ Collect a few UPWARD movements: if delta stays -1 the caption lags the cursor; if it flips to +1 the game names the position being LEFT.
+[11:22:03.821] mcspeak: spoke "1, 2 of 36"
+[11:22:03.821] mc: vertical   cursor 0 -> 1  (item 2 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327058
+[11:22:03.821] gt: * TEXT SET on 000000002C2EFD20: "1"
+[11:22:04.125] gt: 129 CONSTRUCTED; setText ran 670 time(s), 670 string(s) captured; 0 guarded read(s) faulted.
+[11:22:04.125] gt:   by overload: cGUIObjText.25=670 .26=0  cGUIObjMessage.25=0 .26=0
+[11:22:04.633] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:22:04.633] mcspeak: [PICKERPROBE] moved to position 3 (which holds '2'), caption was '2' = position 3, delta 0, step +1. ⚠ NOT SPOKEN. ▶ Collect a few UPWARD movements: if delta stays -1 the caption lags the cursor; if it flips to +1 the game names the position being LEFT.
+[11:22:04.633] mcspeak: spoke "2, 3 of 36"
+[11:22:04.633] mc: vertical   cursor 1 -> 2  (item 3 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327058
+[11:22:04.633] gt: * TEXT SET on 000000002C2EFD20: "2"
+[11:22:04.736] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:22:06.054] kbd: down=[0x26]  pressed=[0x26]  released=[(none)]  (engine Trg=[(none)])
+[11:22:06.054] mcspeak: [PICKERPROBE] moved to position 4 (which holds '3'), caption was '3' = position 4, delta 0, step +1. ⚠ NOT SPOKEN. ▶ Collect a few UPWARD movements: if delta stays -1 the caption lags the cursor; if it flips to +1 the game names the position being LEFT.
+[11:22:06.054] mcspeak: spoke "3, 4 of 36"
+[11:22:06.054] mc: vertical   cursor 2 -> 3  (item 4 of 36, range 0..35, step +1)  caller=000000014008A8EF screen=000000002C326D10 cursor=000000002C327058
+[11:22:06.054] gt: * TEXT SET on 000000002C2EFD20: "3"
+[11:22:06.157] kbd: down=[(none)]  pressed=[(none)]  released=[0x26]  (engine Trg=[(none)])
+[11:22:06.157] gt: 129 CONSTRUCTED; setText ran 682 time(s), 682 string(s) captured; 0 guarded read(s) faulted.
+[11:22:06.157] gt:   by overload: cGUIObjText.25=682 .26=0  cGUIObjMessage.25=0 .26=0
+[11:22:06.563] kbd: down=[0x12 0xa4]  pressed=[0x12 0xa4]  released=[(none)]  (engine Trg=[(none)])
+[11:22:06.666] kbd: down=[0x12 0x73 0xa4]  pressed=[0x73]  released=[(none)]  (engine Trg=[(none)])
