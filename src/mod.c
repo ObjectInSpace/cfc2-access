@@ -665,12 +665,32 @@ static DWORD WINAPI worker(LPVOID param)
             gt_instance_report();
 
         /* ⭐⭐ The LAYOUT PROBE (cfc2_layout.on, absent = off). Looks for the
-         * field that orders objects by SCREEN POSITION -- the one piece both
-         * the Lobby ID field and the Music chooser's strip are blocked on.
-         * Same cadence as the two reporters above so a single run carries all
-         * three and they can be read side by side. */
-        if (gt_ok && (beat == 10 || beat % 5 == 0))
-            gt_layout_report();
+         * field that orders objects by SCREEN POSITION.
+         *
+         * ⛔⛔ IT FIRES ON TEXT CHANGE, NOT ON A TIMER, and that is the whole
+         * point. On the 10-beat cadence it MISSED the quit dialog completely:
+         * the probe sampled at 13:11:49.420, the dialog drew "No" at
+         * 13:11:49.730, and the next sample was ten seconds later -- long after
+         * the dialog had closed. A ~2-second dialog cannot be caught by a
+         * ~10-second poll, and the user paid a real run to discover that.
+         *
+         * ⭐ setText's call count is the right clock: it ticks exactly when the
+         * screen redraws, which is exactly when a dialog appears. Sampling on
+         * CHANGE rather than on time is the same lesson as "report cadence must
+         * fit REAL play" -- the beat schedule was picked for menus, and a modal
+         * lives on a different timescale.
+         *
+         * ⚠ Still rate-limited: at most once per beat, so a busy screen (the
+         * music player redraws its timer constantly) cannot flood the log. */
+        if (gt_ok) {
+            static LONG last_sets;
+            gt_stats ls;
+            gt_get_stats(&ls);
+            if (ls.settext_calls != last_sets || beat == 10 || beat % 5 == 0) {
+                last_sets = ls.settext_calls;
+                gt_layout_report();
+            }
+        }
 
         /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning
          * 1.3 GB, and it duplicated work: gmd_text_ready() already calls
