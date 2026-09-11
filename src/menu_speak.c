@@ -938,6 +938,11 @@ static const mc_screen g_screens[] = {
      * measured across 83 movements in three runs, positions 1-35 are exactly
      * "0".."9" then "A".."Y", one per position, no gaps and no conflicts.
      *
+     * ⭐ AND POSITION 36 = 'Z' IS NOW MEASURED, not extrapolated: in the
+     * 2026-09-11 03:22 run the picker sat at 36 while the lobby-ID slot mirroring
+     * it read "Z". The alphabet "0".."9","A".."Z" is 36 characters, which is
+     * exactly the item count -- two independent facts agreeing.
+     *
      * ⚠ count = 36 is a real invariant: 10 digits + 26 letters. A different
      * live count means this is not that picker.
      *
@@ -1851,29 +1856,34 @@ static BOOL char_picker_matches(const char *s, int position)
     return s[0] == K_PICKER[position - 1];
 }
 
-/* ⛔⛔ WHY THE PICKER IS STILL SILENT, and what one run would settle.
+/* ⭐⭐⭐ RESOLVED 2026-09-11 (run-2026-09-11-0322): THE PICKER SPEAKS, and
+ * there was never an offset to correct.
  *
- * Measured over 88 movements: the caption this screen delivers is ALWAYS the
- * character of a NEIGHBOURING position -- 20 of 20 usable samples were exactly
- * one position off, never the right one. So char_picker_matches() rejects every
- * caption, which is correct behaviour (a wrong character spoken confidently is
- * the failure this file exists to prevent) and leaves the screen speaking bare
- * positions.
+ * The note this replaces said the caption is "ALWAYS the character of a
+ * NEIGHBOURING position -- 20 of 20 samples exactly one position off", and
+ * asked for a run with UPWARD movements to decide between two candidate
+ * rules (the caption lagging the cursor, vs the game setting the character of
+ * the position being LEFT).
  *
- * ⚠⚠ THE DIRECTION IS UNRESOLVED AND THAT IS WHY NOTHING IS SHIPPED. Every one
- * of those 20 samples was a step of -1. The two candidate rules --
- *   (a) the caption lags the cursor by one movement, or
- *   (b) the game sets the character of the position being LEFT
- * predict the SAME character going down and OPPOSITE characters going up. The
- * logs contain only FOUR upward movements and none of them carried a character
- * at all, so the data cannot separate them.
+ * That run happened: **32 upward movements**, and of the 16 positions that
+ * carried a character, **16 matched exactly and 0 were off** --
+ *     pos 2 -> '1'   pos 11 -> 'A'   pos 17 -> 'G'
+ * against K_PICKER, with no offset in either direction.
  *
- * ⛔ Picking one would be a coin flip that speaks the wrong letter half the
- * time while sounding authoritative -- worse than silence on a screen where the
- * user is spelling out a code.
+ * ⛔⛔ SO THE "ALWAYS ONE OFF" FINDING WAS AN ARTEFACT OF THE OLD PAIRING, not
+ * a property of the game -- the same ad-hoc-window failure that produced five
+ * other wrong readings here and is why tools/logpair.py exists. A measurement
+ * of 20 consistent samples was real and its INTERPRETATION was wrong: the
+ * samples were being attributed to the wrong movement.
  *
- * ▶ ONE RUN SETTLES IT: move UP through several picker positions. This probe
- * logs what each movement carried, so the direction falls out by inspection. */
+ * ⭐ The lesson worth keeping: a large consistent offset is exactly what a
+ * systematically mis-paired sample set looks like. Before modelling an offset,
+ * check the pairing that produced it.
+ *
+ * ⚠ char_picker_matches() is UNCHANGED and still required. It rejects any
+ * caption that disagrees with the cursor, so a future regression degrades to a
+ * bare position rather than spelling a wrong code. The channel is
+ * self-verifying; this run simply shows both sources now agree. */
 /* Log what this movement carried, then answer whether it may be spoken.
  * ⚠ Two jobs in one call deliberately: the probe must see EVERY caption the
  * picker delivers, including (especially) the ones the match rejects -- those
