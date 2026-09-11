@@ -237,6 +237,22 @@ static const int g_sentinel_test_rows[] = { 51, MC_LABEL_UNKNOWN, 84 };
  * two 3-item lists sharing the screen object. */
 static const int g_casual_match_rows[] = { 51, 52, 84, 88 };
 
+/* ⭐ Casual Match's value labels. Its four rows are the SAME four settings as
+ * Lobby Filters' rows 1-3 and 6, and the value runs are the ones that screen's
+ * renderer table establishes.
+ *
+ * ⛔ Only rows 2 and 3 (0-based) ship. Row 0's values are GAME NAMES, handled by
+ * the ROM-table path. Row 1 (Game Version) is NOT included: the pairing that
+ * would source its count is contaminated -- row 1 shows live counts of 2, 3 AND
+ * 8 in the logs, which is the game-title strip's traffic bleeding across a
+ * movement boundary, not three different value lists. A count I cannot trust is
+ * not a count. */
+static const mc_value_set g_casual_match_values[] = {
+    { 2, 2, 85 },   /* Cross-region Matchmaking: Off / On          */
+    { 3, 3, 89 },   /* One-button Special Moves: On / Off / Either */
+    { 3, 2, 89 },   /* ...and its 2-value (offline) variant        */
+};
+
 /* ⭐⭐ CREATE LOBBY's VALUE labels. Only the rows whose values were actually
  * SEEN as live text, at the same timestamp as the movement.
  *
@@ -255,7 +271,36 @@ static const int g_casual_match_rows[] = { 51, 52, 84, 88 };
  * fallback.
  *
  * ⚠ Row 8 (1-based 9) is the ONLY row here whose values are unique strings. */
+/* ⭐⭐⭐ NINE OF TEN ROWS' VALUES, from the renderer's own first-value table.
+ *
+ * ⛔⛔ THE USER REPORTED VALUES "MISSING OR INACCURATE, PARTICULARLY ON THE
+ * ONLINE SCREENS", and they were right in a way my metrics could not see:
+ * counting named-vs-bare says nothing about whether a NAME is correct or
+ * whether a VALUE was spoken at all. Measured on the value axis:
+ *     Lobby Settings 74 movements with NO value spoken (of 84)
+ *     Casual Match   54 (of 75)
+ *     Lobby Filters  20 (of 24)
+ * Eight of ten rows here had no variant, so the mod said "2 of 2" while the
+ * screen showed "On".
+ *
+ * ⭐ The table at 0x141205e30 gives each row's FIRST value index directly --
+ * the exact field an mc_value_set needs -- and pairing it with each row's
+ * MEASURED live count yields a single coherent label family for nine rows.
+ * Every previously shipped entry is reproduced (row 8 = 2..9, row 9 =
+ * Challenger/Host), which is the check that this is the right table.
+ *
+ * ⛔ Row 0 is excluded: its values are GAME NAMES, which live in the ROM table,
+ * not in a GMD run -- reading 9 labels from index 14 gives "Any, Confirm,
+ * Cancel, Select..." from four different families. The mixed-family test is
+ * what catches that, and it is applied to every row rather than assumed. */
 static const mc_value_set g_create_lobby_values[] = {
+    { 1, 2,  53 },   /* Game Version: Japanese / English                     */
+    { 2, 2,  85 },   /* Cross-region Matchmaking: Off / On                   */
+    { 3, 8,  95 },   /* Comment: "Everyone is welcome!" .. 8 presets         */
+    { 4, 2, 107 },   /* Event Mode: On (Quick Match) / Off (Arcade Style)    */
+    { 5, 2,  89 },   /* One-button Special Moves: On / Off                   */
+    { 6,10, 115 },   /* Victory Condition: First to 1 .. First to 10         */
+    { 9, 2, 111 },   /* Passcode: Off / On                                   */
     { 8, 2, 137 },   /* Game Start Privilege: Challenger / Host -- MEASURED */
     /* ⭐⭐ Row 7 (0-based) = "Number of Players", 8 values = LOBBY_NUM_00..07,
      * i.e. "2".."9". THREE sources agree:
@@ -329,7 +374,27 @@ static const int g_create_lobby_rows[] = {
      51,  52,  84,  93, 106, 88, 114, 126, 136, 110
 };
 
-/* ⛔ NO VALUE VARIANTS FOR THIS SCREEN, deliberately.
+/* ⭐⭐ LOBBY FILTERS' value labels, from its renderer's table (0x141206e30)
+ * paired with each row's MEASURED live count.
+ *
+ * ⭐ Row 1 is the "Either" case the user would have heard as silence: with 3
+ * live values it is Japanese / English / EITHER, the online-only third option.
+ * The 2-value variant on Select Game never applied here, so the row said
+ * "Game Version, 2 of 3" and named nothing.
+ *
+ * ⛔ Row 0 gets no variant -- its values are GAME NAMES from the ROM table, and
+ * reading 9 labels from index 14 yields "Any, Confirm, Cancel, Select..." from
+ * four unrelated families. The mixed-family check is applied to every row, not
+ * assumed away. */
+static const mc_value_set g_lobby_filter_values[] = {
+    { 1, 3,  53 },   /* Game Version: Japanese / English / Either */
+    { 2, 2,  85 },   /* Cross-region Matchmaking: Off / On        */
+    { 3, 9,  94 },   /* Comment: Any + the 8 presets              */
+    { 4, 2, 107 },   /* Event Mode: On (Quick Match) / Off        */
+    { 5, 3,  89 },   /* One-button Special Moves: On / Off / Either */
+};
+
+/* ⛔ (superseded note) NO VALUE VARIANTS FOR THIS SCREEN, deliberately.
  *
  * The per-row value COUNTS are measured from the 19:45 run, via
  * (cursor - screen - 0x33c)/4:  row0=9  row1=3  row2=2  row3=9  row4=2  row5=3.
@@ -516,6 +581,13 @@ static const mc_value_set g_pcset_values[] = {
  * ⚠ The 4-value row is NOT yet confirmed live -- see MC_VALUES_UNCONFIRMED. */
 static const mc_value_set g_select_game_values[] = {
     { 1, 2, 53 },   /* Game Version: Japanese / English  -- MEASURED */
+    /* ⭐ The 3-value ONLINE variant. The header predicted "Either" is
+     * online-only and the run showed this row at a live count of 3 while only
+     * the 2-value variant existed -- so it said "Game Version, 2 of 3" and
+     * named nothing. GAME_VERSION_ANY (55) completes the contiguous run 53-55,
+     * and the same 3-value set is now confirmed on Lobby Filters, where its
+     * renderer's own table gives first = 53. */
+    { 1, 3, 53 },   /* Game Version: Japanese / English / Either */
     { 2, 2, 58 },   /* Player: P1 / P2                   -- MEASURED */
     { 2, 4, 58 },   /* Player: P1..P4 on 4-player games  -- PREDICTED */
 };
@@ -716,7 +788,8 @@ static const mc_screen g_screens[] = {
     { 0x14009890dULL, -1, 4, "Casual Match", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_ROW, 0, g_casual_match_rows, 4, NULL, 0 },
     { 0x140098986ULL, -1, 0, "Casual Match", MC_VERIFIED_LIVE_TEXT,
-      MC_SETTINGS_VALUE, 0x344, NULL, 0, NULL, 0 },
+      MC_SETTINGS_VALUE, 0x344, NULL, 0, g_casual_match_values,
+      (int)(sizeof(g_casual_match_values) / sizeof(g_casual_match_values[0])) },
 
     /* ⭐⭐ JOIN LOBBY > search filters. Two call sites, one screen object:
      * the vertical ROW selector and the horizontal VALUE selector.
@@ -732,7 +805,8 @@ static const mc_screen g_screens[] = {
     { 0x14008e799ULL, -1, 6, "Lobby Filters", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_ROW, 0, g_lobby_filter_rows, 6, NULL, 0 },
     { 0x14008e813ULL, -1, 0, "Lobby Filters", MC_VERIFIED_LIVE_TEXT,
-      MC_SETTINGS_VALUE, 0x33c, NULL, 0, NULL, 0 },
+      MC_SETTINGS_VALUE, 0x33c, NULL, 0, g_lobby_filter_values,
+      (int)(sizeof(g_lobby_filter_values) / sizeof(g_lobby_filter_values[0])) },
 
     /* ⭐⭐ The LOBBY menu (Online Play > Custom Match). See g_lobby_rows: all
      * three positions named by their own captions across 7 sightings. */

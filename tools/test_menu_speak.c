@@ -597,13 +597,21 @@ int main(void)
         /* Row 0 is the games -- deliberately absent until the ROM index
          * mapping is confirmed (rom_table.h). The titles DO exist. */
         const mc_value_set *game = menu_speak_values_for(v, 0, 8);
-        /* A count nobody has measured must not borrow another variant. */
+        /* ⭐ The ONLINE 3-value Game Version (Japanese/English/Either). It was
+         * a negative here until 2026-09-10: the row ran at a live count of 3
+         * while only the 2-value variant existed, so the mod said "Game
+         * Version, 2 of 3" and named nothing -- part of the "values missing on
+         * the online screens" the user reported. It now resolves, and the
+         * corpus check confirms 53-55 really is that run. */
         const mc_value_set *ver3 = menu_speak_values_for(v, 1, 3);
+        /* ⚠ A count nobody has measured must STILL refuse -- this is the
+         * discriminating half of the case and must not be lost. */
         const mc_value_set *ply7 = menu_speak_values_for(v, 2, 7);
         check("20. value variants match on live count; unmeasured counts refuse",
               ver2 && ver2->first == 53 && ply2 && ply2->first == 58 &&
               ply4 && ply4->first == 58 && ply4->count == 4 &&
-              game == NULL && ver3 == NULL && ply7 == NULL,
+              ver3 && ver3->first == 53 && ver3->count == 3 &&
+              game == NULL && ply7 == NULL,
               "ver2=%p ply2=%p ply4=%p game=%p ver3=%p ply7=%p",
               (const void *)ver2, (const void *)ply2, (const void *)ply4,
               (const void *)game, (const void *)ver3, (const void *)ply7);

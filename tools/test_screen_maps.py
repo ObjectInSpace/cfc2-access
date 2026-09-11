@@ -147,12 +147,40 @@ EXPECTED_VALUES = {
     # and both strings are UNIQUE in the corpus (LOBBY_PERM_00/01) -- so the
     # order is confirmed twice over. The other 2-value rows on that screen are
     # On/Off, which the corpus can never resolve, and get no variant.
+    "g_lobby_filter_values": {
+        (1, 3): ["Japanese Version", "English Version", "Either"],
+        (2, 2): ["Off", "On"],
+        (3, 9): ["Any", "Everyone is welcome!", "Beginners, unite!",
+                 "Intermediates only!", "Advanced players only!",
+                 "Just for fun!", "Let's get serious!",
+                 "Looking to make friends!", "Let's chat!"],
+        (4, 2): ["On (Quick Match)", "Off (Arcade Style)"],
+        (5, 3): ["On", "Off", "Either"],
+    },
+    "g_casual_match_values": {
+        (2, 2): ["Off", "On"],
+        (3, 3): ["On", "Off", "Either"],
+        (3, 2): ["On", "Off"],
+    },
     "g_create_lobby_values": {
-        (8, 2): ["Challenger", "Host"],
+        (1, 2): ["Japanese Version", "English Version"],
+        (2, 2): ["Off", "On"],
+        (3, 8): ["Everyone is welcome!", "Beginners, unite!",
+                 "Intermediates only!", "Advanced players only!",
+                 "Just for fun!", "Let's get serious!",
+                 "Looking to make friends!", "Let's chat!"],
+        (4, 2): ["On (Quick Match)", "Off (Arcade Style)"],
+        (5, 2): ["On", "Off"],
+        (6, 10): ["First to 1", "First to 2", "First to 3", "First to 4",
+                  "First to 5", "First to 6", "First to 7", "First to 8",
+                  "First to 9", "First to 10"],
         (7, 8): ["2", "3", "4", "5", "6", "7", "8", "9"],
+        (8, 2): ["Challenger", "Host"],
+        (9, 2): ["Off", "On"],
     },
     "g_select_game_values": {
         (1, 2): ["Japanese Version", "English Version"],
+        (1, 3): ["Japanese Version", "English Version", "Either"],
         (2, 2): ["P1", "P2"],
         (2, 4): ["P1", "P2", "P3", "P4"],
     },
