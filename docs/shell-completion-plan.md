@@ -121,7 +121,43 @@ been caught by measurement instead of by ear — and it is the next piece of wor
 screens the "text near a movement" is very often a NEIGHBOURING row's object.
 Four times this session that produced a confident wrong reading.
 
-## ⚠ THE 22:45 RUN DID NOT SETTLE THE PICKER — and the reason is unexplained
+## ⭐⭐ THE PICKER'S CHARACTERS ARE EXACT — my "off by one" was a pairing error
+
+Pooling every picker sample across all logs, keyed on SAME-TIMESTAMP text:
+
+    32 samples, ring delta +0 on ALL of them
+    pos 36='Z' · 35='Y' · 34='X' · ... · 2='1' · 1='0'
+
+⛔⛔ **This overturns the "20 of 20 off by one" finding I recorded earlier.**
+That measurement paired captions that arrived AFTER the movement, which lands on
+the next position's character. Keyed on the same timestamp, the character always
+matches the position exactly, and `char_picker_matches()`'s mapping
+(`K[position-1]`) is correct as shipped.
+
+⭐ So there is no direction question and nothing to fix in the matching. The
+`[PICKERPROBE]` instrumentation can be retired once a run confirms speech.
+
+### ⛔ THE REMAINING PUZZLE: the screen usually draws NOTHING
+Per run, picker movements versus movements with a character drawn:
+
+    19:13   41 moves, median gap 0.21s, 37 with a char
+    19:45   37 moves, median gap 3.56s,  0 with a char
+    22:45   15 moves, median gap 0.31s,  0 with a char
+    00:10    5 moves, median gap 0.61s,  0 with a char
+
+⚠ **Pacing is NOT the cause** — 19:13 was the FASTEST run and the only one that
+drew. I had twice offered pacing as the likely explanation; the data refutes it.
+
+⚠ The 19:13 run also predates the keypad shipping (21:01), so the one session
+with characters is the one session where nothing could speak them. Every session
+since has had the code and no characters.
+
+▶ Unexplained. What distinguishes that session is not in any log line I can
+find, and I am not going to invent a third theory. The next run that draws
+characters will speak them; until then the screen says position only, which is
+true.
+
+## ⚠ (superseded) THE 22:45 RUN DID NOT SETTLE THE PICKER
 
 The run delivered what was asked: **7 upward movements** on the picker (the
 data every previous run lacked). But it cannot answer the direction question,
