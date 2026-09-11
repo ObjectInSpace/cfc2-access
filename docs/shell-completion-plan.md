@@ -8,6 +8,46 @@ everything else.
 across three runs). Treating it as a campaign with a checklist is the fix; doing
 one screen per run is what let the count drift.
 
+## ⭐⭐ ROW LABELS: 57 of 58 CONFIRMED — and my audit was wrong three times
+
+Extending the sightings question from values to ROW LABELS, which is what the
+user hears most. The first three answers I got were all wrong, in instructive
+ways, and the correct answer is nearly the opposite of the first:
+
+    attempt 1:  22 of 58 confirmed   -- counted only TEXT SET sightings
+    attempt 2:  49 of 58             -- added "Row, N of M. Caption." lines
+    attempt 3:  39 of 58             -- added captions with no row name, but
+                                        used a WRONG stem rule
+    correct:    57 of 58             -- used name_screens.py's own resolver
+
+⛔ **Attempt 1's error: ignoring the caption channel.** A row named by the
+game's own per-row help caption is BETTER evidence than a text sighting, and it
+is how most of the Options screens were established. Counting only `TEXT SET`
+measures which screens happen to redraw their labels, not which labels are
+verified.
+
+⛔⛔ **Attempt 3's error: inventing a stem rule.** I assumed `HELP_X` pairs with
+`X`. The real pairing is `HELP_OP_BGM_VOL` → `MENU_OP_BGM_VOLUME` — a different
+prefix AND a different suffix. `docs/screen-id-from-prompt-text.md` already
+records that the join is by exact TEXT and never by name, and I rebuilt the
+broken version of it anyway.
+
+⭐ **The fix was to stop writing my own pairing and call the tool that already
+does it.** `name_screens.py` resolves captions to labels correctly; feeding
+every log through it confirms 57 of 58 shipped row labels, including all six
+Sound Settings rows (20 sightings, every position) exactly as their commit
+claimed.
+
+⚠ The 58th, "Input Delay", IS caption-confirmed — `"3 of 5. Set the multiplayer
+input delay…"` — but the resolver does not pair it, plausibly because that
+caption is unusually long. A tooling gap, not missing evidence.
+
+⭐ **The lesson, and it is the same one four times over this session: my ad-hoc
+pairing is the least reliable component in this project.** It has now produced a
+wrong reading about captions across an axis boundary, about stale values, about
+"contaminated" counts, and about this. When a pairing already exists as a tested
+tool, use it.
+
 ## ⚠⚠ HOW MUCH OF THE VALUE DATA IS SIGHTED? 45 of 104 (2026-09-10)
 
 Prompted by the user asking whether "Either" was data or assumption. Auditing
