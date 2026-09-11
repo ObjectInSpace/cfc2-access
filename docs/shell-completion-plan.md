@@ -8,7 +8,36 @@ everything else.
 across three runs). Treating it as a campaign with a checklist is the fix; doing
 one screen per run is what let the count drift.
 
-## ▶ STATUS 2026-09-10 (end of day): 8 callers left, from 15
+## ▶▶ WHAT IS ACTUALLY SILENT — measured on the NEWEST build (21:17 run)
+
+**77% of spoken lines are named: 134 named, 38 bare.** ⚠ Measure this on the
+newest run only. Historical totals across all logs are dominated by builds that
+have since been fixed, and they made two solved screens look broken:
+
+⭐ **The music list is FINE.** It showed 25 bare lines in the 19:13 run and
+**zero** in the 21:17 run — the instance-table reclaim fixed it. Those failures
+were the table saturating (8 LIVE / 56 stale) so `gt_numbered_item` found
+nothing. Post-reclaim the same screen is clean.
+
+⭐ **Network Settings' value axis is FINE too.** Its bare lines are the
+generated rows — Voice Chat Volume and Input Delay, 11 values each. There is no
+11-label family in the corpus because those values are computed, so they get no
+variant by design and the live-quote path handles them.
+
+### The 38 that remain, in order
+- `0x14009885e` **11** and `0x1400988bf` **8** — Casual Match's two 3-item
+  lists. Stack-local cursors, no captions in six runs. **No route.**
+- `0x140082c3c` **5** — Lobby Settings' four still-unknown rows (1-4).
+- `0x14008a91b` **5** — the ID display. Sets no text on movement (105 movements,
+  zero same-timestamp text); its slots write only when a character is ENTERED.
+- `0x1400ac059` **4** — Ranked Leaderboard positions whose caption did not
+  arrive that pass; the channel works there, this is just coverage.
+- `0x14008a8ef` **3** — the picker, correctly refusing off-by-one captions.
+- `0x14008e799` **2** — Lobby Filters' one unknown row.
+
+⭐ **So the remaining silence is ~10 rows on three screens, not a broad gap.**
+Two of those screens have no known route; the rest is coverage or a resolved
+direction question.
 
 Shipped and CONFIRMED BY LOG since this plan was written: Lobby · Lobby Filters
 (5 of 6 rows + its value axis) · Casual Match (4 rows) · Lobby Settings (5 of 10
