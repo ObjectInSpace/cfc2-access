@@ -8,6 +8,67 @@ everything else.
 across three runs). Treating it as a campaign with a checklist is the fix; doing
 one screen per run is what let the count drift.
 
+## ⛔⛔ THE TARGET IS 100% (user, 2026-09-10) — what that actually costs
+
+The user will not move to the games until the shell is complete. So "no route"
+is no longer an acceptable end state for any screen, and each one needs either a
+route or a stated reason it is impossible. Current honest position:
+
+### The two Casual Match 3-item lists — MEASURED NEGATIVE, no text exists
+`0x14009885e` and `0x1400988bf`, 19 of the 38 remaining bare lines.
+
+Exhaustive check: across **70 movements** on those two callers, every piece of
+text set within the same SECOND is either a game title from the 8-item strip
+(which re-sets its eight objects 150-380 times per visit and swamps any window)
+or the Confirm/Back hint strip. **They set no text of their own, ever.**
+
+⛔ And a lead that looked promising died on inspection: the instance set shows
+"Either", "Off", "On" as a group, which is 3 values for a 3-item list. They
+belong to **Lobby Filters' value axis**, which already speaks ("Game, 2 of 9,
+On") — three separate objects each holding one setting's current value, not a
+list to index.
+
+### ⭐⭐ DISASSEMBLED — and they are NOT ITEM LISTS AT ALL
+
+The route that has worked 4 for 4 on this project answered it offline, with no
+run. Reading `0x14009885e` and `0x1400988bf` in context:
+
+- Both pass a **stack-local** cursor (`[rsp+0x50]`) to the generic helper and,
+  on a change, adjust `[rbx+0x344]` (a scroll/page offset) and `[rcx+0x334]`,
+  then call `0x140098bd0` to redraw.
+- `0x140098bd0` loops: `movsxd rax, [rdi+0x334]` · `mov edx, [rsi+rax*4]` ·
+  `call 0x14007d0f0`, walking a table at `0x141207230` between bounds held at
+  `0x1412072a0`/`0x1412072a8`.
+- Those three targets are **integer tables, not strings** (`09 00 00 00 0a 00
+  00 00 …`) — resource/layout ids, the same shape as Gallery's confirm handler.
+- `0x14007d0f0` resolves a GUI object by id and calls a method taking a float in
+  `xmm1` — an animation/visibility setter.
+
+⛔ **So these two callers are a PAGING control over image resources.** They have
+no item names because they name nothing: they move a highlight and re-trigger
+animations. "3 of 3" is not a gap in the mod — it is a complete description of
+what the control does.
+
+⭐ That is 19 of the 38 remaining bare lines accounted for as **correct
+behaviour**, established from the instructions rather than from another run.
+⚠ It also explains six runs of silence: there was never any text to find.
+
+### What 100% requires, screen by screen
+1. **The two 3-item lists** — disassembly. Untried, and the method with the best
+   record here.
+2. **Lobby Settings rows 1-4** — captions have not appeared in four visits;
+   disassembly is the fallback.
+3. **The ID display** — needs a run that ENTERS characters, then likely reads
+   the six slot objects directly (they are in the instance set).
+4. **The picker direction** — one run with upward movements. Already
+   instrumented.
+5. **Fighter Awards' 7 list rows** — one static caption for the screen;
+   disassembly.
+6. **The consent dialog** — sets no item text; disassembly or the GUI tree.
+
+⚠ Items 1, 2, 5 and 6 all reduce to the same technique. That is the next real
+piece of work, and it is offline.
+
 ## ▶▶ WHAT IS ACTUALLY SILENT — measured on the NEWEST build (21:17 run)
 
 **77% of spoken lines are named: 134 named, 38 bare.** ⚠ Measure this on the
