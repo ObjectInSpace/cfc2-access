@@ -121,6 +121,36 @@ been caught by measurement instead of by ear — and it is the next piece of wor
 screens the "text near a movement" is very often a NEIGHBOURING row's object.
 Four times this session that produced a confident wrong reading.
 
+## ⭐⭐ THE 01:30 RUN: Options confirmed, and Fighter Awards' shape solved
+
+⭐ **The Language values finally spoke** — the one class no log could confirm:
+
+    "Language, English [en], 2 of 14"   "Language, French [fr], 3 of 14"
+
+⭐⭐ **And ALL EIGHT game titles now speak the US names**, including the two that
+were worst before: "Project Justice" (was "Moero! Justice Gakuen") and "Plasma
+Sword: Nightmare of Bilstein" (was "Star Gladiator 2"). The JP/US fix is
+confirmed across the whole set, not just the three positions seen earlier.
+
+    Display, Borderless Windowed / Fullscreen · Data Collection, Agree
+    Game Version, Japanese Version / Either
+
+### ⭐ FIGHTER AWARDS IS A 6-COLUMN GRID, and the arithmetic is exact
+The 7-item list is a ROW selector over the 40 achievements:
+
+    achievement = 6 x (position - 1) + 1
+
+Verified on all five observed pairs: pos 2→7, 3→13, 5→25, 6→31, 7→37. This
+matches the disassembly's `0x2aaaaaab` divide-by-3 and multiply-by-6 arithmetic
+found earlier, and it explains the screen rather than changing it — both halves
+already speak through the ACHIEVEMENT_* path (the grid names 12 of 20).
+
+⛔ **It also killed a join I was one sample away from shipping.** The 40-grid
+drew `ACHIEVEMENT_02_DESC` at position 2, so "position == achievement number"
+looked exact — 1 for 1. The 7-item list disproves it outright: position 2 is
+achievement 7. A single agreeing sample is a coincidence, not a rule, and this
+is the third time that standard has paid for itself today.
+
 ## ⭐⭐ THE 00:10 RUN CONFIRMS YESTERDAY'S VALUE WORK — with one new gap
 
 Everything shipped for the online screens was exercised and is correct:
