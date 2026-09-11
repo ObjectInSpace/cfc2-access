@@ -57,7 +57,7 @@ EXPECTED = {
     # run DISPROVED the ordering it implied.
     "g_create_lobby_rows": [
         "<UNKNOWN>", "<UNKNOWN>", "<UNKNOWN>", "<UNKNOWN>", "Event Mode",
-        "One-button Special Moves", "Victory Condition", "<UNKNOWN>",
+        "One-button Special Moves", "Victory Condition", "Number of Players",
         "Game Start Privilege", "Passcode",
     ],
     # Join Lobby > search filters. Five of six named by their own captions in
@@ -138,6 +138,7 @@ EXPECTED_VALUES = {
     # On/Off, which the corpus can never resolve, and get no variant.
     "g_create_lobby_values": {
         (8, 2): ["Challenger", "Host"],
+        (7, 8): ["2", "3", "4", "5", "6", "7", "8", "9"],
     },
     "g_select_game_values": {
         (1, 2): ["Japanese Version", "English Version"],

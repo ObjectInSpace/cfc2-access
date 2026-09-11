@@ -232,6 +232,17 @@ static const int g_casual_match_rows[] = { 51, 52, 84, 88 };
  * ⚠ Row 8 (1-based 9) is the ONLY row here whose values are unique strings. */
 static const mc_value_set g_create_lobby_values[] = {
     { 8, 2, 137 },   /* Game Start Privilege: Challenger / Host -- MEASURED */
+    /* ⭐⭐ Row 7 (0-based) = "Number of Players", 8 values = LOBBY_NUM_00..07,
+     * i.e. "2".."9". THREE sources agree:
+     *   - the measured live count for that row is exactly 8;
+     *   - value positions 1-4 were seen as "2", "3", "4", "5" at the same
+     *     timestamp as the movement;
+     *   - the corpus family LOBBY_NUM_00..07 is exactly "2".."9", and the row
+     *     label LOBBY_NUM ("Number of Players") is the one the instance set
+     *     shows on that screen.
+     * ⚠ A lobby taking up to NINE players is not a guess about the game -- it
+     * is what the corpus lists, and the first four are confirmed live. */
+    { 7, 8, 127 },   /* Number of Players: 2..9 -- MEASURED (1-4 live) */
 };
 
 /* ⭐⭐ CREATE LOBBY's settings, 10 rows, caller 0x140082c3c. FIVE positions
@@ -254,9 +265,14 @@ static const mc_value_set g_create_lobby_values[] = {
  * ⭐ Shipping 4 of 10 is the whole point of MC_LABEL_UNKNOWN: four rows a blind
  * player would otherwise hear as bare numbers, with the remaining six still
  * saying their position, exactly as before. */
+/* ⭐ Position 8 = "Number of Players" (LOBBY_NUM 126), established WITHOUT a
+ * caption: its value list is 8 long and its live values are "2", "3", "4", "5"
+ * at positions 1-4, which is exactly LOBBY_NUM_00..07 ("2".."9"). The row label
+ * and the value family corroborate each other, and the instance set shows
+ * "Number of Players" on this screen. */
 static const int g_create_lobby_rows[] = {
     MC_LABEL_UNKNOWN, MC_LABEL_UNKNOWN, MC_LABEL_UNKNOWN, MC_LABEL_UNKNOWN,
-    106, 88, 114, MC_LABEL_UNKNOWN, 136, 110
+    106, 88, 114, 126, 136, 110
 };
 
 /* ⛔ NO VALUE VARIANTS FOR THIS SCREEN, deliberately.
