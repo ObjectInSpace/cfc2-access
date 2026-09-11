@@ -483,6 +483,17 @@ void gt_focus_report(void);
  * pressing a direction. Reports OFFSETS AND VALUES only -- never a conclusion.
  *
  * Switch: cfc2_modal.on. Absent = off. */
+/* ⭐⭐⭐ The MODAL dialog's selected option index: 0 = the TOP option, 1 = the
+ * next. Read from parent+0x38c, where parent is either option widget's +0x088.
+ *
+ * ⭐ Two independent sources: "Yes" sits above "No" in every run (so 0=Yes),
+ * and on both confirms in run-...-1450 the index read 1 and the game kept
+ * running, i.e. No was taken.
+ *
+ * ⚠ Every press TOGGLES it -- a two-item list wraps, so there is no direction
+ * rule. FALSE when no such dialog is on screen, or the value is not 0/1. */
+BOOL gt_modal_selection(int *out_index);
+
 void gt_modal_probe(void);
 
 void gt_layout_report(void);

@@ -2509,10 +2509,22 @@ void menu_speak_check_modal(void)
         }
     }
 
-    if (strcmp(last, text) == 0)
-        return;                         /* already announced this appearance */
-    _snprintf(last, sizeof(last), "%s", text);
-    last[sizeof(last) - 1] = '\0';
+    /* ⭐⭐ RE-ANNOUNCE WHEN THE SELECTION MOVES, not only when the prompt first
+     * appears. The guard keys on the prompt AND the index: without the index
+     * the dialog would speak once and then fall silent as the user moved
+     * between the options -- which is exactly what the user reported as "it
+     * doesn't speak the option I am on". */
+    {
+        int sel = -1;
+        char key[GT_CAPTION_MAX];
+        (void)gt_modal_selection(&sel);
+        _snprintf(key, sizeof(key), "%d|%s", sel, text);
+        key[sizeof(key) - 1] = '\0';
+        if (strcmp(last, key) == 0)
+            return;                     /* same prompt AND same option */
+        _snprintf(last, sizeof(last), "%s", key);
+        last[sizeof(last) - 1] = '\0';
+    }
 
     menu_speak_flatten_prompt(text, flat, (int)sizeof(flat));
 
@@ -2537,14 +2549,35 @@ void menu_speak_check_modal(void)
      * ⚠ The strings are quoted from the game, so this follows its language. */
     {
         char a[GT_CAPTION_MAX], b[GT_CAPTION_MAX];
-        int i = at;
+        int i = at, selidx = -1;
         if (i >= 2 &&
             gt_prose_at(i - 1, a, (int)sizeof(a)) && a[0] &&
             gt_prose_at(i - 2, b, (int)sizeof(b)) && b[0] &&
             !strchr(a, '<') && !strchr(b, '<') &&
             strlen(a) <= 24 && strlen(b) <= 24) {
             size_t used = strlen(flat);
-            _snprintf(flat + used, sizeof(flat) - used - 1, " %s or %s", a, b);
+            /* ⚠⚠ WORK THE INDICES OUT, DO NOT REASON ABOUT THEM IN PROSE. The
+             * record holds (oldest first) prompt, TOP option, BOTTOM option;
+             * gt_prose_at walks NEWEST-FIRST, so with the prompt at index i:
+             *     a = prose_at(i-1)  ->  the TOP option
+             *     b = prose_at(i-2)  ->  the BOTTOM option
+             * My first version had these the wrong way round -- the comment
+             * said "a is the bottom" and the test caught it by speaking "Yes"
+             * where the planted index meant "No". The arithmetic above is the
+             * check; the sentence is only a record of it. */
+            if (gt_modal_selection(&selidx) && (selidx == 0 || selidx == 1)) {
+                /* ⭐⭐ NAME THE SELECTED OPTION, from the dialog's own state
+                 * (parent+0x38c), 0 = the TOP option. See gt_modal_selection()
+                 * for the two independent sources that fixed that. */
+                _snprintf(flat + used, sizeof(flat) - used - 1, " %s",
+                          selidx == 0 ? a : b);
+            } else {
+                /* ⛔ No readable selection: LIST both rather than name one. A
+                 * wrong option stated confidently on a prompt that quits the
+                 * game is the failure this file exists to prevent. */
+                _snprintf(flat + used, sizeof(flat) - used - 1, " %s or %s",
+                          a, b);
+            }
             flat[sizeof(flat) - 1] = '\0';
         }
     }

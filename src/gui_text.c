@@ -1516,6 +1516,7 @@ static BOOL layout_enabled(void)
  * Switch: cfc2_modal.on. Absent = off.
  */
 #define MODAL_PARENT_OFF 0x088
+#define MODAL_SEL_OFF    0x38c          /* the selected index, in the parent */
 #define MODAL_SNAP       0x400          /* bytes of the parent to watch */
 
 static BOOL modal_enabled(void)
@@ -1524,6 +1525,84 @@ static BOOL modal_enabled(void)
     if (cached < 0)
         cached = (GetFileAttributesA("cfc2_modal.on") != INVALID_FILE_ATTRIBUTES);
     return cached != 0;
+}
+
+/* ⭐⭐⭐ THE MODAL SELECTION -- shipping, not a probe.
+ *
+ * Reads the selected index out of the parent both option widgets share.
+ *
+ *     parent = <either option object> + 0x088
+ *     index  = *(int *)(parent + 0x38c)      0 = the TOP option, 1 = the next
+ *
+ * ⭐ ESTABLISHED BY TWO INDEPENDENT SOURCES, which is the standard every other
+ * row in this project meets:
+ *   1. LAYOUT -- "Yes" sits above "No" at y=540/600 in every run, so a
+ *      top-to-bottom index makes 0=Yes and 1=No.
+ *   2. OUTCOME -- on both confirms in run-...-1450 the index read 1 and the
+ *      game KEPT RUNNING, i.e. the choice taken was No. 1=No from the game's
+ *      own behaviour, agreeing with the layout.
+ *
+ * ⚠ AND THE MODEL IS A TOGGLE, NOT A DIRECTION. My first reading was
+ * "UP gives 0, DOWN gives 1" from two samples, and the next run reversed it.
+ * On a two-item list either direction wraps, so every press flips the value --
+ * 6 of 6 samples across both runs fit that and none fit the direction model.
+ * ⛔ Do not reintroduce a direction rule here.
+ *
+ * ⚠ Returns FALSE when no such dialog is on screen, which is every other
+ * screen: the lookup is keyed on a live object whose text is "Yes".
+ */
+BOOL gt_modal_selection(int *out_index)
+{
+    void *parent = NULL;
+    LONG n;
+    BOOL got = FALSE;
+
+    if (out_index)
+        *out_index = -1;
+    if (!out_index || (!g_installed && !g_focus_test_mode))
+        return FALSE;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return FALSE;
+
+    n = g_inst_count;
+    for (LONG i = 0; i < n && !parent; i++) {
+        void *o = g_inst[i].obj;
+        ULONGLONG vptr = 0;
+        BOOL faulted = FALSE;
+        unsigned char buf[MODAL_PARENT_OFF + sizeof(void *)];
+
+        if (!o || strcmp(g_inst[i].text, "Yes") != 0)
+            continue;
+        if (mem_readable_run(o, sizeof(vptr)) < sizeof(vptr))
+            continue;
+        MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)o);
+        if (faulted || (vptr != GT_VTABLE_ADDR && vptr != GT_VTABLE_MSG))
+            continue;
+        if (mem_readable_run(o, sizeof(buf)) < sizeof(buf))
+            continue;
+        if (!mem_copy(buf, o, sizeof(buf)))
+            continue;
+        memcpy(&parent, buf + MODAL_PARENT_OFF, sizeof(parent));
+    }
+
+    if (parent && !((ULONG_PTR)parent & 7u)) {
+        unsigned char sel[4];
+        const unsigned char *at = (const unsigned char *)parent + MODAL_SEL_OFF;
+        /* ⛔⛔ mem_readable_run FIRST, then the guarded copy. */
+        if (mem_readable_run(at, sizeof(sel)) >= sizeof(sel) &&
+            mem_copy(sel, at, sizeof(sel))) {
+            unsigned v = *(unsigned *)sel;
+            /* ⚠ A two-option dialog. Anything else means this is not the
+             * control we think it is, and a bare refusal beats a wrong word. */
+            if (v <= 1) {
+                *out_index = (int)v;
+                got = TRUE;
+            }
+        }
+    }
+
+    InterlockedExchange(&g_inst_busy, 0);
+    return got;
 }
 
 void gt_modal_probe(void)

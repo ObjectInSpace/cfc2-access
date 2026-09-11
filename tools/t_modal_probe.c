@@ -38,8 +38,16 @@ int main(void)
      * that breaks the code. These two lines are the difference between a test
      * that proves something and one that agrees with me. */
     static ULONGLONG oy[GT_CLASS_SIZE/8], on[GT_CLASS_SIZE/8];
+    static unsigned char parent[0x400];
     memset(oy, 0, sizeof oy); oy[0] = GT_VTABLE_ADDR;
     memset(on, 0, sizeof on); on[0] = GT_VTABLE_ADDR;
+    /* ⭐ The real dialog's shape: both options share a parent at +0x088, and
+     * the selected index lives at parent+0x38c (0 = the TOP option = "Yes"). */
+    memset(parent, 0, sizeof parent);
+    { void *pp = parent;
+      memcpy((char *)oy + 0x88, &pp, sizeof pp);
+      memcpy((char *)on + 0x88, &pp, sizeof pp); }
+    *(unsigned *)(parent + 0x38c) = 1;      /* "No" is selected */
     gt_test_settext_body(oy, "Yes", NULL, 0);
     gt_test_settext_body(on, "No",  NULL, 0);
 
@@ -95,8 +103,10 @@ int main(void)
         FILE *lf;
         char buf[1024];
         int said = 0;
+        /* ⭐ With index 1 planted, the SELECTED option is "No" -- so that is
+         * what must be spoken, not a list of both. */
         const char *WANT = "If you exit the application, all unsaved progress "
-                           "will be lost. Continue? Yes or No";
+                           "will be lost. Continue? No";
 
         menu_speak_test_set_modal_resolver(res);   /* no GMD table here */
         menu_speak_check_modal();                  /* the real thing */
@@ -117,6 +127,32 @@ int main(void)
             } else {
                 printf("ok    the SHIPPING path said: \"%s\"\n", WANT);
             }
+        }
+    }
+
+    /* 5. ⛔⛔ AND THE OTHER INDEX. One direction passes with the mapping
+     * INVERTED -- which is exactly the bug caught above, where index 1 spoke
+     * "Yes". Asserting both directions is what pins it. */
+    {
+        FILE *lf2; char b2[1024]; int said2 = 0;
+        const char *WANT2 = "Continue? Yes";
+
+        *(unsigned *)(parent + 0x38c) = 0;     /* now the TOP option */
+        menu_speak_test_set_modal_resolver(res);
+        menu_speak_check_modal();              /* the guard keys on the index */
+        menu_speak_test_set_modal_resolver(NULL);
+
+        lf2 = fopen("CFC2Access.log", "rb");
+        if (lf2) {
+            while (fgets(b2, sizeof b2, lf2))
+                if (strstr(b2, WANT2)) said2 = 1;
+            fclose(lf2);
+        }
+        if (!said2) {
+            printf("FAIL  index 0 did not speak the TOP option (\"Yes\")\n");
+            bad++;
+        } else {
+            printf("ok    index 0 speaks \"Yes\", index 1 speaks \"No\"\n");
         }
     }
 
