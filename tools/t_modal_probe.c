@@ -135,7 +135,16 @@ int main(void)
      * "Yes". Asserting both directions is what pins it. */
     {
         FILE *lf2; char b2[1024]; int said2 = 0;
-        const char *WANT2 = "Continue? Yes";
+        /* ⭐ SECOND announcement of the SAME dialog: only the option changed,
+         * so ONLY the option is spoken. The user reported the old behaviour --
+         * "it repeats the whole dialog, it should just say yes or no" -- and a
+         * substring test for "Yes" would pass on the full sentence too, so the
+         * assertion below requires the line to BE "Yes", not contain it. */
+        /* ⚠ Match the QUOTED LINE, not the verb: with no speech backend in a
+         * test process menu_speak_line() logs "NOT SPOKEN (backend refused)"
+         * rather than "spoke". Keying on the verb made this fail while the code
+         * was correct -- the test's expectation was wrong, not the feature. */
+        const char *WANT2 = ": \"Yes\"";
 
         *(unsigned *)(parent + 0x38c) = 0;     /* now the TOP option */
         menu_speak_test_set_modal_resolver(res);

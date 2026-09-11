@@ -2514,10 +2514,26 @@ void menu_speak_check_modal(void)
      * the dialog would speak once and then fall silent as the user moved
      * between the options -- which is exactly what the user reported as "it
      * doesn't speak the option I am on". */
+    /* ⭐⭐ AND SAY ONLY WHAT CHANGED.
+     *
+     * ⛔ USER-REPORTED: "it repeats the whole dialog, it should just say yes or
+     * no". Re-reading a two-line warning on every toggle buries the one word
+     * that changed, and the user is moving between two options several times a
+     * second. A sighted player re-reads the warning once and then watches the
+     * highlight; the spoken equivalent is the prompt ONCE, then the option.
+     *
+     * So: the prompt is spoken when the PROMPT changes (a dialog appearing, or
+     * a different dialog), and only the option name when just the INDEX moves. */
+    BOOL prompt_is_new;
     {
         int sel = -1;
         char key[GT_CAPTION_MAX];
         (void)gt_modal_selection(&sel);
+        /* `last` holds "<index>|<prompt>"; compare the prompt half alone to
+         * tell "a new dialog" from "the same dialog, other option". */
+        const char *bar = strchr(last, '|');
+        prompt_is_new = !bar || strcmp(bar + 1, text) != 0;
+
         _snprintf(key, sizeof(key), "%d|%s", sel, text);
         key[sizeof(key) - 1] = '\0';
         if (strcmp(last, key) == 0)
@@ -2526,7 +2542,12 @@ void menu_speak_check_modal(void)
         last[sizeof(last) - 1] = '\0';
     }
 
-    menu_speak_flatten_prompt(text, flat, (int)sizeof(flat));
+    /* ⭐ The prompt only when it is NEW; otherwise the line starts empty and
+     * carries the option alone. */
+    if (prompt_is_new)
+        menu_speak_flatten_prompt(text, flat, (int)sizeof(flat));
+    else
+        flat[0] = ' ';
 
     /* ⭐⭐ AND THE OPTIONS. The question alone leaves the user to guess what the
      * buttons are; the dialog sets them as live text right after the prompt, so
@@ -2556,6 +2577,9 @@ void menu_speak_check_modal(void)
             !strchr(a, '<') && !strchr(b, '<') &&
             strlen(a) <= 24 && strlen(b) <= 24) {
             size_t used = strlen(flat);
+            /* ⚠ No leading space when the prompt was suppressed -- the line is
+             * then just the option name, and " Yes" is not that. */
+            const char *sep = used ? " " : "";
             /* ⚠⚠ WORK THE INDICES OUT, DO NOT REASON ABOUT THEM IN PROSE. The
              * record holds (oldest first) prompt, TOP option, BOTTOM option;
              * gt_prose_at walks NEWEST-FIRST, so with the prompt at index i:
@@ -2569,20 +2593,25 @@ void menu_speak_check_modal(void)
                 /* ⭐⭐ NAME THE SELECTED OPTION, from the dialog's own state
                  * (parent+0x38c), 0 = the TOP option. See gt_modal_selection()
                  * for the two independent sources that fixed that. */
-                _snprintf(flat + used, sizeof(flat) - used - 1, " %s",
+                _snprintf(flat + used, sizeof(flat) - used - 1, "%s%s", sep,
                           selidx == 0 ? a : b);
             } else {
                 /* ⛔ No readable selection: LIST both rather than name one. A
                  * wrong option stated confidently on a prompt that quits the
                  * game is the failure this file exists to prevent. */
-                _snprintf(flat + used, sizeof(flat) - used - 1, " %s or %s",
+                _snprintf(flat + used, sizeof(flat) - used - 1, "%s%s or %s", sep,
                           a, b);
             }
             flat[sizeof(flat) - 1] = '\0';
         }
     }
 
-    menu_speak_line(flat);
+    /* ⚠ If the prompt was suppressed and no option could be read, there is
+     * nothing to say. menu_speak_line() already ignores an empty string, but
+     * being explicit here keeps the intent visible: silence is the correct
+     * outcome, not an accident of an empty buffer. */
+    if (flat[0])
+        menu_speak_line(flat);
 }
 
 void menu_speak(const mc_move *m)
