@@ -271,6 +271,87 @@ static const int g_pause_menu_rows[] = {
     250, 1070, 253, 226, 574, 254, 255, 256
 };
 
+/* ⭐⭐⭐ TRAINING OPTIONS (0x1400a41ef rows + 0x1400a4241 values), 6 rows --
+ * reached from the TRAINING pause menu's "Training Menu" row. This is the
+ * settings screen the user was looking for; there is no separate game-settings
+ * menu, which was the premise that sent two runs looking for one.
+ *
+ * ⭐⭐ ESTABLISHED BY COORDINATES, not by the caption channel, which is
+ * STRUCTURALLY BLIND here: 55 movements at ~600ms-1s dwell produced ZERO
+ * captions for this screen while 30 prose captions flowed for other objects in
+ * the same window. Same class as the Music chooser and the Lobby ID field.
+ *
+ * The join (cfc2_layout.on, runs 2026-09-11 16:26 and 16:35):
+ *
+ *   X=960  "Dummy Behavior"  Y=265   <- the screen HEADING, a DIFFERENT column
+ *   X=320  the six rows, 80.0 px apart:
+ *
+ *     row 0  Y=326  Action         DUMMY_ACTION   683
+ *     row 1  Y=406  Block          DUMMY_GUARD    694
+ *     row 2  Y=486  Throw Escape   DUMMY_NNUKE    700
+ *     row 3  Y=566  Recovery       DUMMY_OKI      705
+ *     row 4  Y=646  Counter Hit    COUNTER_HIT   2960
+ *     row 5  Y=726  Default        MENU_OP_DEFAULT 168
+ *
+ * ⛔⛔ THE INDICES ABOVE WERE WRONG ON FIRST WRITE, and test_screen_maps.py
+ * caught it. I derived them from enumerate() over data/text_english.json --
+ * a DICT INSERTION POSITION, which is not the GMD index the mod looks up. The
+ * map resolved to fighting-move names ("Psychic Throw", "Crystal Shoot") and
+ * would have spoken those where training settings belong. The index must come
+ * from the parsed menu_eng table (tools/name_screens.load_corpus), whose order
+ * the control confirms: 250 -> CONTINUE -> "Resume".
+ *
+ * ⭐⭐ THE X GROUPING IS LOAD-BEARING. The instance set holds SEVEN labels for
+ * a SIX-row screen, and insertion order cannot say which is not a row -- it has
+ * flipped between runs elsewhere on this project. "Dummy Behavior" sits in the
+ * heading column (the same X=960 that carries "Ken Moves" and "P1 Pause Menu")
+ * and ABOVE the first row, and it is the only member of the family with no
+ * HELP_ caption. Three independent signals, one conclusion.
+ *
+ * ⭐⭐ AND THE CONTROL THAT VALIDATES THE METHOD: sorting the training pause
+ * menu by +0x044 reproduces its already-established order 8 of 8, zero
+ * contradictions. The answer was known before the coordinates were read.
+ *
+ * ⚠ Rows 2 and 4 are separated by POSITION ALONE. Both have 3 values, and
+ * DUMMY_UKEMI and COUNTER_HIT both read "Off / On / Random" -- identical
+ * strings. Neither count nor text can tell them apart; only Y-order can. */
+static const int g_training_option_rows[] = {
+    683, 694, 700, 705, 2960, 168
+};
+
+/* ⭐⭐ TRAINING OPTIONS values. values_off = 0x3F0, re-derived on a FRESH
+ * screen object in the CVS1 run (cursors +0x490/494/498/49C/4A0 -> rows 0-4),
+ * so it is not a CVS2-specific constant.
+ *
+ * ⭐⭐ THE SCREEN IS PER-GAME, and this is measured on TWO games rather than
+ * assumed from one:
+ *
+ *                    CVS1            CVS2
+ *   row 0 Action      8 values        8 values   DUMMY_ACTION  (same)
+ *   row 1 Block       4 values       13 values   DUMMY_GUARD / CVS2_GUARD
+ *   row 2 Throw Esc.  3 values        3 values   -- no variant, see below
+ *   row 3 Recovery    3 values        6 values   CVS1_OKI / CVS2_OKI
+ *   row 4 Counter Hit 3 values        3 values   -- no variant, see below
+ *   row 5 Default     no value axis
+ *
+ * The ROW LABELS are identical on both games -- same X column, same Y values,
+ * same 80px spacing -- so one row map serves both and only the value lists
+ * differ. That is exactly what keying on the LIVE count is for.
+ *
+ * ⛔ ROWS 2 AND 4 GET NO VARIANT ON EITHER GAME. DUMMY_UKEMI_00 (701) and
+ * COUNTER_HIT_00 (2962) are both "Off / On / Random" -- three identical strings.
+ * A corpus check cannot confirm which family a 3-value list came from, so
+ * shipping either would be a guess dressed as a lookup. Same rule that keeps
+ * every On/Off row here unnamed. They speak the row name and position, which
+ * is true. */
+static const mc_value_set g_training_option_values[] = {
+    { 0, 8,   684 },  /* Action: Stand..Spectate        -- MEASURED both games */
+    { 1, 4,   695 },  /* Block (CVS1): None/Auto/All/Random      -- MEASURED */
+    { 1, 13, 2927 },  /* Block (CVS2): CVS2_GUARD_00..12         -- MEASURED */
+    { 3, 3,  4077 },  /* Recovery (CVS1): CVS1_OKI_00..02        -- MEASURED */
+    { 3, 6,  2940 },  /* Recovery (CVS2): CVS2_OKI_00..05        -- MEASURED */
+};
+
 /* ⭐⭐⭐ IN-GAME DISPLAY & SOUND SETTINGS (0x14009c755), 7 rows -- reached from
  * the pause menu. Two captions anchor it (position 1 'Change the background
  * artwork.' -> WALLPAPER 575, position 2 'Change your display filter type.' ->
@@ -1047,6 +1128,33 @@ static const mc_screen g_screens[] = {
      * which is why menu_speak_lookup_n() discriminates on caller AND count. */
     { 0x1400a749dULL, -1, 7, "Pause Menu", MC_VERIFIED_LIVE_TEXT,
       MC_LIST, 0, g_training_pause_rows, 7, NULL, 0, 0 },
+
+    /* ⭐⭐⭐ TRAINING OPTIONS -- the ROW axis. See g_training_option_rows for
+     * the coordinate evidence and the control that validates it.
+     *
+     * Reached from the training pause menu's "Training Menu" row. ⚠ There is
+     * no separate game-settings menu; the training settings live here.
+     *
+     * ⛔ MC_SETTINGS_ROW, not MC_LIST -- the defect that shipped twice before
+     * (in-game AV, Keyboard Settings). menu_speak_sibling_row_for() only
+     * considers MC_SETTINGS_ROW entries, so MC_LIST here would make this screen
+     * invisible to its own value axis and every row without a shipped value set
+     * would speak the row NUMBER. */
+    { 0x1400a41efULL, -1, 6, "Training Options", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_ROW, 0, g_training_option_rows, 6, NULL, 0, 0 },
+
+    /* ⭐⭐ TRAINING OPTIONS -- the VALUE axis. Same screen object as the row
+     * site above; values_off 0x3F0 re-derived on a fresh screen object across
+     * five rows in the CVS1 run, so the two axes are told apart by cursor
+     * OFFSET as every other settings screen here is.
+     *
+     * ⚠ No `levels` bits: none of these rows is a numeric range. Every value
+     * list is a set of NAMES, and a wrong levels bit would say "Block, 3, of 4"
+     * where a name belongs. */
+    { 0x1400a4241ULL, -1, 0, "Training Options", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x3F0, NULL, 0, g_training_option_values,
+      (int)(sizeof(g_training_option_values) /
+            sizeof(g_training_option_values[0])), 0 },
 
     /* ⭐⭐ THE LOBBY-ID KEYPAD's character picker (Search Lobby ID > Enter
      * Lobby ID), 36 items, vertical. Caller 0x14008a8ef.

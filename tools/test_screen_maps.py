@@ -115,6 +115,19 @@ EXPECTED = {
         "Resume", "Marquee Card", "Move List", "Controller Settings",
         "Display & Sound Settings", "Load Quick Save", "Quick Save", "Quit",
     ],
+    # Training Options (0x1400a41ef), reached from the training pause menu's
+    # "Training Menu" row. Established by COORDINATES, not captions -- the
+    # caption channel is structurally blind on this screen (55 movements at
+    # ~1s dwell, zero captions, while other objects captioned freely).
+    # ⭐ Grouped by X then sorted by Y: "Dummy Behavior" is the screen HEADING
+    # at X=960, and the six rows sit at X=320, 80px apart. Confirmed on TWO
+    # games (CVS1 and CVS2) with identical labels and ordering.
+    # ⚠ Rows 2 and 4 are separated by POSITION ALONE -- both have 3 values and
+    # both value lists read "Off / On / Random".
+    "g_training_option_rows": [
+        "Action", "Block", "Throw Escape", "Recovery", "Counter Hit",
+        "Default",
+    ],
     "g_lobby_filter_rows": [
         "Game", "Game Version", "Cross-region Matchmaking", "Comment",
         "Event Mode", "One-button Special Moves",
@@ -173,6 +186,26 @@ EXPECTED_VALUES = {
     },
     "g_sound_values": {
         (4, 2): ["Original", "Remix"],
+    },
+    # Training Options. ⭐ The screen is PER-GAME: the row LABELS are identical
+    # on CVS1 and CVS2, only the value lists differ, which is exactly what
+    # keying on the live count is for. Both counts MEASURED, not inferred.
+    # ⛔ Rows 2 (Throw Escape) and 4 (Counter Hit) get NO variant on either
+    # game: DUMMY_UKEMI and COUNTER_HIT are both "Off / On / Random", three
+    # identical strings, so a corpus check cannot say which family a 3-value
+    # list came from. Shipping either would be a guess dressed as a lookup.
+    "g_training_option_values": {
+        (0, 8): ["Stand", "Crouch", "Jump", "Record", "Play", "Human",
+                 "CPU", "Spectate"],
+        (1, 4): ["None", "Auto", "All", "Random"],
+        (1, 13): ["Off", "Auto", "All", "Random", "Blocking",
+                  "Blocking (random)", "Perfect Guard",
+                  "Perfect Guard (random)", "Guard Cancel Attack",
+                  "Guard Cancel Attack (Random)", "Guard Cancel Move (Forward)",
+                  "Guard Cancel Move (Backward)", "Guard Cancel Move (random)"],
+        (3, 3): ["Normal", "Delayed Stand", "Random"],
+        (3, 6): ["Normal", "Safe Fall", "Safe Fall (random)", "Delayed Stand",
+                 "Delayed Stand (random)", "Random"],
     },
     "g_system_values": {
         # Row 0 is the 14 display languages, a contiguous run from index 0.
