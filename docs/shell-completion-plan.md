@@ -121,6 +121,65 @@ been caught by measurement instead of by ear — and it is the next piece of wor
 screens the "text near a movement" is very often a NEIGHBOURING row's object.
 Four times this session that produced a confident wrong reading.
 
+## ⛔⛔ OPTIONS VALUES MUST READ THEIR ACTUAL VALUES — NOT YET SOLVED
+
+User, 2026-09-11: suppressing the wrong value is "not good enough, they will need
+to read their actual values." Correct — position-only is a regression dressed as
+a fix, and a sighted player sees the binding and the volume.
+
+### What is established
+- ⭐ The bad behaviour is FIXED: the mod no longer appends another row's value
+  ("Coin Button, 1 of 6, English [en]"). That was worse than silence.
+- ⭐ The row is already derived correctly for every Options row, via the value
+  cursor's address. "Coin Button, 1 of 6" names the right row.
+- ⭐ Language and Data Collection DO read their values, from shipped tables.
+
+### ⛔ Why the remaining rows do not, and what was ruled out
+1. **No GMD run.** After `MENU_OP_MENU_BTN` / `START_BTN` / `COIN_BTN` the next
+   label is each one's `HELP_`, not a value list. There is nothing to index.
+2. **Not in the instance set either.** The System Settings instance report holds
+   one object per ROW LABEL and values for Language ("English [en]") and Data
+   Collection ("Decline") — but the only `<ICON BTN_*>` objects anywhere in any
+   log are `BTN_LB` / `BTN_RB`, which are the PAGE-FLIPPER hints, not the
+   bindings. Checked across every log: 13 objects, all LB or RB.
+3. **Insertion order cannot join them.** The row labels do arrive in row order,
+   but the value objects are interleaved with unrelated ones.
+4. **The renderer has no label table.** Unlike the lobby screens
+   (`0x141205e30` / `0x141206e30`), `0x1400a37b0` carries no data pointer; it
+   branches on the row index and drives per-row ANIMATION state.
+
+### ▶ What would actually solve it
+The binding is a controller glyph, so the value is a **button id**, not a
+string. The remaining routes, in order of promise:
+- ⛔ **NOT the `+0x378` array.** That was the obvious candidate and it is
+  checked: `0x1400a33c4` compares it against zero, i.e. it is the
+  enabled/disabled flag, the same shape every other settings screen has. Ruled
+  out before proposing it.
+- **Hook the glyph draw.** The ICON vocabulary already exists in
+  `gui_markup.c` (`BTN_START`→"Start", `BTN_LB`→"LB", 132 tokens), so if the
+  per-row glyph passes through any text or draw call with an id, the naming is
+  already written. Nothing in the current hooks sees it, so this needs a new
+  observation point rather than more log analysis.
+- ⛔ **NOT the saved config either — tried and closed.** The bindings persist, so
+  they must be stored; the file is
+  `Steam/userdata/215494178/2400430/remote/savedata.bin`, 1.2 MB, touched during
+  the user's run. It is **encrypted or compressed**: 244 distinct byte values in
+  the first 64 KB and no meaningful strings. Reading it means breaking that
+  first, which is a far bigger job than the feature warrants.
+
+▶ **So the honest position: this needs a new observation point in the running
+game, not more offline analysis.** The most likely is a hook on whatever sets a
+GUI object's ICON — the same class of hook as `setText`, which is how every
+other text channel here was opened. That is real work, not a lookup.
+
+⚠ Until then these rows say "Menu Button, 3 of 7". That is a true statement and
+an incomplete one, and it should be recorded as UNFINISHED rather than shipped
+as correct.
+
+⚠ Volume rows are a different case: those values are GENERATED numbers, and the
+quote path that used to speak them is now suppressed. They need the number read
+from the screen object, not a label.
+
 ## ⭐⭐ THE 01:30 RUN: Options confirmed, and Fighter Awards' shape solved
 
 ⭐ **The Language values finally spoke** — the one class no log could confirm:
