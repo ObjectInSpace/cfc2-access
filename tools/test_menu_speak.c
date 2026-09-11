@@ -891,6 +891,39 @@ int main(void)
               (int)lb.game_strip, lb.total, (int)cm.game_strip, (int)cm.named);
     }
 
+    /* --- case 25: the ROM game-list path is keyed to a CALLER LIST ---------
+     * ⭐⭐ Row 0 means "the game list" on Select Game and on Casual Match's
+     * value axis, and something entirely different elsewhere -- Sound Settings'
+     * row 0 is Music Volume, System's is Language.
+     *
+     * ⚠ So the guard must stay an explicit caller list. Widening it to "any
+     * MC_SETTINGS_VALUE row 0" would make a volume slider announce a game
+     * title. This case fails if anyone does that, which is the only reason it
+     * exists -- the shipping condition is one line and easy to "simplify".
+     *
+     * ⚠ Asserted through menu_speak_lookup, not by re-deriving the condition:
+     * the harness must not restate the mechanism under test. */
+    {
+        const mc_screen *sg = menu_speak_lookup(0x1400b1bd9ULL);
+        const mc_screen *cm = menu_speak_lookup_n(0x140098986ULL, 8);
+        const mc_screen *sv = menu_speak_lookup_n(0x1400a2771ULL, 10);
+
+        /* The two game-list value sites exist and are VALUE sites; the sound
+         * value site exists too and must NOT be one of them. */
+        int ok = sg && cm && sg->kind == MC_SETTINGS_VALUE &&
+                 cm->kind == MC_SETTINGS_VALUE &&
+                 sg->caller != cm->caller &&
+                 (!sv || (sv->caller != 0x1400b1bd9ULL &&
+                          sv->caller != 0x140098986ULL));
+        char d[200];
+        snprintf(d, sizeof d,
+                 "select-game=%d casual=%d distinct=%d sound-not-a-game-list=%d",
+                 sg != NULL, cm != NULL,
+                 (sg && cm) ? (sg->caller != cm->caller) : 0,
+                 (!sv || sv->caller != 0x1400b1bd9ULL));
+        check("25. the ROM game-list path is keyed to specific callers", ok, d);
+    }
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");

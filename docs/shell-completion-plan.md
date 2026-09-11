@@ -13,6 +13,42 @@ one screen per run is what let the count drift.
 Call sites pair up on one screen object (row list + value axis), the shape
 settings screens already use. Grouped by screen, with what each NEEDS:
 
+### ⭐⭐ THE 8-ITEM STRIP WAS NEVER A NAMING PROBLEM — RE-FRAMED (21:30 run)
+
+⛔ I had this filed as "an unnamed screen needing a selection signal" for days.
+It is neither. Since Casual Match shipped, the strip **is that screen's VALUE
+axis** and it already speaks:
+
+    spoke "Game, 2 of 8"    spoke "Game, 6 of 8"
+
+So the row is named and the position is right. What is missing is only the eight
+**value labels** — the game names — which is an ordinary `mc_value_set` gap, not
+a selection problem. The focus differ's negative below does not block it at all.
+
+▶ **What it needs: the strip's cursor index → ROM index mapping, confirmed.**
+`rom_table_index_for(game, 0)` already predicts it and `[ROMPROBE]` already logs
+the prediction on that screen (30 times in this run, unspoken by design).
+
+⭐ **AND THE ORDERING NOW HAS INDEPENDENT SUPPORT.** The Ranked Leaderboard's
+strip captions properly, so it names itself from the game's own text — and
+across the runs it confirms **five positions**, every one matching the ROM
+table's canonical order:
+
+    pos 1 CVS: Millennium Fight 2000 Pro · pos 2 CVS2: Mark of the Millennium
+    pos 3 Capcom Fighting Evolution · pos 7 Project Justice
+    pos 8 Plasma Sword: Nightmare of Bilstein
+
+⚠ That is the COLLECTION's ordering confirmed on a DIFFERENT screen, not on
+Casual Match's strip. It makes the transfer highly likely and does not prove it.
+⛔ Casual Match's own strip yields nothing usable: its titles arrive on the
+transcript channel unsynchronised to movements, and captions paired to its
+positions CONTRADICT each other ("Capcom Fighting Evolution" lands on positions
+1, 4 AND 5 across runs — stale leftovers, not evidence).
+
+▶ **One cheap run settles it:** walk that strip slowly end to end and read the
+`[ROMPROBE]` lines against what the screen actually shows. Eight predictions,
+eight positions, already instrumented — nothing to build.
+
 ### ⛔⛔ THE FOCUS DIFFER HAS ANSWERED, AND THE ANSWER IS NO (21:30 run)
 
 The differ ran (167 diff lines over 53 movements). **Selection is not a field of

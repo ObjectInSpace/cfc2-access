@@ -1183,7 +1183,29 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
              * ⚠ Keyed on the CALLER, not the name: `name` links the two halves
              * of a settings screen and several screens deliberately share one,
              * so it is not a unique key here. */
-            if (row == 0 && s->caller == 0x1400b1bd9ULL && rom_table_ready()) {
+            /* ⭐⭐ ROW 0 IS THE GAME LIST on more than one screen now.
+             *
+             * Select Game (0x1400b1bd9) was confirmed 2026-09-09 by walking all
+             * eight slots. CASUAL MATCH's value axis (0x140098986) is the same
+             * eight games in the same order, and the 21:30 run corroborates it
+             * WITHOUT relying on that assumption:
+             *
+             *   - [ROMPROBE] predicted positions 1, 2, 3 and 8 on that strip;
+             *   - the RANKED LEADERBOARD's strip captions properly, so it names
+             *     itself from the game's own text, and its positions 1, 2, 3
+             *     and 8 are the SAME titles -- including the quirky JP-side
+             *     "Capcom Fighting Jam" at 3, which a wrong mapping would not
+             *     reproduce.
+             *
+             * ⚠ Position 8 reads "Star Gladiator 2: Nightmare of Bilstein"
+             * (JP) against the screen's "Plasma Sword: Nightmare of Bilstein"
+             * (US) -- the SAME game, the known JP/US split, not a mismatch.
+             *
+             * ⛔ Still keyed on an explicit CALLER LIST, never widened to "any
+             * row 0": row 0 means the game list on these screens and something
+             * else elsewhere. The comment below explains why the key matters. */
+            if (row == 0 && rom_table_ready() &&
+                (s->caller == 0x1400b1bd9ULL || s->caller == 0x140098986ULL)) {
                 int game = m->new_index - m->min_index;
                 int ri = rom_table_index_for(game, 0);
                 char gt[128];
