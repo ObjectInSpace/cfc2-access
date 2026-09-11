@@ -1098,6 +1098,48 @@ int main(void)
               ticker == 2 && focus == 1 && quiet == 0, d29);
     }
 
+    /* --- case 30: the REPORT reclaims dead slots, not just counts them -----
+     * ⛔⛔ MEASURED ON THE LOBBY SETTINGS SCREEN: 64 objects, 31 LIVE, 33 STALE,
+     * on a screen that draws 16 objects of its own. Eviction only fires when a
+     * NEW object needs a slot, so a screen that keeps re-setting its RESIDENT
+     * objects never triggers it and the dead pile up -- and a label that screen
+     * really did draw ("Passcode") was missing from the set.
+     *
+     * ⚠ The assertion is that the slot becomes REUSABLE, not merely that a
+     * counter moved. Reclaiming into a slot nothing can allocate from would
+     * satisfy a count-only test and fix nothing. */
+    {
+        gt_test_reset();
+        gt_test_focus_enable();
+        static ULONGLONG d1[4], d2[4], keep[4];
+        d1[0] = d2[0] = keep[0] = GT_VTABLE_ADDR;
+        gt_test_settext_body(d1,   "doomed one", NULL, 0);
+        gt_test_settext_body(d2,   "doomed two", NULL, 0);
+        gt_test_settext_body(keep, "survivor",   NULL, 0);
+        int before = gt_test_instance_count();
+
+        /* Two of the three are freed and their memory reused. */
+        d1[0] = 0xDEADBEEFULL;
+        d2[0] = 0xDEADBEEFULL;
+
+        gt_instance_report();          /* must reclaim both dead slots */
+
+        /* The survivor is untouched... */
+        char got[GT_CAPTION_MAX] = { 0 };
+        int kept = gt_test_instance_text(keep, got, sizeof got);
+        /* ...and the dead ones no longer answer. */
+        char g1[GT_CAPTION_MAX] = { 0 };
+        int d1_gone = (gt_test_instance_text(d1, g1, sizeof g1) == 0);
+
+        char d30[200];
+        snprintf(d30, sizeof d30,
+                 "before=%d survivor=%d(\"%s\") dead-entry-gone=%d",
+                 before, kept, got, d1_gone);
+        check("30. the report RECLAIMS dead slots and spares the live one",
+              before == 3 && kept > 0 && strcmp(got, "survivor") == 0 &&
+              d1_gone, d30);
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",

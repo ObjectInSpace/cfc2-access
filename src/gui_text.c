@@ -870,7 +870,9 @@ void gt_instance_report(void)
 {
     LONG n, dropped;
 
-    if (!g_installed) {
+    /* ⚠ Test mode reaches this too -- the report now RECLAIMS dead slots, which
+     * is behaviour a suite must be able to exercise, not just a printout. */
+    if (!g_installed && !g_focus_test_mode) {
         log_line("gt: instance set: the hook is not installed; NOTHING was "
                  "measured.");
         return;
@@ -886,7 +888,7 @@ void gt_instance_report(void)
              "(table full) ===", n, dropped);
 
     {
-        LONG live = 0, stale = 0;
+        LONG live = 0, stale = 0, reclaimed = 0;
         LONG seq = g_move_seq;
         for (LONG i = 0; i < n; i++) {
             /* ⚠ Re-validate every time. The pointer is not owned and a GUI
@@ -907,6 +909,23 @@ void gt_instance_report(void)
             log_line("gt:   %p %s [move %ld, %ld set(s)] \"%.70s\"",
                      o, ours ? "LIVE " : "STALE",
                      g_inst[i].move_seq, g_inst[i].sets, g_inst[i].text);
+
+            /* ⭐⭐ RECLAIM IT HERE, not merely count it. Eviction only runs when
+             * a NEW object needs a slot, so on a screen that keeps re-setting
+             * its resident objects nothing triggers it and dead entries
+             * accumulate. Measured on the lobby settings screen: 64 objects,
+             * 31 LIVE, 33 STALE -- and that screen needs 16 slots of its own,
+             * so a label it DID draw ("Passcode") may have been squeezed out.
+             *
+             * ⚠ This pass has already proven the entry dead by the same test
+             * eviction uses, and holds the same lock, so freeing the slot costs
+             * one store and cannot race. */
+            if (!ours) {
+                g_inst[i].obj = NULL;
+                g_inst[i].text[0] = '\0';
+                g_inst[i].sets = 0;
+                reclaimed++;
+            }
         }
         /* ⭐ A POSITIVE count of what was examined, and of what is still a
          * valid object -- "0 live" from 64 entries and from none are entirely
@@ -919,6 +938,11 @@ void gt_instance_report(void)
          * to answer it without another code change. */
         log_line("gt: of %ld object(s): %ld still LIVE, %ld stale; current "
                  "move seq %ld.", n, live, stale, seq);
+        if (reclaimed)
+            log_line("gt: ⭐ reclaimed %ld dead slot(s) this pass -- eviction "
+                     "alone only fires when a NEW object needs a slot, so a "
+                     "screen that re-sets its resident objects never triggers "
+                     "it and the dead pile up.", reclaimed);
         if (n >= GT_INST_MAX)
             log_line("gt: ⚠ the table is FULL (%ld slots, %ld eviction(s) so "
                      "far). %ld stale entr%s present -- dead slots are "

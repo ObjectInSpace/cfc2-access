@@ -53,6 +53,38 @@ whatsoever** about its contents.
 immediately via `MC_GAME_STRIP` (already built). Then the three vertical lists at
 ~1 s dwell each.
 
+### ⭐⭐ LOBBY SETTINGS: the LABELS are in hand, the ORDER is not (19:45 run)
+
+The instance set on that screen holds **both halves of the screen**, and they
+separate themselves by a property of the data rather than by position:
+
+- **8 row labels, all with `7 set(s)`:** Game · Game Version · Cross-region
+  Matchmaking · Comment · Event Mode · One-button Special Moves · Victory
+  Condition · Number of Players
+- **8 values, all with `6 set(s)`:** Japanese Version · Off · "Everyone is
+  welcome!" · On (Quick Match) · On · First to 1 · 2 · CVS2: Millionaire
+  Fighting 2001
+
+⭐ So the caption channel's silence on this screen is NOT the end of the road:
+the row names are being drawn, just not as per-row help captions.
+
+⛔⛔ **BUT INSERTION ORDER CANNOT BE USED, AND THIS RUN PROVES IT.** The screen
+has **10 rows**; only 8 labels were captured. Captions independently pin
+**position 7 = Victory Condition** and **position 10 = Passcode**:
+
+- insertion order puts Victory Condition 7th — ✅ agrees;
+- **"Passcode" is absent from the instance set entirely** — so the 8 captured
+  labels cannot simply be positions 1-8, and the one apparent confirmation is a
+  single hit that a wrong ordering would also produce ~1 time in 8.
+
+⚠ AND THE TABLE WAS SATURATED for that report: `64 objects, 31 LIVE, 33 stale`.
+So "Passcode is absent" may mean *evicted*, not *not drawn* — two explanations
+that cannot be told apart offline. **That ambiguity is itself the finding.**
+
+▶ What would settle it: revisit with the table healthier (fewer screens visited
+first), or walk rows 8-10 slowly so their captions arrive. Either gives the two
+missing labels AND a second independent order check.
+
 ### 2. Lobby settings — `0x2C370E20` (`0x140082c3c` 10v + `0x140082d16` 9h)
 ⭐ **The highest-value target, and pacing alone decides it.** Identity is
 certain: the corpus holds a 60-label `LOBBY_*` family and the live values match
