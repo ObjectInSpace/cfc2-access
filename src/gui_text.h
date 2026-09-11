@@ -453,6 +453,21 @@ BOOL gt_take_caption(char *out, int outlen);
  * notified us. */
 void gt_focus_report(void);
 
+/* ⭐⭐ Dump each live text object's raw fields, looking for one that orders
+ * objects by SCREEN POSITION. Two screens need it -- the Lobby ID field and
+ * the Music chooser's game strip -- because on both the text is readable and
+ * the caption channel is silent, so insertion order is the only join left and
+ * insertion order is DEMONSTRABLY WRONG (the edited slot is first in one run
+ * and last in another).
+ *
+ * ⚠ A dump, not a detector: it prints offsets and values and leaves the
+ * identification to a human with a known on-screen order to compare against.
+ * Guessing which field "looks like" a coordinate is the shape-matching that
+ * went 0 for 4 on this project.
+ *
+ * Switch: cfc2_layout.on. Absent = off, and it does nothing at all. */
+void gt_layout_report(void);
+
 /* ⭐⭐ Log the LIVE INSTANCE SET: every cGUIObjText the hook has seen, keyed by
  * OBJECT, with its latest text and whether the pointer is still a valid object.
  *

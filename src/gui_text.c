@@ -1229,6 +1229,135 @@ void gt_focus_diff_report(void)
              "⚠ Nothing here is spoken; it is a measurement.");
 }
 
+/* ⭐⭐ THE LAYOUT PROBE: find a field that orders objects by SCREEN POSITION.
+ *
+ * ⛔⛔ THE BUG IT EXISTS TO KILL. Two screens are blocked on the same thing --
+ * the Lobby ID field (six single-character slots) and the Music chooser's
+ * 9-item game strip. Both have their text on screen; on both, the caption
+ * channel is silent (24 movements, ZERO captions on the music strip, confirmed
+ * across every log). So the text is reachable and the POSITION is not.
+ *
+ * The tempting join is the instance set's insertion order. It is WRONG: in the
+ * 1913 run the slot being edited is LAST in the list, in the 1945 run it is
+ * FIRST -- whichever slot the user touched decides. A lookup by list position
+ * passes each run individually and is wrong in general, which is exactly the
+ * sabotage the music-track fixture exists to catch.
+ *
+ * ⭐ SO: SCREEN POSITION MUST COME FROM THE OBJECT, not from arrival order. A
+ * cGUIObjText is a GUI widget and almost certainly stores its own coordinates.
+ *
+ * ⚠⚠ WHY THIS IS A DUMP AND NOT A DETECTOR. I do not know which offset holds a
+ * coordinate, and "find the field that looks like an X" is precisely the
+ * shape-matching that went 0 for 4 on this project (see the route 1-4 notes:
+ * look-alikes are abundant and indistinguishable as data). This prints the
+ * RAW FIELDS of each candidate object and leaves the identification to a human
+ * comparing them against a screen whose left-to-right order is KNOWN. The
+ * measurement is here; the claim is not.
+ *
+ * ⭐ THE CONTROL THAT MAKES IT READABLE: the lobby field's six slots are all
+ * on screen at once, in a row. So the right offset is one holding six DISTINCT,
+ * MONOTONIC values. A field that is constant across all six is chrome; a field
+ * that changes every frame is a ticker. Both are visible here and neither can
+ * masquerade as the answer.
+ *
+ * ⚠ The focus differ cannot do this job: it reports fields that CHANGE, and a
+ * slot's position is STATIC. That is why this is a separate probe rather than
+ * another mode of an existing one.
+ *
+ * Switch: cfc2_layout.on next to the exe. Absent = off, like every other aid
+ * here -- a diagnostic that runs during play is a mod that stalls.
+ */
+static BOOL layout_enabled(void)
+{
+    static int cached = -1;
+    if (cached < 0)
+        cached = (GetFileAttributesA("cfc2_layout.on") != INVALID_FILE_ATTRIBUTES);
+    return cached != 0;
+}
+
+void gt_layout_report(void)
+{
+    LONG n;
+    int shown = 0;
+
+    if (!layout_enabled())
+        return;
+
+    if (!g_installed) {
+        log_line("layout: the hook is not installed; NOTHING was measured.");
+        return;
+    }
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0) {
+        log_line("layout: instance set busy; report skipped this poll.");
+        return;
+    }
+
+    n = g_inst_count;
+    log_line("layout: === FIELD DUMP of live text objects (%ld in set) ===", n);
+    log_line("layout: ▶ READ IT LIKE THIS: on a screen whose items sit in a "
+             "known left-to-right (or top-to-bottom) order, look for an offset "
+             "holding DISTINCT values that follow that order. Constant across "
+             "all = chrome. Different every poll = a ticker. Neither is a "
+             "coordinate.");
+
+    for (LONG i = 0; i < n; i++) {
+        void *o = g_inst[i].obj;
+        ULONGLONG vptr = 0;
+        BOOL faulted = FALSE;
+        unsigned char cur[GT_CLASS_SIZE];
+        char line[600];
+        int used = 0;
+
+        if (!o)
+            continue;
+        /* ⚠ The pointer is not ours and a GUI object is freed on a screen
+         * change. Re-validate exactly as every other reader here does. */
+        if (mem_readable_run(o, sizeof(ULONGLONG)) < sizeof(ULONGLONG))
+            continue;
+        MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)o);
+        if (faulted || (vptr != GT_VTABLE_ADDR && vptr != GT_VTABLE_MSG))
+            continue;
+        /* ⛔⛔ mem_readable_run FIRST, always. A guarded memcpy across a bad
+         * page is NOT reliably caught -- measured in this project, case C of
+         * run_span_test. The guard is a net for the race, never the check. */
+        if (mem_readable_run(o, GT_CLASS_SIZE) < GT_CLASS_SIZE)
+            continue;
+        if (!mem_copy(cur, o, GT_CLASS_SIZE))
+            continue;
+
+        /* ⭐ Only SHORT texts. The slots and the strip entries are short; the
+         * prose blurbs and markup strips that share the set are not, and they
+         * would bury the rows being compared. */
+        if (!g_inst[i].text[0] || strlen(g_inst[i].text) > 48)
+            continue;
+
+        /* Dump the object's dwords as raw offsets. Naming a field would be a
+         * claim; an offset and its value are the measurement. Offsets 0x00-0x0f
+         * are the vptr and are skipped. */
+        for (int off = 0x10; off < GT_CLASS_SIZE &&
+                             used < (int)sizeof(line) - 24; off += 4) {
+            unsigned v = *(unsigned *)(cur + off);
+            if (!v)
+                continue;               /* zeros carry no ordering information */
+            used += _snprintf(line + used, sizeof(line) - used - 1,
+                              "%s+0x%03x:%08x", used ? " " : "", off, v);
+        }
+        line[sizeof(line) - 1] = '\0';
+        log_line("layout:   %p \"%.24s\" %s", o, g_inst[i].text, line);
+        shown++;
+    }
+
+    /* ⭐ A POSITIVE count of what was examined. "0 failed" must never be
+     * mistakable for "0 checked" -- this project has shipped that once. */
+    log_line("layout: %d object(s) dumped of %ld in the set (short text only).",
+             shown, n);
+    if (!shown)
+        log_line("layout: ⚠ NOTHING was dumped -- no conclusion is available "
+                 "from this poll, which is NOT the same as a negative result.");
+
+    InterlockedExchange(&g_inst_busy, 0);
+}
+
 void gt_focus_report(void)
 {
     LONG n, dropped, notes;

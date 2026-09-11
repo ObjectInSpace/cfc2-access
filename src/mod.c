@@ -649,6 +649,14 @@ static DWORD WINAPI worker(LPVOID param)
         if (gt_ok && (beat == 10 || beat % 5 == 0))
             gt_instance_report();
 
+        /* ⭐⭐ The LAYOUT PROBE (cfc2_layout.on, absent = off). Looks for the
+         * field that orders objects by SCREEN POSITION -- the one piece both
+         * the Lobby ID field and the Music chooser's strip are blocked on.
+         * Same cadence as the two reporters above so a single run carries all
+         * three and they can be read side by side. */
+        if (gt_ok && (beat == 10 || beat % 5 == 0))
+            gt_layout_report();
+
         /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning
          * 1.3 GB, and it duplicated work: gmd_text_ready() already calls
          * gmd_find(), caches the resolved table, and is itself retried by this
