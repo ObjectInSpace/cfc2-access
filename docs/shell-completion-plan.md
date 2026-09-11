@@ -244,6 +244,37 @@ sentence as the Start Button binding.
 changed during the session — which is the feature working, not noise — but it
 means the values are genuinely dynamic and cannot be baked into a table.
 
+## ▶▶ NEXT TARGET: THE PAUSE MENU (user's choice, 2026-09-11)
+
+⚠ **No run has ever entered it.** Both 7-item callers seen so far are Fighter
+Awards (`0x140079833`) and System Settings (`0x1400a3578`) — neither is the
+pause menu, so its caller address is unknown and that is the one thing only a
+run supplies.
+
+⭐ The labels are already predicted and they are a clean contiguous run of
+exactly seven, which is unusual and promising:
+
+    250 CONTINUE      'Resume'          253 COMMAND_LIST 'Move List'
+    251 RESTART       'Restart'         254 LOAD         'Load Quick Save'
+    252 HOW_TO_PLAY   'How to Play'     255 SAVE         'Quick Save'
+                                        256 QUIT         'Quit'
+    257 HELP_CONTINUE 'Return to the game.'   <- the caption that confirms it
+
+⭐ So a single visit should settle it: `HELP_CONTINUE` at position 1 gives
+base 250 by subtraction, and `name_screens.py` resolves that automatically from
+the log without any new code.
+
+⚠⚠ **But this is an IN-GAME screen, not a shell screen.** It is reached by
+starting a match and pausing, so it sits behind the emulated ROM — the first
+screen in this project that does. Whether the shell's cursor hooks even fire
+there is itself unknown and is the first thing the log will answer:
+- `mc:` lines on pause  → the shell still drives it, and this is ordinary work;
+- no `mc:` lines at all  → the pause menu belongs to the emulated game and needs
+  the in-game route, which is a different project entirely.
+
+▶ **The run:** start any game, pause, move through all seven rows with ~1 s
+dwell, then quit back out. Small and specific.
+
 ## ⭐⭐ WHERE ELSE DOES "THE POSITION IS THE VALUE" APPLY? — swept, answer: nowhere else
 
 Asked after the volume fix. Every value row in every log, classified by its
