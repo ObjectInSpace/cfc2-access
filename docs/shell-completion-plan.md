@@ -1150,3 +1150,39 @@ A **position -> live object** join for screens where the caption channel is
 blind. Two screens now want it, both already have the text on screen, and both
 are blocked on the same thing. That, not more label tables, is the next real
 piece of work.
+
+## ⛔ THE MUSIC STRIP IS *NOT* SHIPPED WITH THE COORDINATE JOIN -- measured
+
+The coordinate join (MC_COORD_LIVE) was built for two screens. Only ONE of them
+can use it, and the other was closed by measurement rather than by argument.
+
+**Shipped: the Lobby ID field (0x14008a91b).** Six slots, coord_maxlen = 1.
+Every slot is exactly one character, which is the narrowest possible membership
+rule -- no prompt, timer or button strip on that screen is one character long,
+so the candidate set is unambiguous.
+
+**NOT shipped: the Music chooser's 9-item game strip (0x14009af21).** Its game
+titles are live text, so the join looked applicable. It is not:
+
+The Music screen holds DOZENS of short live strings that a length/markup filter
+cannot separate from a game title -- track names ("01. Prologue"), durations
+("0:28", "2:33", "0:00 / 0:00"), and the breadcrumbs "Museum", "Gallery",
+"Music". Simulating coord_candidate() against every instance-set poll during
+that screen in two runs gives candidate counts of:
+
+    6, 31, 31, 31, 6, 21, 30, 30      (19:13 run)
+    27                                 (17:32 run)
+
+**Never 9.** gt_item_at_position() refuses on a count mismatch, so the row would
+be refused on every movement -- dead code that reads like progress.
+
+⭐ That refusal is the CORRECT behaviour (a duration read aloud as a game name
+is the failure this project exists to prevent), but correct-and-silent is not a
+feature. The screen needs a membership test that distinguishes a game title
+from a track title, and `rom_table_has_title()` already exists for exactly that
+kind of check -- the ROM table names all eight games plus the collection.
+
+▶ NEXT for this screen: filter candidates through the ROM table instead of by
+length. That is a real lead, not a guess: MC_GAME_STRIP already corroborates
+titles that way, and the strip's contents ARE ROM-table titles (confirmed in
+its instance dump).

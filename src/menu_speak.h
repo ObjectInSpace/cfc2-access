@@ -140,7 +140,23 @@ typedef enum {
      * what the game drew, never from a 36-entry table -- a table would freeze
      * in whatever the log happened to show, including the two positions where
      * an unrelated hint strip landed in the same window. */
-    MC_CHAR_PICKER
+    MC_CHAR_PICKER,
+    /* ⭐⭐⭐ A screen whose items are LIVE TEXT ordered by the objects' own
+     * SCREEN COORDINATES (+0x040 X, +0x044 Y). For screens where the text is
+     * on screen but the CAPTION CHANNEL IS BLIND -- the lobby-ID field (six
+     * character slots) and the Music chooser's game strip, which produced ZERO
+     * captions across 24 movements in every log.
+     *
+     * ⛔⛔ The alternative joins are all WRONG here, measured rather than
+     * argued: insertion order puts the edited lobby slot FIRST in one run and
+     * LAST in another, and the objects' +0x050 field reads 0a,0c,0b,0d,0e,0f --
+     * slots 2 and 3 inverted. Only the coordinate orders them correctly.
+     *
+     * ⚠ `count` must be the real item count: gt_item_at_position() REFUSES when
+     * the number of candidate objects disagrees with it, which is what stops a
+     * neighbouring screen's objects from being ordered as if they were this
+     * one's. */
+    MC_COORD_LIVE
 } mc_kind;
 
 /* ⭐ A mapped screen's row whose label is NOT established. See `labels`. */
@@ -204,6 +220,12 @@ typedef struct {
      * ten named options, and guessing would state a level where a name belongs
      * -- the failure this file exists to prevent. */
     unsigned   levels;
+    /* ⭐ For MC_COORD_LIVE: the longest text that counts as an ITEM on this
+     * screen. 0 means the default (48). The lobby slots are single characters
+     * and the music strip's are full game titles, so the two screens need
+     * different ceilings -- and a ceiling that is too generous admits a blurb,
+     * which the count check then rejects, silencing the whole screen. */
+    int        coord_maxlen;
 } mc_screen;
 
 /* What a movement should say. */

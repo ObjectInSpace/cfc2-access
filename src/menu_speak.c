@@ -950,6 +950,31 @@ static const mc_screen g_screens[] = {
     { 0x14008a8efULL, -1, 36, "Enter Lobby ID", MC_VERIFIED_LIVE_TEXT,
       MC_CHAR_PICKER, 0, NULL, 0, NULL, 0 },
 
+    /* ⭐⭐⭐ THE LOBBY-ID FIELD ITSELF (0x14008a91b), 6 character slots,
+     * horizontal. The screen beside the picker above: the picker chooses a
+     * character, this says which SLOT it goes in.
+     *
+     * MEASURED in run-2026-09-11-0322. All six slot objects live at once, one
+     * Y (556.0) with X ascending 800, 864, 928, 992, 1056, 1120 -- a ROW, 64.0
+     * px apart. So this is the screen that proved the coordinate sort must
+     * derive its axis rather than assume Y.
+     *
+     * ⛔⛔ AND THE SCREEN THAT PROVES THE COORDINATE IS THE ONLY USABLE KEY.
+     * Those same six objects carry +0x050 = 0a, 0c, 0b, 0d, 0e, 0f -- slots 2
+     * and 3 INVERTED -- and the instance set's insertion order put the edited
+     * slot FIRST in one run and LAST in another. Ordering by either would
+     * silently swap two characters of a code the user is spelling out, which
+     * on this screen is the whole point of the screen.
+     *
+     * ⚠ coord_maxlen = 1: every slot is exactly one character. That is the
+     * narrowest possible membership rule and it is exactly right here -- the
+     * screen's other text (prompts, the button strip) cannot be one character.
+     *
+     * ⚠ count = 6 is a real invariant, and gt_item_at_position() REFUSES when
+     * the live candidate count disagrees with it. A lobby ID is six characters. */
+    { 0x14008a91bULL, -1, 6, "Lobby ID", MC_VERIFIED_LIVE_TEXT,
+      MC_COORD_LIVE, 0, NULL, 0, NULL, 0, 0, 1 },
+
     /* ⚠ TEST-ONLY. Not a real call site -- no game movement can reach
      * 0xDEADCA11 -- so this cannot affect speech. It keeps the
      * MC_LABEL_UNKNOWN path covered; see MC_TEST_CALLER in the header. */
@@ -1380,6 +1405,39 @@ BOOL menu_speak_derive_row(const void *screen, const void *cursor,
     return TRUE;
 }
 
+/* ⭐⭐ THE MEMBERSHIP TEST for MC_COORD_LIVE. The coordinates ORDER a set; this
+ * decides what is IN it, and the two jobs must stay separate -- a filter that
+ * admits a neighbouring screen's objects produces a perfectly-sorted wrong
+ * answer.
+ *
+ * The instance set holds several screens at once (30 of 64 entries were stale
+ * in the run this was built from), so the rule is deliberately narrow: short
+ * text only, no markup, no prose. Both screens this serves have SHORT items --
+ * the lobby slots are single characters and the music strip's are game titles.
+ *
+ * ⚠ A blurb or a button-hint strip sharing the screen would otherwise become a
+ * candidate, and then the COUNT check in gt_item_at_position() is what refuses
+ * the whole reading rather than silently shifting every position by one. */
+typedef struct { int maxlen; } coord_ctx;
+
+static BOOL coord_candidate(const char *text, void *ctx)
+{
+    const coord_ctx *c = (const coord_ctx *)ctx;
+    size_t n;
+    if (!text || !text[0])
+        return FALSE;
+    n = strlen(text);
+    if (n > (size_t)c->maxlen)
+        return FALSE;
+    /* ⛔ Markup means a hint strip or a styled banner, never an item here. */
+    if (strchr(text, '<'))
+        return FALSE;
+    /* ⛔ A sentence is a caption, not an item. */
+    if (text[n - 1] == '.' || text[n - 1] == '!' || text[n - 1] == '?')
+        return FALSE;
+    return TRUE;
+}
+
 void menu_speak_build(const mc_move *m, mc_speech *out)
 {
     memset(out, 0, sizeof(*out));
@@ -1473,6 +1531,38 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
         /* The live text carries engine markup like everything else on this
          * channel, so it goes through the same translator, and residue is
          * refused rather than read aloud as tag soup. */
+        char spoken[GM_OUT_MAX];
+        gm_speak(text, spoken, sizeof(spoken));
+        if (!spoken[0] || gm_has_residue(spoken)) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        _snprintf(out->item, sizeof(out->item), "%s", spoken);
+        out->item[sizeof(out->item) - 1] = '\0';
+        out->named = TRUE;
+        return;
+    }
+
+    /* ⭐⭐⭐ COORDINATE-ORDERED LIVE TEXT. The screen's items are on screen and
+     * the caption channel is blind, so the objects are ordered by their own
+     * X/Y and position N is the Nth in layout order. See MC_COORD_LIVE.
+     *
+     * ⚠ The candidate filter is the membership test; the coordinates only
+     * ORDER what it admits. gt_item_at_position() then refuses outright if the
+     * number of candidates disagrees with this screen's count -- which is what
+     * stops a neighbouring screen's objects being ordered as if they were this
+     * one's. Two independent gates, same as every other channel here. */
+    if (s->kind == MC_COORD_LIVE) {
+        char text[GT_CAPTION_MAX];
+        coord_ctx cc;
+        cc.maxlen = s->coord_maxlen ? s->coord_maxlen : 48;
+        if (out->total < 1 ||
+            !gt_item_at_position(out->position, out->total,
+                                 coord_candidate, &cc,
+                                 text, (int)sizeof(text)) || !text[0]) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
         char spoken[GM_OUT_MAX];
         gm_speak(text, spoken, sizeof(spoken));
         if (!spoken[0] || gm_has_residue(spoken)) {

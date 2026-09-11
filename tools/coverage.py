@@ -47,7 +47,10 @@ MOVE = re.compile(r"item (?P<pos>\d+) of (?P<total>\d+).*?caller=0*(?P<c>[0-9A-F
 # Kinds that name an item WITHOUT a label map -- they read the game's own live
 # text or derive the name another way, so a position they cover is named even
 # though `labels` is NULL.
-LIVE_KINDS = {"MC_NUMBERED_LIVE", "MC_CHAR_PICKER", "MC_GAME_STRIP"}
+LIVE_KINDS = {"MC_NUMBERED_LIVE", "MC_CHAR_PICKER", "MC_GAME_STRIP",
+              # Named by the objects' own screen coordinates -- no map, and the
+              # count check in gt_item_at_position() is what keeps it honest.
+              "MC_COORD_LIVE"}
 
 # A value axis speaks "<row>, <value>" and is driven by the row map of its
 # SIBLING screen (same `name`), not by a map of its own.
