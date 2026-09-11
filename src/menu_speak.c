@@ -238,6 +238,35 @@ static const int g_lobby_filter_rows[] = {
  * base label, the same convention every other row here follows.
  * ⚠ Row 8 is QUIT (256), not EXIT (42): both read "Quit", and 256 sits with the
  * rest of this screen's family. */
+/* ⭐⭐⭐ THE TRAINING-MODE PAUSE MENU (0x1400a749d at SEVEN items) -- the SAME
+ * caller as the arcade pause menu, which has eight.
+ *
+ * ⛔⛔ USER-REPORTED: "still a lot of missing text in the pause menu". The
+ * 8-row map was the only entry for this caller, so on a 7-item screen the
+ * count check rejected it and EVERY row fell back to a bare position. Nothing
+ * was wrong with the map; it belonged to the other screen.
+ *
+ * ⭐ NAMED BY ITS OWN CAPTIONS, one per position, all seven captured in the
+ * 15:17 run with no gaps:
+ *     1 "Return to training mode."              -> Resume
+ *     2 "Displays the marquee card."            -> Marquee Card
+ *     3 "View the move list."                   -> Move List
+ *     4 "Set the game's controls."              -> Controller Settings
+ *     5 "Change various display and sound settings." -> Display & Sound Settings
+ *     6 "Return to the character select screen." -> Change Character
+ *     7 "Exit training mode."                   -> Quit
+ *
+ * ⭐ It is the arcade menu with Load Quick Save and Quick Save replaced by
+ * Change Character -- which is exactly what training mode offers instead, and
+ * is a check on the reading rather than a coincidence.
+ *
+ * ⚠ CONTINUE (250) and QUIT (256) are shared with the arcade menu even though
+ * their CAPTIONS differ ("Return to training mode" vs "Return to the game"):
+ * the game reuses the item labels and varies only the help text. */
+static const int g_training_pause_rows[] = {
+    250, 1070, 253, 226, 574, 756, 256
+};
+
 static const int g_pause_menu_rows[] = {
     250, 1070, 253, 226, 574, 254, 255, 256
 };
@@ -949,8 +978,19 @@ static const mc_screen g_screens[] = {
     /* ⭐⭐⭐ IN-GAME DISPLAY & SOUND SETTINGS, 7 rows. See g_ingame_av_rows.
      * ⭐ Rows 4-5 (Music Volume, Sound Effects Volume) are LEVELS -- their
      * cursor position IS the setting, same as the Options volume sliders. */
+    /* ⛔⛔ MC_SETTINGS_ROW, not MC_LIST -- and it was MC_LIST, which is why the
+     * user heard "row 5, 1 of 11" instead of "Music Volume, 1 of 11".
+     *
+     * menu_speak_sibling_row_for() only considers MC_SETTINGS_ROW entries, so
+     * declaring this a plain list made it invisible to its OWN value axis: every
+     * row without a shipped value set fell back to the row NUMBER. Display Size
+     * sounded right only because it has one, which is exactly how the bug
+     * survived -- one working row is enough to look correct in passing.
+     *
+     * ⚠ The two halves are linked by this identical `name`; the kind is what
+     * makes the link reachable at all. */
     { 0x14009c755ULL, -1, 7, "Display & Sound Settings", MC_VERIFIED_LIVE_TEXT,
-      MC_LIST, 0, g_ingame_av_rows, 7, NULL, 0, 0 },
+      MC_SETTINGS_ROW, 0, g_ingame_av_rows, 7, NULL, 0, 0 },
 
     /* ⭐⭐ The in-game AV screen's VALUE axis. Same screen object as the row
      * site above -- five call sites share 0x2C498050, which is why the axes
@@ -966,8 +1006,12 @@ static const mc_screen g_screens[] = {
      * captions anchor it and the live object list supplies the rest, with the
      * corpus confirming which ten labels belong. Reached from the pause menu's
      * "Controller Settings". */
+    /* ⛔ MC_SETTINGS_ROW, not MC_LIST -- the same defect the in-game AV screen
+     * had, found by auditing every screen with a value axis for a reachable
+     * row half rather than waiting to hit it. A value movement here would have
+     * said "row 3" instead of "Menu". */
     { 0x14009ec58ULL, -1, 16, "Keyboard Settings", MC_VERIFIED_LIVE_TEXT,
-      MC_LIST, 0, g_kbd_settings_rows, 16, NULL, 0, 0 },
+      MC_SETTINGS_ROW, 0, g_kbd_settings_rows, 16, NULL, 0, 0 },
 
     /* ⭐⭐ KEYBOARD SETTINGS' VALUE AXIS (0x14009ed20), 4 items, horizontal.
      * Same screen object (0x2C498050) as the row site above -- another AXIS of
@@ -992,6 +1036,17 @@ static const mc_screen g_screens[] = {
      * normally, so it needed no new mechanism at all. */
     { 0x1400a749dULL, -1, 8, "Pause Menu", MC_VERIFIED_LIVE_TEXT,
       MC_LIST, 0, g_pause_menu_rows, 8, NULL, 0, 0 },
+
+    /* ⭐⭐⭐ THE TRAINING-MODE PAUSE MENU -- same caller, SEVEN items. See
+     * g_training_pause_rows: all seven named by their own captions in one run.
+     *
+     * ⚠ Without this row the 8-item map failed the count check on every visit
+     * and the whole screen spoke bare positions -- user-reported as "a lot of
+     * missing text in the pause menu". Third screen on this project where one
+     * caller serves two screens (Select Mode/Online Play, Casual/Ranked Match),
+     * which is why menu_speak_lookup_n() discriminates on caller AND count. */
+    { 0x1400a749dULL, -1, 7, "Pause Menu", MC_VERIFIED_LIVE_TEXT,
+      MC_LIST, 0, g_training_pause_rows, 7, NULL, 0, 0 },
 
     /* ⭐⭐ THE LOBBY-ID KEYPAD's character picker (Search Lobby ID > Enter
      * Lobby ID), 36 items, vertical. Caller 0x14008a8ef.

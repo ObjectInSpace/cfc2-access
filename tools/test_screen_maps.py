@@ -55,6 +55,13 @@ EXPECTED = {
     # point (all 7 sightings follow "Data Collection, Agree") and this being the
     # only 3-label run in the SYS_WINDOW family. The count alone was never
     # enough -- that is the reasoning that mislabelled two screens here.
+    # ⭐ The TRAINING-mode pause menu: the same caller as the arcade one but
+    # SEVEN items, so the 8-row map was rejected and the whole screen spoke
+    # bare positions. All seven named by their own captions in one run.
+    "g_training_pause_rows": [
+        "Resume", "Marquee Card", "Move List", "Controller Settings",
+        "Display & Sound Settings", "Change Character", "Quit",
+    ],
     "g_consent_rows": [
         "Agree", "Decline", "Privacy Policy",
     ],
@@ -230,6 +237,39 @@ EXPECTED_VALUES = {
 }
 
 
+def check_value_axes_reach_a_row_map(src):
+    """⛔⛔ EVERY MC_SETTINGS_VALUE ENTRY MUST HAVE A REACHABLE ROW HALF.
+
+    menu_speak_sibling_row_for() only considers MC_SETTINGS_ROW entries, so a
+    row map declared MC_LIST is INVISIBLE to its own value axis -- every row
+    without a shipped value set then speaks the row NUMBER ("row 5, 1 of 11")
+    instead of its name ("Music Volume, 1 of 11").
+
+    ⚠ USER-REPORTED, and it had shipped on TWO screens: the in-game Display &
+    Sound settings and Keyboard Settings. The first sounded partly correct
+    because ONE of its rows has a value set and spoke properly -- which is
+    exactly how it survived a read-through, and why this is a mechanical check
+    rather than something to notice by reading.
+    """
+    m = re.search(r"g_screens\[\]\s*=\s*\{(.*?)\n\};", src, re.S)
+    if not m:
+        return ["g_screens[] not found"]
+    body = re.sub(r"/\*.*?\*/", "", m.group(1), flags=re.S)
+    kinds = {}
+    for entry in re.findall(r"\{([^{}]*)\}", body):
+        f = [x.strip() for x in entry.split(",")]
+        if len(f) < 6 or not f[0].startswith("0x"):
+            continue
+        kinds.setdefault(f[3].strip('"'), []).append(f[5])
+    bad = []
+    for name, ks in kinds.items():
+        if "MC_SETTINGS_VALUE" in ks and "MC_SETTINGS_ROW" not in ks:
+            bad.append("%s has a VALUE axis but no MC_SETTINGS_ROW half "
+                       "(kinds: %s) -- its values will speak the row NUMBER"
+                       % (name, ", ".join(ks)))
+    return bad
+
+
 def main():
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -374,6 +414,19 @@ def main():
                         print("        row %d x%d: got %s want %s"
                               % (k[0], k[1], seen.get(k), want.get(k)))
             failed += 1
+
+    # ⛔ Every value axis must be able to REACH its row map. See the docstring
+    # of check_value_axes_reach_a_row_map: this shipped broken on TWO screens
+    # and was reported by the user, because it is invisible to a read-through.
+    checked += 1
+    axis_bad = check_value_axes_reach_a_row_map(src)
+    if axis_bad:
+        failed += 1
+        print("FAIL  value axes with no reachable row map:")
+        for b in axis_bad:
+            print("        %s" % b)
+    else:
+        print("ok    every MC_SETTINGS_VALUE entry has an MC_SETTINGS_ROW half")
 
     print()
     print("%d checked, %d failed" % (checked, failed))
