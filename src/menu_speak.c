@@ -242,6 +242,62 @@ static const int g_pause_menu_rows[] = {
     250, 1070, 253, 226, 574, 254, 255, 256
 };
 
+/* ⭐⭐⭐ IN-GAME DISPLAY & SOUND SETTINGS (0x14009c755), 7 rows -- reached from
+ * the pause menu. Two captions anchor it (position 1 'Change the background
+ * artwork.' -> WALLPAPER 575, position 2 'Change your display filter type.' ->
+ * SCREEN_FILTER 580) and the live object list gives the rest in row order.
+ *
+ * ⭐ THE FAMILY CONFIRMS IT: 575-593 is one in-game block -- WALLPAPER,
+ * SCREEN_FILTER, SCREEN_SIZE, SCREEN_ROTATE, then SOUND_BGM_VOLUME and
+ * SOUND_SE_VOLUME -- each with its own HELP_ caption at 595-599.
+ *
+ * ⚠ The two volume rows are AMBIGUOUS by text: "Music Volume" is both
+ * MENU_OP_BGM_VOLUME (190, the Options screen) and SOUND_BGM_VOLUME (592).
+ * 592/593 are chosen because they sit INSIDE this screen's own family block
+ * beside WALLPAPER and SCREEN_*, with HELP_SOUND_* captions -- the 190/191 pair
+ * belongs to Options > Music. Text alone could not separate them; the family
+ * neighbourhood does.
+ *
+ * ⚠ INTERNAL_RESO is 4114, far outside the block -- so no base could name this
+ * screen, the same shape as the pause menu. */
+static const int g_ingame_av_rows[] = {
+    575, 580, 583, 4114, 592, 593, 168
+};
+
+/* ⭐⭐⭐ IN-GAME KEYBOARD SETTINGS (0x14009ec58), 16 rows -- reached from the
+ * pause menu's "Controller Settings".
+ *
+ * Two captions anchor it: position 1 'Change key bindings.' -> MENU_KBD_TYPE
+ * (464) and position 9 'Reset to default settings.' -> MENU_OP_DEFAULT (168).
+ * The other fourteen come from the live object list, which holds the whole
+ * screen in row order:
+ *
+ *   Key Bindings · Default · Menu · Start · Coin · Left · Up · Right · Down ·
+ *   Light/Medium/Heavy Punch · Light/Medium/Heavy Kick · Type A
+ *
+ * ⭐ THE CORPUS CORROBORATES THE FAMILY: MENU_KBD_UP/DOWN/LEFT/RIGHT occupy
+ * 239-242 and MENU_KBD_SHOT1..6 occupy 243-248, one unbroken block covering
+ * exactly the ten movement/attack rows this screen shows.
+ *
+ * ⚠ But the corpus ORDER is Up, Down, Left, Right while the SCREEN lists Left,
+ * Up, Right, Down -- so the map is not the corpus order and a base would place
+ * all four wrongly. The screen's order comes from the live object list; the
+ * corpus only confirms WHICH ten labels belong here. Two sources, each
+ * answering the half it can.
+ *
+ * ⛔ NOT a contiguous map overall: the row labels are scattered (464, 168, 573,
+ * 238, 572, then the 239-248 block, then 234), so no base could name this
+ * screen -- the same shape as the pause menu above.
+ *
+ * ⚠ Six rows have an ambiguous corpus match (Light Punch is both
+ * MENU_KBD_SHOT1 and PAD_OPT_6BUTTON_01). The MENU_KBD_* family is chosen
+ * because this is the KEYBOARD screen and that family is contiguous here; the
+ * PAD_OPT_* family belongs to the controller screen. */
+static const int g_kbd_settings_rows[] = {
+    464, 168, 573, 238, 572, 241, 239, 242, 240,
+    243, 244, 245, 246, 247, 248, 234
+};
+
 /* See MC_TEST_CALLER: a map that deliberately keeps one row UNKNOWN so the
  * sentinel path stays covered now that no shipped screen has a gap. */
 static const int g_sentinel_test_rows[] = { 51, MC_LABEL_UNKNOWN, 84 };
@@ -793,6 +849,19 @@ static const mc_screen g_screens[] = {
      * 8-item horizontal game strips, different channels, separate evidence. */
     { 0x1400ac059ULL, -1, 8, "Ranked Leaderboard", MC_VERIFIED_LIVE_TEXT,
       MC_GAME_STRIP, 0, NULL, 0, NULL, 0 },
+
+    /* ⭐⭐⭐ IN-GAME DISPLAY & SOUND SETTINGS, 7 rows. See g_ingame_av_rows.
+     * ⭐ Rows 4-5 (Music Volume, Sound Effects Volume) are LEVELS -- their
+     * cursor position IS the setting, same as the Options volume sliders. */
+    { 0x14009c755ULL, -1, 7, "Display & Sound Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_LIST, 0, g_ingame_av_rows, 7, NULL, 0, 0 },
+
+    /* ⭐⭐⭐ IN-GAME KEYBOARD SETTINGS, 16 rows. See g_kbd_settings_rows: two
+     * captions anchor it and the live object list supplies the rest, with the
+     * corpus confirming which ten labels belong. Reached from the pause menu's
+     * "Controller Settings". */
+    { 0x14009ec58ULL, -1, 16, "Keyboard Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_LIST, 0, g_kbd_settings_rows, 16, NULL, 0, 0 },
 
     /* ⭐⭐⭐ THE IN-GAME PAUSE MENU. See g_pause_menu_rows: all 8 rows named by
      * their own captions across 20 sightings. ⚠ The first screen behind the
