@@ -1615,6 +1615,23 @@ void gt_modal_probe(void)
         if (nch)
             log_line("modal: parent %p -- %d dword(s) changed: %s",
                      parent, nch, line);
+
+        /* ⭐⭐ THE CANDIDATE, REPORTED EVERY SAMPLE whether it moved or not.
+         *
+         * +0x38c held 1 and went to 0 on UP, then back to 1 on DOWN -- the
+         * ROUND TRIP that distinguishes a selection index from a counter or an
+         * animation ramp (the +0x13c..+0x148 block climbs monotonically as
+         * floats and never returns). It is 0/1 as an INTEGER, which as a float
+         * would be a denormal: index values, not geometry.
+         *
+         * ⛔ But that is TWO transitions, and a two-sample finding is how this
+         * project has gone wrong before. Logging it unconditionally means the
+         * next run reports its value at every sample, including the presses
+         * that fall between diffs -- which is what turns two samples into a
+         * count. ⚠ Reported, never spoken: nothing acts on this yet. */
+        log_line("modal: +0x38c = %u  (candidate selection index; UP was 0, "
+                 "DOWN was 1)", *(unsigned *)(cur + 0x38c));
+
         memcpy(g_snap, cur, MODAL_SNAP);
     }
 
