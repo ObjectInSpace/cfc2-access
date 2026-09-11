@@ -865,6 +865,32 @@ int main(void)
               (int)u.named, (int)u.why, u.position, (int)k.named, (int)k.why);
     }
 
+    /* --- case 24: the TWO 8-item game strips are kept apart ----------------
+     * ⛔⛔ Ranked Leaderboard (0x1400ac059) and Casual Match (0x140098986) are
+     * both 8-item horizontal game strips and look identical in a log. The
+     * Leaderboard CAPTIONS one title per movement; Casual Match captions NOT AT
+     * ALL (0 in 20 movements) and its titles arrive only on the transcript
+     * channel.
+     *
+     * ⚠ So exactly one of them may carry game_strip. If Casual Match ever gains
+     * it, the rule would fire on a screen with no per-movement caption and
+     * speak whatever stale title was last set -- and the one caption that does
+     * exist near that strip belongs to a DIFFERENT axis and contradicts the
+     * insertion order. This case is what stops that being added by symmetry. */
+    {
+        mc_speech lb, cm;
+        mc_move lm = mk(0x1400ac059ULL, 2, 0, 7);
+        menu_speak_build(&lm, &lb);
+        mc_move cmv = mk(0x140098986ULL, 2, 0, 7);
+        menu_speak_build(&cmv, &cm);
+
+        check("24. the Leaderboard strip is a game strip; Casual Match's is NOT",
+              lb.game_strip && lb.total == 8 &&
+              !cm.game_strip && !cm.named,
+              "leaderboard=%d (total %d), casual=%d named=%d",
+              (int)lb.game_strip, lb.total, (int)cm.game_strip, (int)cm.named);
+    }
+
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
     printf("all cases passed\n");

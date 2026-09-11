@@ -490,6 +490,35 @@ static const mc_screen g_screens[] = {
     { 0x14009a482ULL, -1, 0, "Gallery", MC_VERIFIED_LIVE_TEXT,
       MC_GAME_STRIP, 0, NULL, 0, NULL, 0 },
 
+    /* ⭐⭐ THE RANKED LEADERBOARD's game strip (Online Play > Ranked
+     * Leaderboard), 8 items, horizontal. Caller 0x1400ac059.
+     *
+     * ESTABLISHED 2026-09-10 (19:45 run). It captions EXACTLY like Gallery: one
+     * full arcade title per movement, on the movement it belongs to. Seven of
+     * eight positions captured, each a unique ROM-table title in the
+     * collection's canonical order:
+     *
+     *   1 CVS: Millennium Fight 2000 Pro   3 Capcom Fighting Evolution
+     *   4 Street Fighter Alpha 3 Upper     5 Power Stone
+     *   6 Power Stone 2                    7 Project Justice
+     *   8 Plasma Sword: Nightmare of Bilstein
+     *
+     * ⭐ MC_GAME_STRIP needs no per-position map -- it names from the LIVE
+     * caption and corroborates against the ROM table -- so position 2 being
+     * uncaptured costs nothing: it will name itself when the user stands on it.
+     * That is the difference between this shape and a label MAP.
+     *
+     * ⚠ count = 8 (not 0 like Gallery): this strip is the eight GAMES with no
+     * collection entry, which is why position 1 is a ROM here and the
+     * collection title at Gallery's position 1. A live count of 8 is therefore
+     * a real invariant worth checking.
+     *
+     * ⛔ NOT to be confused with Casual Match's 8-item strip (0x140098986),
+     * which looks identical and captions NOT AT ALL -- see the plan doc. Two
+     * 8-item horizontal game strips, different channels, separate evidence. */
+    { 0x1400ac059ULL, -1, 8, "Ranked Leaderboard", MC_VERIFIED_LIVE_TEXT,
+      MC_GAME_STRIP, 0, NULL, 0, NULL, 0 },
+
     /* ⭐⭐ JOIN LOBBY > search filters. Two call sites, one screen object:
      * the vertical ROW selector and the horizontal VALUE selector.
      *

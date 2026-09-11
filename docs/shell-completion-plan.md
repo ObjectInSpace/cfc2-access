@@ -13,6 +13,34 @@ one screen per run is what let the count drift.
 Call sites pair up on one screen object (row list + value axis), the shape
 settings screens already use. Grouped by screen, with what each NEEDS:
 
+### ⛔⛔ THE 8-ITEM STRIP: MEASURED AND REFUSED (19:45 run)
+
+It WAS finally walked — **20 movements** — and the result is a clean negative
+worth recording so nobody rebuilds it from the same false lead:
+
+- **Zero captions.** One caption appears near a strip movement
+  ("Capcom Fighting Evolution"), and pairing it properly shows it belongs to the
+  **4-item vertical list** (`0x14009890d`, "3 of 4"), not the strip. ⚠ I first
+  read it as the strip's own — an awk pairing that attributed a caption across
+  an axis boundary. `MC_GAME_STRIP` therefore cannot see this screen at all.
+- **The instance set DOES hold all eight titles**, live, 504 sets each, in the
+  collection's canonical order matching the ROM table exactly.
+
+⛔ And that is precisely the trap already refused twice here. The order is
+*insertion* order, not position evidence, and the one caption that exists
+**contradicts** it: it landed on position 2, where the canonical order puts
+"Capcom Vs. SNK 2", not "Capcom Fighting Evolution".
+
+⭐ So the single apparent data point argues AGAINST the mapping it appears to
+support. Shipping insertion order here would have been the `g_game_options_
+candidate` error with better-looking evidence.
+
+▶ What would settle it: a run that moves the strip **one position at a time with
+~1 s dwell**, so the game's own title text lands per position. If the titles
+never caption, this screen needs a selection signal — the genuinely open
+question the instance route has never had to answer (the music list dodged it by
+being numbered; Gallery dodged it by captioning).
+
 ### 1. Online Play > Casual Match — `0x2BD9C3E0` (4 callers)
 `0x14009885e` 3v · `0x1400988bf` 3v · `0x14009890d` 4v · `0x140098986` 8h
 
