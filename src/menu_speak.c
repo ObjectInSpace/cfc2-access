@@ -257,6 +257,9 @@ static const int g_casual_match_rows[] = { 51, 52, 84, 88 };
  * ⛔ Row 0 still gets no variant: its values are GAME NAMES from the ROM table,
  * not a GMD run. */
 static const mc_value_set g_casual_match_values[] = {
+    /* ⚠ "Either" here is INFERRED, not sighted. See the note in
+     * g_lobby_filter_values -- the game has been seen drawing "Either" only for
+     * One-button Special Moves, never for Game Version. */
     { 1, 3, 53 },   /* Game Version: Japanese / English / Either   */
     { 2, 2, 85 },   /* Cross-region Matchmaking: Off / On          */
     { 3, 3, 89 },   /* One-button Special Moves: On / Off / Either */
@@ -395,8 +398,27 @@ static const int g_create_lobby_rows[] = {
  * reading 9 labels from index 14 yields "Any, Confirm, Cancel, Select..." from
  * four unrelated families. The mixed-family check is applied to every row, not
  * assumed away. */
+/* ⚠⚠ "EITHER": WHAT IS SIGHTED AND WHAT IS INFERRED. The user asked whether it
+ * is an assumption or game data. Both, in different places, and the difference
+ * is worth keeping straight:
+ *
+ * ⭐ SIGHTED for One-button Special Moves. Object 0x2C4DB7D0 in the 19:13 run
+ * held exactly "On", "Off", "Either" -- a real 3-value set the game DREW -- and
+ * the value cursor's address puts that movement on row 5 of this screen, which
+ * is LOBBY_SPMOVE. That is the row {5, 3, 89} covers.
+ *
+ * ⚠ INFERRED for Game Version. "Either" has NEVER been seen drawn for that row.
+ * What supports it: the corpus family is exactly GAME_VERSION_J / _E / _ANY
+ * (three members, no others), the row's live count is exactly 3 wherever it is
+ * measured, and the renderer's own table gives first = 53. What is missing: a
+ * sighting. It is a strong inference from the game's own data, not a guess at a
+ * word -- "Either" is Capcom's string, carrying an _ANY suffix -- but it is not
+ * the same standard as the row above.
+ *
+ * ▶ One run that moves Game Version to its third value on an ONLINE screen
+ * settles it, and the value audit will show it as an agreement. */
 static const mc_value_set g_lobby_filter_values[] = {
-    { 1, 3,  53 },   /* Game Version: Japanese / English / Either */
+    { 1, 3,  53 },   /* Game Version: Japanese / English / Either -- INFERRED */
     { 2, 2,  85 },   /* Cross-region Matchmaking: Off / On        */
     { 3, 9,  94 },   /* Comment: Any + the 8 presets              */
     { 4, 2, 107 },   /* Event Mode: On (Quick Match) / Off        */
