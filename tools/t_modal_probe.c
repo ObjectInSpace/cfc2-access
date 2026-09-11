@@ -1,0 +1,61 @@
+/* Does the SHIPPING modal path produce the line, given the real prompt text?
+ * Exercises gt_latest_text -> menu_speak_is_modal_prompt -> flatten, i.e. the
+ * chain menu_speak_check_modal() runs, with the resolver stubbed because there
+ * is no GMD table here. */
+#include <stdio.h>
+#include <string.h>
+#include <windows.h>
+#include "../src/gui_text.h"
+#include "../src/menu_speak.h"
+
+#define P "If you exit the application, all unsaved\r\nprogress will be lost. Continue?"
+
+static BOOL res(int idx, char *out, unsigned n)
+{
+    if (idx != 384 || !out || !n) return FALSE;
+    _snprintf(out, n, "%s", P); out[n-1] = 0; return TRUE;
+}
+int main(void)
+{
+    int bad = 0;
+    /* 1. the text reaches gt_latest_text with NO cursor movement at all */
+    gt_test_reset();
+    gt_test_focus_enable();
+    static ULONGLONG o[GT_CLASS_SIZE/8];
+    memset(o,0,sizeof o); o[0] = GT_VTABLE_ADDR;
+    gt_test_settext_body(o, P, NULL, 0);
+
+    /* ⛔⛔ ADVANCE THE MOVEMENT SEQUENCE PAST THE RECORD.
+     *
+     * Without this the test is worthless: in a fresh process the record's stamp
+     * happens to equal the current sequence, so a gt_latest_text() re-gated on
+     * the stamp STILL PASSES -- verified by sabotage, which is how this hole was
+     * found. The quit dialog's real situation is that the text was set and the
+     * cursor has since moved elsewhere (or never moved at all), so the stamp
+     * CANNOT match. Reproduce that, or the stamp-free lookup is untested. */
+    gt_note_focus_move();
+    gt_note_focus_move();
+
+    char got[512];
+    if (!gt_latest_text(got, sizeof got) || strcmp(got, P) != 0) {
+        printf("FAIL  gt_latest_text did not return the prompt: \"%s\"\n", got);
+        bad++;
+    } else printf("ok    gt_latest_text returns the prompt with no movement\n");
+
+    /* 2. it is recognised */
+    if (!menu_speak_is_modal_prompt(got, res)) {
+        printf("FAIL  the prompt was not recognised\n"); bad++;
+    } else printf("ok    recognised as a modal prompt\n");
+
+    /* 3. and flattens to what the user hears */
+    char flat[512];
+    menu_speak_flatten_prompt(got, flat, sizeof flat);
+    const char *want = "If you exit the application, all unsaved progress "
+                       "will be lost. Continue?";
+    if (strcmp(flat, want) != 0) {
+        printf("FAIL  flattened wrongly: \"%s\"\n", flat); bad++;
+    } else printf("ok    spoken line: \"%s\"\n", flat);
+
+    printf("\n%s\n", bad ? "FAILED" : "ALL PASSED");
+    return bad ? 1 : 0;
+}
