@@ -212,10 +212,11 @@ static const int g_lobby_filter_rows[] = {
  * two 3-item lists sharing the screen object. */
 static const int g_casual_match_rows[] = { 51, 52, 84, 88 };
 
-/* ⭐⭐ CREATE LOBBY's settings, 10 rows, caller 0x140082c3c. FOUR positions
- * established, each by its OWN caption, pooled across three runs:
+/* ⭐⭐ CREATE LOBBY's settings, 10 rows, caller 0x140082c3c. FIVE positions
+ * established, each by its OWN caption, pooled across four runs:
  *
  *   pos  5  'Turn event mode on or off.'                 -> LOBBY_EVENT 106
+ *   pos  6  'Turn one-button special moves on or off.'   -> LOBBY_SPMOVE 88
  *   pos  7  'The first player to win the indicated...'   -> LOBBY_ROUND 114
  *   pos  9  'Set which player has the ability to...'     -> LOBBY_PERM  136
  *   pos 10  'Choose a passcode for the lobby.'           -> LOBBY_PASS  110
@@ -233,7 +234,7 @@ static const int g_casual_match_rows[] = { 51, 52, 84, 88 };
  * saying their position, exactly as before. */
 static const int g_create_lobby_rows[] = {
     MC_LABEL_UNKNOWN, MC_LABEL_UNKNOWN, MC_LABEL_UNKNOWN, MC_LABEL_UNKNOWN,
-    106, MC_LABEL_UNKNOWN, 114, MC_LABEL_UNKNOWN, 136, 110
+    106, 88, 114, MC_LABEL_UNKNOWN, 136, 110
 };
 
 /* ⛔ NO VALUE VARIANTS FOR THIS SCREEN, deliberately.
@@ -566,14 +567,25 @@ static const mc_screen g_screens[] = {
     { 0x1400ac059ULL, -1, 8, "Ranked Leaderboard", MC_VERIFIED_LIVE_TEXT,
       MC_GAME_STRIP, 0, NULL, 0, NULL, 0 },
 
-    /* ⭐⭐ CREATE LOBBY's settings, 10 rows, 4 named. See g_create_lobby_rows.
-     * ⚠ The value site (0x140082d16) is NOT entered: its values_off has never
-     * been derived, because no run has produced two value cursors on this
-     * screen to solve it from. Adding it with a guessed offset would derive the
-     * WRONG ROW and name the wrong setting -- the exact failure the row
-     * arithmetic exists to prevent. */
+    /* ⭐⭐ CREATE LOBBY's settings, 10 rows, 5 named. See g_create_lobby_rows.
+     *
+     * ⭐⭐ values_off = 0x33c, DERIVED AND VERIFIED against all ten rows in the
+     * 21:30 run. That run walked every row and nudged each one's value, so the
+     * log pairs each focused row with its own value cursor:
+     *
+     *   row 1 -> +0x32c (9 vals) · row 2 -> +0x330 (2) · ... · row 10 -> +0x350
+     *
+     * Ten consecutive 4-byte slots, and (cursor - screen - 0x33c)/4 reproduces
+     * every one. ⚠ I first solved it as 0x328 from the lowest cursor alone and
+     * it was off by five rows on every check -- the offset must be fitted to
+     * the row/cursor PAIRS, never to the minimum address.
+     *
+     * ⭐ This is what lets the VALUE axis speak the row's name: moving a value
+     * now says "Victory Condition, 3 of 10" instead of "3 of 10". */
     { 0x140082c3cULL, -1, 10, "Lobby Settings", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_ROW, 0, g_create_lobby_rows, 10, NULL, 0 },
+    { 0x140082d16ULL, -1, 0, "Lobby Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_VALUE, 0x33c, NULL, 0, NULL, 0 },
 
     /* ⭐⭐ CASUAL MATCH's 4 rows + their value axis. See g_casual_match_rows:
      * three independent sources agree, including the value-slot arithmetic that
