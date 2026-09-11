@@ -241,16 +241,25 @@ static const int g_casual_match_rows[] = { 51, 52, 84, 88 };
  * Lobby Filters' rows 1-3 and 6, and the value runs are the ones that screen's
  * renderer table establishes.
  *
- * ⛔ Only rows 2 and 3 (0-based) ship. Row 0's values are GAME NAMES, handled by
- * the ROM-table path. Row 1 (Game Version) is NOT included: the pairing that
- * would source its count is contaminated -- row 1 shows live counts of 2, 3 AND
- * 8 in the logs, which is the game-title strip's traffic bleeding across a
- * movement boundary, not three different value lists. A count I cannot trust is
- * not a count. */
+ * ⭐⭐ THE COUNTS COME FROM THE VALUE CURSOR'S ADDRESS, not from pairing.
+ * `(cursor - screen - 0x344)/4` names the row directly, and every movement in
+ * every log then resolves to exactly ONE count per row:
+ *     row 0: 8 values (87 movements) · row 1: 3 (30)
+ *     row 2: 2 values (28)           · row 3: 3 (18)
+ *
+ * ⛔⛔ I PREVIOUSLY EXCLUDED ROW 1 AS "CONTAMINATED" -- I had it showing live
+ * counts of 2, 3 AND 8, and called a count I could not trust no count. That was
+ * my ANALYSIS, not the data: I was pairing value movements to the ROW cursor,
+ * which lags when the user changes a value after moving. Keyed on the value
+ * cursor's own address there is no ambiguity at all. The conservative call was
+ * right at the time and the evidence behind it was simply wrong.
+ *
+ * ⛔ Row 0 still gets no variant: its values are GAME NAMES from the ROM table,
+ * not a GMD run. */
 static const mc_value_set g_casual_match_values[] = {
+    { 1, 3, 53 },   /* Game Version: Japanese / English / Either   */
     { 2, 2, 85 },   /* Cross-region Matchmaking: Off / On          */
     { 3, 3, 89 },   /* One-button Special Moves: On / Off / Either */
-    { 3, 2, 89 },   /* ...and its 2-value (offline) variant        */
 };
 
 /* ⭐⭐ CREATE LOBBY's VALUE labels. Only the rows whose values were actually

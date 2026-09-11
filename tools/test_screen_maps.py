@@ -157,10 +157,13 @@ EXPECTED_VALUES = {
         (4, 2): ["On (Quick Match)", "Off (Arcade Style)"],
         (5, 3): ["On", "Off", "Either"],
     },
+    # Counts derived from the VALUE CURSOR's address ((cursor-screen-0x344)/4),
+    # which gives exactly one count per row across every log -- unlike pairing
+    # to the row cursor, which lags and showed row 1 with three different counts.
     "g_casual_match_values": {
+        (1, 3): ["Japanese Version", "English Version", "Either"],
         (2, 2): ["Off", "On"],
         (3, 3): ["On", "Off", "Either"],
-        (3, 2): ["On", "Off"],
     },
     "g_create_lobby_values": {
         (1, 2): ["Japanese Version", "English Version"],
