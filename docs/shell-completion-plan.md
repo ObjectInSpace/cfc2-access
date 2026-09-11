@@ -220,9 +220,33 @@ missing is the ORDER, not the labels.
 rows are unnamed, and it has ONE static caption for the whole screen, so the
 caption channel cannot name them. Needs a different idea; lowest priority.
 
-### Music chooser — `0x14009af21` 9h
-⚠ Gave NO captions in any run, unlike Gallery's identical-looking strip.
-▶ Walk it slowly once. If it stays silent, it needs the instance route.
+### Music chooser — `0x14009af21` 9h — RE-TESTED AND STILL CLOSED
+
+⚠⚠ **A LOOSE PAIRING WINDOW NEARLY REOPENED THIS WRONGLY.** Scanning for "the
+next TEXT SET after a movement" appeared to show the Music chooser naming its
+positions just like Gallery — pos 1 "Capcom Fighting Collection 2", pos 2 "CVS:
+Millennium Fight 2000 Pro", pos 9 "Plasma Sword" — **four positions, zero
+conflicts, and matching Gallery's confirmed mapping exactly.** It looked
+conclusive enough to ship.
+
+⛔ It was an artefact of the window. Constrained to the SAME TIMESTAMP as the
+movement — the standard Gallery and the Ranked Leaderboard actually meet, where
+the title is set in the same millisecond — the Music chooser yields only:
+
+    pos 2: ""            pos 3: "0:00 / 0:00"     (24 movements)
+
+i.e. an empty string and the playback timer. The titles that appeared to pair
+were landing one or two log lines further out, belonging to a later event.
+
+⭐ **THE RULE: match the evidence window to the standard the SHIPPED screens
+meet.** Gallery sets its title on the same millisecond as the movement. A window
+loose enough to admit "a line or two later" admits the whole screen's unrelated
+traffic, and on a screen with a playback timer that traffic is constant. This is
+the third time in one session that a loose pairing produced a confident wrong
+reading (the others: a caption attributed across an axis boundary, and stale
+captions read as per-row evidence).
+
+▶ Still needs a channel nobody has. Not reopened.
 
 ### Lobby-ID keypad — `0x2C440110` (`0x14008a8ef` 36v + `0x14008a91b` 6h)
 36 = 10 digits + 26 letters, reached from "Search Lobby ID".
