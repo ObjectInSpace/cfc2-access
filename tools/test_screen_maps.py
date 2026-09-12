@@ -128,6 +128,23 @@ EXPECTED = {
         "Action", "Block", "Throw Escape", "Recovery", "Counter Hit",
         "Default",
     ],
+    # ⭐⭐ The OTHER TWO Training Options tabs, reached with LB/RB from the tab
+    # above. Same caller (0x1400a41ef) AND same screen object, and both have FIVE
+    # rows -- so (caller, count) matches both and they are told apart only by the
+    # heading the game drew (mc_screen.heading_index; 712 DUMMY_SETTING and 713
+    # PLAYER_SETTING). Exactly one heading object is resident at a time for this
+    # screen, measured across the dump blocks of the 01:2x run.
+    # ⭐ Rows read from the game's own live text, grouped by X=320 and ordered by
+    # Y (366/446/526/606/686) -- the method the tab above validated against a
+    # known-good control.
+    # ⚠ Both maps are NON-CONTIGUOUS in the GMD (714, 2925, 2955, 720, 168), so
+    # no base_index could have named them.
+    "g_dummy_settings_rows": [
+        "Health Bar", "Groove Gauge", "Guard Crush", "Stun", "Default",
+    ],
+    "g_player_settings_rows": [
+        "Attack Data", "Input Display", "Hit Boxes", "Network Delay", "Default",
+    ],
     "g_lobby_filter_rows": [
         "Game", "Game Version", "Cross-region Matchmaking", "Comment",
         "Event Mode", "One-button Special Moves",

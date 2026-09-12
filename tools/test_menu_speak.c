@@ -287,13 +287,28 @@ int main(void)
          * ⛔ This LOOSENS nothing that matters. If two rows shared a caller
          * AND a count, menu_speak_lookup_n() could not choose between them and
          * would silently return the first -- the same class of bug as the
-         * guessed row, arriving by a different door. That stays illegal. */
+         * guessed row, arriving by a different door. That stays illegal.
+         *
+         * ⭐⭐ ...UNLESS BOTH CARRY A DISTINCT HEADING. Training Options' Dummy
+         * Settings and Player Settings tabs share a caller AND a 5-row count --
+         * genuinely, in the game -- and are separable only by the title the
+         * game drew. mc_screen.heading_index is that third key, so a pair is
+         * legal when BOTH sides set one and the two differ.
+         *
+         * ⚠ The exception is deliberately narrow: one side having a heading is
+         * NOT enough (the other would still be reachable by count alone and
+         * would shadow), and two equal headings are no discriminator at all.
+         * Case 32 asserts the behaviour this permits. */
         for (int j = i + 1; j < nrows; j++) {
             const mc_screen *b = menu_speak_row(j);
             if (!a || !b || a->caller != b->caller)
                 continue;
-            if (a->count <= 0 || b->count <= 0 || a->count == b->count)
-                sane = 0;
+            if (a->count > 0 && b->count > 0 && a->count != b->count)
+                continue;                 /* the count separates them */
+            if (a->heading_index > 0 && b->heading_index > 0 &&
+                a->heading_index != b->heading_index)
+                continue;                 /* the live heading separates them */
+            sane = 0;
         }
     }
     check("9. every row is verified, sane, and distinguishable "
@@ -1350,6 +1365,74 @@ int main(void)
               ok, "sound=%#x net=%#x pc=%#x",
               snd ? snd->levels : 0, net ? net->levels : 0,
               pc ? pc->levels : 0);
+    }
+
+    /* --- case 32: ⛔⛔ TWO 5-ROW TABS ON ONE CALLER MUST NOT SHADOW EACH OTHER.
+     *
+     * Training Options is three screens on caller 0x1400a41ef and ONE screen
+     * object: Dummy Behavior (6 rows), Dummy Settings (5) and Player Settings
+     * (5). The last two have the SAME COUNT, so menu_speak_lookup_n()'s
+     * (caller, count) key matches BOTH -- whichever sits first in g_screens
+     * would speak its labels on the other screen, and a wrong label is
+     * indistinguishable from a right one to a blind user.
+     *
+     * ⚠ The count-only lookup CANNOT resolve this, and that is asserted here
+     * rather than assumed: a 5-row query must NOT come back naming one of the
+     * two tabs as if it were certain. Both entries carry heading_index, so the
+     * count-only path is required to leave them alone. */
+    {
+        const mc_screen *five = menu_speak_lookup_n(0x1400a41efULL, 5);
+        const mc_screen *six  = menu_speak_lookup_n(0x1400a41efULL, 6);
+        int ok = 1;
+
+        /* The 6-row tab is unambiguous and must still resolve by count alone. */
+        ok &= six && six->name && strcmp(six->name, "Training Options") == 0;
+        /* ⭐ The 5-row query must not name either tab: both need the heading.
+         * If this ever returns "Dummy Settings" or "Player Settings", one tab is
+         * shadowing the other and the screen is mis-named in play. */
+        ok &= !(five && five->name &&
+                (strcmp(five->name, "Dummy Settings") == 0 ||
+                 strcmp(five->name, "Player Settings") == 0));
+        check("32. the two 5-row training tabs do not shadow each other",
+              ok, "count-only 5 -> %s, 6 -> %s",
+              five && five->name ? five->name : "(none)",
+              six && six->name ? six->name : "(none)");
+    }
+
+    /* --- case 33: and BOTH tabs are reachable, each by its own heading.
+     * ⚠ A discriminator that refused everything would pass case 32 and be
+     * useless -- so assert the positive direction too. menu_speak_lookup_h with
+     * a NULL screen stands in for "the heading could not be read": neither tab
+     * may be returned, because an unreadable input must never count as a match.
+     *
+     * ⭐ The heading TEXT itself cannot be exercised offline (no live GMD and no
+     * instance table in the test process), so what is pinned here is the
+     * eligibility rule. The label CONTENT is validated against the real corpus
+     * by tools/test_screen_maps.py, which this suite cannot do. */
+    {
+        const mc_screen *no_screen = menu_speak_lookup_h(0x1400a41efULL, 5, NULL);
+        int found_dummy = 0, found_player = 0, ok = 1;
+
+        for (int i = 0; i < menu_speak_screen_count(); i++) {
+            const mc_screen *s = menu_speak_screen_at(i);
+            if (!s || !s->name || s->caller != 0x1400a41efULL)
+                continue;
+            if (strcmp(s->name, "Dummy Settings") == 0) {
+                found_dummy = 1;
+                ok &= s->heading_index > 0 && s->count == 5 && s->nlabels == 5;
+            }
+            if (strcmp(s->name, "Player Settings") == 0) {
+                found_player = 1;
+                ok &= s->heading_index > 0 && s->count == 5 && s->nlabels == 5;
+            }
+        }
+        ok &= found_dummy && found_player;
+        /* Without a screen pointer, no heading-keyed entry is eligible. */
+        ok &= !(no_screen && no_screen->heading_index > 0);
+        check("33. both tabs ship with a heading key, and NULL screen matches none",
+              ok, "dummy=%d player=%d null-lookup=%s",
+              found_dummy, found_player,
+              no_screen && no_screen->name ? no_screen->name : "(none)");
     }
 
     printf("\n");

@@ -321,6 +321,74 @@ static const int g_training_option_rows[] = {
     683, 694, 700, 705, 2960, 168
 };
 
+/* ⭐⭐⭐ THE OTHER TWO TRAINING OPTIONS TABS -- the screens the user asked for.
+ *
+ * Training Options is THREE screens on ONE caller (0x1400a41ef) and ONE screen
+ * object. The tab is switched with LB/RB and the rows change underneath:
+ *
+ *   Dummy Behavior   6 rows   y=326..726   (above, already shipped)
+ *   Dummy Settings   5 rows   y=366..686
+ *   Player Settings  5 rows   y=366..686
+ *
+ * ⛔⛔ THE TWO NEW TABS HAVE THE SAME ROW COUNT, so menu_speak_lookup_n()'s
+ * (caller, count) key CANNOT separate them -- one would shadow the other and
+ * speak its labels on the wrong screen. That is why mc_screen gained
+ * heading_index and why these two rows carry one. Shipping them on count alone
+ * was available and would have been wrong.
+ *
+ * ⭐ The heading is readable and UNAMBIGUOUS: across the dump blocks of the
+ * 01:2x run, EXACTLY ONE heading object is resident at a time for this screen
+ * object (Dummy Behavior at y=265, the other two at y=305), so
+ * gt_widget_of(screen, 960, -1) returns the live tab name with no contradiction.
+ *
+ * ⭐⭐ ESTABLISHED FROM THE GAME'S OWN LIVE TEXT, grouped by the X column and
+ * ordered by Y -- the method the Dummy Behavior tab above already validated
+ * against a known-good control:
+ *
+ *   DUMMY SETTINGS            PLAYER SETTINGS
+ *     y=366 Health Bar    714   y=366 Attack Data    724
+ *     y=446 Groove Gauge 2925   y=446 Input Display  727
+ *     y=526 Guard Crush  2955   y=526 Hit Boxes     1064
+ *     y=606 Stun          720   y=606 Network Delay  729
+ *     y=686 Default       168   y=686 Default        168
+ *
+ * ⚠ Both maps are NON-CONTIGUOUS (714, 2925, 2955, 720, 168), so no base_index
+ * could ever have named them -- the same shape as Online Play.
+ *
+ * ⚠ The indices come from the PARSED menu_eng table, not from enumerate() over
+ * data/text_english.json. That dict-insertion mistake shipped once on the tab
+ * above and resolved to fighting-move names; test_screen_maps.py caught it.
+ *
+ * ▶ NOT SHIPPED, and deliberately: the VALUES for these two tabs.
+ *
+ * The value cursors form a clean 8-slot block per tab (values_off 0x3F0, stride
+ * 0x20), rows 0-3 used and row 4 "Default" being a button with no value:
+ *
+ *   block 0  slots  0-7   totals 8, 13        <- Dummy Behavior (shipped)
+ *   block 1  slots  8-11  totals 3, 3, 3, 2
+ *   block 2  slots 16-19  totals 3, 3, 3, 2
+ *   block 3  slots 24-27  totals 2, 2, 2, 11
+ *
+ * ⛔⛔ THERE ARE FOUR BLOCKS AND ONLY THREE TABS, and the heading attribution in
+ * the log LAGS the movement by one (slot 16 was recorded under "Dummy Settings"
+ * while 24-27 came under "Player Settings"), so which block belongs to which tab
+ * is NOT established. Blocks 1 and 2 even share the same shape (3,3,3,2), so a
+ * wrong assignment is undetectable by count.
+ *
+ * Naming a value from the wrong block would say "Health Bar, Off" where "On"
+ * belongs -- a confidently wrong setting, which is the one outcome worse than a
+ * number. The rows above are independently evidenced by X-grouping and Y-order;
+ * the values need a run that moves the VALUE axis on a known tab with the
+ * heading read at the same moment. Until then these rows carry no value set and
+ * the live-caption quote path speaks what the game drew. */
+static const int g_dummy_settings_rows[] = {
+    714, 2925, 2955, 720, 168
+};
+
+static const int g_player_settings_rows[] = {
+    724, 727, 1064, 729, 168
+};
+
 /* ⭐⭐ TRAINING OPTIONS values. values_off = 0x3F0, re-derived on a FRESH
  * screen object in the CVS1 run (cursors +0x490/494/498/49C/4A0 -> rows 0-4),
  * so it is not a CVS2-specific constant.
@@ -1145,6 +1213,29 @@ static const mc_screen g_screens[] = {
     { 0x1400a41efULL, -1, 6, "Training Options", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_ROW, 0, g_training_option_rows, 6, NULL, 0, 0 },
 
+    /* ⭐⭐⭐ TRAINING OPTIONS > DUMMY SETTINGS and > PLAYER SETTINGS -- the two
+     * remaining tabs, reached with LB/RB from the tab above. See
+     * g_dummy_settings_rows for the per-row evidence.
+     *
+     * ⛔⛔ BOTH ARE 5 ROWS ON THE SAME CALLER, so these two entries are the
+     * reason menu_speak_lookup_h() exists: (caller, count) matches BOTH, and
+     * whichever came first in this table would speak its labels on the other
+     * screen. `heading_index` breaks the tie with the title the game itself
+     * drew, resolved through the GMD so it stays correct in all 14 languages.
+     *
+     * ⚠ Designated initialisers: heading_index sits past sibling_caller, and
+     * counting positional fields to reach it is how a map ends up one slot out.
+     * The rows above keep their positional form -- they set no heading. */
+    { .caller = 0x1400a41efULL, .base_index = -1, .count = 5,
+      .name = "Dummy Settings", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_SETTINGS_ROW, .labels = g_dummy_settings_rows, .nlabels = 5,
+      .heading_index = 712 },
+
+    { .caller = 0x1400a41efULL, .base_index = -1, .count = 5,
+      .name = "Player Settings", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_SETTINGS_ROW, .labels = g_player_settings_rows, .nlabels = 5,
+      .heading_index = 713 },
+
     /* ⭐⭐ TRAINING OPTIONS -- the VALUE axis. Same screen object as the row
      * site above; values_off 0x3F0 re-derived on a fresh screen object across
      * five rows in the CVS1 run, so the two axes are told apart by cursor
@@ -1575,6 +1666,13 @@ static const mc_screen g_screens[] = {
 
 int menu_speak_screen_count(void) { return NSCREENS; }
 
+const mc_screen *menu_speak_screen_at(int i)
+{
+    if (i < 0 || i >= NSCREENS)
+        return NULL;
+    return &g_screens[i];
+}
+
 const mc_screen *menu_speak_row(int i)
 {
     if (i < 0 || i >= NSCREENS)
@@ -1746,17 +1844,64 @@ const mc_screen *menu_speak_lookup(ULONGLONG caller)
  * verified rows, never a reason to admit an unverified one. */
 const mc_screen *menu_speak_lookup_n(ULONGLONG caller, int item_count)
 {
+    return menu_speak_lookup_h(caller, item_count, NULL);
+}
+
+/* ⭐⭐ THE SAME LOOKUP, PLUS THE SCREEN'S OWN HEADING. See mc_screen.heading_index.
+ *
+ * ⛔⛔ (caller, count) IS NOT ALWAYS ENOUGH. Training Options is three screens
+ * on ONE caller and ONE screen object: Dummy Behavior (6 rows), Dummy Settings
+ * (5) and Player Settings (5). The last two have the SAME COUNT, so without a
+ * third key one shadows the other and speaks its labels on the wrong screen --
+ * and a wrong label is indistinguishable from a right one to a blind user.
+ *
+ * ⭐ The tie-break is the heading the GAME drew, resolved through the GMD so it
+ * is language-safe. `screen` may be NULL (the caller could not read one), and
+ * then a heading-keyed entry is simply not eligible: an unreadable input must
+ * never be treated as a match. That is the rule an earlier screen got wrong.
+ *
+ * ⚠ Entries WITH a heading are preferred over entries without, so a generic
+ * (caller, count) row cannot win over a specific one. */
+const mc_screen *menu_speak_lookup_h(ULONGLONG caller, int item_count,
+                                     const void *screen)
+{
     const mc_screen *caller_only = NULL;
+    const mc_screen *count_match = NULL;
 
     for (int i = 0; i < NSCREENS; i++) {
-        if (g_screens[i].caller != caller)
+        const mc_screen *s = &g_screens[i];
+
+        if (s->caller != caller)
             continue;
-        if (g_screens[i].count > 0 && g_screens[i].count == item_count)
-            return &g_screens[i];          /* exact: caller AND count agree */
+
+        if (s->heading_index > 0) {
+            char want[GT_CAPTION_MAX], live[GT_CAPTION_MAX];
+
+            /* Not eligible without a screen to read the heading from. */
+            if (!screen)
+                continue;
+            if (s->count > 0 && s->count != item_count)
+                continue;
+            if (!gmd_text_by_index(s->heading_index, want, sizeof(want)) ||
+                !want[0])
+                continue;
+            if (!gt_widget_of(screen, MC_HEADING_X, -1.0f, live, sizeof(live)) ||
+                !live[0])
+                continue;
+            if (strcmp(live, want) != 0)
+                continue;
+            return s;                      /* caller + count + the live heading */
+        }
+
+        if (s->count > 0 && s->count == item_count) {
+            if (count_match == NULL)
+                count_match = s;           /* exact: caller AND count agree */
+            continue;
+        }
         if (caller_only == NULL)
-            caller_only = &g_screens[i];   /* fall back to the first match */
+            caller_only = s;               /* fall back to the first match */
     }
-    return caller_only;
+    return count_match ? count_match : caller_only;
 }
 
 /* ⭐⭐ THE ROW DERIVATION -- see the header for why this is arithmetic and not
@@ -1861,9 +2006,15 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
 
     /* ⭐ Count-aware: one caller can serve several screens (0x14009ba21 is both
      * "Select Mode" at 3 items and the Online Play menu at 6). See
-     * menu_speak_lookup_n(). */
-    const mc_screen *s = menu_speak_lookup_n((ULONGLONG)(ULONG_PTR)m->caller,
-                                             out->total);
+     * menu_speak_lookup_n().
+     *
+     * ⭐⭐ And heading-aware, because count is not always enough: Training
+     * Options' Dummy Settings and Player Settings tabs share a caller AND a row
+     * count, and are told apart only by the title the game drew. `m->screen`
+     * is passed as a VALUE for gt_widget_of() to match parents against; it is
+     * never dereferenced here. */
+    const mc_screen *s = menu_speak_lookup_h((ULONGLONG)(ULONG_PTR)m->caller,
+                                             out->total, m->screen);
     if (!s) {
         out->why = MC_UNNAMED_SCREEN_UNKNOWN;
         return;                        /* unknown screen -> position only */

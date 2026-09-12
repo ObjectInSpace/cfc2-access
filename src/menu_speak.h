@@ -270,7 +270,34 @@ typedef struct {
      * ⚠ Only Casual/Ranked Match need it today; 0 means "match by name", which
      * is every other settings screen. */
     ULONGLONG  sibling_caller;
+    /* ⭐⭐ THE SCREEN'S OWN HEADING, when caller+count cannot tell two screens
+     * apart. NULL for every screen that does not need it.
+     *
+     * ⛔⛔ WHY IT EXISTS. Training Options is THREE screens sharing one caller
+     * AND one screen object -- Dummy Behavior (6 rows), Dummy Settings (5) and
+     * Player Settings (5). The last two have the SAME COUNT, so
+     * menu_speak_lookup_n()'s (caller, count) key cannot separate them: one
+     * would shadow the other and speak its labels on the wrong screen, exactly
+     * the defect that shipped twice on this project.
+     *
+     * The game itself says which tab is live. Measured across the dump blocks
+     * of the 01:2x run: EXACTLY ONE heading object is resident at a time for
+     * this screen object, so gt_widget_of(screen, 960, -1) returns the active
+     * tab name unambiguously -- the same call and the same column that names
+     * the character on the move list.
+     *
+     * ⚠ Matched against the game's own live text, so it is language-specific
+     * by construction; the GMD index below is what makes it language-safe --
+     * the string is resolved through gmd_text_by_index() at match time, never
+     * compared as an English literal. */
+    int        heading_index;
 } mc_screen;
+
+/* ⭐ The heading column. The shell draws a screen's own title at X=960 -- the
+ * same column that carries "Ken Moves" on the move list and "P1 Pause Menu" on
+ * the training pause menu -- while rows sit at X=320/362/84 depending on the
+ * screen. Measured, not assumed: see g_training_option_rows. */
+#define MC_HEADING_X 960.0f
 
 /* What a movement should say. */
 /* Why an item was NOT named. ⭐⭐ This is a reported REASON, not a bare flag,
@@ -459,6 +486,11 @@ void menu_speak_reset_row_total(void);
 int  menu_speak_screen_count(void);
 const mc_screen *menu_speak_lookup(ULONGLONG caller);
 
+/* Test seam: the i'th entry, or NULL when out of range. Needed to assert
+ * properties of entries that lookup cannot reach unambiguously -- two screens
+ * sharing a caller AND a count, which is exactly the Training Options tabs. */
+const mc_screen *menu_speak_screen_at(int i);
+
 /* ⭐⭐ Look a screen up by caller AND live item count.
  *
  * ONE CALLER CAN SERVE SEVERAL SCREENS -- measured, not anticipated.
@@ -474,6 +506,12 @@ const mc_screen *menu_speak_lookup(ULONGLONG caller);
  * ⛔ The count DISCRIMINATES between verified rows; it never admits an
  * unverified one. Every row still needs MC_VERIFIED_LIVE_TEXT. */
 const mc_screen *menu_speak_lookup_n(ULONGLONG caller, int item_count);
+
+/* As above, but able to break a (caller, count) tie using the heading the game
+ * drew -- see mc_screen.heading_index. `screen` may be NULL, in which case no
+ * heading-keyed entry is eligible. */
+const mc_screen *menu_speak_lookup_h(ULONGLONG caller, int item_count,
+                                     const void *screen);
 
 /* Enable the DISCOVERY candidate sweep. OFF by default.
  *
