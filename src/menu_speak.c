@@ -2075,24 +2075,41 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
         n = gt_column_count(m->screen, 84.0f);
         for (int i = 1; i <= n && used < (int)sizeof(line) - 64; i++) {
             char row[GT_CAPTION_MAX * 2], row_spoken[GM_OUT_MAX];
-            /* ⚠⚠ THE NOTATION IS KNOWN-INCOMPLETE, and x=1565 is a deliberate
-             * choice rather than the best one.
+            /* ⭐⭐ THE PAIR COLUMN IS x=633: the FULL input with its condition
+             * (" During Hyakkishu<ICON C_623>+<ICON C_P>"). x=1565 shipped
+             * before this and carried only a direction plus a move-type glyph,
+             * so a row read "Shoryuken, back, special move" -- true, and not
+             * the input the player needs.
              *
-             * x=1565 holds a DIRECTION plus a move-type glyph, so a row reads
-             * "Shoryuken, back, special move" -- true, and not the full input.
-             * The COMPLETE input lives at x=633 together with the condition
-             * (" During Hyakkishu<ICON C_623>+<ICON C_P>").
+             * ⭐ THE SPARSENESS IS NOW UNDERSTOOD, and it was never a reason to
+             * avoid this column. Measured across four runs (627 name objects):
+             *   - x=1565 occupies ALL TEN rows in every run;
+             *   - x=633 occupies a VARYING SUBSET (29 objects);
+             *   - every x=633 Y is a subset of the name Ys -- alignment is
+             *     perfect in all three runs, so the pairing always worked.
+             * The subset is per-ROW, not per-screen: only moves that HAVE a
+             * condition get text, and the rest keep a BLANKED pooled object.
+             * That is the 153-plain / 23-condition split, seen from the object
+             * side.
              *
-             * ⛔ But x=633 is present on only SOME rows -- zero objects in the
-             * 00:06 run, a handful in others -- and I do not yet know what
-             * decides that. Switching to it was tried and the screen went
-             * quiet, so it stays on x=1565 until the sparseness is understood.
+             * ⚠ An earlier note said "zero objects in the 00:06 run". That run
+             * genuinely has none -- but the count that produced it also read
+             * zero for every other run, because 633.0f was encoded as
+             * 0x441e8000 (= 634.0) instead of 0x441e4000. Verify a float
+             * constant before believing a negative built on it.
              *
-             * ⭐ The lesson worth keeping: I diagnosed that silence FOUR times
-             * (eviction, parent mismatch, the column swap, a missing row) and
-             * every one was refuted, because the refusal path below logged
-             * nothing. It logs now. */
-            if (!gt_column_item(m->screen, 84.0f, 1565.0f, i,
+             * ⛔⛔ The silence this column once caused is NOT the sparseness and
+             * NOT the pairing -- gt_column_item() falls through to name-only
+             * when a row has no mate (case 51). The real defect was the BLANKED
+             * mate: a pooled " " is Y-aligned and passes the text[0] filter, so
+             * a row read " Jinchu Watari,  ". Fixed in gt_column_item(), pinned
+             * by cases 53 and 54, sabotage-verified.
+             *
+             * ⚠ The silent build was also from BEFORE MC_MOVE_ROSTER and before
+             * this path logged anything, so it differed by more than the
+             * constant. If the screen goes quiet again the refusal below now
+             * NAMES the cause in one run rather than by theory. */
+            if (!gt_column_item(m->screen, 84.0f, 633.0f, i,
                                 row, (int)sizeof(row)) || !row[0])
                 continue;
             gm_speak(row, row_spoken, sizeof(row_spoken));
@@ -2116,11 +2133,16 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
              * means the column query found nothing (wrong screen pointer, or an
              * evicted table); names>0 with an empty line means every row was
              * refused by the markup translator. Those need different fixes. */
-            log_line("mcspeak: move list read NOTHING -- %d name object(s) in "
-                     "the column, screen %p, cursor %d of %d. (names==0 -> the "
-                     "column query found nothing; names>0 -> every row was "
-                     "refused after translation.)",
-                     n, m->screen, out->position, out->total);
+            /* ⚠ Report the PAIR column's census too. With names>0 the cause is
+             * downstream of the name query, and knowing whether the pair column
+             * was populated separates "the mate broke the row" from "the
+             * translator refused the name" -- the two that cost rounds before. */
+            log_line("mcspeak: move list read NOTHING -- %d name object(s) at "
+                     "x=84, %d pair object(s) at x=633, screen %p, cursor %d of "
+                     "%d. (names==0 -> the column query found nothing; names>0 "
+                     "-> every row was refused after translation.)",
+                     n, gt_column_count(m->screen, 633.0f), m->screen,
+                     out->position, out->total);
             out->why = MC_UNNAMED_TEXT_UNREADABLE;
             return;
         }
@@ -2132,8 +2154,10 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
          * the ear -- there is no gap to hear -- so without the count a partial
          * readout is invisible. Same reason the probe prints what it examined
          * rather than only what it found. */
-        log_line("mcspeak: move list panel -- %d name object(s) in the column, "
-                 "cursor %d of %d.", n, out->position, out->total);
+        log_line("mcspeak: move list panel -- %d name object(s) at x=84, %d pair "
+                 "object(s) at x=633, cursor %d of %d.",
+                 n, gt_column_count(m->screen, 633.0f), out->position,
+                 out->total);
         menu_speak_line(line);
         out->named = TRUE;
         out->spoken_already = TRUE;

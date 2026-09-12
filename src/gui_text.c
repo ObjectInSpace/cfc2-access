@@ -2628,6 +2628,24 @@ BOOL gt_column_item(const void *screen, float x, float pair_x, int position,
             mate = p[i].text;
         }
 
+    /* ⭐⭐ A BLANKED MATE IS NOT A MATE. The game POOLS one pair object per row
+     * and BLANKS it -- a single space -- when the row has nothing to show,
+     * instead of destroying it. Measured: every x=633 object ever seen holding
+     * " " was also seen holding real text, so it is a live, resident,
+     * Y-aligned widget that passes widgets_of()'s `text[0]` filter (which
+     * rejects "" but not " ").
+     *
+     * ⛔ Without this, row 4 reads " Jinchu Watari,  " -- a name, a comma and a
+     * pause the player cannot interpret. Case 54 is exactly that string, and it
+     * was seen to FAIL with this trim removed while case 53 stayed green. */
+    if (mate) {
+        const char *q = mate;
+        while (*q == ' ' || *q == '\t' || *q == '\r' || *q == '\n')
+            q++;
+        if (!*q)
+            mate = NULL;
+    }
+
     if (mate)
         _snprintf(out, (size_t)outlen, "%s, %s", me->text, mate);
     else

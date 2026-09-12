@@ -1714,6 +1714,62 @@ int main(void)
             check("52. the condition column is addressable separately from names",
                   ok && strcmp(v, " During Hyakkishu") == 0, d);
         }
+
+        /* case 53: ⭐⭐ A BLANKED PAIR OBJECT MUST NOT SWALLOW THE NAME, and
+         * this is MEASURED behaviour, not a hypothetical.
+         *
+         * The game POOLS one x=633 object per row and BLANKS it -- setting a
+         * single space -- when that move has no condition, rather than
+         * destroying it. Across four runs, all three x=633 objects ever seen
+         * holding " " were ALSO seen holding real text (2C3DD4A0, 2C3DD840,
+         * 2C513E50). So a blanked mate is a live, resident, Y-aligned widget
+         * with non-empty text[0], and widgets_of() admits it: the `text[0]`
+         * filter rejects "" but a space passes.
+         *
+         * ⚠ The row must still read its NAME. A pair column that is present
+         * but blank is the common case (153 plain inputs against 23
+         * condition-prefixed), so getting this wrong would silence most of
+         * the panel while the sparse rows kept working -- the hardest failure
+         * to hear, because the screen still talks. */
+        {
+            static unsigned char blank[2][GT_CLASS_SIZE];
+            static const float BX[2] = { 84.f, 633.f };
+            static const float BY[2] = { 526.f, 526.f };
+            static const char *const BT[2] = { " Jinchu Watari", " " };
+            for (int i = 0; i < 2; i++) {
+                memset(blank[i], 0, sizeof blank[i]);
+                *(ULONGLONG *)blank[i] = GT_VTABLE_ADDR;
+                memcpy(blank[i] + 0x40, &BX[i], sizeof(float));
+                memcpy(blank[i] + 0x44, &BY[i], sizeof(float));
+                memcpy(blank[i] + 0x88, &P, sizeof(void *));
+                gt_test_settext_body(blank[i], BT[i], NULL, 0);
+            }
+            /* Row 4 by Y order: 234, 307, 380, 526. */
+            char v[128] = { 0 };
+            BOOL ok = gt_column_item(P, 84.f, 633.f, 4, v, sizeof v);
+            char d[200];
+            snprintf(d, sizeof d, "row4 with a BLANKED x=633 mate -> %d \"%s\" "
+                     "(the name must survive; a blank mate may not erase it)",
+                     (int)ok, v);
+            check("53. a blanked pair object does not swallow the row's name",
+                  ok && strstr(v, "Jinchu Watari") != NULL, d);
+        }
+
+        /* case 54: and the blanked mate must not be spoken AS a condition.
+         * "Jinchu Watari,  " read aloud is a name followed by a pause the
+         * player cannot interpret. Whatever the join does, the result must
+         * not end in a dangling separator. */
+        {
+            char v[128] = { 0 };
+            BOOL ok = gt_column_item(P, 84.f, 633.f, 4, v, sizeof v);
+            size_t n = strlen(v);
+            BOOL trailing = n > 0 && (v[n-1] == ',' || v[n-1] == ' ');
+            char d[200];
+            snprintf(d, sizeof d, "\"%s\" -- trailing separator/space: %s",
+                     v, trailing ? "YES (a dangling pause)" : "no");
+            check("54. a blanked mate leaves no dangling separator",
+                  ok && !trailing, d);
+        }
     }
 
     mem_guard_remove();
