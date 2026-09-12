@@ -118,3 +118,62 @@ be on screen, so the 10-row cap, the scrolling and the per-character counts all
 stop mattering. It is also the method with the record here: **disassembly is
 4 for 4 on this project** (sPad, sKeyboard, the GMD table, the cursor
 chokepoint) where memory-shape scanning went 0 for 4.
+
+---
+
+# THE NOTATION: what is established, and the one thing that is not
+
+Investigated 2026-09-12 after the user reported the notation still unread.
+
+## ⭐⭐ THERE ARE TWO COLUMNS, AND THE SHIPPED ONE IS THE WEAKER
+
+    x=1565   a DIRECTION + move-type glyph only, prefixed "<RGHT>"
+             -> a row reads "Shoryuken, back, special move": true, and useless
+    x=633    the FULL INPUT, e.g. "<ICON C_236>+<ICON C_P>"
+
+`x=1565` is what ships today. It is not the right column; it is the one that
+demonstrably does not break the screen.
+
+## ⭐ x=633 IS THE INPUT COLUMN, NOT A "CONDITION" COLUMN
+
+⛔ An earlier note here called it condition text and excluded it as a decoy.
+Then a later note called it "condition AND input". Both were partial. Measured
+across every run: **153 plain-input objects against 23 condition-prefixed
+ones**. The condition is an OPTIONAL PREFIX on the same column:
+
+    "<SIZE 58><ICON C_236></SIZE>+<SIZE 58><ICON C_P></SIZE>"      (plain)
+    " During Jump<ICON C_236>+<ICON C_P>"                           (prefixed)
+    " At Close Range<ICON C_63214>+<ICON C_K>"
+    " After Iai-Geri Hits<ICON C_28>+<ICON C_K>"
+
+⭐ And it ALIGNS: every x=633 object ever captured shares a Y with a move-name
+row. The pairing gt_column_item() already does would work.
+
+## ⛔⛔ SO WHY DID SWITCHING TO x=633 SILENCE THE SCREEN? UNKNOWN.
+
+The 00:06 run had 20 name objects, 0 at x=633, and spoke NOTHING for 21
+move-list movements -- yet `gt_column_item()` falls through to name-only when
+the pair column is empty, so the names alone should still have been read.
+
+Four diagnoses were produced and all four were refuted by the log:
+  1. instance-table eviction  -> 40 and 41 objects were live at the movements
+  2. parent pointer mismatch  -> dump and cursor both read 2c40ca30
+  3. the column swap itself   -> the fall-through path makes it harmless
+  4. a missing g_screens row  -> both rows were present in that build
+
+⚠ The cause could not be determined because the refusal path logged NOTHING.
+That is fixed: it now prints the name count on both the success and failure
+paths. ⭐ **The next run on an x=633 build will identify the cause in one go** --
+`names==0` means the column query found nothing; `names>0` with an empty line
+means every row was refused after translation.
+
+## ▶ THE NEXT STEP, precisely
+
+1. Switch the pair column back to 633.0f in menu_speak.c's MC_MOVE_LIST branch.
+2. One run: open the move list, move a few times.
+3. Read the `mcspeak: move list` lines. They now name the cause directly.
+
+⚠ Do NOT theorise before reading those lines. Five consecutive diagnoses of this
+screen were wrong, every one of them plausible, because an instrument's limit
+kept being read as a fact about the game -- a 24-char log field, a 64-slot
+table ceiling, a 6.6s sampling window.
