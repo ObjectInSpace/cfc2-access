@@ -645,6 +645,77 @@ void gt_focus_diff_note_move(void);
 void gt_focus_diff_note_text(void);
 void gt_focus_diff_report(void);
 
+/* --- THE MOVE LIST MEMBERSHIP PROBE -------------------------------------
+ *
+ * ⭐⭐ ONE QUESTION, and no log can answer it: at cursor-movement time, does
+ * the number of live move-NAME objects equal the vertical cursor's reported
+ * item total? If yes, the coordinate join can name the rows. If no, the shape
+ * of the disagreement says what the cursor actually indexes.
+ *
+ * ⛔⛔ WHY THIS CANNOT BE SETTLED OFFLINE. gt_layout_report() samples every
+ * ~6.6 s (measured) while the user moves every ~0.6 s, so pairing a dump
+ * against a movement in the log failed 172 of 175 times -- the window is
+ * seconds stale and belongs to a different character. The mod can read the
+ * instance set on the poll that follows a movement; the log cannot.
+ *
+ * ⭐⭐⭐ THE GAME DECLARES MEMBERSHIP: +0x088 == the cursor helper's `screen`.
+ * Measured in two runs on two different screen pointers -- 1626 run, screen
+ * 2c3874d0: all 188 name objects and all 99 notation objects carry it; 1635
+ * run, screen 2c316d70: all 20 name objects carry it. Same machinery as
+ * MODAL_PARENT_OFF (0x088), whose premise is "a pointer the game itself shares
+ * between the widgets of one control" -- here at screen scale.
+ *
+ * ⚠ The HEADING column is NOT parent-identified on its own. X=960 is shared
+ * chrome: across one run its 23 sightings carry SIX different parents (the
+ * pause menu, Select Game and Training Options all draw a heading there), and
+ * only 2 belonged to the move list. The heading needs parent AND X.
+ *
+ * ⚠ The name column's X is DERIVED per sample (the modal X among members), not
+ * hardcoded. That constant has been written down as 1265, then 1268, and
+ * measured as 633.0 for the condition column -- three values for one number is
+ * the argument for never baking it in.
+ *
+ * Opt-in: `cfc2_movelist.on`. Nothing is spoken; this only counts.
+ *
+ * ⚠ The opt-in FILE is checked by mod.c, which owns that helper, and the
+ * answer handed in here -- the same shape as gt_focus_diff_enable(). */
+void gt_movelist_enable(BOOL on);
+
+/* Sample once, on the WORKER thread. Cheap enough for the 100 ms poll: a
+ * try-lock, then at most GT_INST_MAX guarded 528-byte reads, no logging.
+ *
+ * ⚠⚠ THE CURSOR STATE IS PASSED IN. `screen` is the cursor helper's own screen
+ * pointer (compared, never dereferenced), `total` its reported item count, and
+ * `is_movelist` whether this is the move list's vertical axis.
+ *
+ * ⛔ An earlier version fetched these itself via mc_peek_rest(), which made
+ * this module depend on menu_cursor -- and linking that into the gui_text
+ * suite pulled in menu_speak and the GMD reader, turning a focused test binary
+ * into most of the mod. mod.c owns both modules and calls them in sequence, so
+ * it does the joining. */
+void gt_movelist_probe(void *screen, int total, BOOL is_movelist);
+
+/* ⭐⭐ THE VERDICT IS A RETURN VALUE, not a printed warning. `samples == 0`
+ * means the probe never observed a movement on a move-list screen, and that is
+ * NOT the same as "the counts disagree" -- reporting it as a tidy zero is the
+ * mistake inconclusive-must-be-a-return-value exists to prevent. */
+BOOL gt_movelist_conclusive(long *samples, long *missed);
+void gt_movelist_report(void);
+
+/* Test seams. ⭐ -1 means the probe never ran; 0 means it ran and recorded
+ * nothing. Those are different facts and a case asserting only "no crash"
+ * passes on both. */
+int  gt_test_ml_buckets(void);
+BOOL gt_test_ml_bucket_at(int i, int *total, int *names, int *members,
+                          long *hits);
+long gt_test_ml_overflow(void);
+long gt_test_ml_missed(void);
+/* Hand the probe its INPUTS (the cursor's total, and the screen pointer that
+ * defines membership) and ask what it CONCLUDED. ⛔ It must not be told which
+ * objects are members -- that is the mechanism under test. */
+void gt_test_ml_feed(int total, void *screen);
+void gt_test_ml_note_move(int n);
+
 /* --- test seams ----------------------------------------------------------
  * ⭐⭐ The stand-in must NOT re-derive what the shipping code derives. A
  * harness that recomputes the mechanism under test leaves the suite green with

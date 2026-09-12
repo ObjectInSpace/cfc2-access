@@ -483,6 +483,40 @@ BOOL mc_take_rest(mc_move *out)
     return TRUE;
 }
 
+/* ⭐⭐ A NON-CONSUMING snapshot of the resting position.
+ *
+ * ⛔⛔ WHY THIS EXISTS RATHER THAN REUSING mc_take_rest(). Both existing
+ * readers CONSUME: mc_take_move() advances g_taken_seq, and mc_take_rest()
+ * keeps last_caller/last_index statics so it reports a position only once.
+ * menu_speak_probe_rest() is already their consumer. A second consumer would
+ * STEAL movements from the speech path -- the user's speech silently dropping
+ * movements is a shipping bug, and a diagnostic must never be able to cause one.
+ *
+ * ⭐ Adding a READER is strictly safer than adding a consumer: this writes no
+ * static state at all, so any number of callers can use it in any order.
+ *
+ * ⚠ Same seq-bracket as the consumers: odd means a write is in flight, and a
+ * changed sequence across the copy means the snapshot is torn. A torn read is
+ * DISCARDED, never reported -- a half-updated screen pointer paired with the
+ * other half's index would be a confident wrong answer. */
+BOOL mc_peek_rest(mc_move *out)
+{
+    LONG before = InterlockedCompareExchange(&g_rest_seq, 0, 0);
+    if (before & 1)
+        return FALSE;
+
+    mc_move snap = g_rest;
+
+    LONG after = InterlockedCompareExchange(&g_rest_seq, 0, 0);
+    if (after != before)
+        return FALSE;
+    if (!snap.cursor)
+        return FALSE;                       /* nothing published yet */
+
+    *out = snap;
+    return TRUE;
+}
+
 BOOL mc_take_move(mc_move *out)
 {
     LONG before = InterlockedCompareExchange(&g_seq, 0, 0);

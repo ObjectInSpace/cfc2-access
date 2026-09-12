@@ -549,6 +549,16 @@ and wrongly. See the long comment in `src/menu_speak.h`.
   screen, then turn it off.
 - `cfc2_pad.on` -- the sPad watcher. Inert for the shell (`Kind=0`, update never
   runs); kept only for the in-game work ahead.
+- `cfc2_movelist.on` -- the MOVE LIST membership probe. Answers the one question
+  no log can: at movement time, does the count of on-screen move-name objects
+  equal the vertical cursor's total? Samples every 100 ms (the user moves every
+  ~0.6 s), aggregates into a histogram so hundreds of movements cost a handful
+  of log lines, reports every 10 s. **Nothing is spoken.**
+  ⭐ Membership comes from the game itself: `+0x088` == the cursor helper's
+  `screen` pointer, measured in two runs on two different pointers. The name
+  column's X is DERIVED (leftmost populated column), never hardcoded -- that
+  constant has been written down as 1265, then 1268, and measured as 633.0 for
+  the neighbouring condition column.
 - `cfc2_hook.off` -- makes the whole mod read-only (kills both hooks).
 
 ### To name a SIMPLE screen (contiguous labels)

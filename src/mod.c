@@ -345,6 +345,23 @@ static DWORD WINAPI worker(LPVOID param)
             gt_focus_diff_report();
     }
 
+    /* ⭐⭐ The MOVE LIST membership probe. Also gated on gt_ok: without the
+     * instance set there are no widgets to count, so it would report a
+     * confident zero about a census it never took.
+     *
+     * ⚠ The file check lives HERE, not in gui_text.c -- mod.c owns
+     * opt_in_file_present(), which resolves the EXE's directory. The two
+     * probes that check a bare relative path in gui_text.c work only because
+     * the CWD happens to be the game dir; that is not a pattern to copy. */
+    if (gt_ok) {
+        BOOL ml_on = opt_in_file_present("cfc2_movelist.on");
+        gt_movelist_enable(ml_on);
+        if (ml_on)
+            log_line("mod: cfc2_movelist.on -- the move-list membership probe "
+                     "is ENABLED. It counts widgets per cursor movement and "
+                     "reports every 10 s. Nothing is spoken.");
+    }
+
     /* ⚠ OPT-IN. The offline tools (disasm.py, find_callers.py,
      * build_riprefs.py, analyze_dump.py) all read this dump, and it is the
      * machinery that cracked sPad, sKeyboard and the cursor chokepoint -- so it
@@ -513,6 +530,34 @@ static DWORD WINAPI worker(LPVOID param)
              * them. */
             if (gt_ok)
                 gt_poll_and_log();
+
+            /* ⭐⭐ THE MOVE LIST PROBE SAMPLES AT 100 ms, NOT ON THE 2 s BEAT.
+             *
+             * The user moves through the move list every ~0.6 s (measured), so
+             * a 2 s beat would lose 3-6 movements per beat -- the same failure
+             * the modal check hit above, and the reason offline pairing against
+             * the 6.6 s layout dump failed 172 of 175 times. At 100 ms this is
+             * ~6x oversampled; what it still misses it COUNTS, so a thin
+             * sample cannot masquerade as a complete one.
+             *
+             * ⚠ mc_peek_rest() does NOT consume, so this cannot steal a
+             * movement from mc_poll_and_log() above -- which would make the
+             * user's speech drop movements to feed a diagnostic.
+             *
+             * ⭐ The JOIN happens here, not inside gui_text: that module must
+             * not depend on menu_cursor (linking the two into the gui_text
+             * suite pulls in menu_speak and the GMD reader). mod.c already owns
+             * both, so it reads the cursor and hands the answer over. */
+            if (gt_ok && mc_ok) {
+                mc_move mlm;
+                if (mc_peek_rest(&mlm)) {
+                    int mltot = mlm.max_index - mlm.min_index + 1;
+                    /* 0x140080250 is the move list's VERTICAL axis -- the one
+                     * whose total's meaning is the open question. */
+                    gt_movelist_probe(mlm.screen, mltot,
+                                      mlm.caller == (void *)0x140080250ULL);
+                }
+            }
 
             if (unpacked && pad_enabled) {
                 unsigned dirs = 0;
@@ -747,6 +792,18 @@ static DWORD WINAPI worker(LPVOID param)
                 gt_layout_report();
             }
         }
+
+        /* ⭐ The move-list probe REPORTS on the slow beats even though it
+         * SAMPLES every 100 ms -- the split gt_focus_diff already uses. Its
+         * output is an aggregate histogram of a handful of lines regardless of
+         * how many movements were sampled, so 10 s cannot flood a log whose
+         * every line costs an _wfopen/fclose. One line per movement would be
+         * hundreds of file opens.
+         *
+         * ⚠ Every 5 beats plus an early one -- the cadence mod.c earned after
+         * beats 10/30/60 missed an entire run. */
+        if (gt_ok && (beat == 10 || beat % 5 == 0))
+            gt_movelist_report();
 
         /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning
          * 1.3 GB, and it duplicated work: gmd_text_ready() already calls

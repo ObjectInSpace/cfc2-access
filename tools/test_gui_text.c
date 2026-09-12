@@ -1413,6 +1413,203 @@ int main(void)
               gt_test_focus_diff_changed() < 0, d39);
     }
 
+    /* --- cases 40-47: THE MOVE LIST MEMBERSHIP PROBE ---------------------
+     *
+     * ⭐⭐⭐ THE FIXTURE IS REAL DATA. From run-2026-09-11-1626 (screen
+     * 2c3874d0) and -1635 (screen 2c316d70): every move-NAME object sits at
+     * X=84.0 and every INPUT-NOTATION object at X=1565.0, and BOTH carry
+     * +0x088 == the cursor helper's `screen` argument. The condition column
+     * (" During Hyakkishu") sits at X=633.0 and is ALSO a member -- which is
+     * exactly why membership cannot key on text shape: a leading-space
+     * capitalised string is indistinguishable from a move name.
+     *
+     * ⚠ Two parents are planted so "filter on the screen pointer" and "count
+     * everything live" give different answers. With one parent they would not. */
+    {
+        /* A member of the screen under test, and a member of another screen. */
+        static unsigned char ours[7][GT_CLASS_SIZE];
+        static unsigned char other[2][GT_CLASS_SIZE];
+        void *P = (void *)0x2C3874D0ULL;      /* the move list's screen  */
+        void *Q = (void *)0x2C251E60ULL;      /* the pause menu's screen */
+        /* 3 names at 84.0, 1 condition at 633.0, 3 notations at 1565.0. */
+        static const float OX[7] = { 84.f, 84.f, 84.f, 633.f,
+                                     1565.f, 1565.f, 1565.f };
+        static const char *const OT[7] = {
+            " Hadoken", " Shoryuken", " Tatsumaki Senpu-kyaku",
+            " During Hyakkishu", "<RGHT>A", "<RGHT>B", "<RGHT>C"
+        };
+        static const float QX[2] = { 362.f, 362.f };
+        static const char *const QT[2] = { "Resume", "Quit" };
+
+        /* Plant the fixture once; the cases below re-feed it. */
+        #define ML_PLANT()                                                    \
+            do {                                                              \
+                gt_test_reset();                                              \
+                gt_test_focus_enable();                                       \
+                gt_movelist_enable(TRUE);                                     \
+                for (int i = 0; i < 7; i++) {                                 \
+                    memset(ours[i], 0, sizeof ours[i]);                       \
+                    *(ULONGLONG *)ours[i] = GT_VTABLE_ADDR;                   \
+                    memcpy(ours[i] + 0x40, &OX[i], sizeof(float));            \
+                    float yy = 234.f + 73.f * (float)i;                       \
+                    memcpy(ours[i] + 0x44, &yy, sizeof(float));               \
+                    memcpy(ours[i] + 0x88, &P, sizeof(void *));               \
+                    gt_test_settext_body(ours[i], OT[i], NULL, 0);            \
+                }                                                             \
+                for (int i = 0; i < 2; i++) {                                 \
+                    memset(other[i], 0, sizeof other[i]);                     \
+                    *(ULONGLONG *)other[i] = GT_VTABLE_ADDR;                  \
+                    memcpy(other[i] + 0x40, &QX[i], sizeof(float));           \
+                    float yy = 225.f + 80.f * (float)i;                       \
+                    memcpy(other[i] + 0x44, &yy, sizeof(float));              \
+                    memcpy(other[i] + 0x88, &Q, sizeof(void *));              \
+                    gt_test_settext_body(other[i], QT[i], NULL, 0);           \
+                }                                                             \
+            } while (0)
+
+        /* case 40: ⭐⭐ MEMBERSHIP KEYS ON +0x088, NOT ON TEXT SHAPE.
+         * 9 live objects, 7 of them this screen's; 3 of those are names. */
+        {
+            ML_PLANT();
+            gt_test_ml_feed(3, P);
+            int tot = 0, nm = 0, mem = 0; long h = 0;
+            BOOL got = gt_test_ml_bucket_at(0, &tot, &nm, &mem, &h);
+            char d[160];
+            snprintf(d, sizeof d, "buckets=%d total=%d names=%d members=%d",
+                     gt_test_ml_buckets(), tot, nm, mem);
+            check("40. members key on the screen pointer, names on the column",
+                  got && mem == 7 && nm == 3, d);
+        }
+
+        /* case 41: ⭐ THE COLUMN X IS DERIVED, not hardcoded. The same shape
+         * shifted by +400 must give the same verdict -- and it must, because
+         * that constant has been written down as 1265, then 1268, and measured
+         * as 633.0. Three values for one number is why nothing bakes it in. */
+        {
+            gt_test_reset();
+            gt_test_focus_enable();
+            gt_movelist_enable(TRUE);
+            for (int i = 0; i < 7; i++) {
+                memset(ours[i], 0, sizeof ours[i]);
+                *(ULONGLONG *)ours[i] = GT_VTABLE_ADDR;
+                float x = OX[i] + 400.f;
+                memcpy(ours[i] + 0x40, &x, sizeof(float));
+                float yy = 234.f + 73.f * (float)i;
+                memcpy(ours[i] + 0x44, &yy, sizeof(float));
+                memcpy(ours[i] + 0x88, &P, sizeof(void *));
+                gt_test_settext_body(ours[i], OT[i], NULL, 0);
+            }
+            gt_test_ml_feed(3, P);
+            int nm = 0, mem = 0;
+            gt_test_ml_bucket_at(0, NULL, &nm, &mem, NULL);
+            char d[140];
+            snprintf(d, sizeof d, "shifted +400: names=%d members=%d", nm, mem);
+            check("41. the name column's X is DERIVED, not a constant",
+                  nm == 3 && mem == 7, d);
+        }
+
+        /* case 42: ⛔⛔ A MISMATCH IS RECORDED, NOT SILENCED. This is the
+         * outcome the logs suggest is REAL (the vertical total read 3 while ~20
+         * name objects were live), so discarding non-matching samples would
+         * print an empty histogram that reads as "no data". Refusing to NAME on
+         * a mismatch is right; refusing to MEASURE one is not. */
+        {
+            ML_PLANT();
+            gt_test_ml_feed(9, P);           /* cursor says 9, only 3 names */
+            int tot = 0, nm = 0;
+            BOOL got = gt_test_ml_bucket_at(0, &tot, &nm, NULL, NULL);
+            char d[140];
+            snprintf(d, sizeof d, "buckets=%d total=%d names=%d",
+                     gt_test_ml_buckets(), tot, nm);
+            check("42. a total/names MISMATCH is recorded, not discarded",
+                  got && tot == 9 && nm == 3, d);
+        }
+
+        /* case 43: repeats AGGREGATE. 200 identical movements must occupy one
+         * bucket -- that is what makes hundreds of fast movements survivable
+         * against a 24-slot table and a per-line-fopen log. */
+        {
+            ML_PLANT();
+            for (int i = 0; i < 200; i++)
+                gt_test_ml_feed(3, P);
+            long h = 0;
+            gt_test_ml_bucket_at(0, NULL, NULL, NULL, &h);
+            char d[140];
+            snprintf(d, sizeof d, "buckets=%d hits=%ld overflow=%ld",
+                     gt_test_ml_buckets(), h, gt_test_ml_overflow());
+            check("43. 200 identical outcomes aggregate into ONE bucket",
+                  gt_test_ml_buckets() == 1 && h == 200 &&
+                  gt_test_ml_overflow() == 0, d);
+        }
+
+        /* case 44: ⛔ the 25th DISTINCT outcome is COUNTED, not wrapped away.
+         * A wrapping ring would discard the rare outcome -- the very evidence
+         * being sought -- and show a full table either way. */
+        {
+            ML_PLANT();
+            for (int i = 0; i < 30; i++)
+                gt_test_ml_feed(i, P);       /* 30 distinct totals */
+            char d[140];
+            snprintf(d, sizeof d, "buckets=%d overflow=%ld",
+                     gt_test_ml_buckets(), gt_test_ml_overflow());
+            check("44. outcomes past the cap are COUNTED, not wrapped",
+                  gt_test_ml_buckets() == 24 && gt_test_ml_overflow() >= 1, d);
+        }
+
+        /* case 45: ⭐⭐ A MISSED MOVEMENT IS COUNTED. The probe samples at
+         * 100 ms against ~0.6 s movements, so some pass between polls -- and a
+         * thin sample must not be able to masquerade as a complete one.
+         *
+         * Drive the real entry point twice with three movements in between:
+         * the sequence jumped by 3, so 2 were missed. */
+        {
+            ML_PLANT();
+            void *S = (void *)0x2C3874D0ULL;
+            gt_test_ml_note_move(1);
+            gt_movelist_probe(S, 3, TRUE);       /* first sample */
+            gt_test_ml_note_move(3);             /* 3 movements, 1 poll */
+            gt_movelist_probe(S, 3, TRUE);       /* second sample */
+            char d[140];
+            snprintf(d, sizeof d, "samples=%d missed=%ld (want missed=2)",
+                     gt_test_ml_buckets(), gt_test_ml_missed());
+            check("45. movements passing between polls are COUNTED as missed",
+                  gt_test_ml_missed() == 2, d);
+        }
+
+        /* case 46: ⭐⭐ OFF must not look like FOUND NOTHING. -1 and 0 are
+         * completely different facts and an assertion of "it did not crash"
+         * passes on both -- the shape that left case 29 green while executing
+         * none of the code it named. */
+        {
+            ML_PLANT();
+            gt_movelist_enable(FALSE);
+            gt_test_ml_feed(3, P);
+            char d[140];
+            snprintf(d, sizeof d, "buckets=%d (want <0 = never ran)",
+                     gt_test_ml_buckets());
+            check("46. gated OFF reports -1, never a tidy 0",
+                  gt_test_ml_buckets() < 0, d);
+        }
+
+        /* case 47: ⛔⛔ A STALE OBJECT IS NOT A MEMBER, and this is the worst
+         * failure direction: validating the vptr only at insert time would
+         * count a freed widget and answer YES when the truth is NO. */
+        {
+            ML_PLANT();
+            *(ULONGLONG *)ours[1] = GT_VTABLE2_ADDR;   /* no longer ours */
+            gt_test_ml_feed(3, P);
+            int nm = 0, mem = 0;
+            gt_test_ml_bucket_at(0, NULL, &nm, &mem, NULL);
+            char d[140];
+            snprintf(d, sizeof d, "names=%d members=%d (one name went stale)",
+                     nm, mem);
+            check("47. a stale object is re-validated OUT of the census",
+                  nm == 2 && mem == 6, d);
+        }
+
+        #undef ML_PLANT
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",

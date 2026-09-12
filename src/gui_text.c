@@ -2460,8 +2460,320 @@ int gt_test_instance_text(void *obj, char *out, int outlen)
     return 0;
 }
 
+/* ===================== THE MOVE LIST MEMBERSHIP PROBE =====================
+ *
+ * See gui_text.h for what this answers and why no log can answer it. Read-only
+ * throughout; nothing here is ever spoken.
+ *
+ * ⭐⭐ AGGREGATE, DO NOT TRANSCRIBE. The user moves through HUNDREDS of entries
+ * quickly (measured median 0.6 s), and log_line() does a full _wfopen/fclose
+ * PER LINE -- so one line per movement is hundreds of file opens on the worker
+ * thread. A repeated outcome increments `hits` instead of taking a slot, so 400
+ * identical movements occupy ONE bucket.
+ *
+ * ⭐ That aggregation is a STRONGER dedupe than g_focus's consecutive-duplicate
+ * rule, and it is also why this report does NOT clear its window. g_focus must
+ * clear or it fills to 48 and goes blind (case 19); g_ml cannot fill by
+ * repetition, only by 24 DISTINCT outcomes -- and g_ml_overflow then says so.
+ * Clearing would destroy the session-wide distribution that IS the verdict. */
+#define GT_ML_MAX 24
+typedef struct {
+    int  total;        /* the vertical cursor's reported item total */
+    int  names;        /* live members in the derived name column */
+    int  members;      /* live objects whose +0x088 == this screen */
+    LONG hits;
+    LONG first_seq, last_seq;
+} gt_ml_bucket;
+static gt_ml_bucket g_ml[GT_ML_MAX];
+static volatile LONG g_ml_used = -1;   /* -1 = never ran; 0 = ran, found none */
+static volatile LONG g_ml_overflow;
+static volatile LONG g_ml_samples;
+static volatile LONG g_ml_missed;      /* movements that passed between polls */
+static volatile LONG g_ml_busy_skips;
+static volatile LONG g_ml_faults;
+static volatile LONG g_ml_on;
+static volatile LONG g_ml_last_seq;
+static float         g_ml_col_x;       /* the DERIVED name-column X */
+
+void gt_movelist_enable(BOOL on) { InterlockedExchange(&g_ml_on, on ? 1 : 0); }
+static BOOL ml_enabled(void) { return g_ml_on == 1; }
+
+/* Record one outcome. ⛔ Overflow STOPS AND COUNTS rather than wrapping: a
+ * wrapping ring would discard the RARE outcome, which is precisely the evidence
+ * being sought, and would show a full table whether or not anything was lost
+ * (the reasoning at g_focus's declaration). */
+static void ml_record(int total, int names, int members, LONG seq)
+{
+    LONG used = g_ml_used < 0 ? 0 : g_ml_used;
+    for (LONG i = 0; i < used; i++) {
+        if (g_ml[i].total == total && g_ml[i].names == names &&
+            g_ml[i].members == members) {
+            g_ml[i].hits++;
+            g_ml[i].last_seq = seq;
+            g_ml_used = used;
+            return;
+        }
+    }
+    if (used >= GT_ML_MAX) {
+        InterlockedIncrement(&g_ml_overflow);
+        g_ml_used = used;
+        return;
+    }
+    g_ml[used].total = total;
+    g_ml[used].names = names;
+    g_ml[used].members = members;
+    g_ml[used].hits = 1;
+    g_ml[used].first_seq = g_ml[used].last_seq = seq;
+    g_ml_used = used + 1;
+}
+
+/* The census itself, given the screen pointer that defines membership.
+ *
+ * ⚠ `screen` is COMPARED as a value against +0x088 read out of our own guarded
+ * copy -- never dereferenced. mc_move.screen is documented "recorded only,
+ * never dereferenced" and that contract is kept. */
+static void ml_census(void *screen, int *out_members, int *out_names)
+{
+    float xs[GT_INST_MAX];
+    /* ⚠ VOLATILE because these live across MEM_GUARDED's setjmp. longjmp may
+     * restore a stale register copy, which here would silently under- or
+     * over-count the census -- and -Wclobbered flagged exactly this. This
+     * project already had one real setjmp hazard caught by that warning; it is
+     * not a warning to wave through. */
+    volatile int nx = 0;
+    volatile int members = 0;
+
+    *out_members = *out_names = 0;
+    if (!screen)
+        return;
+
+    LONG n_ent = g_inst_count;
+    for (volatile LONG i = 0; i < n_ent && nx < GT_INST_MAX; i++) {
+        void *o = g_inst[i].obj;
+        ULONGLONG vptr = 0;
+        BOOL faulted = FALSE;
+        unsigned char buf[GT_CLASS_SIZE];
+        void *parent = NULL;
+        float x = 0.f, y = 0.f;
+
+        if (!o || ((ULONG_PTR)o & 7u))
+            continue;
+        if (!g_inst[i].text[0])
+            continue;
+        /* ⚠ Re-validate EVERY sample. An entry survives until eviction, so a
+         * stale object from a screen left long ago can still hold matching
+         * text -- and counting it would answer YES when the truth is NO, the
+         * worst direction for this particular question. */
+        if (mem_readable_run(o, sizeof(vptr)) < sizeof(vptr))
+            continue;
+        MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)o);
+        if (faulted) { InterlockedIncrement(&g_ml_faults); continue; }
+        if (vptr != GT_VTABLE_ADDR && vptr != GT_VTABLE_MSG)
+            continue;
+        /* ⛔⛔ mem_readable_run FIRST, then the guarded copy. A guarded memcpy
+         * across a bad page is NOT reliably caught -- case C of run_span_test. */
+        if (mem_readable_run(o, GT_CLASS_SIZE) < GT_CLASS_SIZE)
+            continue;
+        if (!mem_copy(buf, o, GT_CLASS_SIZE))
+            continue;
+
+        memcpy(&parent, buf + 0x88, sizeof(parent));
+        if (parent != screen)
+            continue;                       /* not this screen's widget */
+        members++;
+
+        memcpy(&x, buf + 0x40, sizeof(float));
+        memcpy(&y, buf + 0x44, sizeof(float));
+        /* ⚠ Reject NaN outright: it makes every comparison false and would
+         * silently shrink the column census. */
+        if (!(x == x) || !(y == y))
+            continue;
+        xs[nx++] = x;
+    }
+
+    /* ⭐ DERIVE the name column rather than hardcoding it: that constant has
+     * already been written down as 1265, then 1268, and measured as 633.0 for
+     * the condition column. A derived value also survives a resolution change
+     * or a per-game layout difference.
+     *
+     * ⛔⛔ THE LEFTMOST COLUMN, NOT THE MOST POPULATED. Picking the mode was
+     * the first implementation and case 47 caught it: with one of three name
+     * objects gone stale, 2 names against 3 notation objects made the MODE the
+     * NOTATION column (x=1565), so the census reported names=3 -- counting the
+     * wrong column entirely. In-game that is a character with few moves, which
+     * is common (measured per-character counts run 2..23).
+     *
+     * Leftmost is structural: the move list draws names at x=84, conditions at
+     * 633, the heading at 960 and notation at 1565. The name column is the
+     * left-hand one by layout, not by happening to be the busiest. */
+    /* ⚠ volatile for the same reason as above: this runs after the guarded
+     * reads and -Wclobbered covers the whole function. */
+    volatile float best_x = 0.f;
+    volatile int   best_n = 0;
+    for (int i = 0; i < (int)nx; i++) {
+        if (best_n == 0 || xs[i] < best_x) {
+            best_x = xs[i];
+            best_n = 0;
+            for (int j = 0; j < (int)nx; j++)
+                if (xs[j] == xs[i]) best_n++;
+        }
+    }
+    g_ml_col_x   = best_n ? best_x : 0.f;
+    *out_members = (int)members;
+    *out_names   = (int)best_n;
+}
+
+/* ⚠⚠ THE CURSOR STATE IS PASSED IN, not fetched.
+ *
+ * ⛔ The first version called mc_peek_rest() from here, which made gui_text.c
+ * depend on menu_cursor.c -- and linking that into this suite dragged in
+ * menu_speak, the GMD reader and their dependencies, turning a focused test
+ * binary into most of the mod. The module boundary was the problem, not the
+ * link line.
+ *
+ * ⭐ mod.c already owns both modules and already calls them in sequence, so it
+ * hands the screen pointer and the total over. gui_text stays self-contained
+ * and the suite stays honest about what it covers. */
+void gt_movelist_probe(void *screen, int total, BOOL is_movelist)
+{
+    if (!ml_enabled())
+        return;
+    if (!g_installed && !g_focus_test_mode)
+        return;
+    if (g_ml_used < 0)
+        g_ml_used = 0;                      /* it ran: 0 now means "found none" */
+    if (!is_movelist || !screen || total < 1)
+        return;
+
+    LONG seq = g_move_seq;
+    LONG prev = g_ml_last_seq;
+    if (seq == prev)
+        return;                             /* no movement since last sample */
+    /* ⚠ A jump of more than one means movements passed between polls. Counted,
+     * never hidden: a run whose `missed` approaches `samples` is untrustworthy
+     * and the report must say so rather than present a tidy histogram built on
+     * a fraction of the data. */
+    if (prev && seq > prev + 1)
+        InterlockedExchangeAdd(&g_ml_missed, seq - prev - 1);
+    g_ml_last_seq = seq;
+
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0) {
+        InterlockedIncrement(&g_ml_busy_skips);
+        return;
+    }
+    int members = 0, names = 0;
+    ml_census(screen, &members, &names);
+    InterlockedExchange(&g_inst_busy, 0);
+
+    ml_record(total, names, members, seq);
+    InterlockedIncrement(&g_ml_samples);
+}
+
+BOOL gt_movelist_conclusive(long *samples, long *missed)
+{
+    if (samples) *samples = (long)g_ml_samples;
+    if (missed)  *missed  = (long)g_ml_missed;
+    return g_ml_samples > 0;
+}
+
+void gt_movelist_report(void)
+{
+    long samples = 0, missed = 0;
+
+    if (!ml_enabled())
+        return;
+    if (!gt_movelist_conclusive(&samples, &missed)) {
+        log_line("gt: ⚠ MOVE LIST PROBE INCONCLUSIVE -- 0 movement(s) "
+                 "sampled on a move-list screen (%ld poll(s) lost the lock, "
+                 "%ld fault(s)). Nothing can be concluded about membership. "
+                 "This is NOT a negative result.",
+                 (long)g_ml_busy_skips, (long)g_ml_faults);
+        return;
+    }
+
+    LONG used = g_ml_used < 0 ? 0 : g_ml_used;
+    log_line("gt: === MOVE LIST MEMBERSHIP: %ld sample(s), %ld missed ===",
+             samples, missed);
+    log_line("gt:   name column derived at X=%.1f", (double)g_ml_col_x);
+    LONG agree = 0, disagree = 0;
+    for (LONG i = 0; i < used; i++) {
+        log_line("gt:   [total=%-3d names=%-3d members=%-3d] x%-4ld seq %ld..%ld",
+                 g_ml[i].total, g_ml[i].names, g_ml[i].members,
+                 (long)g_ml[i].hits, (long)g_ml[i].first_seq,
+                 (long)g_ml[i].last_seq);
+        if (g_ml[i].total == g_ml[i].names) agree += g_ml[i].hits;
+        else                                disagree += g_ml[i].hits;
+    }
+    /* ⭐ POSITIVE counts throughout: "0 failed" must never be mistakable for
+     * "0 checked". */
+    log_line("gt:   of %ld sample(s): %ld had names == total, %ld DISAGREED; "
+             "%ld outcome(s) did not fit the table; %ld lock-loss; %ld fault(s).",
+             samples, (long)agree, (long)disagree, (long)g_ml_overflow,
+             (long)g_ml_busy_skips, (long)g_ml_faults);
+    log_line("gt: ▶ READ IT LIKE THIS:");
+    log_line("gt:   names == total on EVERY sample -> the coordinate join can "
+             "name the rows; the reader's refusals are the thing to fix.");
+    log_line("gt:   names CONSTANT while total VARIES -> the vertical cursor is "
+             "NOT a row cursor over this column. It selects a CATEGORY or PAGE, "
+             "and a row reader needs the per-category count first.");
+    log_line("gt:   names > total always -> the whole list is resident and the "
+             "cursor counts a WINDOW. Find the scroll offset before position N "
+             "means anything.");
+    log_line("gt:   names == 0 with members > 0 -> the column X was mis-derived; "
+             "compare the derived X above against a cfc2_layout.on dump.");
+    log_line("gt:   names == 0 AND members == 0 -> the +0x088 == screen "
+             "assumption is WRONG here. Re-measure before building anything.");
+}
+
+int gt_test_ml_buckets(void)
+{
+    return g_ml_used < 0 ? -1 : (int)g_ml_used;
+}
+
+BOOL gt_test_ml_bucket_at(int i, int *total, int *names, int *members,
+                          long *hits)
+{
+    if (g_ml_used <= 0 || i < 0 || i >= (int)g_ml_used)
+        return FALSE;
+    if (total)   *total   = g_ml[i].total;
+    if (names)   *names   = g_ml[i].names;
+    if (members) *members = g_ml[i].members;
+    if (hits)    *hits    = (long)g_ml[i].hits;
+    return TRUE;
+}
+
+long gt_test_ml_overflow(void) { return (long)g_ml_overflow; }
+long gt_test_ml_missed(void)   { return (long)g_ml_missed; }
+
+/* ⭐ Hands in only the INPUTS. The harness never says which objects are
+ * members or what the column X is -- those are the mechanism under test. */
+void gt_test_ml_feed(int total, void *screen)
+{
+    if (!ml_enabled())
+        return;
+    if (g_ml_used < 0)
+        g_ml_used = 0;
+    int members = 0, names = 0;
+    ml_census(screen, &members, &names);
+    ml_record(total, names, members, g_move_seq);
+    InterlockedIncrement(&g_ml_samples);
+}
+
+void gt_test_ml_note_move(int n)
+{
+    for (int i = 0; i < n; i++)
+        InterlockedIncrement(&g_move_seq);
+}
+
 void gt_test_reset(void)
 {
+    g_ml_used = -1; g_ml_overflow = 0; g_ml_samples = 0; g_ml_missed = 0;
+    g_ml_busy_skips = 0; g_ml_faults = 0; g_ml_on = 0;
+    g_ml_last_seq = 0; g_ml_col_x = 0.f;
+    for (int i = 0; i < GT_ML_MAX; i++) {
+        g_ml[i].total = g_ml[i].names = g_ml[i].members = 0;
+        g_ml[i].hits = g_ml[i].first_seq = g_ml[i].last_seq = 0;
+    }
     g_calls = g_distinct = g_faults = g_wrong_class = 0;
     g_other_class = g_ours = g_ctors = g_with_text = 0;
     g_settext_calls = 0; g_text_ready = 0; g_text_busy = 0;
