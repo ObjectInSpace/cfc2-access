@@ -561,6 +561,57 @@ typedef BOOL (*gt_cand_fn)(const char *text, void *ctx);
 BOOL gt_item_at_position(int position, int total, gt_cand_fn match, void *ctx,
                          char *out, int outlen);
 
+/* ⭐⭐ A WIDGET OF ONE SCREEN, by the parent pointer the game itself stamps at
+ * +0x088 -- and optionally by column and row.
+ *
+ * ⭐ MEMBERSHIP COMES FROM THE GAME, not from a guess about the text. Measured
+ * across three runs on three different screen pointers: every move-name object
+ * (X=84), every input-notation object (X=1565) and the screen's heading
+ * (X=960) all carry +0x088 == the cursor helper's own `screen` argument. Same
+ * machinery as MODAL_PARENT_OFF, at screen scale.
+ *
+ * ⛔ Why a text-shaped filter will not do here: the move list's CONDITION
+ * column (" During Hyakkishu", X=633) is a leading-space capitalised string
+ * indistinguishable from a move name. Only the coordinate separates them.
+ *
+ * `x`   -- the column, or a negative value for "any column".
+ * `y`   -- the row's Y, or a negative value for "any row". Matched within
+ *          GT_COORD_EPS, because these are floats from the game.
+ *
+ * ⚠ X=960 is SHARED CHROME: the pause menu, Select Game and Training Options
+ * all draw a heading there, and in one run its sightings carried SIX different
+ * parents. So the parent check is what makes a column query safe, and passing
+ * a column alone would be wrong.
+ *
+ * Returns TRUE only when EXACTLY ONE live object matches -- two matches is a
+ * contradiction, not a tie to break. */
+#define GT_COORD_EPS 1.0f
+BOOL gt_widget_of(const void *screen, float x, float y, char *out, int outlen);
+
+/* The Y of the Nth object (1-based) in `screen`'s column at `x`, sorted top to
+ * bottom. ⭐ This is how a row in one column finds its partner in another --
+ * the move list's name and its input notation share a Y. */
+BOOL gt_column_y(const void *screen, float x, int position, float *out_y);
+
+/* How many live objects `screen` has in the column at `x`. ⭐ This is the
+ * VISIBLE count, which on the move list is NOT the cursor's total: the cursor
+ * counts panels (reporting "of 3") while ten move names are on screen. */
+int gt_column_count(const void *screen, float x);
+
+/* The Nth object (1-based, top to bottom) of `screen`'s column at `x`, with the
+ * partner at `pair_x` on the same row appended after ", " when one exists.
+ *
+ * ⭐⭐ THIS IS HOW A WHOLE PANEL IS READ. The move list shows several moves at
+ * once and the cursor moves between PANELS, not rows -- so announcing only the
+ * focused row leaves most of the screen unspoken, and a one-entry panel silent
+ * (it produces no cursor movement at all). Pass pair_x < 0 for no partner.
+ *
+ * ⚠ Rows are paired by SHARING A Y, never by ordinal: the two columns can have
+ * different lengths, and taking the Nth of each would attach a move's input to
+ * the wrong move -- a confident lie about how to perform it. */
+BOOL gt_column_item(const void *screen, float x, float pair_x, int position,
+                    char *out, int outlen);
+
 /* ⭐⭐ A SETTINGS SCREEN'S ROW VALUES, from the live object list.
  *
  * `labels` is the screen's row labels in row order. If the instance table holds

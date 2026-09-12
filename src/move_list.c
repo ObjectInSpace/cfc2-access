@@ -1,6 +1,23 @@
 /*
- * Name the focused move on the in-game MOVE LIST. See move_list.h for the
- * mechanism and for the three routes this replaces, each closed with evidence.
+ * Name a move on the in-game MOVE LIST, from the game's own record tables.
+ * See move_list.h for the mechanism and the routes it replaces.
+ *
+ * ⚠⚠ NOT CURRENTLY ON THE SPEECH PATH -- read this before assuming it is dead
+ * code and deleting it.
+ *
+ * The move list turned out to be PANELS, not rows: the cursor reports "of 3"
+ * while TEN move names are live on screen, so it moves between categories and
+ * each panel shows several moves at once. The shipping announcement therefore
+ * reads the whole visible panel from the LIVE objects (gt_column_item), which
+ * needs no per-row index -- and which also handles the one-entry panel that
+ * emits no cursor movement at all.
+ *
+ * ⭐ THIS IS KEPT because it is the only route that does NOT depend on an
+ * object being drawn. The live columns are capped at ten rows by the draw loop
+ * (`mov ecx,0xa` / `cmovge`); these tables are not. If a long list ever needs
+ * naming beyond what is on screen, or if the live read fails, the record walk
+ * is the answer -- verified against the corpus, sabotage-tested, and
+ * language-safe by construction.
  */
 #include "move_list.h"
 #include "gmd_find.h"

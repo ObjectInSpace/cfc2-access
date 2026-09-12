@@ -2460,6 +2460,182 @@ int gt_test_instance_text(void *obj, char *out, int outlen)
     return 0;
 }
 
+/* ⭐⭐ Walk the instance set for widgets belonging to ONE screen, identified by
+ * the parent pointer the game stamps at +0x088. See gui_text.h.
+ *
+ * ⚠ Both entry points share this so the validation sequence exists once: the
+ * pointer checks, the vptr re-validation and the mem_readable_run-before-copy
+ * ordering are the same five lines gt_item_at_position() uses, and a second
+ * copy of them would be a second place to get them wrong. */
+typedef struct { float x, y; const char *text; } gt_widget;
+
+static int widgets_of(const void *screen, float want_x, gt_widget *out, int cap)
+{
+    int n = 0;
+    LONG n_ent = g_inst_count;
+
+    if (!screen)
+        return 0;
+    for (volatile LONG i = 0; i < n_ent && n < cap; i++) {
+        void *o = g_inst[i].obj;
+        ULONGLONG vptr = 0;
+        BOOL faulted = FALSE;
+        unsigned char buf[GT_CLASS_SIZE];
+        void *parent = NULL;
+        float x = 0.f, y = 0.f;
+
+        if (!o || ((ULONG_PTR)o & 7u) || !g_inst[i].text[0])
+            continue;
+        if (mem_readable_run(o, sizeof(vptr)) < sizeof(vptr))
+            continue;
+        MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)o);
+        if (faulted || (vptr != GT_VTABLE_ADDR && vptr != GT_VTABLE_MSG))
+            continue;
+        /* ⛔⛔ mem_readable_run FIRST, then the guarded copy -- case C of
+         * run_span_test measured a guarded memcpy across a bad page going
+         * UNCAUGHT. The guard is a net for the race, never the check. */
+        if (mem_readable_run(o, GT_CLASS_SIZE) < GT_CLASS_SIZE)
+            continue;
+        if (!mem_copy(buf, o, GT_CLASS_SIZE))
+            continue;
+
+        memcpy(&parent, buf + 0x88, sizeof(parent));
+        if (parent != screen)
+            continue;
+        memcpy(&x, buf + 0x40, sizeof(float));
+        memcpy(&y, buf + 0x44, sizeof(float));
+        if (!(x == x) || !(y == y))         /* reject NaN: breaks every compare */
+            continue;
+        if (want_x >= 0.f && !(x > want_x - GT_COORD_EPS &&
+                               x < want_x + GT_COORD_EPS))
+            continue;
+        out[n].x = x;
+        out[n].y = y;
+        out[n].text = g_inst[i].text;
+        n++;
+    }
+    return n;
+}
+
+/* Sort a widget set by Y, top to bottom, and refuse on a shared Y.
+ * ⚠ Two rows at one coordinate means the ordering is not this screen's -- and
+ * ONE copy of this rule, shared by every caller, so it cannot drift. */
+static BOOL sort_by_y(gt_widget *w, int n)
+{
+    /* n <= 64 on the worker thread, so an insertion sort is the right amount
+     * of machinery. */
+    for (int i = 1; i < n; i++) {
+        gt_widget t = w[i];
+        int j = i - 1;
+        while (j >= 0 && w[j].y > t.y) { w[j + 1] = w[j]; j--; }
+        w[j + 1] = t;
+    }
+    for (int i = 1; i < n; i++)
+        if (w[i].y > w[i-1].y - GT_COORD_EPS && w[i].y < w[i-1].y + GT_COORD_EPS)
+            return FALSE;
+    return TRUE;
+}
+
+BOOL gt_widget_of(const void *screen, float x, float y, char *out, int outlen)
+{
+    gt_widget w[GT_INST_MAX];
+    int n, hit = -1;
+
+    if (out && outlen > 0) out[0] = 0;
+    if ((!g_installed && !g_focus_test_mode) || !out || outlen <= 0)
+        return FALSE;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return FALSE;
+    n = widgets_of(screen, x, w, GT_INST_MAX);
+    InterlockedExchange(&g_inst_busy, 0);
+
+    for (int i = 0; i < n; i++) {
+        if (y >= 0.f && !(w[i].y > y - GT_COORD_EPS && w[i].y < y + GT_COORD_EPS))
+            continue;
+        if (hit >= 0)
+            return FALSE;                   /* two matches is a contradiction */
+        hit = i;
+    }
+    if (hit < 0)
+        return FALSE;
+    _snprintf(out, (size_t)outlen, "%s", w[hit].text);
+    out[outlen - 1] = 0;
+    return out[0] != 0;
+}
+
+BOOL gt_column_y(const void *screen, float x, int position, float *out_y)
+{
+    gt_widget w[GT_INST_MAX];
+    int n;
+
+    if (!out_y || position < 1)
+        return FALSE;
+    if ((!g_installed && !g_focus_test_mode))
+        return FALSE;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return FALSE;
+    n = widgets_of(screen, x, w, GT_INST_MAX);
+    InterlockedExchange(&g_inst_busy, 0);
+
+    /* ⚠ ONE sort, shared with gt_column_item() -- two copies of an ordering
+     * rule is two places for it to drift. */
+    if (position > n || !sort_by_y(w, n))
+        return FALSE;
+    *out_y = w[position - 1].y;
+    return TRUE;
+}
+
+int gt_column_count(const void *screen, float x)
+{
+    gt_widget w[GT_INST_MAX];
+    int n;
+
+    if (!g_installed && !g_focus_test_mode)
+        return 0;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return 0;
+    n = widgets_of(screen, x, w, GT_INST_MAX);
+    InterlockedExchange(&g_inst_busy, 0);
+    return n;
+}
+
+BOOL gt_column_item(const void *screen, float x, float pair_x, int position,
+                    char *out, int outlen)
+{
+    gt_widget w[GT_INST_MAX], p[GT_INST_MAX];
+    int n, np = 0;
+
+    if (out && outlen > 0) out[0] = 0;
+    if ((!g_installed && !g_focus_test_mode) || !out || outlen <= 0 ||
+        position < 1)
+        return FALSE;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return FALSE;
+    n = widgets_of(screen, x, w, GT_INST_MAX);
+    if (pair_x >= 0.f)
+        np = widgets_of(screen, pair_x, p, GT_INST_MAX);
+    InterlockedExchange(&g_inst_busy, 0);
+
+    if (position > n || !sort_by_y(w, n))
+        return FALSE;
+
+    const gt_widget *me = &w[position - 1];
+    /* ⚠ Paired by Y, never by ordinal -- the columns can differ in length. */
+    const char *mate = NULL;
+    for (int i = 0; i < np; i++)
+        if (p[i].y > me->y - GT_COORD_EPS && p[i].y < me->y + GT_COORD_EPS) {
+            if (mate) { mate = NULL; break; }   /* two partners: refuse */
+            mate = p[i].text;
+        }
+
+    if (mate)
+        _snprintf(out, (size_t)outlen, "%s, %s", me->text, mate);
+    else
+        _snprintf(out, (size_t)outlen, "%s", me->text);
+    out[outlen - 1] = 0;
+    return out[0] != 0;
+}
+
 /* ===================== THE MOVE LIST MEMBERSHIP PROBE =====================
  *
  * See gui_text.h for what this answers and why no log can answer it. Read-only

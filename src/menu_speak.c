@@ -1229,6 +1229,19 @@ static const mc_screen g_screens[] = {
     { 0x140080250ULL, -1, 0, "Move List", MC_VERIFIED_LIVE_TEXT,
       MC_MOVE_LIST, 0, NULL, 0, NULL, 0, 0, 0 },
 
+    /* ⭐⭐ THE MOVE LIST'S CHARACTER ROSTER (0x14008028e, horizontal) -- the
+     * sibling axis of the row above. Speaks the screen's own heading, so the
+     * player knows WHOSE moves the list is showing.
+     *
+     * ⚠⚠ count = 0: the roster size is per GAME, not fixed -- 48 in CVS2, 35
+     * elsewhere in the same session. A count would disable the row on every
+     * game but one, exactly as it would on the move list itself.
+     *
+     * ⛔ Leaving this unnamed was a real defect, not a scoping decision: it
+     * made the whole screen unverifiable for the user it is built for. */
+    { 0x14008028eULL, -1, 0, "Move List", MC_VERIFIED_LIVE_TEXT,
+      MC_MOVE_ROSTER, 0, NULL, 0, NULL, 0, 0, 0 },
+
     /* ⚠ TEST-ONLY. Not a real call site -- no game movement can reach
      * 0xDEADCA11 -- so this cannot affect speech. It keeps the
      * MC_LABEL_UNKNOWN path covered; see MC_TEST_CALLER in the header. */
@@ -2020,37 +2033,110 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
      * ⚠ The name comes from the GMD, so it carries no engine markup -- but it
      * goes through gm_speak() anyway, because that is where residue is refused
      * and one channel exempting itself is how tag soup reaches the user. */
-    if (s->kind == MC_MOVE_LIST) {
-        char text[GT_CAPTION_MAX];
-        if (!m->screen ||
-            !ml_move_name(m->screen, out->position - 1, text,
-                          (int)sizeof(text)) || !text[0]) {
-            /* ⭐⭐ LOG WHICH STEP DECLINED. The chain is six links long
-             * (screen -> game -> table -> record -> GMD index -> text) and a
-             * bare "3 of 7" says only that one of them failed.
+    /* ⭐⭐⭐ THE MOVE LIST IS PANELS, NOT ROWS -- and the first version got this
+     * wrong in a way that MISLED rather than merely omitted.
+     *
+     * ⛔⛔ USER-REPORTED: "there might be three or four entries in the list but
+     * there are more than that number of moves... some panels only have one
+     * entry and up and down does nothing so they need to be read."
+     *
+     * MEASURED, and the user's model is right: the cursor reports "of 3" while
+     * TEN move names are live on screen. So the vertical axis moves between
+     * PANELS/categories, not between rows, and "Somersault Throw, 2 of 3"
+     * implied the character had three moves and you were on the second. Both
+     * halves of that were false.
+     *
+     * ⚠ And a one-entry panel emits NO cursor movement at all, so it was
+     * silent -- the worst case, because nothing signals that anything is there.
+     *
+     * ⭐ So a panel change reads the WHOLE panel: every visible move with its
+     * input. That is what a sighted player takes in at a glance. Speech
+     * interrupts on the next movement (speech_say's interrupt=TRUE), so a fast
+     * walk cannot build a backlog. */
+    if (s->kind == MC_MOVE_LIST || s->kind == MC_MOVE_ROSTER) {
+        char head[GT_CAPTION_MAX], spoken[GM_OUT_MAX];
+        char line[1024];
+        int used = 0, n;
+
+        if (!m->screen) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        line[0] = '\0';
+        /* The screen's own heading names the character -- quoted from the game,
+         * so JP/US roster naming never arises. */
+        if (gt_widget_of(m->screen, 960.0f, -1.0f, head, (int)sizeof(head)) &&
+            head[0]) {
+            gm_speak(head, spoken, sizeof(spoken));
+            if (spoken[0] && !gm_has_residue(spoken))
+                used += _snprintf(line + used, sizeof(line) - used - 1,
+                                  "%s", spoken);
+        }
+        n = gt_column_count(m->screen, 84.0f);
+        for (int i = 1; i <= n && used < (int)sizeof(line) - 64; i++) {
+            char row[GT_CAPTION_MAX * 2], row_spoken[GM_OUT_MAX];
+            /* ⚠⚠ THE NOTATION IS KNOWN-INCOMPLETE, and x=1565 is a deliberate
+             * choice rather than the best one.
              *
-             * ⛔ THE FIRST VERSION OMITTED THIS AND IT COST A RUN: the reader
-             * shipped with an image-range bounds check applied to the SCREEN,
-             * which is on the heap, so every lookup failed at the first read.
-             * The log showed bare positions and nothing else, and the reason
-             * had to be reconstructed from pointer arithmetic afterwards.
-             * ml_move_name_why() knew the answer the whole time. */
-            log_line("mcspeak: move list declined at step %d (row %d of %d, "
-                     "screen %p) -- see ml_why in move_list.h.",
-                     (int)ml_move_name_why(), out->position, out->total,
-                     m->screen);
+             * x=1565 holds a DIRECTION plus a move-type glyph, so a row reads
+             * "Shoryuken, back, special move" -- true, and not the full input.
+             * The COMPLETE input lives at x=633 together with the condition
+             * (" During Hyakkishu<ICON C_623>+<ICON C_P>").
+             *
+             * ⛔ But x=633 is present on only SOME rows -- zero objects in the
+             * 00:06 run, a handful in others -- and I do not yet know what
+             * decides that. Switching to it was tried and the screen went
+             * quiet, so it stays on x=1565 until the sparseness is understood.
+             *
+             * ⭐ The lesson worth keeping: I diagnosed that silence FOUR times
+             * (eviction, parent mismatch, the column swap, a missing row) and
+             * every one was refuted, because the refusal path below logged
+             * nothing. It logs now. */
+            if (!gt_column_item(m->screen, 84.0f, 1565.0f, i,
+                                row, (int)sizeof(row)) || !row[0])
+                continue;
+            gm_speak(row, row_spoken, sizeof(row_spoken));
+            if (!row_spoken[0] || gm_has_residue(row_spoken))
+                continue;
+            used += _snprintf(line + used, sizeof(line) - used - 1,
+                              "%s%s", used ? ". " : "", row_spoken);
+        }
+        line[sizeof(line) - 1] = '\0';
+        if (!line[0]) {
+            /* ⛔⛔ THIS REFUSAL USED TO BE COMPLETELY SILENT, and that cost a
+             * whole debugging session. The user reported the move list had gone
+             * quiet; because nothing was logged here, a failed readout was
+             * INDISTINGUISHABLE from never visiting the screen -- and I
+             * produced FOUR wrong diagnoses in a row (table eviction, parent
+             * pointer mismatch, the x=633 column, a missing g_screens row),
+             * every one of them refuted by the log afterwards, before
+             * discovering the path simply could not report itself.
+             *
+             * ⭐ The counts are what identify the cause in ONE run: names==0
+             * means the column query found nothing (wrong screen pointer, or an
+             * evicted table); names>0 with an empty line means every row was
+             * refused by the markup translator. Those need different fixes. */
+            log_line("mcspeak: move list read NOTHING -- %d name object(s) in "
+                     "the column, screen %p, cursor %d of %d. (names==0 -> the "
+                     "column query found nothing; names>0 -> every row was "
+                     "refused after translation.)",
+                     n, m->screen, out->position, out->total);
             out->why = MC_UNNAMED_TEXT_UNREADABLE;
             return;
         }
-        char spoken[GM_OUT_MAX];
-        gm_speak(text, spoken, sizeof(spoken));
-        if (!spoken[0] || gm_has_residue(spoken)) {
-            out->why = MC_UNNAMED_TEXT_UNREADABLE;
-            return;
-        }
-        _snprintf(out->item, sizeof(out->item), "%s", spoken);
-        out->item[sizeof(out->item) - 1] = '\0';
+        /* ⚠ Spoken DIRECTLY, not through out->item: a panel of ten moves with
+         * their inputs far exceeds item[128], and truncating it would cut a
+         * move's input mid-notation -- worse than not reading it. */
+        /* ⚠ Log the COUNT alongside, because menu_speak_line() logs only the
+         * text. A panel that read 3 of its 10 rows sounds perfectly fine to
+         * the ear -- there is no gap to hear -- so without the count a partial
+         * readout is invisible. Same reason the probe prints what it examined
+         * rather than only what it found. */
+        log_line("mcspeak: move list panel -- %d name object(s) in the column, "
+                 "cursor %d of %d.", n, out->position, out->total);
+        menu_speak_line(line);
         out->named = TRUE;
+        out->spoken_already = TRUE;
         return;
     }
 
@@ -2850,6 +2936,13 @@ void menu_speak(const mc_move *m)
 {
     mc_speech sp;
     menu_speak_build(m, &sp);
+
+    /* ⭐ The builder already spoke a whole PANEL (the move list). Saying
+     * anything further would repeat it and append an "N of M" that counts
+     * panels rather than rows -- the very thing that made the old announcement
+     * misleading. */
+    if (sp.spoken_already)
+        return;
 
     /* ⚠ The item NAME leads, then the position. A screen reader user wants the
      * word first; the position is context, not the headline. */

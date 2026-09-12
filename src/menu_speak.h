@@ -179,7 +179,19 @@ typedef enum {
      *
      * ⚠ No base_index, no labels, no count -- the screen's own +0x3d8 bounds
      * the row, and src/move_list.c range-checks every step. */
-    MC_MOVE_LIST
+    MC_MOVE_LIST,
+    /* ⭐⭐ The move list's CHARACTER ROSTER, named by quoting the screen's own
+     * heading ("Ken Moves") rather than a roster table.
+     *
+     * ⛔⛔ It was first left unnamed on the reasoning that the heading already
+     * shows the character. That is sighted reasoning: the screen said
+     * "2 of 48" and there was no way to know whose moves were being read --
+     * which also made every move name unverifiable. User-reported.
+     *
+     * ⭐ Quoting the live heading sidesteps the JP/US roster question: whatever
+     * the build calls the character is what is spoken, with no table to drift
+     * between regions. */
+    MC_MOVE_ROSTER
 } mc_kind;
 
 /* ⭐ A mapped screen's row whose label is NOT established. See `labels`. */
@@ -322,6 +334,11 @@ typedef enum {
 
 typedef struct {
     BOOL  named;               /* did we resolve an item NAME? */
+    /* ⭐ The builder ALREADY SPOKE this one, so menu_speak() must not speak it
+     * again. Set only by the move list, whose announcement is a whole PANEL of
+     * moves -- far larger than item[128] and with no "N of M" suffix to add,
+     * since the cursor counts panels rather than rows. */
+    BOOL  spoken_already;
     mc_named_why why;          /* if not, WHICH guard declined */
     mc_axis axis;              /* item / settings row / settings value */
     int   row;                 /* MC_AXIS_VALUE: which row, 0-based */

@@ -1610,6 +1610,112 @@ int main(void)
         #undef ML_PLANT
     }
 
+    /* --- cases 48-52: gt_widget_of / gt_column_y ------------------------
+     *
+     * ⭐⭐ THE MOVE LIST'S THREE COLUMNS, real coordinates from
+     * run-2026-09-11-2228: names at x=84, condition text at x=633, the heading
+     * at x=960, input notation at x=1565, rows 73 px apart. A move's name and
+     * its notation SHARE the row's Y, which is the pairing under test.
+     *
+     * ⛔⛔ THE FAILURE THIS GUARDS: pairing a name to the WRONG row's notation
+     * would tell the player the wrong input for a move they can see named --
+     * confidently, and undetectably. Case 50 is that case. */
+    {
+        static unsigned char col[8][GT_CLASS_SIZE];
+        void *P = (void *)0x2C48D1C0ULL;      /* the move list's screen  */
+        void *Q = (void *)0x2BE55550ULL;      /* another screen entirely */
+        /* name/notation pairs on shared Ys, plus chrome and a foreign heading */
+        static const float CX[8] = { 84.f, 1565.f, 84.f, 1565.f,
+                                     633.f, 960.f, 960.f, 84.f };
+        static const float CY[8] = { 234.f, 234.f, 307.f, 307.f,
+                                     380.f, 142.f, 142.f, 380.f };
+        static const char *const CT[8] = {
+            " Hadoken", "<RGHT>236P", " Shoryuken", "<RGHT>623P",
+            " During Hyakkishu", "Ken Moves", "Pause Menu", " Tatsumaki"
+        };
+        /* index 6 ("Pause Menu") belongs to Q -- the shared-chrome trap. */
+        gt_test_reset();
+        gt_test_focus_enable();
+        for (int i = 0; i < 8; i++) {
+            memset(col[i], 0, sizeof col[i]);
+            *(ULONGLONG *)col[i] = GT_VTABLE_ADDR;
+            memcpy(col[i] + 0x40, &CX[i], sizeof(float));
+            memcpy(col[i] + 0x44, &CY[i], sizeof(float));
+            void *par = (i == 6) ? Q : P;
+            memcpy(col[i] + 0x88, &par, sizeof(void *));
+            gt_test_settext_body(col[i], CT[i], NULL, 0);
+        }
+
+        /* case 48: the heading resolves, and the FOREIGN one at the same
+         * coordinate does not win. ⚠ x=960 is shared chrome: in one run its
+         * sightings carried SIX different parents. */
+        {
+            char v[64] = { 0 };
+            BOOL ok = gt_widget_of(P, 960.f, -1.f, v, sizeof v);
+            char d[140];
+            snprintf(d, sizeof d, "returned %d, \"%s\" (want \"Ken Moves\"; "
+                     "another screen has a heading at the same x/y)", (int)ok, v);
+            check("48. a column query is scoped by the PARENT, not the coordinate",
+                  ok && strcmp(v, "Ken Moves") == 0, d);
+        }
+
+        /* case 49: the Nth row of a column, sorted by Y. */
+        {
+            float y1 = 0.f, y2 = 0.f;
+            BOOL a = gt_column_y(P, 84.f, 1, &y1);
+            BOOL b = gt_column_y(P, 84.f, 3, &y2);
+            char d[140];
+            snprintf(d, sizeof d, "row1 y=%.0f (want 234) row3 y=%.0f (want 380)",
+                     (double)y1, (double)y2);
+            check("49. gt_column_y returns the Nth row's Y, top to bottom",
+                  a && b && y1 == 234.f && y2 == 380.f, d);
+        }
+
+        /* case 50: ⛔⛔ THE PAIRING. Row 2's name is "Shoryuken" at y=307, so
+         * its notation must be the y=307 one -- NOT row 1's. An implementation
+         * that took the Nth notation without checking Y would pass whenever
+         * both columns are complete and fail silently when they are not. */
+        {
+            float y = 0.f;
+            char v[64] = { 0 };
+            BOOL ok = gt_column_y(P, 84.f, 2, &y) &&
+                      gt_widget_of(P, 1565.f, y, v, sizeof v);
+            char d[140];
+            snprintf(d, sizeof d, "row2 y=%.0f -> \"%s\" (want <RGHT>623P)",
+                     (double)y, v);
+            check("50. a row's notation is found by its own Y, not by ordinal",
+                  ok && strcmp(v, "<RGHT>623P") == 0, d);
+        }
+
+        /* case 51: a row with NO notation refuses rather than borrowing one.
+         * Row 3 (" Tatsumaki", y=380) has no x=1565 partner -- the 10-row draw
+         * cap means a long list's lower rows genuinely lack one. */
+        {
+            float y = 0.f;
+            char v[64] = { 1 };
+            BOOL got = gt_column_y(P, 84.f, 3, &y);
+            BOOL ok = gt_widget_of(P, 1565.f, y, v, sizeof v);
+            char d[140];
+            snprintf(d, sizeof d, "row3 y=%.0f, notation returned %d \"%s\"",
+                     (double)y, (int)ok, v);
+            check("51. a row with no notation refuses (never borrows a neighbour's)",
+                  got && !ok && v[0] == 0, d);
+        }
+
+        /* case 52: the CONDITION column is not mistaken for a name. It is a
+         * leading-space capitalised string at x=633 -- indistinguishable from a
+         * move name by text, separable only by coordinate. */
+        {
+            char v[64] = { 0 };
+            BOOL ok = gt_widget_of(P, 633.f, 380.f, v, sizeof v);
+            char d[140];
+            snprintf(d, sizeof d, "x=633 gives \"%s\"; the name column at that "
+                     "y gives a different string", v);
+            check("52. the condition column is addressable separately from names",
+                  ok && strcmp(v, " During Hyakkishu") == 0, d);
+        }
+    }
+
     mem_guard_remove();
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",
