@@ -79,6 +79,33 @@ static const struct icon_row ICONS[] = {
     { "C_5", "neutral" },
     { "C_6", "forward" },
     { "C_8", "up" },
+    /* ⭐⭐ EIGHT MORE TOKENS THAT WERE REACHING THE USER UNTRANSLATED. Surveyed
+     * the live captures: 31 distinct C_* tokens appear in the move list's x=633
+     * column and these 8 had no entry, so a row spoke "During Jump [C_236]
+     * +punch" -- a literal bracketed token where the input belongs. That is the
+     * worst place to leak one, because the input IS what the player came for.
+     *
+     * Read as motions, per the convention above -- a sighted player sees an arc,
+     * not digits. Numpad directions: 1 down-back, 2 down, 3 down-forward,
+     * 4 back, 6 forward, 8 up, 9 up-forward. `T` = charge, as C_2T/C_4T show.
+     *
+     * ⚠ Derived from the notation, not measured from the corpus (these appear in
+     * ZERO GMD strings, like every C_* motion above), so the parity checker's
+     * corpus inputs cannot exercise them -- the LIVE cases in
+     * check_markup_parity.py are what pins them. */
+    { "C_1", "down-back" },
+    { "C_1T", "charge down-back" },
+    { "C_23", "down then down-forward" },
+    { "C_319", "down-forward, back, up-forward" },
+    { "C_412", "back, down-back, down" },
+    { "C_6248", "forward, down, down-back, up" },
+    /* ⚠ These two are read as the LITERAL SWEEP, not given a genre nickname.
+     * C_2141236 is 2-1-4-1-2-3-6 and C_2363214 is 2-3-6 then 3-2-1-4; neither
+     * has a settled common name, and inventing one ("double quarter circle")
+     * would be a claim about the input rather than a reading of it. A player can
+     * execute a described sweep; a wrong nickname sends them to training mode. */
+    { "C_2141236", "down, back, down, forward" },
+    { "C_2363214", "quarter circle forward then half circle back" },
     { "C_A", "Any Attack" },
     { "C_A1", "Attack 1" },
     { "C_A2", "Attack 2" },

@@ -33,6 +33,27 @@ DIRECTIONS = {
     "C_7": "up-back", "C_8": "up", "C_9": "up-forward",
     "C_4T": "charge back",
     "D_KEY": "d-pad", "KB_ARROWS": "arrow keys",
+
+    # ⛔⛔ THE ORACLE HAD NO MOTION TOKENS AT ALL -- not even C_236, which the C
+    # table has carried from the start. The parity checker never caught it
+    # because the CORPUS contains zero motion tokens (they are derived from the
+    # notation, not measured), so 239/239 agreed on inputs that never exercised
+    # them. The live move list is where they actually appear.
+    #
+    # ⚠ Two implementations agreeing proves only that they agree on the inputs
+    # tested. Keep this block and gui_markup.c's table in step BY HAND, and the
+    # live-string cases in check_markup_parity.py are what pins them.
+    "C_2T": "charge down", "C_1T": "charge down-back",
+    "C_28": "down then up",
+    "C_23": "down then down-forward",
+    "C_236": "quarter circle forward", "C_214": "quarter circle back",
+    "C_623": "dragon punch", "C_421": "reverse dragon punch",
+    "C_41236": "half circle forward", "C_63214": "half circle back",
+    "C_319": "down-forward, back, up-forward",
+    "C_412": "back, down-back, down",
+    "C_6248": "forward, down, down-back, up",
+    "C_2141236": "down, back, down, forward",
+    "C_2363214": "quarter circle forward then half circle back",
 }
 
 # Attack buttons whose meaning is stable across every game in the collection.
@@ -257,6 +278,15 @@ class Translator:
             if nxt is not None and gap.strip() == "":
                 # Another icon follows with only whitespace between them.
                 out.append(",")
+            elif nxt is not None and gap.strip() in ("/", "+"):
+                # ⭐⭐ AN OPERATOR BETWEEN TWO ICONS is input notation, and this
+                # is the ONLY place that can be known: "/" between two prose
+                # words is ordinary UI text ("Zoom In/Out", "Show/Hide UI"), but
+                # between two ICONS it is a CHOICE, and "+" a CHORD. Without
+                # this the row fused into "back/forward" and "light punch/heavy
+                # punch" -- one spoken word where two discrete inputs belong.
+                out.append(" or " if gap.strip() == "/" else " plus ")
+                gap = ""
             out.append(gap)
             # The source often runs an icon straight into its label with no
             # space ("<ICON BTN_START>Training"); insert one so they do not
@@ -273,6 +303,24 @@ class Translator:
         # Arabic -- so assume the survey is incomplete rather than closed.
         # unknown_tags() reports these so they can be handled deliberately.
         text = re.sub(r"</?(?!ICON\b)[A-Za-z_][A-Za-z0-9_]*[^>]*>", "", text)
+
+        # ⭐⭐ SPEAK THE INPUT OPERATORS. Between two input elements, "+" is a
+        # CHORD (press together) and "/" is a CHOICE (either one) -- the button
+        # hint path has always said "plus"/"or", but the general path left them
+        # as punctuation, so a move list row fused into "forward+punch" and
+        # "back/forward": one spoken word where two discrete inputs belong.
+        #
+        # ⚠ Only BETWEEN WORD CHARACTERS, so prose is untouched: "(No
+        # Additional Input)" gains nothing and a trailing operator is left.
+        #
+        # ⛔⛔ "+" ONLY -- NOT "/", and the parity check is what settled it. An
+        # earlier version expanded both and turned the button hints into "Zoom
+        # In or Out", "Show or Hide UI", "Previous or Next": a slash between two
+        # words is ordinary UI prose and much more common than its use as a
+        # choice operator. "+" between word characters is always a chord here.
+        # The "/" separating two ICONS still reads as discrete inputs, because
+        # the icon pass above already comma-separates adjacent icons.
+        text = re.sub(r"(?<=\w)\+(?=\w)", " plus ", text)
 
         text = re.sub(r"\s+", " ", text)
         text = re.sub(r",\s*([.,;:!?])", r"\1", text)

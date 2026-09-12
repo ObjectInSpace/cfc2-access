@@ -91,6 +91,33 @@ def main():
         "Training <SIZE 58><ICON BTN_X></SIZE>Game Settings "
         "<SIZE 58><ICON CANCEL></SIZE>Back",
         "P1",
+        # ⭐⭐ THE MOVE LIST'S x=633 COLUMN -- condition AND input in ONE string.
+        # Verbatim from docs/run-2026-09-11-2228 and -2055 (untruncated).
+        #
+        # ⛔ These exist because the corpus has ZERO motion tokens, so the 239
+        # corpus inputs left every C_236/C_63214/C_6248 UNTESTED -- and the
+        # Python oracle turned out to have no motion table at all while parity
+        # still read PASS. A superset vocabulary needs superset cases.
+        " During Hyakkishu<SIZE 58><ICON C_K></SIZE>",
+        " During Hyakkishu (No Additional Input)",
+        " During Jump<SIZE 58><ICON C_236></SIZE>+<SIZE 58><ICON C_P></SIZE>",
+        " Near Opponent<SIZE 58><ICON C_4></SIZE>/<SIZE 58><ICON C_6></SIZE>"
+        "+<SIZE 58><ICON C_HK></SIZE>",
+        " Near Opponent<SIZE 58><ICON C_6248></SIZE>+<SIZE 58><ICON C_P></SIZE>",
+        " At Close Range<SIZE 58><ICON C_63214></SIZE>+<SIZE 58><ICON C_K></SIZE>",
+        "<SIZE 58><ICON C_1T></SIZE><SIZE 58><ICON C_319></SIZE>"
+        "+<SIZE 58><ICON C_K></SIZE>",
+        "<SIZE 58><ICON C_412></SIZE>+<SIZE 58><ICON C_P></SIZE>",
+        "<SIZE 58><ICON C_2141236></SIZE>+<SIZE 58><ICON C_P></SIZE>",
+        "<SIZE 58><ICON C_2363214></SIZE>+<SIZE 58><ICON C_P></SIZE>",
+        "<SIZE 58><ICON C_236></SIZE><SIZE 58><ICON C_23></SIZE>"
+        "+<SIZE 58><ICON C_P></SIZE>",
+        "<SIZE 58><ICON C_1></SIZE>+<SIZE 58><ICON C_HK></SIZE>",
+        " During Cling to Mamahaha<SIZE 58><ICON C_HK></SIZE>",
+        " At Height of Neutral/Forward Jump<SIZE 58><ICON C_3></SIZE>"
+        "+<SIZE 58><ICON C_P></SIZE>",
+        # A BLANKED pooled pair object: the game sets one space, not "".
+        " ",
     ]
     inputs.extend(LIVE)
 

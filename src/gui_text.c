@@ -1767,10 +1767,19 @@ void gt_layout_report(void)
         if (!mem_copy(cur, o, GT_CLASS_SIZE))
             continue;
 
-        /* ⭐ Only SHORT texts. The slots and the strip entries are short; the
-         * prose blurbs and markup strips that share the set are not, and they
-         * would bury the rows being compared. */
-        if (!g_inst[i].text[0] || strlen(g_inst[i].text) > 48)
+        /* ⛔⛔ THERE WAS A 48-CHAR SKIP HERE AND IT DESTROYED EVIDENCE. The
+         * stated reason was that prose blurbs "would bury the rows being
+         * compared" -- but the move list's x=633 column holds the condition AND
+         * the input in ONE string, and those run well past 48 chars
+         * (" Near Opponent<SIZE 58><ICON C_4></SIZE>/..." is 95). So the exact
+         * objects the column census needed were dropped BEFORE the dump, and a
+         * survey of that column read as "sparse" when it was mostly unlogged.
+         *
+         * A dump's job is to record what is there. Filtering by length is a
+         * guess about which objects matter, made before the question is known,
+         * and it fails silently: a dropped object and an absent one look
+         * identical. Every object with text is dumped now. */
+        if (!g_inst[i].text[0])
             continue;
 
         /* Dump the object's dwords as raw offsets. Naming a field would be a
@@ -1785,7 +1794,16 @@ void gt_layout_report(void)
                               "%s+0x%03x:%08x", used ? " " : "", off, v);
         }
         line[sizeof(line) - 1] = '\0';
-        log_line("layout:   %p \"%.24s\" %s", o, g_inst[i].text, line);
+        /* ⛔⛔ NOT "%.24s". That truncation has now misled this project FOUR
+         * times -- most recently in this very column: every x=633 string in the
+         * census arrived cut at 24 chars, so " During Hyakkishu<SIZE 5" looked
+         * like a bare condition and the whole question "is the notation in a
+         * separate object?" was an artefact of the format string. The answer,
+         * visible the moment the text is printed whole, is that x=633 carries
+         * the condition AND the input together.
+         *
+         * ⚠ A display limit is not a fact about the data. Print the string. */
+        log_line("layout:   %p \"%s\" %s", o, g_inst[i].text, line);
         shown++;
     }
 

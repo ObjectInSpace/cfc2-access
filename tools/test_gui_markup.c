@@ -138,6 +138,46 @@ int main(void)
           "<SIZE 58><ICON C_4T></SIZE>Charge <SIZE 58><ICON C_6></SIZE>",
           "charge back Charge; forward");
 
+    /* --- ⭐⭐ THE OPERATORS BETWEEN TWO ICONS. "/" = either-of, "+" = chord.
+     * Without these the row FUSED into one spoken word -- "back/forward" and
+     * "light punch/heavy punch" -- where two discrete inputs belong, which is
+     * exactly the information the notation exists to carry.
+     *
+     * ⛔⛔ AND THE DISCRIMINATION IS THE POINT. A first attempt expanded every
+     * "+"/"/" over the finished string; the parity check rejected it, because
+     * the button hints turned into "Zoom In or Out", "Show or Hide UI",
+     * "Previous or Next" -- four real strings damaged to fix none. The
+     * operator's meaning depends on what FLANKS it, so the prose cases below
+     * are as load-bearing as the notation ones. --- */
+    check("move list: either-of between two icons",
+          " Near Opponent<SIZE 58><ICON C_4></SIZE>/<SIZE 58><ICON C_6></SIZE>"
+          "+<SIZE 58><ICON C_HK></SIZE>",
+          "Near Opponent back or forward plus heavy kick");
+    check("move list: either-of between two attack icons",
+          " During Cling to Mamahaha<SIZE 58><ICON C_LP></SIZE>/"
+          "<SIZE 58><ICON C_HP></SIZE>",
+          "During Cling to Mamahaha light punch or heavy punch");
+    /* ⚠ PROSE, NOT NOTATION: a slash between two WORDS is ordinary UI text and
+     * must stay silent. This is the case the over-broad version broke. */
+    check("prose slash is NOT an operator",
+          "<SIZE 58><ICON D_KEY></SIZE>Move <SIZE 58><ICON BTN_LT></SIZE>"
+          "<SIZE 58><ICON BTN_RT></SIZE>Zoom In/Out",
+          "d-pad Move; LT RT Zoom In/Out");
+    /* ⚠ A slash inside a CONDITION is also prose ("Neutral/Forward Jump"), and
+     * it sits in the same string as a real chord -- so one string exercises
+     * both halves of the rule. */
+    check("a condition's slash stays, its chord speaks",
+          " At Height of Neutral/Forward Jump<SIZE 58><ICON C_3></SIZE>"
+          "+<SIZE 58><ICON C_P></SIZE>",
+          "At Height of Neutral/Forward Jump down-forward plus punch");
+    /* ⚠ The condition with NO input at all -- the parenthetical must survive
+     * intact and gain no operators. */
+    check("condition with no input keeps its parenthetical",
+          " During Hyakkishu (No Additional Input)",
+          "During Hyakkishu (No Additional Input)");
+    /* ⭐ A BLANKED pooled pair object: the game sets one SPACE, not "". */
+    check("a blanked pair object yields nothing", " ", "");
+
     /* --- Robustness. These are not corpus shapes; they are what a bounded
      * parser must survive without corrupting anything. --- */
 
