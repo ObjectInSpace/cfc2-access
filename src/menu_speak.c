@@ -3241,7 +3241,25 @@ void menu_speak(const mc_move *m)
  * conversion, the interrupt policy and the honest logging. */
 void menu_speak_line(const char *line)
 {
-    wchar_t w[256];
+    /* ⛔⛔ THIS WAS wchar_t[256] AND IT SILENCED THE WHOLE MOVE LIST.
+     *
+     * USER-REPORTED: "The move list doesn't read." The panel path builds a
+     * line[1024] -- a heading plus TEN rows, each now carrying its condition
+     * AND its notation -- and every one of them ran past 256 wchars, so
+     * MultiByteToWideChar returned 0 (ERROR_INSUFFICIENT_BUFFER) and the
+     * readout was DISCARDED at the very last step. The panel was built
+     * correctly every time; nothing was ever spoken.
+     *
+     * ⚠ The regression came from making rows BETTER: single-row callers fit
+     * 256 comfortably, and the panel only crossed the limit once conditions
+     * were added to the notation. A shared helper sized for one caller's
+     * longest string is a trap for the next caller, so this is sized from the
+     * LARGEST line any caller can pass, not from a round number.
+     *
+     * ⭐ The counts in the log are what found this in ONE run: "10 name
+     * object(s), 10 pair object(s)" on the SUCCESS path proved the readout was
+     * built, so the fault had to be downstream of it. */
+    wchar_t w[1024];
     int n;
 
     if (!line || !line[0])
@@ -3249,11 +3267,57 @@ void menu_speak_line(const char *line)
     n = MultiByteToWideChar(CP_UTF8, 0, line, -1, w,
                             (int)(sizeof(w) / sizeof(w[0])));
     if (n <= 0) {
-        /* ⭐ A conversion failure must not speak mojibake. Say nothing and log,
-         * rather than emit bytes the reader will render as noise. */
-        log_line("mcspeak: could not convert \"%s\" to UTF-16; not speaking.",
-                 line);
-        return;
+        DWORD err = GetLastError();
+
+        /* ⭐⭐ A LINE TOO LONG IS SPOKEN TRUNCATED, NEVER DISCARDED. Dropping it
+         * is how the entire move list went silent: one buffer constant made a
+         * fully-built, correct readout vanish at the last step, and to the user
+         * that is indistinguishable from a screen the mod cannot read at all.
+         * Hearing nine of ten rows is a minor loss; hearing nothing is a broken
+         * screen. So an oversized line is re-converted with the API's own
+         * truncation and spoken.
+         *
+         * ⚠ The failure is still LOGGED as a defect, with the reason and the
+         * length, so a buffer that needs raising is visible rather than
+         * papered over. 122 = ERROR_INSUFFICIENT_BUFFER. */
+        if (err == ERROR_INSUFFICIENT_BUFFER) {
+            int cap = (int)(sizeof(w) / sizeof(w[0]));
+            log_line("mcspeak: ⚠ line is %d byte(s), buffer is %d wchar(s) -- "
+                     "SPEAKING IT TRUNCATED. Raise the buffer. \"%s\"",
+                     (int)strlen(line), cap, line);
+            /* ⛔⛔ BOUND THE SOURCE, NOT JUST THE DESTINATION. Measured against
+             * the real API: with cbMultiByte = -1 OR the full length,
+             * MultiByteToWideChar returns 0/ERROR_INSUFFICIENT_BUFFER and
+             * writes NOTHING -- it never partially fills. So a "truncating"
+             * call that only caps cchWideChar stays exactly as silent as the
+             * bug it was meant to fix. Capping the SOURCE byte count converts
+             * what fits and returns the count.
+             *
+             * ⚠ Back off to a UTF-8 character boundary first: cutting mid
+             * sequence makes the tail unconvertible, and a continuation byte is
+             * 10xxxxxx. At most three steps. */
+            int src = cap - 1;
+            if (src > (int)strlen(line))
+                src = (int)strlen(line);
+            while (src > 0 && ((unsigned char)line[src] & 0xC0) == 0x80)
+                src--;
+            n = MultiByteToWideChar(CP_UTF8, 0, line, src, w, cap - 1);
+            if (n <= 0)
+                return;                     /* genuinely unconvertible */
+            w[n] = L'\0';
+        } else {
+            /* ⭐ A conversion failure must not speak mojibake. Say nothing and
+             * log, rather than emit bytes the reader will render as noise.
+             *
+             * ⚠ Report the REASON and the LENGTH. "could not convert" alone
+             * cost a whole round: the string it printed was perfectly
+             * well-formed UTF-8, so the message pointed at the TEXT when the
+             * fault was the BUFFER. */
+            log_line("mcspeak: could not convert %d byte(s) to UTF-16 "
+                     "(GetLastError=%lu); not speaking: \"%s\"",
+                     (int)strlen(line), (unsigned long)err, line);
+            return;
+        }
     }
 
     /* interrupt=TRUE: the user has moved on, so a queued previous item is
