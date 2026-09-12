@@ -28,12 +28,39 @@ static const void *tables_addr(void)
                              : (const void *)(ULONG_PTR)ML_GAME_TABLES;
 }
 
-/* ⭐ A pointer read out of game memory must land somewhere plausible before it
- * is followed. Without bounds, a garbage qword becomes an address we then
- * dereference -- and a guard is a NET for the race between the check and the
- * read, never a substitute for the check (case C of run_span_test measured a
- * guarded memcpy across a bad page going UNCAUGHT). */
-static BOOL plausible(const void *p, SIZE_T need)
+/* ⛔⛔ TWO KINDS OF ADDRESS, AND ONE BOUND FOR BOTH WAS THE BUG.
+ *
+ * The first version applied an IMAGE range (0x140000000..0x143000000) to every
+ * read. But only the TABLE pointers live in the image; the SCREEN OBJECT is on
+ * the heap -- measured at 0x2C3D7DB0 in the 21:47 run, far BELOW the image
+ * base. So every read of the screen was rejected, resolve_table() failed at its
+ * first rd32(), and the whole move list spoke bare positions. The mechanism was
+ * right and the bounds check refused it.
+ *
+ * ⚠⚠ AND THE TESTS COULD NOT CATCH IT. The suite allocates one synthetic world
+ * and points the bounds at it, so the screen and the tables sat in the SAME
+ * range and the two cases were indistinguishable. A fixture that collapses a
+ * distinction cannot test it -- case 12 plants them far apart.
+ *
+ * ⭐ So: heap reads are validated by mem_readable_run() alone (the OS knows
+ * what is mapped; the heap cannot be bounded a priori), while a pointer
+ * FOLLOWED out of game memory into the image still gets the range check -- that
+ * is the one where a garbage qword would otherwise become an address we
+ * dereference.
+ *
+ * A guard is a NET for the race between check and read, never a substitute for
+ * the check: case C of run_span_test measured a guarded memcpy across a bad
+ * page going UNCAUGHT. */
+static BOOL readable(const void *p, SIZE_T need)
+{
+    if (!p)
+        return FALSE;
+    return mem_readable_run(p, need) >= need;
+}
+
+/* An address that must lie inside the game IMAGE -- the per-game table
+ * pointers and the records they hold. */
+static BOOL in_image(const void *p, SIZE_T need)
 {
     const BYTE *lo = (const BYTE *)(g_lo_override ? g_lo_override
                                                   : (const void *)0x140000000ULL);
@@ -42,15 +69,17 @@ static BOOL plausible(const void *p, SIZE_T need)
     const BYTE *b  = (const BYTE *)p;
     if (!b || b < lo || b + need > hi)
         return FALSE;
-    return mem_readable_run(p, need) >= need;
+    return readable(p, need);
 }
 
-/* Read a 4-byte int from game memory, guarded. */
+/* Read a 4-byte int from game memory, guarded. ⚠ Heap-safe: validated by what
+ * is actually mapped, not by an image range -- the screen object is on the
+ * heap. */
 static BOOL rd32(const void *p, int *out)
 {
     BOOL faulted = FALSE;
     int v = 0;
-    if (!plausible(p, sizeof(v)))
+    if (!readable(p, sizeof(v)))
         return FALSE;
     MEM_GUARDED(faulted, memcpy(&v, p, sizeof(v)));
     if (faulted)
@@ -64,7 +93,7 @@ static BOOL rdptr(const void *p, const void **out)
 {
     BOOL faulted = FALSE;
     const void *v = NULL;
-    if (!plausible(p, sizeof(v)))
+    if (!readable(p, sizeof(v)))
         return FALSE;
     MEM_GUARDED(faulted, memcpy(&v, p, sizeof(v)));
     if (faulted)
@@ -93,7 +122,9 @@ static BOOL resolve_table(const void *screen, const void **table)
     }
     const BYTE *slot = (const BYTE *)tables_addr() + (SIZE_T)game * sizeof(void *);
     const void *t = NULL;
-    if (!rdptr(slot, &t) || !plausible(t, ML_RECORD_SIZE)) {
+    /* ⭐ THE table pointer IS image-resident, so it keeps the range check --
+     * this is the read where a garbage qword would otherwise be followed. */
+    if (!rdptr(slot, &t) || !in_image(t, ML_RECORD_SIZE)) {
         g_why = ML_BAD_TABLE;
         return FALSE;
     }
@@ -180,7 +211,10 @@ BOOL ml_move_name(const void *screen, int row, char *out, int outlen)
         return FALSE;
     }
     const BYTE *rec = (const BYTE *)table + (SIZE_T)move_id * ML_RECORD_SIZE;
-    if (!rd32(rec + ML_REC_OFF_NAME, &gmd_index)) {
+    /* ⚠ The record is INSIDE the image table, so it gets the image range check
+     * -- this is where a wild move_id would otherwise walk off the end. */
+    if (!in_image(rec, ML_RECORD_SIZE) ||
+        !rd32(rec + ML_REC_OFF_NAME, &gmd_index)) {
         g_why = ML_BAD_ID;
         return FALSE;
     }

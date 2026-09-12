@@ -277,6 +277,49 @@ int main(void)
               good && !bad, d);
     }
 
+    /* --- case 12: ⛔⛔ THE SCREEN IS ON THE HEAP, THE TABLES ARE IN THE IMAGE
+     *
+     * THE BUG THIS EXISTS FOR, and it shipped. The first version applied ONE
+     * bounds check -- the image range -- to every read. The screen object is on
+     * the heap (measured at 0x2C3D7DB0 in the 21:47 run, far BELOW the image
+     * base), so every read of it was rejected, resolve_table() failed at its
+     * first rd32(), and the whole move list spoke bare positions. The mechanism
+     * was right; the bounds check refused it.
+     *
+     * ⚠⚠ AND THE OTHER ELEVEN CASES COULD NOT CATCH IT. They allocate ONE
+     * synthetic world and point the bounds at it, so the screen and the tables
+     * sat in the SAME range and the two address kinds were indistinguishable.
+     * A fixture that collapses a distinction cannot test it.
+     *
+     * So this case plants them in SEPARATE allocations and tells the module
+     * only about the table range -- exactly the live arrangement. */
+    {
+        BYTE *heap = (BYTE *)VirtualAlloc(NULL, 0x2000, MEM_COMMIT | MEM_RESERVE,
+                                          PAGE_READWRITE);
+        if (!heap) { printf("FATAL: heap alloc failed\n"); return 1; }
+        int ids[] = { 3 };
+        plant_world(1, 1, ids, 1);               /* tables + blob in `world` */
+
+        /* Move the SCREEN to a separate allocation, and scope the module's
+         * image range to the tables only -- the screen is now outside it. */
+        memset(heap, 0, 0x2000);
+        BYTE *hscreen = heap + 0x100;
+        *(int *)(hscreen + ML_OFF_GAME)  = 1;
+        *(int *)(hscreen + ML_OFF_TOTAL) = 1;
+        *(int *)(hscreen + ML_OFF_IDS)   = 3;
+        ml_test_set_tables(tables, tables, world + WORLD);
+
+        char v[64] = { 0 };
+        BOOL ok = ml_move_name(hscreen, 0, v, sizeof v);
+        char d[160];
+        snprintf(d, sizeof d, "returned %d, \"%s\", why=%d (screen %p is outside "
+                 "the table range %p..%p)", (int)ok, v, (int)ml_move_name_why(),
+                 (void *)hscreen, (void *)tables, (void *)(world + WORLD));
+        check("12. a screen OUTSIDE the image range still reads (it is heap)",
+              ok && strcmp(v, "msg13") == 0, d);
+        VirtualFree(heap, 0, MEM_RELEASE);
+    }
+
     VirtualFree(world, 0, MEM_RELEASE);
     mem_guard_remove();
 

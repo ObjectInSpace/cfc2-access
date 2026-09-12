@@ -2025,6 +2025,20 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
         if (!m->screen ||
             !ml_move_name(m->screen, out->position - 1, text,
                           (int)sizeof(text)) || !text[0]) {
+            /* ⭐⭐ LOG WHICH STEP DECLINED. The chain is six links long
+             * (screen -> game -> table -> record -> GMD index -> text) and a
+             * bare "3 of 7" says only that one of them failed.
+             *
+             * ⛔ THE FIRST VERSION OMITTED THIS AND IT COST A RUN: the reader
+             * shipped with an image-range bounds check applied to the SCREEN,
+             * which is on the heap, so every lookup failed at the first read.
+             * The log showed bare positions and nothing else, and the reason
+             * had to be reconstructed from pointer arithmetic afterwards.
+             * ml_move_name_why() knew the answer the whole time. */
+            log_line("mcspeak: move list declined at step %d (row %d of %d, "
+                     "screen %p) -- see ml_why in move_list.h.",
+                     (int)ml_move_name_why(), out->position, out->total,
+                     m->screen);
             out->why = MC_UNNAMED_TEXT_UNREADABLE;
             return;
         }
