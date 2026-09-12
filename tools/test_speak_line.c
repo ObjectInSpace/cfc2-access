@@ -1,27 +1,31 @@
-/* ⭐⭐ THE BUFFER THAT SILENCED THE MOVE LIST.
+/* ⭐⭐ THE BUFFER THAT SILENCED THE MOVE LIST -- and why there is no buffer now.
  *
  * USER-REPORTED: "The move list doesn't read." The panel readout was built
  * correctly on every movement -- the log proved it, "10 name object(s), 10 pair
  * object(s)" on the SUCCESS path -- and then vanished at the very last step,
  * because menu_speak_line() converted into a wchar_t[256] while the panel path
- * passes a line[1024]. MultiByteToWideChar returned 0 and the line was dropped.
+ * passes a much longer line. MultiByteToWideChar returned 0 and it was dropped.
  *
  * ⚠ The regression came from making rows BETTER. Single-row callers fit 256
  * comfortably; the panel only crossed the limit once each row carried its
- * condition AS WELL AS its notation. A shared helper sized for one caller's
- * longest string is a trap for the next caller.
+ * condition AS WELL AS its notation.
  *
- * ⛔⛔ AND THE FIRST FIX WAS WRONG IN A WAY THAT WOULD HAVE SHIPPED SILENTLY.
- * I wrote a "speak it truncated" path that capped only cchWideChar. Measured
- * against the real API: with cbMultiByte = -1 OR the full source length,
- * MultiByteToWideChar returns 0/ERROR_INSUFFICIENT_BUFFER and writes NOTHING --
- * it never partially fills. That path would have been exactly as silent as the
- * bug. Case 3 is that measurement, and it fails if the source is not bounded.
+ * ⛔⛔ AND THE FIX IS NOT A BIGGER NUMBER. USER: "We don't need to truncate if
+ * there are no limits." Correct -- I first raised 256 to 1024 and added a
+ * truncating fallback, which is the same mistake one size up: a constant
+ * someone chose, capping what the user may hear, plus a fallback path that can
+ * itself be wrong (mine was, twice). menu_speak_line() now asks the API how
+ * many wchars THIS line needs and allocates exactly that, so no caller can
+ * outgrow it, there is nothing to truncate, and no truncation path to get
+ * wrong.
+ *
+ * These cases assert that sizing rule, and case 2 is the user's real panel.
  *
  * Build/run: tools\run_sl_test.ps1
  */
 #include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int failures;
@@ -34,53 +38,48 @@ static void check(const char *name, int ok, const char *detail)
         failures++;
 }
 
-/* The conversion under test, lifted to match menu_speak_line()'s logic exactly.
- * ⚠ A copy is a second place to drift, so this file asserts the BEHAVIOUR of
- * the Win32 calls the shipping code makes; menu_speak.c carries the same
- * sequence and the comments in both point at each other. */
-static int convert(const char *line, wchar_t *w, int cap, int *was_truncated)
+/* The sizing rule under test, matching menu_speak_line() exactly: measure,
+ * allocate to fit, convert. Returns the wchar count, 0 on refusal.
+ *
+ * ⚠ A copy is a second place to drift, so both carry comments pointing at each
+ * other; what this file pins is that the RULE converts anything the callers can
+ * produce, at any length. */
+static int convert(const char *line, wchar_t **out)
 {
-    int n;
+    wchar_t *w;
+    int need, n;
 
-    *was_truncated = 0;
-    n = MultiByteToWideChar(CP_UTF8, 0, line, -1, w, cap);
-    if (n > 0)
-        return n;
-    if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+    *out = NULL;
+    need = MultiByteToWideChar(CP_UTF8, 0, line, -1, NULL, 0);
+    if (need <= 0)
         return 0;
-
-    {
-        int src = cap - 1;
-        if (src > (int)strlen(line))
-            src = (int)strlen(line);
-        while (src > 0 && ((unsigned char)line[src] & 0xC0) == 0x80)
-            src--;
-        n = MultiByteToWideChar(CP_UTF8, 0, line, src, w, cap - 1);
-        if (n <= 0)
-            return 0;
-        w[n] = L'\0';
-        *was_truncated = 1;
-        return n;
-    }
+    w = (wchar_t *)malloc((size_t)need * sizeof(wchar_t));
+    if (!w)
+        return 0;
+    n = MultiByteToWideChar(CP_UTF8, 0, line, -1, w, need);
+    if (n <= 0) { free(w); return 0; }
+    *out = w;
+    return n;
 }
 
 int main(void)
 {
-    wchar_t w[1024];
-    int n, trunc;
+    wchar_t *w;
+    int n;
 
     /* case 1: an ordinary single row converts untouched. */
     {
         const char *s = "Shoryuken, dragon punch plus punch";
-        n = convert(s, w, 1024, &trunc);
+        n = convert(s, &w);
         check("1. an ordinary row converts whole",
-              n > 0 && !trunc && wcslen(w) == strlen(s), "");
+              n > 0 && wcslen(w) == strlen(s), "");
+        free(w);
     }
 
-    /* case 2: ⛔⛔ THE REGRESSION. A real ten-row panel -- verbatim from the
-     * 01:03 run that the user reported as silent -- must convert at the
-     * SHIPPING buffer size. At 256 it returned 0 and the move list said
-     * nothing at all. */
+    /* case 2: ⛔⛔ THE REGRESSION. A real ten-row panel, verbatim from the 01:03
+     * run the user reported as silent. It must convert WHOLE -- every character
+     * present, nothing trimmed -- and the old fixed 256 must be shown failing
+     * on it, or this case is not testing the bug that happened. */
     {
         const char *panel =
             "Ryu Moves. Somersault Throw,  Near Opponent back or forward plus "
@@ -92,108 +91,80 @@ int main(void)
             "circle back plus kick. Shinku Hadoken, quarter circle forward "
             "quarter circle forward plus punch. Shinku Tatsumaki Senpu-kyaku, "
             "quarter circle back quarter circle back plus kick";
-        char d[120];
-        int at256, t256;
-        wchar_t small[256];
-
-        n = convert(panel, w, 1024, &trunc);
-        at256 = MultiByteToWideChar(CP_UTF8, 0, panel, -1, small, 256);
-        (void)t256;
-        snprintf(d, sizeof d,
-                 "%d bytes: at the shipping 1024 n=%d; at the OLD 256 n=%d",
-                 (int)strlen(panel), n, at256);
-        check("2. a real ten-row panel converts at the shipping size",
-              n > 0 && !trunc && at256 == 0, d);
-    }
-
-    /* case 3: ⛔⛔ THE MEASUREMENT THAT KILLED THE FIRST FIX. Capping only the
-     * DESTINATION does not truncate -- the API writes nothing and reports
-     * ERROR_INSUFFICIENT_BUFFER. A fix relying on it would be as silent as the
-     * bug. This asserts the API's actual behaviour, so the shipping code cannot
-     * quietly go back to it. */
-    {
-        char big[600];
-        wchar_t small[256];
-        int dest_only, src_bounded;
         char d[140];
+        wchar_t small[256];
+        int at256;
 
-        memset(big, 'A', sizeof big - 1);
-        big[sizeof big - 1] = '\0';
-
-        SetLastError(0);
-        dest_only = MultiByteToWideChar(CP_UTF8, 0, big, (int)strlen(big),
-                                        small, 255);
-        src_bounded = MultiByteToWideChar(CP_UTF8, 0, big, 255, small, 255);
+        n = convert(panel, &w);
+        at256 = MultiByteToWideChar(CP_UTF8, 0, panel, -1, small, 256);
         snprintf(d, sizeof d,
-                 "destination-only cap -> %d (writes nothing); "
-                 "source bounded -> %d", dest_only, src_bounded);
-        check("3. truncation requires bounding the SOURCE, not the destination",
-              dest_only == 0 && src_bounded == 255, d);
+                 "%d bytes -> %d wchars, complete; the OLD fixed 256 gave %d",
+                 (int)strlen(panel), n, at256);
+        check("2. the user's real panel converts COMPLETE, nothing trimmed",
+              n > 0 && wcslen(w) == strlen(panel) && at256 == 0, d);
+        free(w);
     }
 
-    /* case 4: an oversized line is SPOKEN TRUNCATED, never dropped. Hearing
-     * nine of ten rows is a minor loss; hearing nothing is a broken screen, and
-     * to the user the two are indistinguishable from a screen that cannot be
-     * read at all. */
+    /* case 3: ⭐⭐ NO LENGTH IS REFUSED. The point of the rewrite: a line far
+     * past any fixed buffer this project ever shipped must still convert in
+     * full. 8000 bytes is well beyond the worst case the 10-row draw cap can
+     * produce -- and every fixed-size design would fail this case. */
     {
-        char big[600];
-        wchar_t small[256];
+        char *big = (char *)malloc(8001);
         char d[120];
 
-        memset(big, 'A', sizeof big - 1);
-        big[sizeof big - 1] = '\0';
-        n = convert(big, small, 256, &trunc);
-        snprintf(d, sizeof d, "n=%d truncated=%d len=%d", n, trunc,
-                 n > 0 ? (int)wcslen(small) : -1);
-        check("4. an over-long line is spoken truncated, not discarded",
-              n > 0 && trunc && wcslen(small) == 255, d);
+        memset(big, 'A', 8000);
+        big[8000] = '\0';
+        n = convert(big, &w);
+        snprintf(d, sizeof d, "8000 bytes -> %d wchars (len=%d)", n,
+                 n > 0 ? (int)wcslen(w) : -1);
+        check("3. no length is refused -- an 8000-byte line converts in full",
+              n > 0 && wcslen(w) == 8000, d);
+        free(w);
+        free(big);
     }
 
-    /* case 5: ⚠ truncation must not split a UTF-8 sequence. The shell's text is
-     * UTF-8 and the collection ships 14 languages, so a cut mid-character is a
-     * realistic case, not a hypothetical -- and it makes the tail
-     * unconvertible.
-     *
-     * ⚠ THE SOURCE MUST BE LONG ENOUGH IN WCHARS, not just in bytes -- my first
-     * version of this case used 597 bytes of 3-byte Japanese, which is only 201
-     * wchars and so FIT in the buffer: it reported truncated=0 and failed
-     * against correct code. The test data was wrong, not the mechanism. Sized
-     * in CHARACTERS now: 300 Hiragana (900 bytes) against a 256-wchar buffer,
-     * with a leading ASCII byte so the 255-byte cut lands mid-sequence. */
+    /* case 4: ⚠ multi-byte UTF-8 converts in full too. The shell's text is UTF-8
+     * across 14 languages, and a sizing rule that treated BYTES as wchars would
+     * pass every ASCII case above and still be wrong here. 300 Hiragana is 900
+     * bytes but 300 wchars. */
     {
         char big[1024];
-        wchar_t small[256];
-        char d[140];
+        char d[120];
         int i = 0, chars = 0;
 
-        big[i++] = 'x';                     /* shift the 3-byte grid by one */
         while (chars < 300) {                /* U+3042 HIRAGANA A */
             big[i++] = (char)0xE3; big[i++] = (char)0x81; big[i++] = (char)0x82;
             chars++;
         }
         big[i] = '\0';
-        /* The cut at src=255 lands inside a sequence; the back-off must move it
-         * to a boundary, so the converted count is a whole number of chars. */
-        n = convert(big, small, 256, &trunc);
-        snprintf(d, sizeof d, "%d bytes / %d chars -> n=%d truncated=%d",
-                 i, chars, n, trunc);
-        check("5. truncation backs off to a UTF-8 character boundary",
-              n > 0 && trunc && wcslen(small) == (size_t)n, d);
+        n = convert(big, &w);
+        snprintf(d, sizeof d, "%d bytes / %d chars -> %d wchars", i, chars, n);
+        check("4. multi-byte UTF-8 converts in full (bytes != wchars)",
+              n > 0 && wcslen(w) == 300, d);
+        free(w);
     }
 
-    /* case 6: a genuinely malformed string is still REFUSED, not spoken as
-     * mojibake. The truncation path must not become a way for bad bytes to
-     * reach the reader. */
+    /* case 5: a genuinely malformed string is still REFUSED, not spoken as
+     * mojibake. Removing the length limit must not turn the one real refusal
+     * into an accept-anything path.
+     *
+     * ⚠ CP_UTF8 without MB_ERR_INVALID_CHARS SUBSTITUTES U+FFFD rather than
+     * failing, so the refusal must be asserted with the strict flag -- and the
+     * lax value is printed beside it so the difference is visible rather than
+     * assumed. */
     {
         const char bad[] = { (char)0xFF, (char)0xFE, (char)0xFD, '\0' };
-        wchar_t small[256];
         char d[120];
+        int strict, lax;
 
-        SetLastError(0);
-        n = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, bad, -1,
-                                small, 256);
-        snprintf(d, sizeof d, "strict conversion of invalid UTF-8 -> %d", n);
-        check("6. invalid UTF-8 is refused under strict conversion", n == 0, d);
+        strict = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, bad, -1,
+                                     NULL, 0);
+        lax = MultiByteToWideChar(CP_UTF8, 0, bad, -1, NULL, 0);
+        snprintf(d, sizeof d, "strict -> %d (refused), lax -> %d (substitutes)",
+                 strict, lax);
+        check("5. invalid UTF-8 is refused under strict conversion",
+              strict == 0, d);
     }
 
     printf("\n%s (%d failure(s))\n", failures ? "FAILED" : "ALL PASSED",

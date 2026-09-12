@@ -27,6 +27,7 @@
 #include "move_list.h"    /* the in-game move list's own indirection */
 
 #include <stdio.h>
+#include <stdlib.h>       /* malloc/free: menu_speak_line sizes to its line */
 #include <string.h>
 
 /* --- The screen table ----------------------------------------------------
@@ -2055,8 +2056,33 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
      * walk cannot build a backlog. */
     if (s->kind == MC_MOVE_LIST || s->kind == MC_MOVE_ROSTER) {
         char head[GT_CAPTION_MAX], spoken[GM_OUT_MAX];
-        char line[1024];
-        int used = 0, n;
+        /* ⭐⭐ DERIVED FROM WHAT CAN ACTUALLY ARRIVE, not a number someone liked.
+         *
+         * ⛔ This was 1024 and it was REACHABLE in ordinary play: the longest
+         * corpus move name is 43 chars and the longest live condition+input
+         * translates to about 60, so a worst-case row is ~110 and a full panel
+         * ~1150. Worse, the loop below used to STOP at `sizeof(line) - 64`, so
+         * a long panel silently lost its last rows -- and a panel that reads 7
+         * of its 10 moves sounds perfectly fine to the ear.
+         *
+         * The bound is computable, so compute it. gt_column_item() caps each
+         * row at sizeof(row) = GT_CAPTION_MAX*2, and the instance table holds
+         * at most 64 objects, so 64 rows is the ceiling on what can ever be
+         * found -- generous, since the SCREEN draws at most 10 (the hard cap at
+         * 0x14008040f). Plus the heading and a ". " per row.
+         *
+         * ⚠ 64 is written here rather than including gui_text.c's private
+         * GT_INST_MAX: exporting an internal just to size a buffer couples them
+         * the wrong way round, and this only needs to be an upper bound, not
+         * that exact value. Nothing the screen can produce overflows it, so the
+         * loop needs no early exit and nothing is ever trimmed.
+         *
+         * ⚠ static, not a stack array: at ~33 KB this is too much to put on the
+         * worker thread's frame in an already-deep call path. menu_speak() runs
+         * only on that one thread -- the same single-threaded assumption the
+         * `static char last[]` dedupe buffers in this file already rely on. */
+        static char line[64 * (GT_CAPTION_MAX * 2 + 2) + GT_CAPTION_MAX + 1];
+        int used = 0, n, spoken_rows = 0;
 
         if (!m->screen) {
             out->why = MC_UNNAMED_TEXT_UNREADABLE;
@@ -2073,7 +2099,14 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
                                   "%s", spoken);
         }
         n = gt_column_count(m->screen, 84.0f);
-        for (int i = 1; i <= n && used < (int)sizeof(line) - 64; i++) {
+        /* ⛔⛔ THIS LOOP USED TO STOP EARLY: `used < sizeof(line) - 64` quietly
+         * abandoned the remaining rows once the line filled. A panel that read
+         * 7 of its 10 moves sounds completely fine to the ear -- there is no
+         * gap to hear -- so rows vanished with nothing to reveal it. The buffer
+         * is now sized past the worst case instead, so every row the screen
+         * draws is read. If it ever DOES fill, the count logged below disagrees
+         * with the rows spoken and says so, rather than trimming in silence. */
+        for (int i = 1; i <= n; i++) {
             char row[GT_CAPTION_MAX * 2], row_spoken[GM_OUT_MAX];
             /* ⭐⭐ THE PAIR COLUMN IS x=633: the FULL input with its condition
              * (" During Hyakkishu<ICON C_623>+<ICON C_P>"). x=1565 shipped
@@ -2117,6 +2150,7 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
                 continue;
             used += _snprintf(line + used, sizeof(line) - used - 1,
                               "%s%s", used ? ". " : "", row_spoken);
+            spoken_rows++;
         }
         line[sizeof(line) - 1] = '\0';
         if (!line[0]) {
@@ -2154,10 +2188,11 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
          * the ear -- there is no gap to hear -- so without the count a partial
          * readout is invisible. Same reason the probe prints what it examined
          * rather than only what it found. */
-        log_line("mcspeak: move list panel -- %d name object(s) at x=84, %d pair "
-                 "object(s) at x=633, cursor %d of %d.",
-                 n, gt_column_count(m->screen, 633.0f), out->position,
-                 out->total);
+        log_line("mcspeak: move list panel -- %d of %d name object(s) SPOKEN, "
+                 "%d pair object(s) at x=633, %d of %d bytes, cursor %d of %d.%s",
+                 spoken_rows, n, gt_column_count(m->screen, 633.0f),
+                 used, (int)sizeof(line), out->position, out->total,
+                 spoken_rows < n ? "  ⚠ ROWS WERE DROPPED." : "");
         menu_speak_line(line);
         out->named = TRUE;
         out->spoken_already = TRUE;
@@ -3258,66 +3293,59 @@ void menu_speak_line(const char *line)
      *
      * ⭐ The counts in the log are what found this in ONE run: "10 name
      * object(s), 10 pair object(s)" on the SUCCESS path proved the readout was
-     * built, so the fault had to be downstream of it. */
-    wchar_t w[1024];
-    int n;
+     * built, so the fault had to be downstream of it.
+     *
+     * ⭐⭐ THE FIX IS NOT A BIGGER NUMBER -- IT IS NO LIMIT AT ALL. A fixed
+     * buffer here is a cap on what the user may hear, chosen by whoever wrote
+     * the constant, and every such constant this project has shipped was
+     * eventually reached by real content. The conversion is now sized from THIS
+     * line: ask the API how many wchars it needs, allocate exactly that, and
+     * convert. No caller can outgrow it, so there is nothing to truncate and no
+     * truncation path to get wrong.
+     *
+     * ⚠ A UTF-8 string never needs more wchars than it has bytes, so the size
+     * is bounded by strlen and the heap call is small. The stack buffer below
+     * covers the ordinary case without allocating at all. */
+    wchar_t stackbuf[512];
+    wchar_t *w = stackbuf;
+    wchar_t *heap = NULL;
+    int n, need;
 
     if (!line || !line[0])
         return;
-    n = MultiByteToWideChar(CP_UTF8, 0, line, -1, w,
-                            (int)(sizeof(w) / sizeof(w[0])));
-    if (n <= 0) {
-        DWORD err = GetLastError();
 
-        /* ⭐⭐ A LINE TOO LONG IS SPOKEN TRUNCATED, NEVER DISCARDED. Dropping it
-         * is how the entire move list went silent: one buffer constant made a
-         * fully-built, correct readout vanish at the last step, and to the user
-         * that is indistinguishable from a screen the mod cannot read at all.
-         * Hearing nine of ten rows is a minor loss; hearing nothing is a broken
-         * screen. So an oversized line is re-converted with the API's own
-         * truncation and spoken.
+    need = MultiByteToWideChar(CP_UTF8, 0, line, -1, NULL, 0);
+    if (need <= 0) {
+        /* ⭐ A conversion failure must not speak mojibake. Say nothing and log,
+         * rather than emit bytes the reader will render as noise.
          *
-         * ⚠ The failure is still LOGGED as a defect, with the reason and the
-         * length, so a buffer that needs raising is visible rather than
-         * papered over. 122 = ERROR_INSUFFICIENT_BUFFER. */
-        if (err == ERROR_INSUFFICIENT_BUFFER) {
-            int cap = (int)(sizeof(w) / sizeof(w[0]));
-            log_line("mcspeak: ⚠ line is %d byte(s), buffer is %d wchar(s) -- "
-                     "SPEAKING IT TRUNCATED. Raise the buffer. \"%s\"",
-                     (int)strlen(line), cap, line);
-            /* ⛔⛔ BOUND THE SOURCE, NOT JUST THE DESTINATION. Measured against
-             * the real API: with cbMultiByte = -1 OR the full length,
-             * MultiByteToWideChar returns 0/ERROR_INSUFFICIENT_BUFFER and
-             * writes NOTHING -- it never partially fills. So a "truncating"
-             * call that only caps cchWideChar stays exactly as silent as the
-             * bug it was meant to fix. Capping the SOURCE byte count converts
-             * what fits and returns the count.
-             *
-             * ⚠ Back off to a UTF-8 character boundary first: cutting mid
-             * sequence makes the tail unconvertible, and a continuation byte is
-             * 10xxxxxx. At most three steps. */
-            int src = cap - 1;
-            if (src > (int)strlen(line))
-                src = (int)strlen(line);
-            while (src > 0 && ((unsigned char)line[src] & 0xC0) == 0x80)
-                src--;
-            n = MultiByteToWideChar(CP_UTF8, 0, line, src, w, cap - 1);
-            if (n <= 0)
-                return;                     /* genuinely unconvertible */
-            w[n] = L'\0';
-        } else {
-            /* ⭐ A conversion failure must not speak mojibake. Say nothing and
-             * log, rather than emit bytes the reader will render as noise.
-             *
-             * ⚠ Report the REASON and the LENGTH. "could not convert" alone
-             * cost a whole round: the string it printed was perfectly
-             * well-formed UTF-8, so the message pointed at the TEXT when the
-             * fault was the BUFFER. */
-            log_line("mcspeak: could not convert %d byte(s) to UTF-16 "
-                     "(GetLastError=%lu); not speaking: \"%s\"",
-                     (int)strlen(line), (unsigned long)err, line);
+         * ⚠ This is now the ONLY refusal, and it means the string is genuinely
+         * not valid UTF-8 -- never that it was too long. Report the reason and
+         * the length: "could not convert" alone cost a whole round, because the
+         * string it printed was perfectly well-formed and the message pointed
+         * at the TEXT when the fault was the BUFFER. */
+        log_line("mcspeak: could not convert %d byte(s) to UTF-16 "
+                 "(GetLastError=%lu, not a length problem); not speaking: "
+                 "\"%s\"", (int)strlen(line), (unsigned long)GetLastError(),
+                 line);
+        return;
+    }
+    if (need > (int)(sizeof(stackbuf) / sizeof(stackbuf[0]))) {
+        heap = (wchar_t *)malloc((size_t)need * sizeof(wchar_t));
+        if (!heap) {
+            log_line("mcspeak: out of memory for a %d wchar line; not speaking.",
+                     need);
             return;
         }
+        w = heap;
+    }
+    n = MultiByteToWideChar(CP_UTF8, 0, line, -1, w, need);
+    if (n <= 0) {
+        log_line("mcspeak: conversion failed on the second pass "
+                 "(GetLastError=%lu); not speaking.",
+                 (unsigned long)GetLastError());
+        free(heap);
+        return;
     }
 
     /* interrupt=TRUE: the user has moved on, so a queued previous item is
@@ -3329,6 +3357,7 @@ void menu_speak_line(const char *line)
         log_line("mcspeak: spoke \"%s\"", line);
     else
         log_line("mcspeak: ⛔ NOT SPOKEN (backend refused): \"%s\"", line);
+    free(heap);
 }
 
 
