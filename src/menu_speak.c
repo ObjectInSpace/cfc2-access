@@ -24,6 +24,7 @@
 #define CLS_ITEM  0x01   /* short, no markup, no terminal punctuation */
 #define CLS_BLURB 0x02   /* ends in . ? ! -- a HELP-style sentence     */
 #include "prompt_id.h"    /* which label produced a captured string */
+#include "move_list.h"    /* the in-game move list's own indirection */
 
 #include <stdio.h>
 #include <string.h>
@@ -1206,6 +1207,28 @@ static const mc_screen g_screens[] = {
     { 0x14008a91bULL, -1, 6, "Lobby ID", MC_VERIFIED_LIVE_TEXT,
       MC_COORD_LIVE, 0, NULL, 0, NULL, 0, 0, 1 },
 
+    /* ⭐⭐⭐ THE IN-GAME MOVE LIST (0x140080250, vertical) -- the largest single
+     * gap in the mod: 529 of 924 unnamed movements across every run, and
+     * user-reported as not reading.
+     *
+     * Named from the game's OWN indirection (src/move_list.c), which is why
+     * this needs no base, no map and no count. See MC_MOVE_LIST in the header
+     * for the mechanism and for the three routes closed with evidence.
+     *
+     * ⚠⚠ count = 0 ON PURPOSE -- and here that is load-bearing rather than a
+     * placeholder. The list length is the CHARACTER'S move count: measured
+     * totals of 2,3,4,5,6,7,8,9,12,14 within a single session as the roster
+     * cursor moved. A count would disable the row on every character but one.
+     * menu_speak_lookup_n() treats 0 as "match the caller, any count".
+     *
+     * ⚠ The sibling axis 0x14008028e is the character ROSTER, not a second
+     * move list, and it is deliberately NOT given a row here -- its items are
+     * the cast, which the live heading already names ("Ken Moves"). Naming it
+     * from the roster corpus would reintroduce the JP/US question this route
+     * avoids. */
+    { 0x140080250ULL, -1, 0, "Move List", MC_VERIFIED_LIVE_TEXT,
+      MC_MOVE_LIST, 0, NULL, 0, NULL, 0, 0, 0 },
+
     /* ⚠ TEST-ONLY. Not a real call site -- no game movement can reach
      * 0xDEADCA11 -- so this cannot affect speech. It keeps the
      * MC_LABEL_UNKNOWN path covered; see MC_TEST_CALLER in the header. */
@@ -1970,6 +1993,38 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
             !gt_item_at_position(out->position, out->total,
                                  coord_candidate, &cc,
                                  text, (int)sizeof(text)) || !text[0]) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        char spoken[GM_OUT_MAX];
+        gm_speak(text, spoken, sizeof(spoken));
+        if (!spoken[0] || gm_has_residue(spoken)) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        _snprintf(out->item, sizeof(out->item), "%s", spoken);
+        out->item[sizeof(out->item) - 1] = '\0';
+        out->named = TRUE;
+        return;
+    }
+
+    /* ⭐⭐⭐ THE IN-GAME MOVE LIST. See MC_MOVE_LIST in the header for why every
+     * screen-derived route is closed and this one is not.
+     *
+     * ⚠ The ROW is the cursor index relative to min, which is what `position`
+     * already is, minus one -- the array at +0x354 is 0-based while position is
+     * 1-based. Using position directly would name the NEXT move on every row,
+     * which is the off-by-one that would be least visible in testing and worst
+     * in use.
+     *
+     * ⚠ The name comes from the GMD, so it carries no engine markup -- but it
+     * goes through gm_speak() anyway, because that is where residue is refused
+     * and one channel exempting itself is how tag soup reaches the user. */
+    if (s->kind == MC_MOVE_LIST) {
+        char text[GT_CAPTION_MAX];
+        if (!m->screen ||
+            !ml_move_name(m->screen, out->position - 1, text,
+                          (int)sizeof(text)) || !text[0]) {
             out->why = MC_UNNAMED_TEXT_UNREADABLE;
             return;
         }

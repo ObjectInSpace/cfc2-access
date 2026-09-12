@@ -34,6 +34,7 @@ New-Item -ItemType Directory -Force -Path "$root\build" | Out-Null
     "$root\src\menu_cursor.c" "$root\src\menu_speak.c" `
     "$root\src\rom_table.c" "$root\src\gui_text.c" `
     "$root\src\gui_markup.c" "$root\src\prompt_id.c" `
+    "$root\src\move_list.c" `
     @minhookSrc `
     -I "$root\libs\minhook\include" `
     -luser32 -lpsapi -s

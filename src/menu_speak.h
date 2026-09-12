@@ -156,7 +156,30 @@ typedef enum {
      * the number of candidate objects disagrees with it, which is what stops a
      * neighbouring screen's objects from being ordered as if they were this
      * one's. */
-    MC_COORD_LIVE
+    MC_COORD_LIVE,
+    /* ⭐⭐⭐ THE IN-GAME MOVE LIST, named from the game's OWN indirection
+     * rather than from what is on screen.
+     *
+     *     move_id = [screen + row*4 + 0x354]
+     *     record  = game_table[ [screen+0x330] ] + 12 * move_id
+     *     NAME    = gmd_text_by_index( record[+4] )
+     *
+     * ⛔⛔ EVERY OTHER ROUTE IS CLOSED, WITH EVIDENCE. The draw loop clamps to
+     * TEN visible rows while the real count sits at +0x3d8, so a coordinate
+     * join cannot work once a list exceeds ten (names != total in 0 of 17 tight
+     * pairings). GMD order is not screen order (13 of 19 captured windows were
+     * neither a prefix nor a contiguous slice). And the per-list totals do not
+     * partition a character's moves (Akuma's observed totals sum to 26 against
+     * 19 corpus moves). See docs/move-list-solved.md.
+     *
+     * ⭐⭐ Language-safe AND game-agnostic by construction: the record yields an
+     * INDEX, so the live message table supplies the text in whatever language
+     * is loaded, and one path covers all 1658 move names across 183 characters
+     * in 9 game tags. No per-game and no per-region tables to drift.
+     *
+     * ⚠ No base_index, no labels, no count -- the screen's own +0x3d8 bounds
+     * the row, and src/move_list.c range-checks every step. */
+    MC_MOVE_LIST
 } mc_kind;
 
 /* ⭐ A mapped screen's row whose label is NOT established. See `labels`. */
