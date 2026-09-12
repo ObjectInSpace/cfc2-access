@@ -95,8 +95,28 @@ plus per-count value sets covers every game.
 
 # 2. THE MOVE LIST — same structure, and the names are readable
 
-`0x14008028e` (48, horizontal) + `0x140080250` (category, vertical), screen
-`0x2C3F7B60`. User-reported as "not reading"; confirmed.
+`0x14008028e` (horizontal) + `0x140080250` (vertical), screen `0x2C3F7B60` /
+`0x2C3874D0`. User-reported as "not reading"; confirmed.
+
+## ⛔⛔ CORRECTION: THE TWO AXES WERE LABELLED BACKWARDS
+
+Earlier versions of this file called `0x14008028e` "the 48 moves" and
+`0x140080250` a "per-character category selector". **Both are wrong.** The
+interleaved movement log proves it: every step of the horizontal axis is
+followed by a vertical axis reporting a *different* total — 3, 7, 4, 4, 6, 2, 4
+in sequence.
+
+    0x14008028e  HORIZONTAL, "of 48"  = the CHARACTER ROSTER (CVS2's cast)
+    0x140080250  VERTICAL, 2..14      = that character's MOVE LIST
+
+⭐ Everything that looked odd now follows: the vertical count changes right
+after each horizontal step because a different character is selected; 154
+distinct move names appear across the run because that is many characters at
+6-10 moves each; and the live move-name window is 6-10 rows, not a scrolling
+view of 48.
+
+⚠ 35 also appears as a horizontal total (16:35 run), so the roster size differs
+per GAME rather than being a fixed 48.
 
 ## ⭐⭐ THREE COLUMNS, and one page is a clean 73 px grid
 
