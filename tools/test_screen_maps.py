@@ -105,6 +105,19 @@ EXPECTED = {
         "Wallpaper", "Display Filter", "Display Size", "Internal Resolution",
         "Music Volume", "Sound Effects Volume", "Default",
     ],
+    # ⭐⭐ The SAME screen on a game with no "Internal Resolution" option. Same
+    # caller, discriminated by COUNT (6 vs 7), which is what lookup_n already
+    # does. Measured from the layout dumps: the six-row form holds exactly these
+    # six and the survivors re-space to a clean 80px grid --
+    #   7 rows y = 286 366 446 526 606 686 766   (Internal Resolution at 526)
+    #   6 rows y = 326 406 486 566 646 726
+    # so it is a different LAYOUT, not the 7-row one with a row hidden.
+    # ⚠ Its `levels` mask is 0x18 (rows 3-4), NOT the 7-row entry's 0x30: the two
+    # volume rows sit one slot earlier here.
+    "g_ingame_av_rows6": [
+        "Wallpaper", "Display Filter", "Display Size",
+        "Music Volume", "Sound Effects Volume", "Default",
+    ],
     "g_kbd_settings_rows": [
         "Key Bindings", "Default", "Menu", "Start", "Coin",
         "Left", "Up", "Right", "Down",

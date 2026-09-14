@@ -488,6 +488,30 @@ static const int g_ingame_av_rows[] = {
     575, 580, 583, 4114, 592, 593, 168
 };
 
+/* ⭐⭐ THE SAME SCREEN WITHOUT "Internal Resolution" -- it is PER-GAME, and the
+ * six-row variant is why the user still heard "1 of 6" here.
+ *
+ * ⛔ The 7-row entry above is count-gated, so on a game with no
+ * internal-resolution option the map disagreed with the live count and the
+ * whole screen fell back to a bare position. Correct behaviour from the guard,
+ * and a missing row from me.
+ *
+ * ⭐ MEASURED from the layout dumps, not assumed: the six-row variant holds
+ * EXACTLY the seven labels minus Internal Resolution, and the survivors re-space
+ * to a clean 80px grid rather than leaving a gap --
+ *
+ *     7 rows  y = 286 366 446 526 606 686 766   (Internal Resolution at 526)
+ *     6 rows  y = 326 406 486 566 646 726
+ *
+ * so it is a different LAYOUT, not the same layout with one row hidden. A
+ * position-based patch on the 7-row map would have named rows 4-6 wrongly.
+ *
+ * ⚠ 4114 is the dropped index. Note it is the outlier in the family (575-593
+ * otherwise), i.e. added later -- consistent with it being the optional one. */
+static const int g_ingame_av_rows6[] = {
+    575, 580, 583, 592, 593, 168
+};
+
 /* ⭐⭐ IN-GAME DISPLAY & SOUND values. values_off = 0x398, derived from the
  * cursor addresses: rows 0-5 sit at +0x398, 39c, 3a0, 3a4, 3a8, 3ac.
  *
@@ -549,8 +573,21 @@ static const mc_value_set g_ingame_av_values[] = {
  * this axis is ever to be named it needs a different anchor entirely -- the
  * caption channel or the instance set -- not a better offset.
  *
- * ⚠ It speaks "1 of 2" / "2 of 2", which is a correct reading of a two-value
- * toggle; it simply does not say WHICH setting. */
+ * ⭐⭐ ANSWERED 2026-09-14, and by the instance set exactly as predicted above.
+ * IT IS NOT A VALUE AXIS AT ALL -- it is a Yes/No CONFIRMATION DIALOG, which is
+ * why its cursor is a stack local unrelated to any row and why the same "2 of 2"
+ * appeared on Start, Heavy Kick and Menu alike. Trying to join it to a row was
+ * answering the wrong question.
+ *
+ * Measured in the layout dumps: while the dialog is up, column x=960 holds
+ * EXACTLY 'Yes' (y=540) and 'No' (y=600) and the screen heading is GONE; in
+ * every other dump that column holds only 'Keyboard Settings'. So MC_ROW_COLUMN
+ * at x=960, count-gated to 2, reads it with no map.
+ *
+ * ⛔ A label MAP was available and refused: SYSTEM_YES/NO (19/20) and
+ * SYS_WINDOW_YES/NO (25/26) are both exactly "Yes"/"No" and nothing in the
+ * corpus separates them. Picking one would be the shape of guess that has
+ * mislabelled two screens on this project. The game draws the words; quote them. */
 static const int g_kbd_settings_rows[] = {
     464, 168, 573, 238, 572, 241, 239, 242, 240,
     243, 244, 245, 246, 247, 248, 234
@@ -1184,8 +1221,41 @@ static const mc_screen g_screens[] = {
      *
      * ⚠ The two halves are linked by this identical `name`; the kind is what
      * makes the link reachable at all. */
+    /* ⚠ levels 0x30 = rows 4-5 (Music Volume, Sound Effects Volume). It lives on
+     * the ROW entry, not the value entry, because the 6-row variant below puts
+     * those same two rows at 3-4 -- see the sibling-mask note in
+     * menu_speak_build(). */
     { 0x14009c755ULL, -1, 7, "Display & Sound Settings", MC_VERIFIED_LIVE_TEXT,
-      MC_SETTINGS_ROW, 0, g_ingame_av_rows, 7, NULL, 0, 0 },
+      MC_SETTINGS_ROW, 0, g_ingame_av_rows, 7, NULL, 0, 0x30u },
+
+    /* ⭐⭐ THE SIX-ROW VARIANT of the same screen -- games with no
+     * "Internal Resolution" option. Same caller, discriminated by COUNT, which
+     * is what menu_speak_lookup_n() is for and what makes this safe where the
+     * training tabs needed a different approach entirely (there, two tabs shared
+     * a count; here the counts differ, so the existing key suffices).
+     *
+     * ⚠ Same `name` as the 7-row entry ON PURPOSE: menu_speak_sibling_row_for()
+     * links the value axis by name, and the value axis's own count-based
+     * tie-break then picks whichever row entry matches the live row count. */
+    /* ⚠ levels 0x18 = rows 3-4 here, the SAME two volume rows one slot earlier
+     * because Internal Resolution is absent. A shared 0x30 would have marked
+     * Sound Effects Volume and Default instead -- a level stated where a name
+     * belongs, on the row that resets the screen. */
+    { 0x14009c755ULL, -1, 6, "Display & Sound Settings", MC_VERIFIED_LIVE_TEXT,
+      MC_SETTINGS_ROW, 0, g_ingame_av_rows6, 6, NULL, 0, 0x18u },
+
+    /* ⭐⭐ THE KEYBOARD SETTINGS CONFIRMATION DIALOG (Yes / No), 2 items.
+     * See the long note at g_kbd_settings_rows: this was recorded for months as
+     * an unjoinable VALUE axis, and it is not a value axis -- it is a dialog.
+     * Its cursor is a stack local, which is exactly what a dialog's would be.
+     *
+     * ⭐ Read from column x=960, where the game draws both options and where the
+     * screen heading is absent while the dialog is up. No map: SYSTEM_YES/NO and
+     * SYS_WINDOW_YES/NO are textually identical and the corpus cannot separate
+     * them, so the words come from the screen itself. */
+    { .caller = 0x14009ed68ULL, .base_index = -1, .count = 2,
+      .name = "Confirm", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_ROW_COLUMN, .coord_x = MC_HEADING_X },
 
     /* ⭐⭐ The in-game AV screen's VALUE axis. Same screen object as the row
      * site above -- five call sites share 0x2C498050, which is why the axes
@@ -2525,9 +2595,6 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
                                   0, &row)) {
             out->row = row;
             out->have_row = TRUE;
-            /* ⭐ Is this row a numeric level? See mc_screen::levels. */
-            if (row >= 0 && row < 32 && (s->levels & (1u << row)))
-                out->is_level = TRUE;
             out->why = MC_UNNAMED_NO_LABELS;
             /* ⭐⭐ Name the ROW this value belongs to, from the SIBLING row
              * entry's map. "Game Version, English Version" is what a user
@@ -2542,6 +2609,25 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
              * it the search returns the first match and can name the row from
              * the OTHER screen's map. */
             const mc_screen *sib = menu_speak_sibling_row_for(s, m->screen);
+            /* ⭐⭐ THE LEVEL MASK COMES FROM THE SIBLING ROW ENTRY, not from this
+             * value entry -- because ROW INDICES SHIFT BETWEEN VARIANTS of the
+             * same screen and a value axis carries only ONE mask.
+             *
+             * ⛔⛔ Measured: Display & Sound Settings has a 7-row form and a
+             * 6-row form (games with no "Internal Resolution"). Music Volume and
+             * Sound Effects Volume are rows 4-5 in the first and rows 3-4 in the
+             * second, so the value entry's 0x30 mask is right for one and names
+             * a LEVEL where a NAME belongs in the other -- the exact failure
+             * class `levels` is a per-row mask to avoid.
+             *
+             * The sibling is already chosen by the LIVE row count, so it is the
+             * variant actually on screen. Fall back to this entry's own mask
+             * when no sibling resolves, which is every single-variant screen. */
+            if (row >= 0 && row < 32) {
+                unsigned mask = (sib && sib->levels) ? sib->levels : s->levels;
+                if (mask & (1u << row))
+                    out->is_level = TRUE;
+            }
             if (sib && sib->labels && row >= 0 && row < sib->nlabels) {
                 char text[128];
                 if (gmd_text_by_index(sib->labels[row], text, sizeof(text)) &&

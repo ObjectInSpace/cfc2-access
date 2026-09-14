@@ -1453,6 +1453,40 @@ int main(void)
               v ? v->levels : 0);
     }
 
+    /* --- case 35: ⛔⛔ TWO VARIANTS OF ONE SCREEN NEED TWO LEVEL MASKS.
+     *
+     * Display & Sound Settings has a 7-row form and a 6-row form (games with no
+     * "Internal Resolution"). Music Volume and Sound Effects Volume are rows 4-5
+     * in the first and rows 3-4 in the second, so ONE mask cannot serve both:
+     * the 7-row 0x30 applied to the 6-row screen marks Sound Effects Volume and
+     * DEFAULT -- stating a level on the row that resets the screen.
+     *
+     * ⭐ The mask therefore lives on the ROW entry (selected by live count), not
+     * on the shared value entry. This asserts both, and that the volume rows are
+     * marked in each while Default never is. */
+    {
+        const mc_screen *r7 = menu_speak_lookup_n(0x14009c755ULL, 7);
+        const mc_screen *r6 = menu_speak_lookup_n(0x14009c755ULL, 6);
+        int ok = r7 && r6;
+
+        if (ok) {
+            ok &= r7->nlabels == 7 && r6->nlabels == 6;
+            /* 7-row: volumes at 4,5; Default is row 6 and must NOT be a level */
+            ok &= (r7->levels & (1u << 4)) && (r7->levels & (1u << 5));
+            ok &= !(r7->levels & (1u << 6));
+            /* 6-row: the same two rows at 3,4; Default is row 5 */
+            ok &= (r6->levels & (1u << 3)) && (r6->levels & (1u << 4));
+            ok &= !(r6->levels & (1u << 5));
+            /* ⚠ And the masks must actually DIFFER -- if someone copies one to
+             * the other this case is the only thing that notices. */
+            ok &= r7->levels != r6->levels;
+        }
+        check("35. each AV variant carries its own level mask", ok,
+              "7-row levels=%#x (n=%d), 6-row levels=%#x (n=%d)",
+              r7 ? r7->levels : 0, r7 ? r7->nlabels : -1,
+              r6 ? r6->levels : 0, r6 ? r6->nlabels : -1);
+    }
+
 
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }
