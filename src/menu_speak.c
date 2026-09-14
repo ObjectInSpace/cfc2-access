@@ -380,11 +380,22 @@ static const int g_training_option_rows[] = {
  * number. The rows above are independently evidenced by X-grouping and Y-order;
  * the values need a run that moves the VALUE axis on a known tab with the
  * heading read at the same moment. Until then these rows carry no value set and
- * the live-caption quote path speaks what the game drew. */
+ * the live-caption quote path speaks what the game drew.
+ *
+ * ⚠⚠ THESE TWO MAPS ARE NOT WIRED TO A SCREEN, deliberately. Nothing reads them
+ * at runtime -- MC_ROW_COLUMN speaks the label the game drew instead. They are
+ * kept as the OFFLINE EXPECTATION that tools/test_screen_maps.py validates
+ * against the real corpus, which is what proves the indices above are the
+ * strings actually on screen. Wiring them would require naming the tab, and the
+ * tab cannot be named (see the g_screens entry).
+ *
+ * ⚠ `used` to keep -Wunused-variable quiet without deleting the evidence. */
+__attribute__((used))
 static const int g_dummy_settings_rows[] = {
     714, 2925, 2955, 720, 168
 };
 
+__attribute__((used))
 static const int g_player_settings_rows[] = {
     724, 727, 1064, 729, 168
 };
@@ -1213,28 +1224,51 @@ static const mc_screen g_screens[] = {
     { 0x1400a41efULL, -1, 6, "Training Options", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_ROW, 0, g_training_option_rows, 6, NULL, 0, 0 },
 
-    /* ⭐⭐⭐ TRAINING OPTIONS > DUMMY SETTINGS and > PLAYER SETTINGS -- the two
-     * remaining tabs, reached with LB/RB from the tab above. See
-     * g_dummy_settings_rows for the per-row evidence.
+    /* ⭐⭐⭐ TRAINING OPTIONS' OTHER TABS -- read from the LIVE ROW LABELS, with
+     * no map and no heading. Reached with LB/RB from the tab above.
      *
-     * ⛔⛔ BOTH ARE 5 ROWS ON THE SAME CALLER, so these two entries are the
-     * reason menu_speak_lookup_h() exists: (caller, count) matches BOTH, and
-     * whichever came first in this table would speak its labels on the other
-     * screen. `heading_index` breaks the tie with the title the game itself
-     * drew, resolved through the GMD so it stays correct in all 14 languages.
+     * ⛔⛔ THERE ARE FOUR TABS, NOT THREE, and two of them have the IDENTICAL
+     * shape: 5 rows whose value lists are (3,3,3,2). The full walk at 01:25:56
+     * -> 01:26:30 goes block 0 (6 rows) -> 1 -> 2 -> 3 on ONE screen object, so
+     * neither the row count nor the value counts can tell tabs 1 and 2 apart.
      *
-     * ⚠ Designated initialisers: heading_index sits past sibling_caller, and
-     * counting positional fields to reach it is how a map ends up one slot out.
-     * The rows above keep their positional form -- they set no heading. */
+     * ⛔⛔ AND THE HEADING CANNOT EITHER -- it is STALE exactly when it matters.
+     * Measured per dump block, heading against the first row:
+     *
+     *     'Dummy Behavior'   + 'Action'        OK
+     *     'Dummy Settings'   + 'Health Bar'    OK
+     *     'Dummy Settings'   + 'Health Bar'    OK
+     *     'Player Settings'  + 'Health Bar'    <-- MISMATCH
+     *     'Training Options' + 'Attack Data'   <-- MISMATCH
+     *     'Dummy Behavior'   + 'Action'        OK
+     *
+     * 2 of 6. The heading object is updated on a different schedule from the row
+     * objects and leads them by one tab, and it sometimes reverts to the generic
+     * "Training Options". A heading_index key was BUILT and SHIPPED against this
+     * screen before the walk was read properly; it would have paired Player
+     * Settings' title to Dummy Settings' labels. Removed -- see the note in
+     * menu_speak.h.
+     *
+     * ⭐ So do not identify the tab at all. The ROW LABELS ARE the identity, the
+     * game draws them, and MC_COORD_LIVE speaks the Nth by its own coordinate --
+     * correct on every tab including ones never seen, in all 14 languages, with
+     * no map to get out of step. The labels the corpus confirmed
+     * (g_dummy_settings_rows / g_player_settings_rows) are kept only as the
+     * offline EXPECTATION that test_screen_maps.py checks; nothing reads them at
+     * runtime.
+     *
+     * ⛔ NOT MC_COORD_LIVE: its filter is TEXT-ONLY, and on this screen the
+     * value column (X=835: "Normal", "Off", "Auto-Recovery") and the heading
+     * (X=960) are all short, markup-free and non-sentence, so they pass it too.
+     * Measured on the real dumps: 10 candidates where 5 are needed, and
+     * gt_item_at_position() then refuses the whole screen. Correct, but silent.
+     *
+     * ⭐ MC_ROW_COLUMN instead: scope by the COLUMN (X=320) and order by Y, the
+     * same gt_column_item() pair the move list uses. The column is what
+     * separates a row label from its value, and no text rule can. */
     { .caller = 0x1400a41efULL, .base_index = -1, .count = 5,
-      .name = "Dummy Settings", .how = MC_VERIFIED_LIVE_TEXT,
-      .kind = MC_SETTINGS_ROW, .labels = g_dummy_settings_rows, .nlabels = 5,
-      .heading_index = 712 },
-
-    { .caller = 0x1400a41efULL, .base_index = -1, .count = 5,
-      .name = "Player Settings", .how = MC_VERIFIED_LIVE_TEXT,
-      .kind = MC_SETTINGS_ROW, .labels = g_player_settings_rows, .nlabels = 5,
-      .heading_index = 713 },
+      .name = "Training Options", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_ROW_COLUMN, .coord_x = 320.0f },
 
     /* ⭐⭐ TRAINING OPTIONS -- the VALUE axis. Same screen object as the row
      * site above; values_off 0x3F0 re-derived on a fresh screen object across
@@ -1844,64 +1878,17 @@ const mc_screen *menu_speak_lookup(ULONGLONG caller)
  * verified rows, never a reason to admit an unverified one. */
 const mc_screen *menu_speak_lookup_n(ULONGLONG caller, int item_count)
 {
-    return menu_speak_lookup_h(caller, item_count, NULL);
-}
-
-/* ⭐⭐ THE SAME LOOKUP, PLUS THE SCREEN'S OWN HEADING. See mc_screen.heading_index.
- *
- * ⛔⛔ (caller, count) IS NOT ALWAYS ENOUGH. Training Options is three screens
- * on ONE caller and ONE screen object: Dummy Behavior (6 rows), Dummy Settings
- * (5) and Player Settings (5). The last two have the SAME COUNT, so without a
- * third key one shadows the other and speaks its labels on the wrong screen --
- * and a wrong label is indistinguishable from a right one to a blind user.
- *
- * ⭐ The tie-break is the heading the GAME drew, resolved through the GMD so it
- * is language-safe. `screen` may be NULL (the caller could not read one), and
- * then a heading-keyed entry is simply not eligible: an unreadable input must
- * never be treated as a match. That is the rule an earlier screen got wrong.
- *
- * ⚠ Entries WITH a heading are preferred over entries without, so a generic
- * (caller, count) row cannot win over a specific one. */
-const mc_screen *menu_speak_lookup_h(ULONGLONG caller, int item_count,
-                                     const void *screen)
-{
     const mc_screen *caller_only = NULL;
-    const mc_screen *count_match = NULL;
 
     for (int i = 0; i < NSCREENS; i++) {
-        const mc_screen *s = &g_screens[i];
-
-        if (s->caller != caller)
+        if (g_screens[i].caller != caller)
             continue;
-
-        if (s->heading_index > 0) {
-            char want[GT_CAPTION_MAX], live[GT_CAPTION_MAX];
-
-            /* Not eligible without a screen to read the heading from. */
-            if (!screen)
-                continue;
-            if (s->count > 0 && s->count != item_count)
-                continue;
-            if (!gmd_text_by_index(s->heading_index, want, sizeof(want)) ||
-                !want[0])
-                continue;
-            if (!gt_widget_of(screen, MC_HEADING_X, -1.0f, live, sizeof(live)) ||
-                !live[0])
-                continue;
-            if (strcmp(live, want) != 0)
-                continue;
-            return s;                      /* caller + count + the live heading */
-        }
-
-        if (s->count > 0 && s->count == item_count) {
-            if (count_match == NULL)
-                count_match = s;           /* exact: caller AND count agree */
-            continue;
-        }
+        if (g_screens[i].count > 0 && g_screens[i].count == item_count)
+            return &g_screens[i];          /* exact: caller AND count agree */
         if (caller_only == NULL)
-            caller_only = s;               /* fall back to the first match */
+            caller_only = &g_screens[i];   /* fall back to the first match */
     }
-    return count_match ? count_match : caller_only;
+    return caller_only;
 }
 
 /* ⭐⭐ THE ROW DERIVATION -- see the header for why this is arithmetic and not
@@ -2008,13 +1995,13 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
      * "Select Mode" at 3 items and the Online Play menu at 6). See
      * menu_speak_lookup_n().
      *
-     * ⭐⭐ And heading-aware, because count is not always enough: Training
-     * Options' Dummy Settings and Player Settings tabs share a caller AND a row
-     * count, and are told apart only by the title the game drew. `m->screen`
-     * is passed as a VALUE for gt_widget_of() to match parents against; it is
-     * never dereferenced here. */
-    const mc_screen *s = menu_speak_lookup_h((ULONGLONG)(ULONG_PTR)m->caller,
-                                             out->total, m->screen);
+     * ⚠ A heading-aware variant of this lookup was added and REMOVED -- see
+     * mc_screen.coord_x. Training Options' tabs cannot be told apart by their
+     * heading, because the heading object is refreshed on a different schedule
+     * from the rows and leads them by one tab. MC_ROW_COLUMN names those rows
+     * without identifying the tab at all. */
+    const mc_screen *s = menu_speak_lookup_n((ULONGLONG)(ULONG_PTR)m->caller,
+                                             out->total);
     if (!s) {
         out->why = MC_UNNAMED_SCREEN_UNKNOWN;
         return;                        /* unknown screen -> position only */
@@ -2150,6 +2137,47 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
      * number of candidates disagrees with this screen's count -- which is what
      * stops a neighbouring screen's objects being ordered as if they were this
      * one's. Two independent gates, same as every other channel here. */
+    /* ⭐⭐ A ROW LABEL FROM ITS OWN COLUMN -- see MC_ROW_COLUMN. The column is
+     * the membership test and Y is the order, so a row label is never confused
+     * with its value (X=835 here) or with the screen heading (X=960). No map, no
+     * screen identity, no index. */
+    if (s->kind == MC_ROW_COLUMN) {
+        char text[GT_CAPTION_MAX], spoken[GM_OUT_MAX];
+        int n;
+
+        if (!m->screen || s->coord_x <= 0.0f) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        /* ⚠ The column's own population must agree with the live row count.
+         * Without this a tab drawing a DIFFERENT number of rows would still
+         * yield the Nth label -- a perfectly-ordered wrong answer, which is the
+         * failure this whole file is built to refuse. */
+        n = gt_column_count(m->screen, s->coord_x);
+        if (n != out->total) {
+            log_line("mcspeak: %s -- column x=%.0f holds %d label(s) but the "
+                     "cursor says %d; refusing rather than naming a row.",
+                     s->name ? s->name : "(unnamed)", (double)s->coord_x, n,
+                     out->total);
+            out->why = MC_UNNAMED_COUNT_MISMATCH;
+            return;
+        }
+        if (!gt_column_item(m->screen, s->coord_x, -1.0f, out->position,
+                            text, (int)sizeof(text)) || !text[0]) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        gm_speak(text, spoken, sizeof(spoken));
+        if (!spoken[0] || gm_has_residue(spoken)) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        _snprintf(out->item, sizeof(out->item), "%s", spoken);
+        out->item[sizeof(out->item) - 1] = '\0';
+        out->named = TRUE;
+        return;
+    }
+
     if (s->kind == MC_COORD_LIVE) {
         char text[GT_CAPTION_MAX];
         coord_ctx cc;

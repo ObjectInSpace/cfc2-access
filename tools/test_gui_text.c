@@ -1755,6 +1755,48 @@ int main(void)
                   ok && strstr(v, "Jinchu Watari") != NULL, d);
         }
 
+        /* case 54b: ⭐⭐ THE COLUMN IS WHAT SEPARATES A ROW LABEL FROM ITS VALUE,
+         * and no text rule can.
+         *
+         * ⛔⛔ Training Options draws row labels at X=320 and their values at
+         * X=835, and the value strings are just as short, markup-free and
+         * non-sentence as the labels ("Normal", "Off", "Auto-Recovery"). A
+         * text-only candidate filter (MC_COORD_LIVE's) admitted TEN candidates
+         * where FIVE were needed on the real dumps, so the count check refused
+         * the screen outright -- correct, but silent. MC_ROW_COLUMN scopes by X
+         * instead, which is why this case plants BOTH columns and requires the
+         * count to see only the labels. */
+        {
+            static unsigned char tro[8][GT_CLASS_SIZE];
+            void *T = (void *)0x2C29E210ULL;      /* the real screen pointer */
+            static const float TX[8] = { 320.f, 835.f, 320.f, 835.f,
+                                         320.f, 835.f, 320.f, 960.f };
+            static const float TY[8] = { 366.f, 366.f, 446.f, 446.f,
+                                         526.f, 526.f, 606.f, 305.f };
+            static const char *const TT[8] = {
+                "Health Bar", "Normal", "Groove Gauge", "Auto-Recovery",
+                "Guard Crush", "Normal", "Stun", "Player Settings"
+            };
+            for (int i = 0; i < 8; i++) {
+                memset(tro[i], 0, sizeof tro[i]);
+                *(ULONGLONG *)tro[i] = GT_VTABLE_ADDR;
+                memcpy(tro[i] + 0x40, &TX[i], sizeof(float));
+                memcpy(tro[i] + 0x44, &TY[i], sizeof(float));
+                memcpy(tro[i] + 0x88, &T, sizeof(void *));
+                gt_test_settext_body(tro[i], TT[i], NULL, 0);
+            }
+            int nrows = gt_column_count(T, 320.0f);
+            int nvals = gt_column_count(T, 835.0f);
+            char r2[GT_CAPTION_MAX] = { 0 };
+            BOOL got = gt_column_item(T, 320.0f, -1.0f, 2, r2, sizeof r2);
+            char d[200];
+            snprintf(d, sizeof d, "x=320 -> %d label(s), x=835 -> %d value(s); "
+                     "row 2 = \"%s\" (want Groove Gauge)", nrows, nvals, r2);
+            check("54b. a row column excludes the value column and the heading",
+                  nrows == 4 && nvals == 3 && got &&
+                  strcmp(r2, "Groove Gauge") == 0, d);
+        }
+
         /* case 54: and the blanked mate must not be spoken AS a condition.
          * "Jinchu Watari,  " read aloud is a name followed by a pause the
          * player cannot interpret. Whatever the join does, the result must

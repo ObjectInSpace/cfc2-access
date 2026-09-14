@@ -157,6 +157,27 @@ typedef enum {
      * neighbouring screen's objects from being ordered as if they were this
      * one's. */
     MC_COORD_LIVE,
+    /* ⭐⭐ A ROW LABEL READ FROM ITS OWN COLUMN. Like MC_COORD_LIVE, the game's
+     * live text names the row and no map is consulted -- but membership comes
+     * from the COLUMN (`coord_x`) rather than from a text rule, and the rows are
+     * ordered by Y within it.
+     *
+     * ⛔⛔ WHY THE TEXT RULE IS NOT ENOUGH. Training Options draws its row labels
+     * at X=320 and their VALUES at X=835, and the value strings ("Normal",
+     * "Off", "Auto-Recovery") are just as short, markup-free and non-sentence as
+     * the labels. Measured on real dumps: MC_COORD_LIVE's filter admitted 10
+     * candidates where 5 were needed, so the count check refused the screen
+     * outright. A column is what distinguishes a label from its value; no
+     * property of the text is.
+     *
+     * ⭐ And it needs no screen identity at all, which is the point. Training
+     * Options is FOUR tabs sharing one caller and one screen object, two of them
+     * with identical row counts AND identical value-list shapes -- so neither
+     * count nor value counts can name the tab, and the heading is stale exactly
+     * when the tab changes (2 of 6 dumps disagreed with their own rows). Reading
+     * the label the game drew sidesteps the question: it is right on every tab,
+     * including tabs never observed, in all 14 languages. */
+    MC_ROW_COLUMN,
     /* ⭐⭐⭐ THE IN-GAME MOVE LIST, named from the game's OWN indirection
      * rather than from what is on screen.
      *
@@ -270,27 +291,23 @@ typedef struct {
      * ⚠ Only Casual/Ranked Match need it today; 0 means "match by name", which
      * is every other settings screen. */
     ULONGLONG  sibling_caller;
-    /* ⭐⭐ THE SCREEN'S OWN HEADING, when caller+count cannot tell two screens
-     * apart. NULL for every screen that does not need it.
+    /* ⭐ For MC_ROW_COLUMN: the X of the column holding this screen's row
+     * labels. 0 means unset, and the entry then names nothing.
      *
-     * ⛔⛔ WHY IT EXISTS. Training Options is THREE screens sharing one caller
-     * AND one screen object -- Dummy Behavior (6 rows), Dummy Settings (5) and
-     * Player Settings (5). The last two have the SAME COUNT, so
-     * menu_speak_lookup_n()'s (caller, count) key cannot separate them: one
-     * would shadow the other and speak its labels on the wrong screen, exactly
-     * the defect that shipped twice on this project.
+     * ⛔⛔ A `heading_index` FIELD LIVED HERE AND WAS WRONG. It keyed a screen on
+     * the title the game drew at X=960, to separate Training Options' two 5-row
+     * tabs. It shipped, and then the full LB/RB walk showed the heading object
+     * is updated on a DIFFERENT SCHEDULE from the row objects and leads them by
+     * one tab -- 2 of 6 dumps had a heading naming a different tab than its own
+     * rows, and one had reverted to the generic "Training Options". So the key
+     * paired one tab's title to another tab's labels: the precise bug it was
+     * added to prevent. Removed rather than patched, because MC_ROW_COLUMN needs
+     * no screen identity at all.
      *
-     * The game itself says which tab is live. Measured across the dump blocks
-     * of the 01:2x run: EXACTLY ONE heading object is resident at a time for
-     * this screen object, so gt_widget_of(screen, 960, -1) returns the active
-     * tab name unambiguously -- the same call and the same column that names
-     * the character on the move list.
-     *
-     * ⚠ Matched against the game's own live text, so it is language-specific
-     * by construction; the GMD index below is what makes it language-safe --
-     * the string is resolved through gmd_text_by_index() at match time, never
-     * compared as an English literal. */
-    int        heading_index;
+     * ⚠ The lesson, not the field: a screen property is only a key if it is
+     * updated ATOMICALLY with the thing it identifies. Two objects the game
+     * refreshes independently are not one fact. */
+    float      coord_x;
 } mc_screen;
 
 /* ⭐ The heading column. The shell draws a screen's own title at X=960 -- the
@@ -507,11 +524,6 @@ const mc_screen *menu_speak_screen_at(int i);
  * unverified one. Every row still needs MC_VERIFIED_LIVE_TEXT. */
 const mc_screen *menu_speak_lookup_n(ULONGLONG caller, int item_count);
 
-/* As above, but able to break a (caller, count) tie using the heading the game
- * drew -- see mc_screen.heading_index. `screen` may be NULL, in which case no
- * heading-keyed entry is eligible. */
-const mc_screen *menu_speak_lookup_h(ULONGLONG caller, int item_count,
-                                     const void *screen);
 
 /* Enable the DISCOVERY candidate sweep. OFF by default.
  *
