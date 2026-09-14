@@ -223,6 +223,29 @@ EXPECTED_VALUES = {
         (3, 3): ["Normal", "Delayed Stand", "Random"],
         (3, 6): ["Normal", "Safe Fall", "Safe Fall (random)", "Delayed Stand",
                  "Delayed Stand (random)", "Random"],
+        # ⭐⭐ THE OTHER TABS. `row` is the slot derived from values_off, and the
+        # slots are ABSOLUTE across the screen object: each tab owns a block of
+        # EIGHT, so slot = tab_base + row. Measured live -- the row axis on
+        # "Guard Crush, 3 of 5" produced slot 10, "Groove Gauge, 2 of 5" gave
+        # slot 9; slot - (row-1) == 8 on all six pairings.
+        #
+        # Dummy Settings (row cursor +0x354 / +0x358), base 8:
+        (10, 3): ["Normal", "Minimal", "Off"],          # Guard Crush
+        (11, 2): ["Normal", "None"],                    # Stun
+        # ⚠ slot 8 Health Bar has NO entry: VITAL_GAUGE_00..02 are 715-717 but
+        # _03 ("Fixed 100%") is at 4136, so a {first, count} run cannot express
+        # it -- {8, 4, 715} would name the fourth value "Super Combo Gauge".
+        # ⚠ slot 9 Groove Gauge is per-game, like Block/Recovery above.
+        #
+        # Player Settings (row cursor +0x35c), base 24:
+        (24, 2): ["Off", "On"],                         # Attack Data
+        (25, 2): ["Off", "On"],                         # Input Display
+        # ⚠ REVERSED relative to the two above -- TR_ON_OFF, not TR_OFF_ON.
+        # This is exactly why the values come from the table and never from the
+        # order they "should" have.
+        (26, 2): ["On", "Off"],                         # Hit Boxes
+        # ⚠ slot 27 Network Delay is a GENERATED 11-level range, not labels; it
+        # carries a `levels` bit on the screen entry instead of a value set.
     },
     "g_system_values": {
         # Row 0 is the 14 display languages, a contiguous run from index 0.

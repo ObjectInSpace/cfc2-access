@@ -1409,6 +1409,50 @@ int main(void)
               ok, "entries=%d", seen);
     }
 
+    /* --- case 34: ⭐⭐ THE TRAINING VALUE SLOTS ARE ABSOLUTE ACROSS TABS.
+     *
+     * USER: "The rows read, but not the values." The value entry existed but its
+     * sets covered only the FIRST tab, so every other tab spoke "row 11, 2 of 3".
+     *
+     * ⭐ Each tab owns a block of EIGHT slots, so slot = tab_base + row -- and
+     * this is MEASURED, not assumed: in the 17:02 run the row axis on "Guard
+     * Crush, 3 of 5" produced slot 10 and "Groove Gauge, 2 of 5" produced slot
+     * 9, i.e. slot - (row-1) == 8 on all six pairings.
+     *
+     * This asserts the slots that must exist and the ones that deliberately must
+     * NOT -- a missing entry is the correct behaviour for a row whose values
+     * cannot be expressed as a contiguous run. */
+    {
+        const mc_screen *v = menu_speak_lookup(0x1400a4241ULL);
+        int have8 = 0, have10 = 0, have11 = 0, have24 = 0, have26 = 0;
+        int have27 = 0, ok = v != NULL;
+
+        if (ok) {
+            for (int i = 0; i < v->nvalues; i++) {
+                int r = v->values[i].row;
+                if (r == 8)  have8  = 1;
+                if (r == 10) have10 = 1;
+                if (r == 11) have11 = 1;
+                if (r == 24) have24 = 1;
+                if (r == 26) have26 = 1;
+                if (r == 27) have27 = 1;
+            }
+            ok &= have10 && have11 && have24 && have26;
+            /* ⛔ Slot 8 (Health Bar) must have NO entry: VITAL_GAUGE_00..02 are
+             * 715-717 but _03 is at 4136, so a {first,count} run cannot express
+             * it and {8,4,715} would name the 4th value "Super Combo Gauge". */
+            ok &= !have8;
+            /* ⛔ Slot 27 (Network Delay) is a GENERATED level, not a label run:
+             * it must carry a levels BIT and no value set. */
+            ok &= !have27;
+            ok &= (v->levels & (1u << 27)) != 0;
+        }
+        check("34. training value slots are absolute (tab_base + row)", ok,
+              "s8=%d s10=%d s11=%d s24=%d s26=%d s27=%d levels=%#x",
+              have8, have10, have11, have24, have26, have27,
+              v ? v->levels : 0);
+    }
+
 
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }

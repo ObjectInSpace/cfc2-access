@@ -431,6 +431,39 @@ static const mc_value_set g_training_option_values[] = {
     { 1, 13, 2927 },  /* Block (CVS2): CVS2_GUARD_00..12         -- MEASURED */
     { 3, 3,  4077 },  /* Recovery (CVS1): CVS1_OKI_00..02        -- MEASURED */
     { 3, 6,  2940 },  /* Recovery (CVS2): CVS2_OKI_00..05        -- MEASURED */
+
+    /* ⭐⭐⭐ THE OTHER TABS' VALUES. `row` here is the slot index derived from
+     * values_off, and the slots are ABSOLUTE across the whole screen object:
+     * each tab owns a block of EIGHT, so slot = tab_base + row.
+     *
+     * ⭐ MEASURED LIVE, not inferred. In the 17:02 run the row axis sat on
+     * "Guard Crush, 3 of 5" and the next value movement used slot 10; "Groove
+     * Gauge, 2 of 5" gave slot 9. slot - (row-1) == 8 on every pairing, six for
+     * six. That is the arithmetic below.
+     *
+     * ⚠ THE 4-VALUE HEALTH BAR IS NON-CONTIGUOUS IN THE GMD: VITAL_GAUGE_00..02
+     * are 715-717 but _03 ("Fixed 100%") is at 4136 -- appended long after its
+     * siblings. A {first, count} run CANNOT express it, so Health Bar gets no
+     * entry here and the live-caption quote path speaks it. Shipping
+     * {8, 4, 715} would have named the fourth value "Super Combo Gauge" (718).
+     *
+     * ⚠ Guard Crush's values sit at 2957 -- nowhere near its 2955 label -- and
+     * Hit Boxes reads On/Off (1066) where Attack Data reads Off/On (725). Both
+     * come from the table, never from the ordering they "should" have. */
+
+    /* --- tab at row-cursor +0x354 / +0x358 (Dummy Settings), base 8 --------- */
+    /* slot 8  = Health Bar    -- NO ENTRY, see above (non-contiguous) */
+    /* slot 9  = Groove Gauge  -- per-game, like Block/Recovery above; the live
+     *                            quote path speaks it until a run measures it */
+    { 10, 3, 2957 },  /* Guard Crush: GUARD_CRASH_00..02  Normal/Minimal/Off  */
+    { 11, 2,  721 },  /* Stun:        STUN_GAUGE_00..01   Normal/None         */
+
+    /* --- tab at row-cursor +0x35c (Player Settings), base 24 --------------- */
+    { 24, 2,  725 },  /* Attack Data:   TR_OFF_ON_00..01  Off/On              */
+    { 25, 2,  725 },  /* Input Display: TR_OFF_ON_00..01  Off/On              */
+    { 26, 2, 1066 },  /* Hit Boxes:     TR_ON_OFF_00..01  On/Off  ⚠ REVERSED  */
+    /* slot 27 = Network Delay -- 11 GENERATED levels ("the level of network
+     * delay to simulate"), not labels. It is a LEVEL row; see `levels` below. */
 };
 
 /* ⭐⭐⭐ IN-GAME DISPLAY & SOUND SETTINGS (0x14009c755), 7 rows -- reached from
@@ -1278,10 +1311,16 @@ static const mc_screen g_screens[] = {
      * ⚠ No `levels` bits: none of these rows is a numeric range. Every value
      * list is a set of NAMES, and a wrong levels bit would say "Block, 3, of 4"
      * where a name belongs. */
+    /* ⚠ `levels` bit 27 = Network Delay, whose 11 values are a GENERATED range
+     * ("Set the level of network delay to simulate."), not a label run. Without
+     * it the row would read "4 of 11" as a list position; with it the index IS
+     * the setting. Every other slot here is a set of NAMES -- a wrong levels bit
+     * states a level where a name belongs, which is why this is a per-row mask
+     * and never inferred from the value count. */
     { 0x1400a4241ULL, -1, 0, "Training Options", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_VALUE, 0x3F0, NULL, 0, g_training_option_values,
       (int)(sizeof(g_training_option_values) /
-            sizeof(g_training_option_values[0])), 0 },
+            sizeof(g_training_option_values[0])), (1u << 27) },
 
     /* ⭐⭐ THE LOBBY-ID KEYPAD's character picker (Search Lobby ID > Enter
      * Lobby ID), 36 items, vertical. Caller 0x14008a8ef.
@@ -2171,6 +2210,65 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
         if (!spoken[0] || gm_has_residue(spoken)) {
             out->why = MC_UNNAMED_TEXT_UNREADABLE;
             return;
+        }
+        /* ⭐⭐ ANNOUNCE THE PAGE WHEN THE TAB CHANGES. USER: "It also doesn't
+         * read the title of each page when switching." Correct -- LB/RB swaps
+         * the whole row set and nothing said so, leaving the player to infer the
+         * page from its first row.
+         *
+         * ⭐ THE TAB IS IDENTIFIED BY THE ROW CURSOR'S OFFSET, not by the
+         * heading. Each tab owns its OWN cursor field -- measured +0x350 (Dummy
+         * Behavior, 6 rows), +0x354 and +0x358 (5 rows each), +0x35c (Player
+         * Settings) -- and that offset arrives as an ARGUMENT alongside the
+         * movement, so it is atomic with the rows it describes. The heading
+         * object is NOT: it is refreshed on a different schedule and leads the
+         * rows by one tab (2 of 6 dumps disagreed), which is why a
+         * heading_index key was built, shipped and removed. See coord_x.
+         *
+         * ⚠ The TITLE still comes from the heading widget, because that is the
+         * only place the page's name exists -- but it is read only at the moment
+         * the cursor offset says the tab CHANGED, and it is spoken as a PREFIX
+         * to a row read independently from the row column. So a stale heading
+         * can mislabel the page; it can never mis-name the row. A strictly
+         * smaller claim than the key it replaces.
+         *
+         * ⚠ Keyed on the screen POINTER as well: a different screen object
+         * reusing the same offset is a different page and must re-announce. */
+        {
+            static const void *last_screen;
+            static ULONG_PTR   last_off = (ULONG_PTR)-1;
+            ULONG_PTR off = (m->screen && m->cursor)
+                          ? (ULONG_PTR)m->cursor - (ULONG_PTR)m->screen
+                          : (ULONG_PTR)-1;
+
+            if (off != (ULONG_PTR)-1 &&
+                (off != last_off || m->screen != last_screen)) {
+                char head[GT_CAPTION_MAX], head_spoken[GM_OUT_MAX];
+
+                last_off    = off;
+                last_screen = m->screen;
+                if (gt_widget_of(m->screen, MC_HEADING_X, -1.0f,
+                                 head, (int)sizeof(head)) && head[0]) {
+                    gm_speak(head, head_spoken, sizeof(head_spoken));
+                    /* ⚠ Refuse a heading identical to the row about to be
+                     * spoken -- on a one-row page that would stutter. */
+                    if (head_spoken[0] && !gm_has_residue(head_spoken) &&
+                        strcmp(head_spoken, spoken) != 0) {
+                        char line[GT_CAPTION_MAX + GM_OUT_MAX + 32];
+                        _snprintf(line, sizeof(line) - 1, "%s. %s, %d of %d",
+                                  head_spoken, spoken, out->position,
+                                  out->total);
+                        line[sizeof(line) - 1] = '\0';
+                        log_line("mcspeak: tab changed (row cursor +0x%03x) -- "
+                                 "announcing the page \"%s\".",
+                                 (unsigned)off, head_spoken);
+                        menu_speak_line(line);
+                        out->named          = TRUE;
+                        out->spoken_already = TRUE;
+                        return;
+                    }
+                }
+            }
         }
         _snprintf(out->item, sizeof(out->item), "%s", spoken);
         out->item[sizeof(out->item) - 1] = '\0';
