@@ -1373,6 +1373,49 @@ static const mc_screen g_screens[] = {
       .name = "Training Options", .how = MC_VERIFIED_LIVE_TEXT,
       .kind = MC_ROW_COLUMN, .coord_x = 320.0f },
 
+    /* ⭐⭐ GAME SETTINGS / EX SETTINGS (Select Game > Game Settings), 7 rows,
+     * vertical, caller 0x14009d8df. Diagnosed 2026-09-15 from the 13:05 run;
+     * before this the screen spoke bare "N of 7" with no row names at all.
+     *
+     * ⭐⭐ IT IS TWO TABS ON ONE CALLER, cycled by RB (key E / 0x45):
+     *   tab A, heading "Game Settings": Game Difficulty, Attack Power, Timer
+     *     Speed, Speed Select, Battle Type, Max Rounds (Single), Default
+     *   tab B, heading "EX Settings": Coin Mode, Boot Display, Secret
+     *     Characters, Same Character Select, Version, Sound Style, Default
+     * B is the emulated game's own arcade DIP settings; A is the match settings.
+     * Three E presses in the run (13:07:53, :56, :59) and the row set flips
+     * within ~180 ms of each; no dump ever changed tab without one.
+     *
+     * ⛔⛔ A LABEL MAP WAS AVAILABLE AND IS REFUSED. All seven of tab A's labels
+     * pair exactly and uniquely against the corpus (OPT_DIFFICULTY 643,
+     * OPT_DAMAGE_LEVEL 644, OPT_TIMER_SPEED 649, OPT_GAME_SPEED 661,
+     * OPT_BATTLE_TYPE 1108, OPT_CVS2_MR 1115, MENU_OP_DEFAULT 168 --
+     * non-contiguous, so a MAP, never a base). But the two tabs are identical
+     * in every property a map could key on: same caller, same count of 7, same
+     * column, same 80px pitch. A (caller, count) map would have spoken tab A's
+     * seven names on tab B -- a confidently wrong SETTING name, which is the
+     * failure this file exists to refuse. MC_ROW_COLUMN quotes what the game
+     * drew, so it is right on BOTH tabs without telling them apart.
+     *
+     * Geometry measured over 16 field dumps: labels X=320, Y 286..766 on an
+     * exact 80px pitch, 7 objects, no chrome in the column. Values sit at
+     * X=835 sharing each label's Y; the heading is at X=960.
+     * ⚠ The layout dump's floats are BIG-endian -- decoding them little-endian
+     * yields all-zero coordinates, a wrong answer that reads like a real one.
+     *
+     * ⛔ THE TAB NAME IS NOT ANNOUNCED, and the shipped mechanism cannot do it.
+     * MC_ROW_COLUMN's tab announcement keys on the row cursor's OFFSET changing
+     * (Training Options' four tabs own +0x350/+0x354/+0x358/+0x35c). Measured
+     * here: BOTH tabs drive the same field, +0x35C, across all 34 movements. So
+     * the offset can never signal the switch on this screen. The heading at
+     * X=960 did track its own rows in 16 of 16 dumps -- but that is exactly the
+     * heading_index key that was built, shipped and REMOVED for Training
+     * Options, and 3 tab switches in one session is not the walk that exposed
+     * it there. Rows first; the tab name needs its own evidence. */
+    { .caller = 0x14009d8dfULL, .base_index = -1, .count = 7,
+      .name = "Game Settings", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_ROW_COLUMN, .coord_x = 320.0f },
+
     /* ⭐⭐ TRAINING OPTIONS -- the VALUE axis. Same screen object as the row
      * site above; values_off 0x3F0 re-derived on a fresh screen object across
      * five rows in the CVS1 run, so the two axes are told apart by cursor
