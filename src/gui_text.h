@@ -783,7 +783,12 @@ void gt_settings_census_enable(BOOL on);
  * would pull menu_cursor, menu_speak and the GMD reader into a focused test
  * binary. `row_x`/`val_x` are screen properties, never constants of this
  * module. */
-void gt_settings_census(void *screen, float row_x, float val_x);
+/* ⚠ `val_total` is the VALUE cursor's reported item count. The report needs it
+ * to say whether a row's list is COMPLETE -- and it needs to, because THE LIST
+ * WRAPS: "press Right until it stops changing" never terminates, and no log
+ * data can detect that, since a wrapping list produces movements forever. The
+ * count is the only stopping rule. Pass 0 when no value axis is live. */
+void gt_settings_census(void *screen, float row_x, float val_x, int val_total);
 
 /* ⭐⭐ THE VERDICT IS A RETURN VALUE. `samples == 0` means no movement was
  * sampled with both columns readable -- NOT that the rows have no values. */
@@ -794,6 +799,7 @@ int  gt_test_sc_entries(void);
 BOOL gt_test_sc_entry_at(int i, const char **label, const char **value,
                          long *hits);
 long gt_test_sc_overflow(void);
+int  gt_test_sc_expect(const char *label);
 /* ⭐ Clears the census so a case can ask the UNSAMPLED question. Without it
  * every case runs against a populated table and a verdict stuck at TRUE is
  * indistinguishable from a working one -- proven by sabotage. */

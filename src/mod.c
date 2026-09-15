@@ -588,7 +588,13 @@ static DWORD WINAPI worker(LPVOID param)
                      * does not decide which corpus run those values are, or
                      * which tab is showing -- that join stays offline where the
                      * corpus can check it. */
-                    gt_settings_census(mlm.screen, 320.0f, 835.0f);
+                    /* ⚠ Only a HORIZONTAL movement carries a value-axis total;
+                     * on a vertical (row) movement the total is the ROW count
+                     * and passing it would declare a 7-value expectation for
+                     * every row. 0 means "unknown", which the report says
+                     * rather than guessing. */
+                    gt_settings_census(mlm.screen, 320.0f, 835.0f,
+                                       mlm.vertical ? 0 : mltot);
                 }
             }
 

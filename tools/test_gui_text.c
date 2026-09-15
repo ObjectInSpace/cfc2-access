@@ -1833,7 +1833,9 @@ int main(void)
                  * nothing. The first version of this case omitted it and read
                  * as a broken probe. */
                 gt_note_focus_move();
-                gt_settings_census(S, 320.0f, 835.0f);
+                /* 3 is the value-axis total for this synthetic row: the walk
+                 * below visits all three, so the row must report COMPLETE. */
+                gt_settings_census(S, 320.0f, 835.0f, 3);
             }
 
             /* case 54c: every value the walk passed is kept, not just the last.
@@ -1920,6 +1922,52 @@ int main(void)
              * An empty census reported as a finding would say "this screen's
              * rows have no values" when the truth is "nobody walked them" --
              * the difference between a measurement and a guess. */
+            /* case 54h: ⭐⭐ A PARTIAL WALK MUST NOT LOOK COMPLETE.
+             *
+             * ⛔⛔ USER: "It doesn't work like that, it wraps." My walk
+             * instruction was "press Right until it stops changing", which on a
+             * wrapping list NEVER TERMINATES -- and no log data can detect
+             * that, because a wrapping list produces movements forever. The
+             * row's own reported total is the only measure of done, so the
+             * census must keep it and the report must compare against it.
+             *
+             * Here a 9-value row is walked only twice. Recording 2 values and
+             * calling the row done would ship a value set missing seven
+             * entries -- the mod would then state a setting the game never
+             * offered. */
+            {
+                gt_test_sc_reset();
+                static unsigned char wo[2][GT_CLASS_SIZE];
+                void *W = (void *)0x2BE7A291ULL;
+                static const float WX[2] = { 320.f, 835.f };
+                static const float WY[2] = { 286.f, 286.f };
+                static const char *const W2[2] = { "Free Play", "Normal" };
+                for (int v = 0; v < 2; v++) {
+                    const char *TT[2] = { "Game Difficulty", W2[v] };
+                    for (int i = 0; i < 2; i++) {
+                        memset(wo[i], 0, sizeof wo[i]);
+                        *(ULONGLONG *)wo[i] = GT_VTABLE_ADDR;
+                        memcpy(wo[i] + 0x40, &WX[i], sizeof(float));
+                        memcpy(wo[i] + 0x44, &WY[i], sizeof(float));
+                        memcpy(wo[i] + 0x88, &W, sizeof(void *));
+                        gt_test_settext_body(wo[i], TT[i], NULL, 0);
+                    }
+                    gt_note_focus_move();
+                    gt_settings_census(W, 320.0f, 835.0f, 9);  /* 9, saw 2 */
+                }
+                int n = gt_test_sc_entries(), vals = 0, expect = 0;
+                for (int i = 0; i < n; i++) {
+                    const char *l = NULL, *v = NULL;
+                    if (!gt_test_sc_entry_at(i, &l, &v, NULL)) continue;
+                    if (strcmp(l, "Game Difficulty") == 0 && v[0]) vals++;
+                }
+                expect = gt_test_sc_expect("Game Difficulty");
+                snprintf(d, sizeof d, "walked 2 of a 9-value row: recorded "
+                         "%d value(s), expectation kept as %d", vals, expect);
+                check("54h. a partial walk keeps the row's FULL total, so it "
+                      "cannot read as complete", vals == 2 && expect == 9, d);
+            }
+
             {
                 gt_test_sc_reset();
                 long s = -1, m = -1;

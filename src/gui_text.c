@@ -2970,6 +2970,16 @@ typedef struct {
     char  value[64];
     LONG  hits;
     LONG  first_seq, last_seq;
+    /* ⭐⭐ THE ROW'S OWN TOTAL, as the value cursor reported it at the moment
+     * this pair was seen. Without it the report cannot say whether a row's list
+     * is COMPLETE, and the user is left counting presses.
+     *
+     * ⛔⛔ IT MATTERS BECAUSE THE LIST WRAPS. User: "It doesn't work like that,
+     * it wraps." My walk instruction was "press Right until it stops changing",
+     * which on a wrapping list never terminates -- and no amount of log data
+     * detects that, because a wrapping list produces movements forever. The
+     * count is the only stopping rule, so the mod must know it and say so. */
+    int   expect;
 } gt_sc_entry;
 
 #define GT_SC_MAX 128
@@ -2992,7 +3002,7 @@ static BOOL sc_enabled(void) { return g_sc_on == 1; }
 /* ⛔ Overflow STOPS AND COUNTS rather than wrapping -- the rare value is
  * precisely the evidence being sought, and a wrapping ring would discard it
  * while still showing a full table. Same reasoning as ml_record(). */
-static void sc_record(const char *label, const char *value, LONG seq)
+static void sc_record(const char *label, const char *value, LONG seq, int expect)
 {
     LONG used = g_sc_used < 0 ? 0 : g_sc_used;
     for (LONG i = 0; i < used; i++) {
@@ -3000,6 +3010,11 @@ static void sc_record(const char *label, const char *value, LONG seq)
             strncmp(g_sc[i].value, value, sizeof(g_sc[i].value)) == 0) {
             g_sc[i].hits++;
             g_sc[i].last_seq = seq;
+            /* ⚠ Keep the LARGEST total ever reported for this row. A movement
+             * sampled while the row cursor was elsewhere carries that other
+             * row's total; taking the latest would let a 2-value row overwrite
+             * a 9-value row's expectation and declare it complete. */
+            if (expect > g_sc[i].expect) g_sc[i].expect = expect;
             g_sc_used = used;
             return;
         }
@@ -3013,6 +3028,7 @@ static void sc_record(const char *label, const char *value, LONG seq)
     lstrcpynA(g_sc[used].value, value, (int)sizeof(g_sc[used].value));
     g_sc[used].hits = 1;
     g_sc[used].first_seq = g_sc[used].last_seq = seq;
+    g_sc[used].expect = expect;
     g_sc_used = used + 1;
 }
 
@@ -3025,7 +3041,7 @@ static void sc_record(const char *label, const char *value, LONG seq)
  *
  * `row_x` is the label column and `val_x` the value column; both come from the
  * caller because they are screen properties, not constants of this module. */
-void gt_settings_census(void *screen, float row_x, float val_x)
+void gt_settings_census(void *screen, float row_x, float val_x, int val_total)
 {
     if (!sc_enabled())
         return;
@@ -3077,7 +3093,7 @@ void gt_settings_census(void *screen, float row_x, float val_x)
             lstrcpynA(label, pair, (int)sizeof(label));
             value[0] = '\0';
         }
-        sc_record(label, value, seq);
+        sc_record(label, value, seq, val_total);
         got++;
     }
 
@@ -3121,6 +3137,47 @@ void gt_settings_census_report(void)
                  g_sc[i].label, g_sc[i].value[0] ? g_sc[i].value : "(no value)",
                  (long)g_sc[i].hits, (long)g_sc[i].first_seq,
                  (long)g_sc[i].last_seq);
+
+    /* ⭐⭐ PER-ROW COMPLETENESS, stated rather than left to the reader.
+     *
+     * ⛔⛔ THE LIST WRAPS, so "it stopped changing" is not a stopping rule and
+     * a walk cannot be self-evidently complete. The row's own reported total is
+     * the only measure of DONE, and comparing it by hand against a table is
+     * exactly the slow, error-prone step this probe exists to remove. A row
+     * short of its total was not walked far enough -- that is a gap in the
+     * WALK, never a short list, and shipping it as a value set would state a
+     * setting the game never offered. */
+    log_line("gt:   --- per-row completeness ---");
+    for (LONG i = 0; i < used; i++) {
+        /* Count this label's distinct values, once, at its first appearance. */
+        BOOL first = TRUE;
+        for (LONG j = 0; j < i; j++)
+            if (strncmp(g_sc[j].label, g_sc[i].label,
+                        sizeof(g_sc[j].label)) == 0) { first = FALSE; break; }
+        if (!first)
+            continue;
+        LONG n = 0; int expect = 0;
+        for (LONG j = 0; j < used; j++)
+            if (strncmp(g_sc[j].label, g_sc[i].label,
+                        sizeof(g_sc[j].label)) == 0) {
+                if (g_sc[j].value[0]) n++;
+                if (g_sc[j].expect > expect) expect = g_sc[j].expect;
+            }
+        if (n == 0)
+            log_line("gt:     %-28s an ACTION row (no value seen)",
+                     g_sc[i].label);
+        else if (expect > 0 && n >= expect)
+            log_line("gt:     %-28s %ld of %d  COMPLETE", g_sc[i].label,
+                     (long)n, expect);
+        else if (expect > 0)
+            log_line("gt:     %-28s %ld of %d  ⚠ INCOMPLETE -- walk this row "
+                     "%d more time(s)", g_sc[i].label, (long)n, expect,
+                     expect - (int)n);
+        else
+            log_line("gt:     %-28s %ld value(s), total UNKNOWN -- the value "
+                     "cursor was never on this row, so completeness cannot be "
+                     "judged", g_sc[i].label, (long)n);
+    }
     /* ⭐ POSITIVE counts: "0 failed" must never look like "0 checked". */
     log_line("gt:   %ld distinct label=value pair(s) from %ld sample(s); "
              "%ld did not fit the table; %ld lock-loss; %ld unreadable.",
@@ -3151,6 +3208,20 @@ BOOL gt_test_sc_entry_at(int i, const char **label, const char **value,
 }
 
 long gt_test_sc_overflow(void) { return (long)g_sc_overflow; }
+
+/* The largest total ever reported for `label`'s value axis. ⭐ A case needs
+ * this to prove a PARTIAL walk keeps the full expectation -- see case 54h and
+ * the wrap note on gt_sc_entry.expect. */
+int gt_test_sc_expect(const char *label)
+{
+    int best = 0;
+    LONG used = g_sc_used < 0 ? 0 : g_sc_used;
+    for (LONG i = 0; i < used; i++)
+        if (strncmp(g_sc[i].label, label, sizeof(g_sc[i].label)) == 0 &&
+            g_sc[i].expect > best)
+            best = g_sc[i].expect;
+    return best;
+}
 
 /* ⭐⭐ A TEST SEAM FOR THE *UNSAMPLED* STATE, which is the one that matters.
  * Case 54f asserted only the success path (conclusive after 3 samples) and
