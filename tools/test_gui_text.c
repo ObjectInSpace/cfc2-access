@@ -1846,6 +1846,51 @@ int main(void)
                 check("54k. no pair_x still reads the label alone",
                       g1 && strcmp(v1, "Health Bar") == 0, d);
             }
+
+            /* case 54l: ⭐⭐⭐ A MISALIGNED COLUMN -- the case that actually
+             * discriminates shared-Y from ordinal pairing.
+             *
+             * ⛔⛔ THE SABOTAGE SWEEP EXPOSED 54i-54k AS BLIND TO THIS. With the
+             * mate chosen by ORDINAL instead of shared Y, all three passed --
+             * because the 54b fixture is ALIGNED: row N and value N happen to
+             * share a Y for every row that has a value. Two rules that agree on
+             * every input a case supplies are untested by that case.
+             *
+             * Here the value column SKIPS row 2 (nothing at y=446), which is
+             * the real shape of an action row sitting mid-screen. Shared-Y must
+             * give row 3 its OWN value; ordinal would hand row 3 the SECOND
+             * value -- the value belonging to a different setting, spoken
+             * confidently. That is the confusion this pairing rule exists to
+             * prevent. */
+            {
+                static unsigned char mo[5][GT_CLASS_SIZE];
+                void *M = (void *)0x2C29E300ULL;
+                static const float MX[5] = { 320.f, 320.f, 320.f,
+                                             835.f, 835.f };
+                static const float MY[5] = { 366.f, 446.f, 526.f,
+                                             366.f, 526.f };   /* no 446 */
+                static const char *const MT[5] = {
+                    "First Row", "Action Row", "Third Row",
+                    "First Value", "Third Value" };
+                for (int i = 0; i < 5; i++) {
+                    memset(mo[i], 0, sizeof mo[i]);
+                    *(ULONGLONG *)mo[i] = GT_VTABLE_ADDR;
+                    memcpy(mo[i] + 0x40, &MX[i], sizeof(float));
+                    memcpy(mo[i] + 0x44, &MY[i], sizeof(float));
+                    memcpy(mo[i] + 0x88, &M, sizeof(void *));
+                    gt_test_settext_body(mo[i], MT[i], NULL, 0);
+                }
+                char r3[GT_CAPTION_MAX] = { 0 }, r2[GT_CAPTION_MAX] = { 0 };
+                BOOL g3 = gt_column_item(M, 320.0f, 835.0f, 3, r3, sizeof r3);
+                BOOL g2b = gt_column_item(M, 320.0f, 835.0f, 2, r2, sizeof r2);
+                snprintf(d, sizeof d, "row 3 -> \"%s\" (want \"Third Row, "
+                         "Third Value\", ordinal would give \"Third Value\" to "
+                         "row 2); row 2 -> \"%s\" (want \"Action Row\")",
+                         r3, r2);
+                check("54l. a SKIPPED row does not shift every value up one",
+                      g3 && strcmp(r3, "Third Row, Third Value") == 0 &&
+                      g2b && strcmp(r2, "Action Row") == 0, d);
+            }
         }
 
         /* --- cases 54c-54f: ⭐⭐ THE SETTINGS CENSUS ------------------------
