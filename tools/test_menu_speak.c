@@ -302,7 +302,37 @@ int main(void)
             const mc_screen *b = menu_speak_row(j);
             if (!a || !b || a->caller != b->caller)
                 continue;
-            if (a->count <= 0 || b->count <= 0 || a->count == b->count)
+            /* ⭐⭐ Two rows may share a caller only if they are
+             * DISTINGUISHABLE at lookup time.
+             *
+             * Positive counts must differ -- that is the original rule, and it
+             * still holds: two entries claiming the same caller AND count means
+             * one silently shadows the other.
+             *
+             * ⭐ A count == 0 entry is a deliberate CATCH-ALL (every game draws
+             * a different number of settings, so Game Settings and Training
+             * Options cannot enumerate their counts). It is legal beside
+             * counted entries because menu_speak_lookup_n() prefers an exact
+             * count match and only then the catch-all -- but ONLY ONE per
+             * caller, or that choice becomes table-order-dependent.
+             *
+             * ⚠ This is NOT the rule being loosened to fit a change. A catch-all
+             * is safe for MC_ROW_COLUMN specifically because that path
+             * re-checks the LIVE COLUMN against the cursor's count on every
+             * movement and refuses on a mismatch. A label map has no such
+             * check -- its count IS the guard -- which is why a map entry must
+             * still carry a positive count, asserted below. */
+            if (a->count < 0 || b->count < 0)
+                sane = 0;
+            else if (a->count > 0 && b->count > 0 && a->count == b->count)
+                sane = 0;                       /* same caller AND count */
+            else if (a->count == 0 && b->count == 0)
+                sane = 0;                       /* two catch-alls: ambiguous */
+            /* ⛔ A catch-all must never carry a label map or a base: those
+             * CLAIM names from a table and the count is the only thing that
+             * ties the table to the screen. */
+            else if ((a->count == 0 && (a->labels || a->base_index >= 0)) ||
+                     (b->count == 0 && (b->labels || b->base_index >= 0)))
                 sane = 0;
         }
     }
@@ -1405,12 +1435,22 @@ int main(void)
             if (!s || s->kind != MC_ROW_COLUMN)
                 continue;
             seen++;
-            if (!(s->coord_x > 0.0f) || s->count <= 0)
+            /* ⚠ The COLUMN is the requirement, and it is the one this case was
+             * written for: a zero coord_x makes the path refuse SILENTLY on a
+             * screen the table claims to name.
+             *
+             * ⭐ The count may legitimately be 0. Every game draws a different
+             * number of settings -- this caller reports 3,4,5,6,7,8 across the
+             * collection -- so a catch-all is the only entry that covers them,
+             * and MC_ROW_COLUMN re-checks the LIVE COLUMN against the cursor
+             * on every movement, so the table count is not what keeps it
+             * honest. A negative count is still a typo. */
+            if (!(s->coord_x > 0.0f) || s->count < 0)
                 ok = 0;
         }
         ok &= seen > 0;
-        check("33. every MC_ROW_COLUMN entry has a column and a count",
-              ok, "entries=%d", seen);
+        check("33. every MC_ROW_COLUMN entry has a column (count may be a "
+              "catch-all)", ok, "entries=%d", seen);
     }
 
     /* --- case 33c: ⭐⭐⭐ THE VALUE REACHES THE SPOKEN LINE, END TO END.

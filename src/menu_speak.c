@@ -1368,10 +1368,31 @@ static const mc_screen g_screens[] = {
      *
      * ⭐ MC_ROW_COLUMN instead: scope by the COLUMN (X=320) and order by Y, the
      * same gt_column_item() pair the move list uses. The column is what
-     * separates a row label from its value, and no text rule can. */
-    { .caller = 0x1400a41efULL, .base_index = -1, .count = 5,
+     * separates a row label from its value, and no text rule can.
+     *
+     * ⭐⭐⭐ count = 0 -- EVERY TAB OF EVERY GAME.
+     *
+     * ⛔ USER: "also some training modes" were still silent. Measured across
+     * the collection: this caller reports counts 2, 3, 4, 5, 6 AND 7, because
+     * each game's training tabs hold different settings. Entries for 5 and 6
+     * named two of those and left the rest speaking bare positions.
+     *
+     * ⭐ Thirteen distinct row sets were captured and every one draws its
+     * labels at x=320. MC_ROW_COLUMN quotes what is drawn, so it needs no
+     * per-tab and no per-game knowledge.
+     *
+     * ⚠ SAFE because this path re-checks the LIVE COLUMN against the cursor's
+     * count on every movement and refuses on a mismatch -- the column is the
+     * safety mechanism, not the table's count.
+     *
+     * ⚠ The 6-row entry ABOVE keeps its exact count deliberately: it is
+     * MC_SETTINGS_ROW with a LABEL MAP (g_training_option_rows), where the
+     * count is the only thing standing between that map and another tab's
+     * rows. lookup_n prefers an exact count match, so that entry still wins
+     * for 6 and this one catches everything else. */
+    { .caller = 0x1400a41efULL, .base_index = -1, .count = 0,
       .name = "Training Options", .how = MC_VERIFIED_LIVE_TEXT,
-      .kind = MC_ROW_COLUMN, .coord_x = 320.0f },
+      .kind = MC_ROW_COLUMN, .coord_x = 320.0f, .pair_x = 835.0f },
 
     /* ⭐⭐ GAME SETTINGS / EX SETTINGS (Select Game > Game Settings), 7 rows,
      * vertical, caller 0x14009d8df. Diagnosed 2026-09-15 from the 13:05 run;
@@ -1418,8 +1439,29 @@ static const mc_screen g_screens[] = {
      * 835, heading 960, rows 80px apart). So a row now reads "Game Difficulty,
      * Free Play". The values are QUOTED, never mapped -- "Normal" has thirteen
      * corpus stems and TWO of them are rows of this screen, and "Free Play"'s
-     * only stem belongs to a different row than the one the game draws it on. */
-    { .caller = 0x14009d8dfULL, .base_index = -1, .count = 7,
+     * only stem belongs to a different row than the one the game draws it on.
+     *
+     * ⭐⭐⭐ count = 0 -- ONE ENTRY FOR ALL EIGHT GAMES.
+     *
+     * ⛔ USER: "There are a few missing still, mostly for game/ex settings."
+     * Measured across a full sweep of the collection: this caller reports
+     * counts 3, 4, 5, 6, 7 AND 8, because every game draws a different set of
+     * settings. A `count = 7` entry named CVS2 and refused all the rest --
+     * correctly, but it left most of the collection silent.
+     *
+     * ⭐ The row sets differ; THE GEOMETRY NEVER DOES. Thirteen distinct row
+     * sets were captured and every one draws labels at x=320 with values at
+     * x=835. MC_ROW_COLUMN quotes whatever is drawn there, so it does not care
+     * WHICH settings a game has -- which is exactly why one entry can cover
+     * eight games where a label map would need eight.
+     *
+     * ⚠ count = 0 IS SAFE HERE, AND NOT BECAUSE THE CHECK WAS DROPPED. This
+     * path validates against the LIVE COLUMN on every movement: if the column
+     * does not hold exactly as many labels as the cursor reports, it refuses
+     * and says so. The table count is not the safety mechanism, the column is.
+     * ⛔ That reasoning does NOT transfer to a label map, where count is the
+     * only thing standing between a screen and another screen's names. */
+    { .caller = 0x14009d8dfULL, .base_index = -1, .count = 0,
       .name = "Game Settings", .how = MC_VERIFIED_LIVE_TEXT,
       .kind = MC_ROW_COLUMN, .coord_x = 320.0f, .pair_x = 835.0f },
 
@@ -2073,17 +2115,31 @@ const mc_screen *menu_speak_lookup(ULONGLONG caller)
  * verified rows, never a reason to admit an unverified one. */
 const mc_screen *menu_speak_lookup_n(ULONGLONG caller, int item_count)
 {
-    const mc_screen *caller_only = NULL;
+    const mc_screen *any_count = NULL;     /* an explicit count == 0 entry */
+    const mc_screen *caller_only = NULL;   /* last resort: first match */
 
     for (int i = 0; i < NSCREENS; i++) {
         if (g_screens[i].caller != caller)
             continue;
         if (g_screens[i].count > 0 && g_screens[i].count == item_count)
             return &g_screens[i];          /* exact: caller AND count agree */
-        if (caller_only == NULL)
-            caller_only = &g_screens[i];   /* fall back to the first match */
+        /* ⭐⭐ A count == 0 entry is a deliberate CATCH-ALL and must beat the
+         * table's ordering.
+         *
+         * ⛔ It used to fall back to the FIRST caller match, which shadowed
+         * this: Training Options ships a 6-row LABEL MAP and a count == 0
+         * MC_ROW_COLUMN entry on one caller, and a 3-row tab would have been
+         * handed the 6-row map -- one screen indexing another's labels, which
+         * is the confident-wrong-name failure case 9 exists to prevent.
+         *
+         * ⚠ Only ONE catch-all per caller is legal; case 9 enforces that, so
+         * this choice is unambiguous rather than order-dependent. */
+        if (g_screens[i].count == 0 && any_count == NULL)
+            any_count = &g_screens[i];
+        else if (caller_only == NULL)
+            caller_only = &g_screens[i];
     }
-    return caller_only;
+    return any_count ? any_count : caller_only;
 }
 
 /* ⭐⭐ THE ROW DERIVATION -- see the header for why this is arithmetic and not
