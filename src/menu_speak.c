@@ -1438,11 +1438,26 @@ static const mc_screen g_screens[] = {
      * 34 vertical movements of the 13:05 run, identical on both tabs. This
      * axis's own cursor indexes a value array shared by the tabs (tab A slots
      * 0-5 at +0x384.., tab B slots 6-11), which is why the usual
-     * (cursor - screen - values_off)/4 derivation cannot give a row here. */
+     * (cursor - screen - values_off)/4 derivation cannot give a row here.
+     *
+     * ⭐⭐ levels bit 0 = Game Difficulty, whose value is NOT TEXT.
+     *
+     * ⛔ USER-VERIFIED: with every other row speaking its value, that row said
+     * "Game Difficulty, 9 of 9" -- no value at all. Measured in the layout
+     * dump: every other row carries an object at x=835 and this one has
+     * NOTHING at any X on its line. It is a 9-position numeric scale drawn as
+     * graphics, which is also why OPT_DIFFICULTY is the only row of this screen
+     * with no value run in the corpus. So the POSITION IS THE SETTING and it
+     * speaks "Game Difficulty, 4, of 9".
+     *
+     * ⚠ A per-row MASK, never inferred from "the value read came back empty":
+     * a value that failed to READ is not a level, and treating it as one would
+     * state a setting where a read error belongs. Only bit 0 is set because
+     * only that row was measured to have no text. */
     { .caller = 0x14009d929ULL, .base_index = -1, .count = 0,
       .name = "Game Settings", .how = MC_VERIFIED_LIVE_TEXT,
       .kind = MC_ROW_VALUE_LIVE, .coord_x = 320.0f, .pair_x = 835.0f,
-      .row_off = 0x35C },
+      .levels = (1u << 0), .row_off = 0x35C },
 
     /* ⭐⭐ TRAINING OPTIONS -- the VALUE axis. Same screen object as the row
      * site above; values_off 0x3F0 re-derived on a fresh screen object across
@@ -2445,6 +2460,12 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
         char text[GT_CAPTION_MAX], spoken[GM_OUT_MAX];
         int row = -1, ncol;
 
+        /* ⚠ This IS a value axis, and saying so is load-bearing: the formatter
+         * picks the level form ("Game Difficulty, 4, of 9") and the
+         * row-plus-value form from `axis`, and an unset axis silently falls
+         * through to a bare position. */
+        out->axis = MC_AXIS_VALUE;
+
         if (!m->screen || s->coord_x <= 0.0f || s->row_off <= 0) {
             out->why = MC_UNNAMED_TEXT_UNREADABLE;
             return;
@@ -2475,6 +2496,45 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
             out->why = MC_UNNAMED_ROW_UNDERIVABLE;
             return;
         }
+        /* ⭐⭐ A ROW WHOSE VALUE IS NOT TEXT AT ALL.
+         *
+         * ⛔ USER-VERIFIED GAP: with values working everywhere else, Game
+         * Difficulty spoke "Game Difficulty, 9 of 9" -- no value. Measured in
+         * the layout dump: every other row has an object at x=835 and that row
+         * has NOTHING at any X on its line. It is a 9-position numeric scale
+         * the game draws as graphics, which is also why OPT_DIFFICULTY is the
+         * one row of this screen with no value run in the corpus.
+         *
+         * ⭐ So the POSITION IS THE SETTING, exactly as a volume slider's is,
+         * and the `levels` mask already says so per row. Marking it here routes
+         * it to the "Game Difficulty, 4, of 9" form instead of a list position.
+         *
+         * ⚠ Read from the mask, never inferred from "the value was missing": a
+         * value that failed to READ is not a level, and treating it as one
+         * would state a setting where a read error belongs. */
+        if (row < 32 && (s->levels & (1u << row))) {
+            /* ⭐ A level row is spoken as "<row>, N, of M" by the formatter,
+             * which needs row_name set and `named` left FALSE -- the row's
+             * value is a NUMBER, so there is no item text to claim. Read the
+             * label alone (no pair_x): pairing would append nothing anyway,
+             * and asking for a partner that cannot exist invites the read to
+             * fail for the wrong reason. */
+            if (gt_column_item(m->screen, s->coord_x, -1.0f, row + 1,
+                               text, (int)sizeof(text)) && text[0]) {
+                gm_speak(text, spoken, sizeof(spoken));
+                if (spoken[0] && !gm_has_residue(spoken)) {
+                    _snprintf(out->row_name, sizeof(out->row_name), "%s",
+                              spoken);
+                    out->row_name[sizeof(out->row_name) - 1] = '\0';
+                    out->is_level = TRUE;
+                    out->why = MC_NAMED_OK;
+                    return;
+                }
+            }
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+
         /* +1: the column helper is 1-based, the cursor field is 0-based. */
         if (!gt_column_item(m->screen, s->coord_x,
                             s->pair_x > 0.0f ? s->pair_x : -1.0f,

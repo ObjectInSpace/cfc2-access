@@ -1503,12 +1503,16 @@ int main(void)
              * speak that row instead -- this is what distinguishes reading the
              * row field from reading this axis's own index, which on a tabbed
              * screen indexes a shared array. */
-            *(int *)((char *)FS + 0x35C) = 0;
+            /* ⚠ Row 2 (Timer Speed), not row 0: row 0 is Game Difficulty,
+             * which is a LEVEL row and deliberately comes back unnamed. This
+             * case is about WHICH row is read, so it must use a row whose
+             * value is text -- otherwise it would fail for an unrelated
+             * reason and read as a regression. */
+            *(int *)((char *)FS + 0x35C) = 2;
             menu_speak_build(&vm, &sp);
             check("33f. the spoken row follows the ROW cursor, not the value "
                   "axis index",
-                  sp.named &&
-                  strcmp(sp.item, "Game Difficulty, Free Play") == 0,
+                  sp.named && strcmp(sp.item, "Timer Speed, Normal") == 0,
                   "named=%d item=\"%s\"", (int)sp.named, sp.item);
 
             /* ⛔⛔ A row index the COLUMN cannot support must REFUSE, not quote
@@ -1520,6 +1524,63 @@ int main(void)
                   !sp.named && sp.why == MC_UNNAMED_ROW_UNDERIVABLE,
                   "named=%d why=%d item=\"%s\"",
                   (int)sp.named, (int)sp.why, sp.item);
+
+            /* --- case 33h: ⭐⭐ A ROW WHOSE VALUE IS NOT TEXT.
+             *
+             * ⛔ USER-VERIFIED GAP: with values working on every other row,
+             * Game Difficulty spoke "Game Difficulty, 9 of 9" -- no value. It
+             * has NOTHING at x=835 (measured; every other row has an object
+             * there), because its 9 positions are a numeric scale drawn as
+             * graphics. The position IS the setting, so it must come back as a
+             * LEVEL: row_name set, is_level TRUE, and `named` FALSE because
+             * there is no item text to claim.
+             *
+             * ⚠ The fixture drops the value object for row 0 to reproduce
+             * exactly that shape. */
+            {
+                static int lvl_screen[512];
+                void *LS = (void *)lvl_screen;
+                static unsigned char lo[12][GT_CLASS_SIZE];
+                /* Same geometry MINUS the x=835 object at y=286. */
+                int k = 0;
+                for (int i = 0; i < 13; i++) {
+                    if (i == 1)          /* "Free Play" at y=286 */
+                        continue;
+                    memset(lo[k], 0, sizeof lo[k]);
+                    *(ULONGLONG *)lo[k] = GT_VTABLE_ADDR;
+                    memcpy(lo[k] + 0x40, &GX[i], sizeof(float));
+                    memcpy(lo[k] + 0x44, &GY[i], sizeof(float));
+                    memcpy(lo[k] + 0x88, &LS, sizeof(void *));
+                    gt_test_settext_body(lo[k], GT_[i], NULL, 0);
+                    k++;
+                }
+                *(int *)((char *)LS + 0x35C) = 0;    /* Game Difficulty */
+                mc_move lm = mk(0x14009d929ULL, 3, 0, 8);   /* 4 of 9 */
+                lm.vertical = FALSE;
+                lm.screen = LS;
+                menu_speak_build(&lm, &sp);
+                check("33h. a textless value row speaks as a LEVEL, not a "
+                      "missing value",
+                      !sp.named && sp.is_level &&
+                      strcmp(sp.row_name, "Game Difficulty") == 0 &&
+                      sp.position == 4 && sp.total == 9,
+                      "named=%d is_level=%d row_name=\"%s\" %d of %d",
+                      (int)sp.named, (int)sp.is_level, sp.row_name,
+                      sp.position, sp.total);
+
+                /* ⛔⛔ AND A ROW THAT IS *NOT* MARKED MUST STILL SPEAK ITS TEXT.
+                 * Marking every row a level, or letting an empty read imply
+                 * one, would turn "Attack Power, Low" into "Attack Power, 1,
+                 * of 4" -- a number where a name belongs. Row 1 has its value
+                 * object, is unmarked, and must come back named. */
+                *(int *)((char *)LS + 0x35C) = 1;    /* Attack Power */
+                menu_speak_build(&lm, &sp);
+                check("33i. an unmarked row still speaks its value TEXT",
+                      sp.named && !sp.is_level &&
+                      strcmp(sp.item, "Attack Power, Normal") == 0,
+                      "named=%d is_level=%d item=\"%s\"",
+                      (int)sp.named, (int)sp.is_level, sp.item);
+            }
         }
     }
 
