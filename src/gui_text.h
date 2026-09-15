@@ -753,6 +753,48 @@ void gt_movelist_probe(void *screen, int total, BOOL is_movelist);
 BOOL gt_movelist_conclusive(long *samples, long *missed);
 void gt_movelist_report(void);
 
+/* --- THE SETTINGS CENSUS -------------------------------------------------
+ *
+ * ⭐⭐ WHAT ARE ALL THE VALUES A SETTINGS ROW CAN HOLD? No log can say.
+ * gt_layout_report() is change-triggered but RATE-LIMITED TO ONE BEAT (2 s)
+ * while the value cursor moves every ~0.2-0.5 s. Measured on the 2026-09-15
+ * Game Settings run: 42 value movements, 16 dumps, and EXACTLY ONE distinct
+ * value captured per row -- a nine-value row was indistinguishable from a
+ * one-value row.
+ *
+ * ⭐ Sampling on the poll that FOLLOWS a movement turns one ordinary walk of a
+ * settings screen into the whole vocabulary of every row. Each distinct
+ * label=value pair is recorded once; the report is an aggregate, so a busy
+ * screen cannot flood a log whose every line costs an _wfopen/fclose.
+ *
+ * ⚠ Rows pair with values by SHARING A Y (the gt_column_item() contract),
+ * never by ordinal -- two columns of different lengths taken Nth-by-Nth would
+ * attach a value to the wrong setting.
+ *
+ * ⛔ It names no screen and claims no corpus run. It records what the game drew
+ * beside which label; the join to a label run stays offline where the corpus
+ * can check it.
+ *
+ * Opt-in: `cfc2_census.on`. Nothing is spoken; this only records. */
+void gt_settings_census_enable(BOOL on);
+
+/* Sample once, on the WORKER thread, after a movement. ⚠ The cursor state is
+ * PASSED IN for the same reason gt_movelist_probe() takes it: fetching it here
+ * would pull menu_cursor, menu_speak and the GMD reader into a focused test
+ * binary. `row_x`/`val_x` are screen properties, never constants of this
+ * module. */
+void gt_settings_census(void *screen, float row_x, float val_x);
+
+/* ⭐⭐ THE VERDICT IS A RETURN VALUE. `samples == 0` means no movement was
+ * sampled with both columns readable -- NOT that the rows have no values. */
+BOOL gt_settings_census_conclusive(long *samples, long *missed);
+void gt_settings_census_report(void);
+
+int  gt_test_sc_entries(void);
+BOOL gt_test_sc_entry_at(int i, const char **label, const char **value,
+                         long *hits);
+long gt_test_sc_overflow(void);
+
 /* Test seams. ⭐ -1 means the probe never ran; 0 means it ran and recorded
  * nothing. Those are different facts and a case asserting only "no crash"
  * passes on both. */

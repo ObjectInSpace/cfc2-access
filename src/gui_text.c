@@ -2937,6 +2937,221 @@ void gt_movelist_report(void)
              "assumption is WRONG here. Re-measure before building anything.");
 }
 
+/* --- THE SETTINGS CENSUS -------------------------------------------------
+ *
+ * ⭐⭐ ONE QUESTION: what are ALL the values a settings row can hold? The log
+ * cannot answer it. gt_layout_report() is change-triggered but RATE-LIMITED TO
+ * ONE BEAT (2 s), while the value cursor moves every ~0.2-0.5 s -- so it
+ * samples roughly one value in five, and each sample is whatever the column
+ * happened to land on. Measured on the 2026-09-15 run: 42 value movements, 16
+ * dumps, and EXACTLY ONE distinct value captured per row. A row with nine
+ * values looked identical to a row with one.
+ *
+ * ⚠ This is the same failure the move-list probe exists for ("samples every
+ * ~6.6 s while the user moves every ~0.6 s, so pairing failed 172 of 175
+ * times"), and it takes the same fix: sample on the poll that FOLLOWS a
+ * movement, accumulate, and report an aggregate. The log cannot pair a dump to
+ * a movement; the mod can.
+ *
+ * ⭐ Every value the user walks past is recorded ONCE, so a single ordinary
+ * walk of a settings screen yields the whole vocabulary of every row -- rather
+ * than one run per row per value.
+ *
+ * ⚠ ROWS AND VALUES ARE PAIRED BY SHARING A Y, never by ordinal -- the
+ * gt_column_item() contract. Two columns of different lengths taken Nth-by-Nth
+ * would attach a value to the wrong setting, which is exactly the confident lie
+ * this file refuses.
+ *
+ * ⛔ It does NOT name the screen, the tab, or claim which corpus run a value
+ * belongs to. It records what the game drew next to which label. The join to a
+ * label run stays offline where it can be checked against the corpus. */
+typedef struct {
+    char  label[64];
+    char  value[64];
+    LONG  hits;
+    LONG  first_seq, last_seq;
+} gt_sc_entry;
+
+#define GT_SC_MAX 128
+static gt_sc_entry   g_sc[GT_SC_MAX];
+static volatile LONG g_sc_used = -1;   /* -1 = never ran; 0 = ran, found none */
+static volatile LONG g_sc_overflow;
+static volatile LONG g_sc_samples;
+static volatile LONG g_sc_missed;
+static volatile LONG g_sc_busy_skips;
+static volatile LONG g_sc_unreadable;  /* a movement whose columns would not read */
+static volatile LONG g_sc_on;
+static volatile LONG g_sc_last_seq;
+
+void gt_settings_census_enable(BOOL on)
+{
+    InterlockedExchange(&g_sc_on, on ? 1 : 0);
+}
+static BOOL sc_enabled(void) { return g_sc_on == 1; }
+
+/* ⛔ Overflow STOPS AND COUNTS rather than wrapping -- the rare value is
+ * precisely the evidence being sought, and a wrapping ring would discard it
+ * while still showing a full table. Same reasoning as ml_record(). */
+static void sc_record(const char *label, const char *value, LONG seq)
+{
+    LONG used = g_sc_used < 0 ? 0 : g_sc_used;
+    for (LONG i = 0; i < used; i++) {
+        if (strncmp(g_sc[i].label, label, sizeof(g_sc[i].label)) == 0 &&
+            strncmp(g_sc[i].value, value, sizeof(g_sc[i].value)) == 0) {
+            g_sc[i].hits++;
+            g_sc[i].last_seq = seq;
+            g_sc_used = used;
+            return;
+        }
+    }
+    if (used >= GT_SC_MAX) {
+        InterlockedIncrement(&g_sc_overflow);
+        g_sc_used = used;
+        return;
+    }
+    lstrcpynA(g_sc[used].label, label, (int)sizeof(g_sc[used].label));
+    lstrcpynA(g_sc[used].value, value, (int)sizeof(g_sc[used].value));
+    g_sc[used].hits = 1;
+    g_sc[used].first_seq = g_sc[used].last_seq = seq;
+    g_sc_used = used + 1;
+}
+
+/* Sample once, on the WORKER thread, after a cursor movement.
+ *
+ * ⚠⚠ THE CURSOR STATE IS PASSED IN, as gt_movelist_probe() does and for the
+ * same reason: fetching it here would make this module depend on menu_cursor
+ * and drag menu_speak plus the GMD reader into a focused test binary. mod.c
+ * owns both and joins them.
+ *
+ * `row_x` is the label column and `val_x` the value column; both come from the
+ * caller because they are screen properties, not constants of this module. */
+void gt_settings_census(void *screen, float row_x, float val_x)
+{
+    if (!sc_enabled())
+        return;
+    if (!g_installed && !g_focus_test_mode)
+        return;
+    if (g_sc_used < 0)
+        g_sc_used = 0;                      /* it ran: 0 now means "found none" */
+    if (!screen || row_x <= 0.0f || val_x <= 0.0f)
+        return;
+
+    LONG seq = g_move_seq;
+    LONG prev = g_sc_last_seq;
+    if (seq == prev)
+        return;                             /* no movement since last sample */
+    /* ⚠ Movements that passed between polls are COUNTED. A run whose `missed`
+     * approaches `samples` has not seen the screen and the report says so. */
+    if (prev && seq > prev + 1)
+        InterlockedExchangeAdd(&g_sc_missed, seq - prev - 1);
+    g_sc_last_seq = seq;
+
+    /* ⛔⛔ DO NOT TAKE g_inst_busy HERE. gt_column_count() and gt_column_item()
+     * each take it themselves, and InterlockedCompareExchange is NOT reentrant
+     * -- holding it across those calls makes every one of them fail and return
+     * nothing. The census then records zero pairs on a screen full of them,
+     * which in a live run is indistinguishable from "this screen has no
+     * values". Caught by case 54c, which read as a broken probe until the lock
+     * was traced. */
+    int n = gt_column_count(screen, row_x);
+    LONG got = 0;
+    for (int i = 1; i <= n; i++) {
+        char pair[GT_CAPTION_MAX];
+        /* gt_column_item() appends the partner sharing this row's Y after
+         * ", " -- so a row with no value yields the label alone, which is
+         * recorded with an empty value rather than skipped. An action row
+         * (Default) is a real observation, not a gap. */
+        if (!gt_column_item(screen, row_x, val_x, i, pair, (int)sizeof(pair)))
+            continue;
+        if (!pair[0])
+            continue;
+        char label[64], value[64];
+        const char *sep = strstr(pair, ", ");
+        if (sep) {
+            int ln = (int)(sep - pair);
+            if (ln > (int)sizeof(label) - 1) ln = (int)sizeof(label) - 1;
+            memcpy(label, pair, (size_t)ln);
+            label[ln] = '\0';
+            lstrcpynA(value, sep + 2, (int)sizeof(value));
+        } else {
+            lstrcpynA(label, pair, (int)sizeof(label));
+            value[0] = '\0';
+        }
+        sc_record(label, value, seq);
+        got++;
+    }
+
+    if (got == 0)
+        InterlockedIncrement(&g_sc_unreadable);
+    else
+        InterlockedIncrement(&g_sc_samples);
+}
+
+/* ⭐⭐ THE VERDICT IS A RETURN VALUE. `samples == 0` means no movement was ever
+ * sampled on a readable settings screen -- NOT that the rows have no values.
+ * Reporting that as a tidy empty table is the mistake
+ * inconclusive-must-be-a-return-value exists to prevent. */
+BOOL gt_settings_census_conclusive(long *samples, long *missed)
+{
+    if (samples) *samples = (long)g_sc_samples;
+    if (missed)  *missed  = (long)g_sc_missed;
+    return g_sc_samples > 0;
+}
+
+void gt_settings_census_report(void)
+{
+    long samples = 0, missed = 0;
+
+    if (!sc_enabled())
+        return;
+    if (!gt_settings_census_conclusive(&samples, &missed)) {
+        log_line("gt: ⚠ SETTINGS CENSUS INCONCLUSIVE -- 0 movement(s) sampled "
+                 "with both columns readable (%ld poll(s) lost the lock, %ld "
+                 "movement(s) read no column). Nothing can be concluded about "
+                 "any row's values. This is NOT a negative result.",
+                 (long)g_sc_busy_skips, (long)g_sc_unreadable);
+        return;
+    }
+
+    LONG used = g_sc_used < 0 ? 0 : g_sc_used;
+    log_line("gt: === SETTINGS CENSUS: %ld sample(s), %ld missed, %ld pair(s) "
+             "===", samples, missed, (long)used);
+    for (LONG i = 0; i < used; i++)
+        log_line("gt:   %-28s = %-28s x%-4ld seq %ld..%ld",
+                 g_sc[i].label, g_sc[i].value[0] ? g_sc[i].value : "(no value)",
+                 (long)g_sc[i].hits, (long)g_sc[i].first_seq,
+                 (long)g_sc[i].last_seq);
+    /* ⭐ POSITIVE counts: "0 failed" must never look like "0 checked". */
+    log_line("gt:   %ld distinct label=value pair(s) from %ld sample(s); "
+             "%ld did not fit the table; %ld lock-loss; %ld unreadable.",
+             (long)used, samples, (long)g_sc_overflow,
+             (long)g_sc_busy_skips, (long)g_sc_unreadable);
+    log_line("gt: ▶ READ IT LIKE THIS: every DISTINCT value a row can hold "
+             "appears as its own line once the user has walked that row's "
+             "values. A row showing ONE value was never walked -- that is a "
+             "gap in the WALK, not a one-value row. Compare each row's value "
+             "count against the horizontal cursor's reported total before "
+             "believing the list is complete.");
+}
+
+int gt_test_sc_entries(void)
+{
+    return g_sc_used < 0 ? -1 : (int)g_sc_used;
+}
+
+BOOL gt_test_sc_entry_at(int i, const char **label, const char **value,
+                         long *hits)
+{
+    if (g_sc_used <= 0 || i < 0 || i >= (int)g_sc_used)
+        return FALSE;
+    if (label) *label = g_sc[i].label;
+    if (value) *value = g_sc[i].value;
+    if (hits)  *hits  = (long)g_sc[i].hits;
+    return TRUE;
+}
+
+long gt_test_sc_overflow(void) { return (long)g_sc_overflow; }
+
 int gt_test_ml_buckets(void)
 {
     return g_ml_used < 0 ? -1 : (int)g_ml_used;

@@ -360,6 +360,20 @@ static DWORD WINAPI worker(LPVOID param)
             log_line("mod: cfc2_movelist.on -- the move-list membership probe "
                      "is ENABLED. It counts widgets per cursor movement and "
                      "reports every 10 s. Nothing is spoken.");
+
+        /* ⚠ OPT-IN, like every other diagnostic here. A settings screen is
+         * walked deliberately to collect its values; there is no reason to
+         * sample one during ordinary play. The lesson that turned the
+         * discovery sweep off by default applies: ask whether the expensive
+         * thing needs to run AT ALL before making it cheap. */
+        BOOL sc_on = opt_in_file_present("cfc2_census.on");
+        gt_settings_census_enable(sc_on);
+        if (sc_on)
+            log_line("mod: cfc2_census.on -- the settings census is ENABLED. "
+                     "It records each row's label and the value drawn beside "
+                     "it on every cursor movement, and reports every 10 s. "
+                     "Walk a settings row's values LEFT and RIGHT through the "
+                     "whole list to collect them. Nothing is spoken.");
     }
 
     /* ⚠ OPT-IN. The offline tools (disasm.py, find_callers.py,
@@ -556,6 +570,25 @@ static DWORD WINAPI worker(LPVOID param)
                      * whose total's meaning is the open question. */
                     gt_movelist_probe(mlm.screen, mltot,
                                       mlm.caller == (void *)0x140080250ULL);
+
+                    /* ⭐⭐ THE SETTINGS CENSUS, on the same movement and for the
+                     * same reason the probe above runs at 100 ms: the value
+                     * cursor moves every ~0.2-0.5 s and the 2 s layout dump
+                     * caught ONE value per row out of nine.
+                     *
+                     * ⚠ The columns are the SETTINGS-SCREEN geometry measured
+                     * across 16 dumps (labels X=320, values X=835, 80px pitch),
+                     * which Training Options and Game Settings share. Passed in
+                     * rather than baked into gui_text: a column X has been
+                     * written down as 1265, then 1268, and measured as 633 on a
+                     * neighbouring screen -- three values for one number is the
+                     * argument against ever hardcoding one.
+                     *
+                     * ⛔ It records what the game DREW next to each label. It
+                     * does not decide which corpus run those values are, or
+                     * which tab is showing -- that join stays offline where the
+                     * corpus can check it. */
+                    gt_settings_census(mlm.screen, 320.0f, 835.0f);
                 }
             }
 
@@ -804,6 +837,12 @@ static DWORD WINAPI worker(LPVOID param)
          * beats 10/30/60 missed an entire run. */
         if (gt_ok && (beat == 10 || beat % 5 == 0))
             gt_movelist_report();
+
+        /* ⭐ Same split and same cadence as the probe above: SAMPLE at 100 ms,
+         * REPORT on the slow beat. The census table is deduplicated, so its
+         * report is a handful of lines however many movements were sampled. */
+        if (gt_ok && (beat == 10 || beat % 5 == 0))
+            gt_settings_census_report();
 
         /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning
          * 1.3 GB, and it duplicated work: gmd_text_ready() already calls

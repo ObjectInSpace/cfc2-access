@@ -1797,6 +1797,118 @@ int main(void)
                   strcmp(r2, "Groove Gauge") == 0, d);
         }
 
+        /* --- cases 54c-54f: ⭐⭐ THE SETTINGS CENSUS ------------------------
+         *
+         * The probe exists because the 2 s layout dump caught ONE value per row
+         * out of nine on the real Game Settings run. These cases prove it
+         * accumulates the values a walk passes through, and -- the part that
+         * matters -- that it cannot report a thin sample as a complete one. */
+        {
+            static unsigned char sco[6][GT_CLASS_SIZE];
+            void *S = (void *)0x2BE7A290ULL;     /* the real screen pointer */
+            static const float SX[6] = { 320.f, 835.f, 320.f, 835.f,
+                                         320.f, 960.f };
+            static const float SY[6] = { 286.f, 286.f, 366.f, 366.f,
+                                         766.f, 225.f };
+            gt_test_focus_enable();
+            gt_settings_census_enable(TRUE);
+
+            /* Walk one row through three of its values, as the user would. */
+            static const char *const V3[3] = { "Low", "Normal", "High" };
+            for (int v = 0; v < 3; v++) {
+                const char *TT[6] = {
+                    "Attack Power", V3[v], "Timer Speed", "Normal",
+                    "Default", "Game Settings"
+                };
+                for (int i = 0; i < 6; i++) {
+                    memset(sco[i], 0, sizeof sco[i]);
+                    *(ULONGLONG *)sco[i] = GT_VTABLE_ADDR;
+                    memcpy(sco[i] + 0x40, &SX[i], sizeof(float));
+                    memcpy(sco[i] + 0x44, &SY[i], sizeof(float));
+                    memcpy(sco[i] + 0x88, &S, sizeof(void *));
+                    gt_test_settext_body(sco[i], TT[i], NULL, 0);
+                }
+                /* ⚠ The probe samples only after a MOVEMENT -- that is the
+                 * whole design, and without this the census correctly records
+                 * nothing. The first version of this case omitted it and read
+                 * as a broken probe. */
+                gt_note_focus_move();
+                gt_settings_census(S, 320.0f, 835.0f);
+            }
+
+            /* case 54c: every value the walk passed is kept, not just the last.
+             * ⛔ This is the whole point: a sampler that overwrites reports a
+             * nine-value row as a one-value row, which is what the layout dump
+             * did and why this probe exists. */
+            int n = gt_test_sc_entries();
+            int seen_low = 0, seen_norm = 0, seen_high = 0, seen_default = 0;
+            for (int i = 0; i < n; i++) {
+                const char *l = NULL, *v = NULL;
+                if (!gt_test_sc_entry_at(i, &l, &v, NULL)) continue;
+                if (strcmp(l, "Attack Power") == 0) {
+                    if (strcmp(v, "Low") == 0)    seen_low = 1;
+                    if (strcmp(v, "Normal") == 0) seen_norm = 1;
+                    if (strcmp(v, "High") == 0)   seen_high = 1;
+                }
+                if (strcmp(l, "Default") == 0 && v[0] == '\0') seen_default = 1;
+            }
+            char d[220];
+            snprintf(d, sizeof d, "%d entr(y/ies); Attack Power saw Low=%d "
+                     "Normal=%d High=%d", n, seen_low, seen_norm, seen_high);
+            check("54c. the census keeps EVERY value a walk passed through",
+                  seen_low && seen_norm && seen_high, d);
+
+            /* case 54d: a row with no value is an OBSERVATION, not a gap.
+             * Default is an action row; recording nothing for it would make an
+             * unwalked row and an actionable row look identical. */
+            snprintf(d, sizeof d, "Default recorded with an empty value: %s",
+                     seen_default ? "yes" : "NO");
+            check("54d. an action row is recorded with no value, not skipped",
+                  seen_default, d);
+
+            /* case 54e: ⭐⭐ rows pair with values by SHARING A Y. Timer Speed
+             * sits at y=366 and its value "Normal" at the same Y; Attack Power
+             * at y=286 must never collect Timer Speed's value. An ordinal pair
+             * would attach row 2's value to row 1 the moment the columns differ
+             * in length. */
+            int mispaired = 0;
+            for (int i = 0; i < n; i++) {
+                const char *l = NULL, *v = NULL;
+                if (!gt_test_sc_entry_at(i, &l, &v, NULL)) continue;
+                /* "Attack Power" is at y=286, whose value column holds only the
+                 * V3 walk. Anything else there is a mispairing. */
+                if (strcmp(l, "Attack Power") == 0 &&
+                    strcmp(v, "Low") && strcmp(v, "Normal") && strcmp(v, "High"))
+                    mispaired++;
+            }
+            /* ⚠ The positive count is asserted TOO. "0 mispaired" is trivially
+             * true of an EMPTY table -- and this case passed while the census
+             * had recorded nothing at all, which is precisely the "0 failed
+             * looks like 0 checked" trap. It must see the three real pairings
+             * before its negative means anything. */
+            int ap_pairs = seen_low + seen_norm + seen_high;
+            snprintf(d, sizeof d, "%d mispaired value(s) on Attack Power, from "
+                     "%d real pairing(s)", mispaired, ap_pairs);
+            check("54e. a row never collects another row's value",
+                  mispaired == 0 && ap_pairs == 3, d);
+
+            /* case 54f: ⭐⭐ THE VERDICT IS A RETURN VALUE. With the probe
+             * enabled but never sampled, "conclusive" must be FALSE -- an empty
+             * table is not the finding "these rows have no values".
+             * ⛔ A case asserting only "the report did not crash" passes whether
+             * or not this distinction exists, which is the failure
+             * inconclusive-must-be-a-return-value describes. */
+            {
+                long s = -1, m = -1;
+                BOOL conc = gt_settings_census_conclusive(&s, &m);
+                snprintf(d, sizeof d, "after %d sample(s): conclusive=%d "
+                         "samples=%ld", 3, (int)conc, s);
+                check("54f. a sampled census reports CONCLUSIVE with a count",
+                      conc && s == 3, d);
+            }
+            gt_settings_census_enable(FALSE);
+        }
+
         /* case 54: and the blanked mate must not be spoken AS a condition.
          * "Jinchu Watari,  " read aloud is a name followed by a pause the
          * player cannot interpret. Whatever the join does, the result must
