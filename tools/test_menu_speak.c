@@ -1453,38 +1453,58 @@ int main(void)
               v ? v->levels : 0);
     }
 
-    /* --- case 35: ⛔⛔ TWO VARIANTS OF ONE SCREEN NEED TWO LEVEL MASKS.
+    /* --- case 35: ⛔⛔ TWO VARIANTS OF ONE SCREEN NEED TWO LEVEL MASKS, and
+     * this case drives menu_speak_build() rather than reading the table.
      *
      * Display & Sound Settings has a 7-row form and a 6-row form (games with no
      * "Internal Resolution"). Music Volume and Sound Effects Volume are rows 4-5
      * in the first and rows 3-4 in the second, so ONE mask cannot serve both:
      * the 7-row 0x30 applied to the 6-row screen marks Sound Effects Volume and
-     * DEFAULT -- stating a level on the row that resets the screen.
+     * DEFAULT -- stating a level on the row that RESETS the screen.
      *
-     * ⭐ The mask therefore lives on the ROW entry (selected by live count), not
-     * on the shared value entry. This asserts both, and that the volume rows are
-     * marked in each while Default never is. */
+     * ⭐ So the mask is read from the SIBLING ROW entry (selected by the live
+     * row count), not from the shared value entry.
+     *
+     * ⚠⚠ AN EARLIER VERSION OF THIS CASE ONLY INSPECTED THE TABLE, and it
+     * PASSED with the lookup sabotaged back to the shared mask -- it asserted
+     * the data and never the code consuming it. This drives a real value
+     * movement on each variant, which is what makes the sabotage fail. */
     {
-        const mc_screen *r7 = menu_speak_lookup_n(0x14009c755ULL, 7);
-        const mc_screen *r6 = menu_speak_lookup_n(0x14009c755ULL, 6);
-        int ok = r7 && r6;
+        /* values_off is 0x398; row N's cursor is screen + 0x398 + 4*N. */
+        static unsigned char av7buf[0x400], av6buf[0x400];
+        const mc_screen *val = menu_speak_lookup(0x14009c7a3ULL);
+        int ok = val != NULL;
+        mc_speech s7d, s7v, s6d, s6v;
+
+        memset(&s7d, 0, sizeof s7d); memset(&s7v, 0, sizeof s7v);
+        memset(&s6d, 0, sizeof s6d); memset(&s6v, 0, sizeof s6v);
 
         if (ok) {
-            ok &= r7->nlabels == 7 && r6->nlabels == 6;
-            /* 7-row: volumes at 4,5; Default is row 6 and must NOT be a level */
-            ok &= (r7->levels & (1u << 4)) && (r7->levels & (1u << 5));
-            ok &= !(r7->levels & (1u << 6));
-            /* 6-row: the same two rows at 3,4; Default is row 5 */
-            ok &= (r6->levels & (1u << 3)) && (r6->levels & (1u << 4));
-            ok &= !(r6->levels & (1u << 5));
-            /* ⚠ And the masks must actually DIFFER -- if someone copies one to
-             * the other this case is the only thing that notices. */
-            ok &= r7->levels != r6->levels;
+            mc_move mv = mk(0x14009c7a3ULL, 1, 0, 10);
+            menu_speak_reset_row_total();
+            menu_speak_note_row_total(av7buf, 7);
+            mv.screen = av7buf;
+            mv.cursor = (int *)(av7buf + 0x398 + 4 * 4);     /* row 4 = volume  */
+            menu_speak_build(&mv, &s7v);
+            mv.cursor = (int *)(av7buf + 0x398 + 4 * 6);     /* row 6 = Default */
+            menu_speak_build(&mv, &s7d);
+
+            mc_move mv6 = mk(0x14009c7a3ULL, 1, 0, 10);
+            menu_speak_reset_row_total();
+            menu_speak_note_row_total(av6buf, 6);
+            mv6.screen = av6buf;
+            mv6.cursor = (int *)(av6buf + 0x398 + 4 * 3);    /* row 3 = volume  */
+            menu_speak_build(&mv6, &s6v);
+            mv6.cursor = (int *)(av6buf + 0x398 + 4 * 5);    /* row 5 = Default */
+            menu_speak_build(&mv6, &s6d);
+
+            ok &= s7v.is_level && !s7d.is_level;
+            ok &= s6v.is_level && !s6d.is_level;
         }
-        check("35. each AV variant carries its own level mask", ok,
-              "7-row levels=%#x (n=%d), 6-row levels=%#x (n=%d)",
-              r7 ? r7->levels : 0, r7 ? r7->nlabels : -1,
-              r6 ? r6->levels : 0, r6 ? r6->nlabels : -1);
+        check("35. each AV variant levels the right rows (7:4-5, 6:3-4)", ok,
+              "7row vol=%d default=%d | 6row vol=%d default=%d",
+              (int)s7v.is_level, (int)s7d.is_level,
+              (int)s6v.is_level, (int)s6d.is_level);
     }
 
 
