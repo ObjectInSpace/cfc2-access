@@ -178,6 +178,30 @@ typedef enum {
      * the label the game drew sidesteps the question: it is right on every tab,
      * including tabs never observed, in all 14 languages. */
     MC_ROW_COLUMN,
+    /* ⭐⭐ A VALUE AXIS whose row is read from the screen's ROW CURSOR, and
+     * whose row+value are then QUOTED from their columns.
+     *
+     * ⛔ USER-REPORTED: "They don't read when I change them with left or right,
+     * only when I leave and come back." Exactly right. MC_ROW_COLUMN names the
+     * ROW axis; pressing left/right is a different CALLER with no table entry
+     * at all, so it fell through to "unknown screen" and spoke bare position --
+     * at the one moment the value is the thing that changed.
+     *
+     * ⚠ WHY NOT MC_SETTINGS_VALUE. That kind derives the row by
+     * (cursor - screen - values_off)/4, which on this screen yields a slot in
+     * a value array SHARED BY BOTH TABS -- tab B's first row derives as 6, not
+     * 0. A slot is not a row position, and feeding it to a column read would
+     * quote the wrong line. It also needs `labels` (GMD indices) to name the
+     * value, which this screen cannot have: "Normal" has 13 corpus stems and
+     * two are rows of this very screen.
+     *
+     * ⭐ So the row comes from the ROW CURSOR FIELD instead -- screen+row_off,
+     * a plain int holding the 0-based row, measured at +0x35C across all 34
+     * vertical movements of the 13:05 run and identical on both tabs. Read
+     * under the fault guard, bounds-checked against the column's own
+     * population, and the row is then quoted from the live columns exactly as
+     * MC_ROW_COLUMN does. No map, no GMD, no tab identity. */
+    MC_ROW_VALUE_LIVE,
     /* ⭐⭐⭐ THE IN-GAME MOVE LIST, named from the game's OWN indirection
      * rather than from what is on screen.
      *
@@ -332,6 +356,20 @@ typedef struct {
      * withdrawn settings census. The current value is a fact the game is
      * displaying; the list is not. */
     float      pair_x;
+    /* ⭐⭐ For MC_ROW_VALUE_LIVE: the byte offset, from the screen object, of
+     * the int holding the focused ROW index (0-based).
+     *
+     * ⚠ This is the ROW cursor, NOT `values_off`. A value movement carries the
+     * VALUE cursor as its argument, and on a tabbed screen that indexes a
+     * shared array where tab B starts at slot 6 -- so it cannot say which of
+     * the seven visible rows is focused. The row cursor can, and it is the same
+     * field for both tabs (measured +0x35C over 34 movements).
+     *
+     * ⛔ Read under the fault guard and bounds-checked against the live
+     * column's population before use: a screen laid out differently would
+     * otherwise yield SOME row number, and a plausible-looking wrong row is
+     * what this file exists to refuse. */
+    int        row_off;
 } mc_screen;
 
 /* ⭐ The heading column. The shell draws a screen's own title at X=960 -- the

@@ -1463,6 +1463,64 @@ int main(void)
         check("33d. an action row speaks its label ALONE",
               sp.named && strcmp(sp.item, "Default") == 0,
               "named=%d item=\"%s\"", (int)sp.named, sp.item);
+
+        /* --- cases 33e-33g: ⭐⭐ CHANGING A VALUE MUST SPEAK.
+         *
+         * ⛔ USER: "They don't read when I change them with left or right, only
+         * when I leave and come back." The value axis is a different CALLER;
+         * without its own entry it spoke bare position at the one moment the
+         * value changed. MC_ROW_VALUE_LIVE reads the ROW CURSOR to learn which
+         * row is focused, then quotes that row and its value.
+         *
+         * ⚠ The screen object here is a real allocation in this process (the
+         * planted objects' parent), so row_off can be written and read like the
+         * game's own field. */
+        {
+            static int fake_screen[512];        /* stands in for the screen */
+            void *FS = (void *)fake_screen;
+            static unsigned char vo[13][GT_CLASS_SIZE];
+            for (int i = 0; i < 13; i++) {
+                memset(vo[i], 0, sizeof vo[i]);
+                *(ULONGLONG *)vo[i] = GT_VTABLE_ADDR;
+                memcpy(vo[i] + 0x40, &GX[i], sizeof(float));
+                memcpy(vo[i] + 0x44, &GY[i], sizeof(float));
+                memcpy(vo[i] + 0x88, &FS, sizeof(void *));
+                gt_test_settext_body(vo[i], GT_[i], NULL, 0);
+            }
+            /* The row cursor says row 4 (0-based) = "Battle Type". */
+            *(int *)((char *)FS + 0x35C) = 4;
+            mc_move vm = mk(0x14009d929ULL, 1, 0, 2);
+            vm.vertical = FALSE;
+            vm.screen = FS;
+            menu_speak_build(&vm, &sp);
+            check("33e. changing a value speaks the ROW and its new value",
+                  sp.named &&
+                  strcmp(sp.item, "Battle Type, 3 on 3 Match") == 0,
+                  "named=%d item=\"%s\"", (int)sp.named, sp.item);
+
+            /* ⭐⭐ And it follows the ROW cursor, not the value cursor. Point
+             * the row cursor at a different row and the SAME movement must
+             * speak that row instead -- this is what distinguishes reading the
+             * row field from reading this axis's own index, which on a tabbed
+             * screen indexes a shared array. */
+            *(int *)((char *)FS + 0x35C) = 0;
+            menu_speak_build(&vm, &sp);
+            check("33f. the spoken row follows the ROW cursor, not the value "
+                  "axis index",
+                  sp.named &&
+                  strcmp(sp.item, "Game Difficulty, Free Play") == 0,
+                  "named=%d item=\"%s\"", (int)sp.named, sp.item);
+
+            /* ⛔⛔ A row index the COLUMN cannot support must REFUSE, not quote
+             * a plausible-looking wrong line. 99 is past the end of a 7-row
+             * column. */
+            *(int *)((char *)FS + 0x35C) = 99;
+            menu_speak_build(&vm, &sp);
+            check("33g. an out-of-range row cursor REFUSES rather than quoting",
+                  !sp.named && sp.why == MC_UNNAMED_ROW_UNDERIVABLE,
+                  "named=%d why=%d item=\"%s\"",
+                  (int)sp.named, (int)sp.why, sp.item);
+        }
     }
 
     /* --- case 33b: ⭐⭐ THE VALUE COLUMN MUST ACTUALLY BE WIRED.

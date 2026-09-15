@@ -1423,6 +1423,27 @@ static const mc_screen g_screens[] = {
       .name = "Game Settings", .how = MC_VERIFIED_LIVE_TEXT,
       .kind = MC_ROW_COLUMN, .coord_x = 320.0f, .pair_x = 835.0f },
 
+    /* ⭐⭐ GAME SETTINGS -- the VALUE axis (caller 0x14009d929, horizontal).
+     *
+     * ⛔ USER: "They don't read when I change them with left or right, only
+     * when I leave and come back." This entry is that fix: without it the
+     * value axis had NO table row and spoke bare position.
+     *
+     * ⚠ count = 0 DELIBERATELY. Every row has a different number of values --
+     * measured 2, 3, 4, 5 and 9 on this screen in one run -- so a fixed count
+     * would disable the entry on every row but one. The same reasoning as the
+     * music strip's count = 0.
+     *
+     * ⚠ row_off = 0x35C is the ROW cursor, not this axis's own. Measured on all
+     * 34 vertical movements of the 13:05 run, identical on both tabs. This
+     * axis's own cursor indexes a value array shared by the tabs (tab A slots
+     * 0-5 at +0x384.., tab B slots 6-11), which is why the usual
+     * (cursor - screen - values_off)/4 derivation cannot give a row here. */
+    { .caller = 0x14009d929ULL, .base_index = -1, .count = 0,
+      .name = "Game Settings", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_ROW_VALUE_LIVE, .coord_x = 320.0f, .pair_x = 835.0f,
+      .row_off = 0x35C },
+
     /* ⭐⭐ TRAINING OPTIONS -- the VALUE axis. Same screen object as the row
      * site above; values_off 0x3F0 re-derived on a fresh screen object across
      * five rows in the CVS1 run, so the two axes are told apart by cursor
@@ -2402,6 +2423,69 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
                     }
                 }
             }
+        }
+        _snprintf(out->item, sizeof(out->item), "%s", spoken);
+        out->item[sizeof(out->item) - 1] = '\0';
+        out->named = TRUE;
+        return;
+    }
+
+    /* ⭐⭐ A VALUE MOVEMENT: say which row and what it now reads.
+     *
+     * ⛔ USER: "They don't read when I change them with left or right, only
+     * when I leave and come back." The value axis is a DIFFERENT CALLER with no
+     * table entry, so left/right spoke bare position at exactly the moment the
+     * value changed -- the one moment it matters.
+     *
+     * The row comes from the screen's ROW CURSOR (see row_off), not from this
+     * movement's own cursor: that one indexes a value array shared by both
+     * tabs, where tab B's first row is slot 6. The row and its value are then
+     * quoted from the live columns, as MC_ROW_COLUMN does. */
+    if (s->kind == MC_ROW_VALUE_LIVE) {
+        char text[GT_CAPTION_MAX], spoken[GM_OUT_MAX];
+        int row = -1, ncol;
+
+        if (!m->screen || s->coord_x <= 0.0f || s->row_off <= 0) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        /* ⚠ GUARDED. `screen` is a pointer from a live game thread; this module
+         * reads it, never trusts it. mem_readable first, then the copy -- the
+         * fault guard is a net for the race, never the check. */
+        {
+            const void *rc = (const char *)m->screen + s->row_off;
+            if (!mem_readable(rc, sizeof(row)) ||
+                !mem_copy(&row, rc, sizeof(row))) {
+                out->why = MC_UNNAMED_ROW_UNDERIVABLE;
+                return;
+            }
+        }
+        /* ⭐⭐ BOUND IT AGAINST THE COLUMN'S OWN POPULATION, not against a
+         * constant. A screen laid out differently would otherwise yield SOME
+         * row number and quote a real-looking wrong line. The column is the
+         * thing being indexed, so it is the thing that decides what is in
+         * range. */
+        ncol = gt_column_count(m->screen, s->coord_x);
+        if (ncol <= 0 || row < 0 || row >= ncol) {
+            log_line("mcspeak: %s -- the row cursor at +0x%x reads %d but the "
+                     "column x=%.0f holds %d label(s); refusing rather than "
+                     "quoting a row.",
+                     s->name ? s->name : "(unnamed)", (unsigned)s->row_off,
+                     row, (double)s->coord_x, ncol);
+            out->why = MC_UNNAMED_ROW_UNDERIVABLE;
+            return;
+        }
+        /* +1: the column helper is 1-based, the cursor field is 0-based. */
+        if (!gt_column_item(m->screen, s->coord_x,
+                            s->pair_x > 0.0f ? s->pair_x : -1.0f,
+                            row + 1, text, (int)sizeof(text)) || !text[0]) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        gm_speak(text, spoken, sizeof(spoken));
+        if (!spoken[0] || gm_has_residue(spoken)) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
         }
         _snprintf(out->item, sizeof(out->item), "%s", spoken);
         out->item[sizeof(out->item) - 1] = '\0';
