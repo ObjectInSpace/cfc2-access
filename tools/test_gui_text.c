@@ -1941,7 +1941,13 @@ int main(void)
                 void *W = (void *)0x2BE7A291ULL;
                 static const float WX[2] = { 320.f, 835.f };
                 static const float WY[2] = { 286.f, 286.f };
-                static const char *const W2[2] = { "Free Play", "Normal" };
+                /* ⚠ The SAME pair twice, deliberately. sc_record() dedups on
+                 * label AND value, so a repeat takes the UPDATE path -- the
+                 * only place the largest-total rule lives. Two DIFFERENT values
+                 * would take the insert path twice and the rule would never
+                 * run, which is how an earlier version of this case passed with
+                 * that rule sabotaged. */
+                static const char *const W2[2] = { "Free Play", "Free Play" };
                 for (int v = 0; v < 2; v++) {
                     const char *TT[2] = { "Game Difficulty", W2[v] };
                     for (int i = 0; i < 2; i++) {
@@ -1953,7 +1959,14 @@ int main(void)
                         gt_test_settext_body(wo[i], TT[i], NULL, 0);
                     }
                     gt_note_focus_move();
-                    gt_settings_census(W, 320.0f, 835.0f, 9);  /* 9, saw 2 */
+                    /* ⚠ The SECOND sample carries a total of 2, as a real one
+                     * does when it lands while the row cursor has moved to a
+                     * 2-value row. Taking the LATEST total would drop the
+                     * expectation from 9 to 2 and declare this row complete --
+                     * which is exactly what the sabotage sweep does. Keeping
+                     * the largest is the property under test, and a case that
+                     * passes one constant total cannot detect the difference. */
+                    gt_settings_census(W, 320.0f, 835.0f, v == 0 ? 9 : 2);
                 }
                 int n = gt_test_sc_entries(), vals = 0, expect = 0;
                 for (int i = 0; i < n; i++) {
@@ -1962,10 +1975,11 @@ int main(void)
                     if (strcmp(l, "Game Difficulty") == 0 && v[0]) vals++;
                 }
                 expect = gt_test_sc_expect("Game Difficulty");
-                snprintf(d, sizeof d, "walked 2 of a 9-value row: recorded "
-                         "%d value(s), expectation kept as %d", vals, expect);
+                snprintf(d, sizeof d, "one value of a 9-value row, sampled "
+                         "twice (totals 9 then 2): %d distinct value(s), "
+                         "expectation kept as %d (want 9)", vals, expect);
                 check("54h. a partial walk keeps the row's FULL total, so it "
-                      "cannot read as complete", vals == 2 && expect == 9, d);
+                      "cannot read as complete", vals == 1 && expect == 9, d);
             }
 
             {
