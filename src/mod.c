@@ -366,14 +366,19 @@ static DWORD WINAPI worker(LPVOID param)
          * sample one during ordinary play. The lesson that turned the
          * discovery sweep off by default applies: ask whether the expensive
          * thing needs to run AT ALL before making it cheap. */
-        BOOL sc_on = opt_in_file_present("cfc2_census.on");
-        gt_settings_census_enable(sc_on);
-        if (sc_on)
-            log_line("mod: cfc2_census.on -- the settings census is ENABLED. "
-                     "It records each row's label and the value drawn beside "
-                     "it on every cursor movement, and reports every 10 s. "
-                     "Walk a settings row's values LEFT and RIGHT through the "
-                     "whole list to collect them. Nothing is spoken.");
+        /* ⛔⛔ WITHDRAWN: the census CRASHED THE USER'S GAME (see the call site
+         * in the poll loop for the evidence and what to investigate). The
+         * switch is still read so a run SAYS the feature is withheld rather
+         * than appearing to work and silently recording nothing -- a silent
+         * no-op is exactly the state a blind user cannot distinguish from a
+         * broken one. */
+        if (opt_in_file_present("cfc2_census.on"))
+            log_line("mod: ⛔ cfc2_census.on is present but the settings "
+                     "census is WITHDRAWN -- it crashed the game in ~1.5 s on "
+                     "2026-09-15 (confirmed by isolation; mechanism NOT yet "
+                     "established). Nothing is being recorded. Delete the file "
+                     "to silence this line.");
+        gt_settings_census_enable(FALSE);
     }
 
     /* ⚠ OPT-IN. The offline tools (disasm.py, find_callers.py,
@@ -588,13 +593,31 @@ static DWORD WINAPI worker(LPVOID param)
                      * does not decide which corpus run those values are, or
                      * which tab is showing -- that join stays offline where the
                      * corpus can check it. */
-                    /* ⚠ Only a HORIZONTAL movement carries a value-axis total;
-                     * on a vertical (row) movement the total is the ROW count
-                     * and passing it would declare a 7-value expectation for
-                     * every row. 0 means "unknown", which the report says
-                     * rather than guessing. */
-                    gt_settings_census(mlm.screen, 320.0f, 835.0f,
-                                       mlm.vertical ? 0 : mltot);
+                    /* ⛔⛔ THE CENSUS IS NOT CALLED. It CRASHED THE USER'S GAME.
+                     *
+                     * Confirmed by isolation on 2026-09-15: same build, same
+                     * hooks, `cfc2_census.on` removed -> no crash; present ->
+                     * dead in ~1.5 s. Two crashes, 0xc0000409 (stack buffer
+                     * overrun) then 0xc0000005, both faulting inside the game.
+                     *
+                     * ⚠ THE MECHANISM IS NOT ESTABLISHED. It compiles clean at
+                     * -O2 -Wall -Wextra -Wclobbered, every offline case passes,
+                     * and three readings of the code produced three different
+                     * unproven theories. Re-enabling it on the strength of a
+                     * plausible fix would be the fourth.
+                     *
+                     * ⭐ It walked the instance table 15 times per sample
+                     * (1 + 2 per row), taking and RELEASING g_inst_busy between
+                     * every call, on the 100 ms poll, while the ctor hook adds
+                     * and evicts instances from the game's own thread -- and
+                     * gt_column_item() hands back `.text` POINTERS INTO that
+                     * table which outlive the lock. That is the shape to
+                     * investigate first, offline, before this is called again.
+                     *
+                     * ⛔ A diagnostic that crashes the user's game is worth
+                     * less than no diagnostic. The code and its cases stay for
+                     * the investigation; the CALL does not ship.
+                     * See [[fix-the-users-bug-not-the-tooling]]. */
                 }
             }
 
@@ -844,11 +867,9 @@ static DWORD WINAPI worker(LPVOID param)
         if (gt_ok && (beat == 10 || beat % 5 == 0))
             gt_movelist_report();
 
-        /* ⭐ Same split and same cadence as the probe above: SAMPLE at 100 ms,
-         * REPORT on the slow beat. The census table is deduplicated, so its
-         * report is a handful of lines however many movements were sampled. */
-        if (gt_ok && (beat == 10 || beat % 5 == 0))
-            gt_settings_census_report();
+        /* ⛔ The census report is not called either: with the sampler withdrawn
+         * it would print only its INCONCLUSIVE line every 10 s, which is noise
+         * that reads like a finding. */
 
         /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning
          * 1.3 GB, and it duplicated work: gmd_text_ready() already calls
