@@ -62,6 +62,10 @@
 
 #include "../src/menu_speak.h"
 #include "../src/menu_cursor.h"
+/* ⭐ For case 33c: planting a Game Settings screen needs the instance-table
+ * seams (gt_test_settext_body) and the class constants. The suite already
+ * LINKS gui_text.c; only the declarations were missing. */
+#include "../src/gui_text.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -1407,6 +1411,91 @@ int main(void)
         ok &= seen > 0;
         check("33. every MC_ROW_COLUMN entry has a column and a count",
               ok, "entries=%d", seen);
+    }
+
+    /* --- case 33c: ⭐⭐⭐ THE VALUE REACHES THE SPOKEN LINE, END TO END.
+     *
+     * ⛔⛔ THE CASE THE SABOTAGE SWEEP DEMANDED. 54i-54k prove the HELPER pairs
+     * a row with the value sharing its Y, and 33b proves the TABLE carries a
+     * pair_x -- but with `-1.0f` hardcoded where `s->pair_x` belongs in
+     * menu_speak.c, every one of those still passed. Only a case that drives
+     * menu_speak_build() on a planted Game Settings screen can see the field
+     * actually being read.
+     *
+     * ⚠ Plants the real geometry: labels x=320, values x=835, 80px pitch, and
+     * a 7th row with NO value (the "Default" action row), which is the
+     * asymmetry that makes ordinal pairing wrong. */
+    {
+        static unsigned char go[13][GT_CLASS_SIZE];
+        void *S = (void *)0x2BE7A290ULL;           /* the real screen pointer */
+        static const float GX[13] = {
+            320.f, 835.f, 320.f, 835.f, 320.f, 835.f, 320.f,
+            835.f, 320.f, 835.f, 320.f, 835.f, 320.f };
+        static const float GY[13] = {
+            286.f, 286.f, 366.f, 366.f, 446.f, 446.f, 526.f,
+            526.f, 606.f, 606.f, 686.f, 686.f, 766.f };
+        static const char *const GT_[13] = {
+            "Game Difficulty", "Free Play", "Attack Power", "Normal",
+            "Timer Speed", "Normal", "Speed Select", "Turbo 1",
+            "Battle Type", "3 on 3 Match", "Max Rounds (Single)",
+            "3 (First to 2)", "Default" };
+        gt_test_focus_enable();
+        for (int i = 0; i < 13; i++) {
+            memset(go[i], 0, sizeof go[i]);
+            *(ULONGLONG *)go[i] = GT_VTABLE_ADDR;
+            memcpy(go[i] + 0x40, &GX[i], sizeof(float));
+            memcpy(go[i] + 0x44, &GY[i], sizeof(float));
+            memcpy(go[i] + 0x88, &S, sizeof(void *));
+            gt_test_settext_body(go[i], GT_[i], NULL, 0);
+        }
+        /* Row 1 of 7 on the Game Settings caller. */
+        mc_move gm = mk(0x14009d8dfULL, 0, 0, 6);
+        gm.screen = S;
+        menu_speak_build(&gm, &sp);
+        check("33c. a settings row SPEAKS its value, not just its label",
+              sp.named && strcmp(sp.item, "Game Difficulty, Free Play") == 0,
+              "named=%d item=\"%s\"", (int)sp.named, sp.item);
+
+        /* And the action row with no value must not borrow another row's. */
+        gm = mk(0x14009d8dfULL, 6, 0, 6);
+        gm.screen = S;
+        menu_speak_build(&gm, &sp);
+        check("33d. an action row speaks its label ALONE",
+              sp.named && strcmp(sp.item, "Default") == 0,
+              "named=%d item=\"%s\"", (int)sp.named, sp.item);
+    }
+
+    /* --- case 33b: ⭐⭐ THE VALUE COLUMN MUST ACTUALLY BE WIRED.
+     *
+     * ⛔⛔ THIS CASE EXISTS BECAUSE THE SABOTAGE SWEEP CAUGHT ITS ABSENCE.
+     * Cases 54i-54k in the gui_text suite prove gt_column_item() pairs a row
+     * with the value sharing its Y -- but they call that helper DIRECTLY. With
+     * the pair_x plumbing deleted from menu_speak.c's MC_ROW_COLUMN path
+     * (`-1.0f` hardcoded where `s->pair_x` belongs), all three still PASSED:
+     * the helper was never the thing at risk. A case must exercise the path
+     * that READS the field, not just the helper it hands off to.
+     *
+     * Game Settings is the screen whose values are quoted (labels x=320,
+     * values x=835, measured over 16 dumps). If its pair_x is lost, the rows
+     * still speak and nothing looks broken -- the player simply never hears
+     * what any setting is SET TO, which is the whole point of the screen. */
+    {
+        int ok = 0;
+        double px = -1.0;
+        for (int i = 0; i < menu_speak_screen_count(); i++) {
+            const mc_screen *s = menu_speak_screen_at(i);
+            if (!s || s->kind != MC_ROW_COLUMN || !s->name)
+                continue;
+            if (strcmp(s->name, "Game Settings") != 0)
+                continue;
+            px = (double)s->pair_x;
+            /* The value column sits well to the RIGHT of the label column --
+             * asserting only "non-zero" would pass a pair_x accidentally set
+             * to the label's own X, which would pair every row with itself. */
+            ok = (s->pair_x > s->coord_x + 100.0f);
+        }
+        check("33b. Game Settings ships a VALUE column right of its labels",
+              ok, "pair_x=%.0f", px);
     }
 
     /* --- case 34: ⭐⭐ THE TRAINING VALUE SLOTS ARE ABSOLUTE ACROSS TABS.

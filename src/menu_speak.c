@@ -1411,7 +1411,8 @@ static const mc_screen g_screens[] = {
      * X=960 did track its own rows in 16 of 16 dumps -- but that is exactly the
      * heading_index key that was built, shipped and REMOVED for Training
      * Options, and 3 tab switches in one session is not the walk that exposed
-     * it there. Rows first; the tab name needs its own evidence. */
+     * it there. Rows first; the tab name needs its own evidence.
+     *
      * ⭐⭐ pair_x = 835: the VALUE column, measured across 16 field dumps at
      * exactly that X with each value sharing its label's Y (labels 320, values
      * 835, heading 960, rows 80px apart). So a row now reads "Game Difficulty,
