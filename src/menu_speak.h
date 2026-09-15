@@ -308,6 +308,30 @@ typedef struct {
      * updated ATOMICALLY with the thing it identifies. Two objects the game
      * refreshes independently are not one fact. */
     float      coord_x;
+    /* ⭐⭐ For MC_ROW_COLUMN: the X of the column holding each row's VALUE, to
+     * be spoken after the row's own label. 0 means the screen has no value
+     * column and only the label is read -- which is every MC_ROW_COLUMN screen
+     * that shipped before this field existed.
+     *
+     * ⭐ WHY QUOTE RATHER THAN MAP. Game Settings' values cannot be named from
+     * the corpus with any confidence: "Normal" has THIRTEEN stems and two of
+     * them are rows of this very screen, while "Free Play"'s only stem
+     * (EXOPT_COIN_MODE_02) belongs to a DIFFERENT row than the one the game
+     * draws it on. So the text a game draws does not identify its label, and a
+     * map keyed on it would state a setting the player is not on. The game
+     * already drew the right word; quoting it makes no claim at all.
+     *
+     * ⚠ The pairing is by SHARED Y inside gt_column_item(), never by ordinal:
+     * the label and value columns can hold different numbers of objects (an
+     * action row like "Default" has no value), and taking the Nth of each would
+     * attach one row's value to another -- a confidently wrong SETTING, which
+     * is the failure this file exists to refuse.
+     *
+     * ⛔ It does NOT give the value's position in its list ("3 of 9"). That
+     * needs the row's value vocabulary, which is not established -- see the
+     * withdrawn settings census. The current value is a fact the game is
+     * displaying; the list is not. */
+    float      pair_x;
 } mc_screen;
 
 /* ⭐ The heading column. The shell draws a screen's own title at X=960 -- the

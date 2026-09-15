@@ -1412,9 +1412,15 @@ static const mc_screen g_screens[] = {
      * heading_index key that was built, shipped and REMOVED for Training
      * Options, and 3 tab switches in one session is not the walk that exposed
      * it there. Rows first; the tab name needs its own evidence. */
+     * ⭐⭐ pair_x = 835: the VALUE column, measured across 16 field dumps at
+     * exactly that X with each value sharing its label's Y (labels 320, values
+     * 835, heading 960, rows 80px apart). So a row now reads "Game Difficulty,
+     * Free Play". The values are QUOTED, never mapped -- "Normal" has thirteen
+     * corpus stems and TWO of them are rows of this screen, and "Free Play"'s
+     * only stem belongs to a different row than the one the game draws it on. */
     { .caller = 0x14009d8dfULL, .base_index = -1, .count = 7,
       .name = "Game Settings", .how = MC_VERIFIED_LIVE_TEXT,
-      .kind = MC_ROW_COLUMN, .coord_x = 320.0f },
+      .kind = MC_ROW_COLUMN, .coord_x = 320.0f, .pair_x = 835.0f },
 
     /* ⭐⭐ TRAINING OPTIONS -- the VALUE axis. Same screen object as the row
      * site above; values_off 0x3F0 re-derived on a fresh screen object across
@@ -2314,8 +2320,21 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
             out->why = MC_UNNAMED_COUNT_MISMATCH;
             return;
         }
-        if (!gt_column_item(m->screen, s->coord_x, -1.0f, out->position,
-                            text, (int)sizeof(text)) || !text[0]) {
+        /* ⭐⭐ pair_x appends the VALUE sharing this row's Y, so a settings row
+         * reads "Game Difficulty, Free Play" instead of the label alone. 0
+         * keeps the old behaviour (label only) for every screen that shipped
+         * before the field existed -- gt_column_item() takes < 0 for "no
+         * partner". See the field's comment for why this QUOTES rather than
+         * maps: on this screen "Normal" has 13 corpus stems and two of them are
+         * its own rows.
+         *
+         * ⚠ A row with no value (the "Default" action row) yields the label
+         * alone, because the pairing is by shared Y and there is nothing at
+         * that Y to append -- not a gap to fill. */
+        if (!gt_column_item(m->screen, s->coord_x,
+                            s->pair_x > 0.0f ? s->pair_x : -1.0f,
+                            out->position, text, (int)sizeof(text)) ||
+            !text[0]) {
             out->why = MC_UNNAMED_TEXT_UNREADABLE;
             return;
         }

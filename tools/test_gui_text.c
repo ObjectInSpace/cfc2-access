@@ -1795,6 +1795,57 @@ int main(void)
             check("54b. a row column excludes the value column and the heading",
                   nrows == 4 && nvals == 3 && got &&
                   strcmp(r2, "Groove Gauge") == 0, d);
+
+            /* --- cases 54i-54k: ⭐⭐ QUOTING THE ROW'S VALUE ----------------
+             *
+             * MC_ROW_COLUMN's pair_x appends the value sharing a row's Y, so a
+             * settings row reads "Game Difficulty, Free Play". The values are
+             * QUOTED rather than mapped because the drawn text does NOT
+             * identify a corpus label: on the real screen "Normal" has 13 stems
+             * and two of them are rows of that same screen, and "Free Play"'s
+             * only stem belongs to a different row than the one it is drawn on.
+             *
+             * ⚠ This fixture has FOUR labels and THREE values -- "Stun" has no
+             * partner -- which is exactly the asymmetry that makes ordinal
+             * pairing wrong. */
+
+            /* case 54i: the value joins its OWN row, by shared Y. */
+            {
+                char v2[GT_CAPTION_MAX] = { 0 };
+                BOOL g2 = gt_column_item(T, 320.0f, 835.0f, 2, v2, sizeof v2);
+                snprintf(d, sizeof d, "row 2 with pair_x=835 -> \"%s\" "
+                         "(want \"Groove Gauge, Auto-Recovery\")", v2);
+                check("54i. a row quotes the value sharing its Y",
+                      g2 && strcmp(v2, "Groove Gauge, Auto-Recovery") == 0, d);
+            }
+
+            /* case 54j: ⛔⛔ THE ASYMMETRY CASE, and the reason for shared-Y.
+             * "Stun" (row 4, y=606) has NO value. Ordinal pairing would hand it
+             * the 3rd value ("Normal", y=526) -- a confidently wrong SETTING
+             * for a row that has none. It must come back as the label alone. */
+            {
+                char v4[GT_CAPTION_MAX] = { 0 };
+                BOOL g4 = gt_column_item(T, 320.0f, 835.0f, 4, v4, sizeof v4);
+                size_t ln = strlen(v4);
+                BOOL dangling = ln > 0 && (v4[ln-1] == ',' || v4[ln-1] == ' ');
+                snprintf(d, sizeof d, "row 4 (no value) -> \"%s\"; dangling "
+                         "separator: %s", v4, dangling ? "YES" : "no");
+                check("54j. a row with no value quotes the label ALONE, never "
+                      "another row's value",
+                      g4 && strcmp(v4, "Stun") == 0 && !dangling, d);
+            }
+
+            /* case 54k: pair_x unset (< 0) keeps the label-only behaviour every
+             * MC_ROW_COLUMN screen shipped with before this field existed. */
+            {
+                char v1[GT_CAPTION_MAX] = { 0 };
+                BOOL g1 = gt_column_item(T, 320.0f, -1.0f, 1, v1, sizeof v1);
+                snprintf(d, sizeof d, "row 1 with no pair_x -> \"%s\" "
+                         "(want \"Health Bar\", NOT \"Health Bar, Normal\")",
+                         v1);
+                check("54k. no pair_x still reads the label alone",
+                      g1 && strcmp(v1, "Health Bar") == 0, d);
+            }
         }
 
         /* --- cases 54c-54f: ⭐⭐ THE SETTINGS CENSUS ------------------------
