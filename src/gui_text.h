@@ -794,6 +794,10 @@ int  gt_test_sc_entries(void);
 BOOL gt_test_sc_entry_at(int i, const char **label, const char **value,
                          long *hits);
 long gt_test_sc_overflow(void);
+/* ⭐ Clears the census so a case can ask the UNSAMPLED question. Without it
+ * every case runs against a populated table and a verdict stuck at TRUE is
+ * indistinguishable from a working one -- proven by sabotage. */
+void gt_test_sc_reset(void);
 
 /* Test seams. ⭐ -1 means the probe never ran; 0 means it ran and recorded
  * nothing. Those are different facts and a case asserting only "no crash"

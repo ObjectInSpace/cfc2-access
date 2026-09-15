@@ -1906,6 +1906,31 @@ int main(void)
                 check("54f. a sampled census reports CONCLUSIVE with a count",
                       conc && s == 3, d);
             }
+
+            /* case 54g: ⭐⭐ AND AN UNSAMPLED CENSUS MUST REPORT INCONCLUSIVE.
+             *
+             * ⛔⛔ THIS CASE EXISTS BECAUSE THE SABOTAGE SWEEP CAUGHT 54f BEING
+             * BLIND. With gt_settings_census_conclusive() hardwired to return
+             * TRUE, all four of 54c-54f still PASSED: 54f asserts `conc && s ==
+             * 3`, and since the census really had sampled three times, `s == 3`
+             * carried the assertion while `conc` was never actually tested. A
+             * case that only ever asks the SUCCEEDING question cannot tell a
+             * working verdict from a constant one.
+             *
+             * An empty census reported as a finding would say "this screen's
+             * rows have no values" when the truth is "nobody walked them" --
+             * the difference between a measurement and a guess. */
+            {
+                gt_test_sc_reset();
+                long s = -1, m = -1;
+                BOOL conc = gt_settings_census_conclusive(&s, &m);
+                int entries = gt_test_sc_entries();
+                snprintf(d, sizeof d, "empty census: conclusive=%d samples=%ld "
+                         "entries=%d (want conclusive=0, entries=-1 'never "
+                         "ran')", (int)conc, s, entries);
+                check("54g. an UNSAMPLED census reports INCONCLUSIVE, not empty",
+                      !conc && s == 0 && entries == -1, d);
+            }
             gt_settings_census_enable(FALSE);
         }
 

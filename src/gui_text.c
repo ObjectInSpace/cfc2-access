@@ -3152,6 +3152,20 @@ BOOL gt_test_sc_entry_at(int i, const char **label, const char **value,
 
 long gt_test_sc_overflow(void) { return (long)g_sc_overflow; }
 
+/* ⭐⭐ A TEST SEAM FOR THE *UNSAMPLED* STATE, which is the one that matters.
+ * Case 54f asserted only the success path (conclusive after 3 samples) and
+ * PASSED with gt_settings_census_conclusive() hardwired to return TRUE -- the
+ * sabotage sweep caught it. A verdict that cannot say "I never looked" is the
+ * failure inconclusive-must-be-a-return-value exists to prevent, and proving it
+ * needs an empty census to ask. See case 54g. */
+void gt_test_sc_reset(void)
+{
+    memset(g_sc, 0, sizeof g_sc);
+    g_sc_used = -1;
+    g_sc_overflow = g_sc_samples = g_sc_missed = 0;
+    g_sc_busy_skips = g_sc_unreadable = g_sc_last_seq = 0;
+}
+
 int gt_test_ml_buckets(void)
 {
     return g_ml_used < 0 ? -1 : (int)g_ml_used;
