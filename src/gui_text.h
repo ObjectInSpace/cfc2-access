@@ -800,6 +800,28 @@ BOOL gt_test_sc_entry_at(int i, const char **label, const char **value,
                          long *hits);
 long gt_test_sc_overflow(void);
 int  gt_test_sc_expect(const char *label);
+
+/* --- THE SCREEN SNAPSHOT ---------------------------------------------------
+ *
+ * ⭐⭐ Logs a screen's row labels (and the value beside each) ONCE, the first
+ * time a cursor movement lands on a screen object not already reported.
+ *
+ * ⛔ USER: "These tests need to be faster for me to complete." Learning a
+ * screen's rows previously needed a ~3 SECOND PAUSE, because the field dump is
+ * rate-limited to one 2 s beat. With this, walking in and pressing one key is
+ * enough -- which matters when the person testing cannot glance at the screen
+ * to check whether the capture worked.
+ *
+ * ⚠ NOT the withdrawn settings census. That sampled on EVERY movement, walking
+ * the instance table 15 times per sample with the lock taken and released
+ * between each, and it CRASHED THE GAME. This takes the lock once per SCREEN
+ * and is then silent until a different screen appears -- a human-speed event.
+ *
+ * Opt-in: `cfc2_snap.on`. Nothing is spoken. */
+void gt_snapshot_enable(BOOL on);
+void gt_snapshot(const void *screen, float row_x, float val_x, int total);
+long gt_snapshot_count(void);
+void gt_test_snapshot_reset(void);
 /* ⭐ Clears the census so a case can ask the UNSAMPLED question. Without it
  * every case runs against a populated table and a verdict stuck at TRUE is
  * indistinguishable from a working one -- proven by sabotage. */

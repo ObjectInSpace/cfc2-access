@@ -3207,6 +3207,140 @@ BOOL gt_test_sc_entry_at(int i, const char **label, const char **value,
     return TRUE;
 }
 
+/* --- THE SCREEN SNAPSHOT ---------------------------------------------------
+ *
+ * ⭐⭐ USER: "These tests need to be faster for me to complete if you need to
+ * cover each screen for each game." Correct, and the slowness was mine: to
+ * learn a screen's rows I had to ask for a ~3 SECOND PAUSE, because
+ * gt_layout_report() is rate-limited to one 2 s beat. Eight games times several
+ * screens at that pace is a lot of waiting for the one person who cannot skim
+ * the screen to check.
+ *
+ * This fires ONCE PER SCREEN, on the first cursor movement that lands on a
+ * screen object we have not already reported. Walk in, press a key, walk out --
+ * the rows are in the log. No pause, no dwell, no counting.
+ *
+ * ⚠ WHY THIS IS NOT THE WITHDRAWN CENSUS. That sampled on EVERY movement and
+ * walked the instance table 15 times per sample (1 + 2 per row), taking and
+ * releasing the lock between each, on the 100 ms poll -- and it crashed the
+ * game. This takes the lock ONCE, reads at most MC_SNAP_ROWS rows in that one
+ * hold, and then does nothing at all until a DIFFERENT screen appears. A
+ * screen change is a human-speed event, not a 100 ms one.
+ *
+ * ⛔ It records the labels as DRAWN and claims nothing about them -- no corpus
+ * join, no count check, no screen identity. Reading the log is my job; this
+ * only has to make one walk enough. */
+#define MC_SNAP_ROWS 24
+
+static const void   *g_snap_last;
+static volatile LONG g_snap_on;
+static volatile LONG g_snap_count;
+
+void gt_snapshot_enable(BOOL on) { InterlockedExchange(&g_snap_on, on ? 1 : 0); }
+long gt_snapshot_count(void)     { return (long)g_snap_count; }
+void gt_test_snapshot_reset(void) { g_snap_last = NULL; g_snap_count = 0; }
+
+/* ⭐⭐ THE COLUMNS THIS SCREEN ACTUALLY HAS, discovered rather than assumed.
+ *
+ * ⛔⛔ THIS IS THE GAP THAT MADE CVS1 INVISIBLE. Its Game Settings drew NOTHING
+ * at x=320 -- the column CVS2 uses and the only one anything asked about -- so
+ * every reader found an empty column and concluded nothing was there. A
+ * snapshot that inherits that assumption would fail on exactly the screens it
+ * exists to discover.
+ *
+ * ⚠ Sorted left to right, deduplicated within GT_COORD_EPS. The caller decides
+ * which column is labels and which is values; this only reports what exists. */
+static int snap_columns(const void *screen, float *out, int cap)
+{
+    gt_widget w[GT_INST_MAX];
+    int n, k = 0;
+
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return 0;
+    n = widgets_of(screen, -1.0f, w, GT_INST_MAX);     /* -1: every column */
+    InterlockedExchange(&g_inst_busy, 0);
+
+    for (int i = 0; i < n && k < cap; i++) {
+        int seen = 0;
+        for (int j = 0; j < k; j++)
+            if (w[i].x > out[j] - GT_COORD_EPS && w[i].x < out[j] + GT_COORD_EPS)
+                { seen = 1; break; }
+        if (!seen)
+            out[k++] = w[i].x;
+    }
+    for (int i = 0; i < k; i++)                        /* insertion sort */
+        for (int j = i + 1; j < k; j++)
+            if (out[j] < out[i]) { float t = out[i]; out[i] = out[j];
+                                   out[j] = t; }
+    return k;
+}
+
+void gt_snapshot(const void *screen, float row_x, float val_x, int total)
+{
+    char pair[GT_CAPTION_MAX];
+    float cols[16];
+    int n, i, shown = 0, ncol;
+
+    if (g_snap_on != 1)
+        return;
+    if ((!g_installed && !g_focus_test_mode) || !screen)
+        return;
+    /* ⭐ THE WHOLE COST CONTROL: one report per screen object. */
+    if (screen == g_snap_last)
+        return;
+
+    /* ⚠ The suggested row_x is a HINT, not a requirement. If this screen draws
+     * nothing there -- as CVS1's Game Settings does -- fall back to the
+     * left-most populated column, which is what a row label column is on every
+     * settings screen measured. Reporting "no rows" instead would hide the one
+     * screen worth capturing. */
+    ncol = snap_columns(screen, cols, 16);
+    n = (row_x > 0.0f) ? gt_column_count(screen, row_x) : 0;
+    if (n <= 0) {
+        for (i = 0; i < ncol; i++) {
+            int c = gt_column_count(screen, cols[i]);
+            if (c >= 2) { row_x = cols[i]; n = c; break; }
+        }
+    }
+    if (n <= 0)
+        return;                 /* not a row screen; do not claim one */
+    g_snap_last = screen;
+    InterlockedIncrement(&g_snap_count);
+
+    log_line("snap: === SCREEN %p: %d row(s) at x=%.0f, cursor says %d ===",
+             screen, n, (double)row_x, total);
+    /* ⭐ Every column, so a screen whose values sit somewhere unexpected can be
+     * read from the log without another run. */
+    {
+        char line[256];
+        int used = _snprintf(line, sizeof(line), "snap:   columns:");
+        for (i = 0; i < ncol && used > 0 && used < (int)sizeof(line) - 12; i++)
+            used += _snprintf(line + used, sizeof(line) - used, " %.0f(%d)",
+                              (double)cols[i],
+                              gt_column_count(screen, cols[i]));
+        line[sizeof(line) - 1] = '\0';
+        log_line("%s", line);
+    }
+    /* ⚠ A disagreement between the column and the cursor is the FIRST thing to
+     * know about a new screen -- it is exactly what made CVS1 refuse to speak
+     * (a 6-row screen against a table saying 7). Stated, never silently
+     * reconciled. */
+    if (total > 0 && n != total)
+        log_line("snap:   ⚠ the column holds %d but the cursor reports %d -- "
+                 "this screen needs its own count variant.", n, total);
+    for (i = 1; i <= n && i <= MC_SNAP_ROWS; i++) {
+        if (!gt_column_item(screen, row_x, val_x > 0.0f ? val_x : -1.0f,
+                            i, pair, (int)sizeof(pair)) || !pair[0])
+            continue;
+        log_line("snap:   %2d. %s", i, pair);
+        shown++;
+    }
+    /* ⭐ A POSITIVE count of what was examined: "0 failed" must never be
+     * mistakable for "0 checked". */
+    log_line("snap:   %d of %d row(s) read%s.", shown, n,
+             n > MC_SNAP_ROWS ? " (capped)" : "");
+}
+
 long gt_test_sc_overflow(void) { return (long)g_sc_overflow; }
 
 /* The largest total ever reported for `label`'s value axis. ⭐ A case needs

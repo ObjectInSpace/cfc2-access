@@ -372,6 +372,15 @@ static DWORD WINAPI worker(LPVOID param)
          * than appearing to work and silently recording nothing -- a silent
          * no-op is exactly the state a blind user cannot distinguish from a
          * broken one. */
+        /* ⭐ The snapshot: opt-in, nothing spoken, one report per screen. */
+        BOOL snap_on = opt_in_file_present("cfc2_snap.on");
+        gt_snapshot_enable(snap_on);
+        if (snap_on)
+            log_line("mod: cfc2_snap.on -- the screen snapshot is ENABLED. It "
+                     "logs each screen's row labels and values ONCE, on the "
+                     "first cursor movement there. Walk in, press a key, walk "
+                     "out. Nothing is spoken.");
+
         if (opt_in_file_present("cfc2_census.on"))
             log_line("mod: ⛔ cfc2_census.on is present but the settings "
                      "census is WITHDRAWN -- it crashed the game in ~1.5 s on "
@@ -593,6 +602,18 @@ static DWORD WINAPI worker(LPVOID param)
                      * does not decide which corpus run those values are, or
                      * which tab is showing -- that join stays offline where the
                      * corpus can check it. */
+                    /* ⭐⭐ THE SCREEN SNAPSHOT: one report per SCREEN, so a
+                     * capture costs a single keypress instead of a 3-second
+                     * pause. 320/835 are the settings-screen geometry as a
+                     * HINT only -- gt_snapshot() discovers the real columns and
+                     * falls back to the leftmost populated one, which is what
+                     * CVS1's Game Settings needs (it draws nothing at 320).
+                     *
+                     * ⚠ Unlike the withdrawn census this does NOT run per
+                     * movement: it is silent until a different screen object
+                     * appears, which is a human-speed event. */
+                    gt_snapshot(mlm.screen, 320.0f, 835.0f, mltot);
+
                     /* ⛔⛔ THE CENSUS IS NOT CALLED. It CRASHED THE USER'S GAME.
                      *
                      * Confirmed by isolation on 2026-09-15: same build, same

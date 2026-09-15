@@ -1847,6 +1847,83 @@ int main(void)
                       g1 && strcmp(v1, "Health Bar") == 0, d);
             }
 
+            /* --- cases 54m-54o: ⭐⭐ THE SCREEN SNAPSHOT --------------------
+             *
+             * ⛔ USER: "These tests need to be faster for me to complete."
+             * Learning a screen's rows needed a ~3 second pause; this fires on
+             * the first movement that reaches a new screen. */
+            {
+                static unsigned char so[6][GT_CLASS_SIZE];
+                void *S1 = (void *)0x2C29E400ULL;
+                /* ⚠ Rows at x=600, NOT the 320 the caller will suggest -- this
+                 * is CVS1's shape, the screen that reported nothing because
+                 * every reader assumed 320. */
+                static const float SX[6] = { 600.f, 900.f, 600.f, 900.f,
+                                             600.f, 900.f };
+                static const float SY[6] = { 286.f, 286.f, 366.f, 366.f,
+                                             446.f, 446.f };
+                static const char *const ST[6] = {
+                    "Coin Mode", "Free Play", "Boot Display", "None",
+                    "Version", "Ver. 2K25" };
+                for (int i = 0; i < 6; i++) {
+                    memset(so[i], 0, sizeof so[i]);
+                    *(ULONGLONG *)so[i] = GT_VTABLE_ADDR;
+                    memcpy(so[i] + 0x40, &SX[i], sizeof(float));
+                    memcpy(so[i] + 0x44, &SY[i], sizeof(float));
+                    memcpy(so[i] + 0x88, &S1, sizeof(void *));
+                    gt_test_settext_body(so[i], ST[i], NULL, 0);
+                }
+                gt_test_snapshot_reset();
+                gt_snapshot_enable(TRUE);
+
+                /* case 54m: ⭐⭐ IT FINDS A COLUMN THE CALLER GUESSED WRONG.
+                 * The hint is 320 and this screen draws nothing there. A
+                 * snapshot that trusted the hint would report nothing -- on
+                 * exactly the screen it exists to discover. */
+                gt_snapshot(S1, 320.0f, 835.0f, 3);
+                long after_first = gt_snapshot_count();
+                snprintf(d, sizeof d, "snapshots after a wrong-column hint: "
+                         "%ld (want 1)", after_first);
+                check("54m. the snapshot finds the rows when the hinted column "
+                      "is EMPTY", after_first == 1, d);
+
+                /* case 54n: ⭐⭐ ONCE PER SCREEN, not per movement. This is the
+                 * whole cost argument, and the difference from the census that
+                 * crashed the game: further movements on the SAME screen must
+                 * do nothing at all. */
+                gt_snapshot(S1, 320.0f, 835.0f, 3);
+                gt_snapshot(S1, 320.0f, 835.0f, 3);
+                gt_snapshot(S1, 320.0f, 835.0f, 3);
+                snprintf(d, sizeof d, "after 3 more movements on the SAME "
+                         "screen: %ld (want still 1)", gt_snapshot_count());
+                check("54n. the snapshot fires ONCE per screen, not per "
+                      "movement", gt_snapshot_count() == 1, d);
+
+                /* case 54o: and a DIFFERENT screen does report. Without this,
+                 * "fires once" could be satisfied by never firing again. */
+                {
+                    static unsigned char s2o[2][GT_CLASS_SIZE];
+                    void *S2 = (void *)0x2C29E500ULL;
+                    static const float S2X[2] = { 600.f, 600.f };
+                    static const float S2Y[2] = { 286.f, 366.f };
+                    static const char *const S2T[2] = { "Row A", "Row B" };
+                    for (int i = 0; i < 2; i++) {
+                        memset(s2o[i], 0, sizeof s2o[i]);
+                        *(ULONGLONG *)s2o[i] = GT_VTABLE_ADDR;
+                        memcpy(s2o[i] + 0x40, &S2X[i], sizeof(float));
+                        memcpy(s2o[i] + 0x44, &S2Y[i], sizeof(float));
+                        memcpy(s2o[i] + 0x88, &S2, sizeof(void *));
+                        gt_test_settext_body(s2o[i], S2T[i], NULL, 0);
+                    }
+                    gt_snapshot(S2, 320.0f, 835.0f, 2);
+                    snprintf(d, sizeof d, "after a DIFFERENT screen: %ld "
+                             "(want 2)", gt_snapshot_count());
+                    check("54o. a different screen DOES report",
+                          gt_snapshot_count() == 2, d);
+                }
+                gt_snapshot_enable(FALSE);
+            }
+
             /* case 54l: ⭐⭐⭐ A MISALIGNED COLUMN -- the case that actually
              * discriminates shared-Y from ordinal pairing.
              *
