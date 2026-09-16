@@ -1768,14 +1768,24 @@ int main(void)
         e = menu_speak_lookup_for(0x140079739ULL, 40, screen);
         ok &= (e && e->kind == MC_LIST && e->nlabels == 40);
 
-        /* ⛔ A tab index outside 0..7 establishes nothing. It must NOT claim,
-         * and must NOT be clamped into some roster. */
-        *tab = 99;
-        e = menu_speak_lookup_for(0x140079739ULL, 40, screen);
-        ok &= (e && e->kind == MC_LIST);
-        *tab = -1;
-        e = menu_speak_lookup_for(0x140079739ULL, 40, screen);
-        ok &= (e && e->kind == MC_LIST);
+        /* ⛔⛔ A tab index outside 0..7 establishes nothing. It must NOT claim,
+         * and must NOT be CLAMPED into some roster.
+         *
+         * ⚠ THE COUNTS HERE ARE CHOSEN TO ISOLATE THE BOUNDS CHECK, and an
+         * earlier version of this case did not: it used 40 items for both,
+         * where clamping 99->7 (STG2, 24) and -1->0 (CVS1, 35) fails the size
+         * cross-check anyway, so the suite passed with the bounds check
+         * DELETED. Sabotage found that, not review.
+         *
+         * So: pair each out-of-range value with the item count its CLAMPED
+         * roster would have. A clamp then satisfies the size check and claims
+         * the screen -- and only a real bounds check refuses. */
+        *tab = 99;                     /* would clamp to 7 = STG2, 24 chars */
+        e = menu_speak_lookup_for(0x140079739ULL, 24, screen);
+        ok &= !(e && e->kind == MC_GAME_ROSTER);
+        *tab = -1;                     /* would clamp to 0 = CVS1, 35 chars */
+        e = menu_speak_lookup_for(0x140079739ULL, 35, screen);
+        ok &= !(e && e->kind == MC_GAME_ROSTER);
 
         /* ⛔⛔ A SIZE DISAGREEMENT IS A REFUSAL, not a near-miss. Tab 1 is
          * CVS2 (48); on a 35-item list the identity and the live count
