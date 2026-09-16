@@ -110,23 +110,80 @@ emu_status emu_rom_index(int *out);
  * object's own string pointer. Bounded copy; never returns unterminated. */
 emu_status emu_rom_name(char *out, unsigned cap);
 
-/* Map the 1-based ROM index to the canonical 0..7 game index used by
+/* Map the 0-based ROM index (0..17) to the canonical 0..7 game index used by
  * move_list.h / roster_table.h, and to a revision ordinal within that game.
  * Returns FALSE for an out-of-range index rather than clamping -- a silently
  * clamped id would name the WRONG GAME's characters, which is the worst
  * failure class in this project. */
 BOOL emu_game_from_rom_index(int rom_index, int *game_out, int *rev_out);
 
-/* The expected short name for a 1-based ROM index, or NULL if out of range.
+/* The expected short name for a 0-based ROM index (0..17), or NULL if out of
+ * range.
  * Lets a caller CROSS-CHECK the live string at state+0x30 against the table the
  * game's own rom_index_from_name() must have used to produce state+0x44. Two
  * independent sources agreeing is the standard used throughout this project;
  * one source "looking right" is not. */
 const char *emu_rom_name_for_index(int rom_index);
 
+/* --- Finding guest RAM inside the arena ----------------------------------
+ *
+ * ⚠⚠ THE ARENA'S BOUNDS ARE NOT KNOWN FROM VirtualQuery. The live run measured
+ * a 511 MB region for a 256 MB request, which means the allocator handed back a
+ * pointer INSIDE a larger committed run and VirtualQuery reports the enclosing
+ * run, not our allocation. So a scan must be bounded by what it can actually
+ * read, and must never present "I stopped at my own limit" as "it is not here".
+ *
+ * ⭐⭐ THE SIGNATURE IS AN ALGEBRAIC INVARIANT, NOT A VALUE MATCH.
+ * Published CVS2 (NAOMI) prior art gives a player struct of stride 0x5CC with
+ * health and max_health adjacent. Those are MAME/Flycast guest addresses and
+ * are useless here as literals -- CFC2 rebases guest RAM into its own arena.
+ * What survives rebasing is the RELATIONSHIP between the fields:
+ *
+ *     P2 == P1 + 0x5CC                  (the stride)
+ *     health <= max_health              (for BOTH players)
+ *     max_health equal and nonzero      (both players share the cap)
+ *
+ * Several independent fields agreeing at one base is a positive
+ * identification. ONE field "looking right" is not -- this project has already
+ * been fooled by a pointer pair that passed 13 trials with clean controls and
+ * was a monotonic allocation counter.
+ *
+ * ⚠ AND A MATCH IS STILL ONLY A CANDIDATE. Variance identifies candidates;
+ * REVERSIBILITY identifies state. Confirming this needs a hit taken in
+ * training mode and then reset: real health returns to its cap, a look-alike
+ * does not. emu_ram_find() reports candidates; it does not claim to have found
+ * guest RAM, and its documentation must not either. */
+
+typedef struct {
+    ULONGLONG p1;          /* address of the P1 player struct               */
+    ULONGLONG guest_base;  /* p1 minus the prior-art offset -- INFERRED     */
+    unsigned  health;      /* what P1's health field read at match time     */
+    unsigned  max_health;
+} emu_ram_hit;
+
+/* Scan the arena for the CVS2 player-pair signature.
+ *
+ * Fills up to `cap` hits and sets *n_out. The return value distinguishes:
+ *   EMU_OK          - the scan COMPLETED and *n_out is a real count (0 is a
+ *                     real answer: the signature is not present)
+ *   EMU_UNREADABLE  - the scan could not run or was cut short; *n_out says
+ *                     nothing about the game. NOT a negative.
+ *   EMU_NOT_RUNNING - no game is loaded
+ *
+ * ⚠ `scanned_out` receives the number of bytes actually examined, so a caller
+ * can tell a complete sweep from a truncated one. "0 failed" must never be
+ * reportable as if it were "0 checked". */
+emu_status emu_ram_find(emu_ram_hit *out, unsigned cap, unsigned *n_out,
+                        SIZE_T *scanned_out);
+
 /* --- Offline test seam ---------------------------------------------------
  * Point the state slot at a planted fixture. The shipping code never calls
  * this; passing 0 restores the real constant. */
 void emu_ram_test_redirect(ULONGLONG state_slot);
+
+/* Override the scan window, so the offline suite can plant a fixture arena
+ * instead of needing a running game. Passing base 0 restores normal behaviour
+ * (derive the window from the live state object). */
+void emu_ram_test_window(ULONGLONG base, SIZE_T size);
 
 #endif /* CFC2_EMU_RAM_H */

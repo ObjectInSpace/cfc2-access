@@ -262,3 +262,168 @@ const char *emu_rom_name_for_index(int rom_index)
         return NULL;
     return g_rom_map[rom_index].name;
 }
+
+/* --- Finding guest RAM inside the arena ---------------------------------- */
+
+/* Published CVS2 (NAOMI) prior art. Used as a SHAPE to verify, never as an
+ * address: these are Flycast guest addresses and CFC2 rebases guest RAM into
+ * its own arena. What survives rebasing is the offsets WITHIN the struct and
+ * the stride BETWEEN the two players. */
+#define CVS2_STRIDE        0x5CCu     /* P2 = P1 + this                     */
+#define CVS2_HP_OFF        0x00u      /* health, u16, at the struct base    */
+#define CVS2_MAXHP_OFF     0x04u      /* max_health, u16                    */
+#define CVS2_GUEST_P1      0x2419A8u  /* P1 health's offset in guest RAM    */
+
+/* A page at a time, so a 256 MB sweep costs ~65k reads rather than 65 million.
+ * ⭐ A per-item VirtualQuery is never affordable at scale -- every scanner in
+ * this project has hit that wall, and three had to be rewritten for it. */
+#define SCAN_PAGE 0x1000u
+
+static ULONGLONG g_win_base;    /* test override; 0 = derive from the game */
+static SIZE_T    g_win_size;
+
+void emu_ram_test_window(ULONGLONG base, SIZE_T size)
+{
+    g_win_base = base;
+    g_win_size = size;
+}
+
+/* Does a player pair live at `p1` within the buffer starting at `buf_addr`?
+ * Pure arithmetic on already-copied bytes: no foreign reads happen here, so it
+ * cannot fault and needs no guard of its own. */
+static BOOL pair_matches(const unsigned char *buf, SIZE_T buflen,
+                         SIZE_T off, unsigned *hp_out, unsigned *max_out)
+{
+    unsigned hp1, mx1, hp2, mx2;
+    SIZE_T p2 = off + CVS2_STRIDE;
+
+    /* Both structs must lie wholly inside the buffer, or we would be reading
+     * a neighbour's bytes and calling the result a match. */
+    if (p2 + CVS2_MAXHP_OFF + 2 > buflen)
+        return FALSE;
+
+    hp1 = (unsigned)(buf[off + CVS2_HP_OFF] | (buf[off + CVS2_HP_OFF + 1] << 8));
+    mx1 = (unsigned)(buf[off + CVS2_MAXHP_OFF] | (buf[off + CVS2_MAXHP_OFF + 1] << 8));
+    hp2 = (unsigned)(buf[p2 + CVS2_HP_OFF] | (buf[p2 + CVS2_HP_OFF + 1] << 8));
+    mx2 = (unsigned)(buf[p2 + CVS2_MAXHP_OFF] | (buf[p2 + CVS2_MAXHP_OFF + 1] << 8));
+
+    /* ⛔ The all-zero case satisfies "health <= max_health" trivially and is
+     * the single most abundant pattern in a 256 MB arena. Requiring a nonzero,
+     * shared, plausible cap is what makes this a signature rather than a
+     * tautology -- a filter every look-alike passes finds only look-alikes. */
+    if (mx1 == 0 || mx1 != mx2)
+        return FALSE;
+    if (mx1 > 0x2000)              /* a health cap, not a pointer or a count */
+        return FALSE;
+    if (hp1 > mx1 || hp2 > mx2)
+        return FALSE;
+
+    /* ⛔⛔ BOTH PLAYERS AT ZERO HEALTH IS NOT A LIVE MATCH, and the offline
+     * suite caught this: a decoy planted 4 bytes away still matched, because
+     * reading one dword LOW lands a zero in the health slot and a real value
+     * in the cap slot -- self-consistent, and meaningless.
+     *
+     * In a live match at least one fighter has health above zero (a double KO
+     * is a single frame, and we are not scanning for that). Requiring it costs
+     * nothing real and removes an enormous class of zero-adjacent coincidences
+     * that a 256 MB arena supplies in abundance.
+     *
+     * ⚠ This is also why the fixture's OWN misalignment mattered: if a decoy
+     * four bytes off the plant can satisfy the signature, so can any of the
+     * millions of near-zero dwords in the real arena. */
+    if (hp1 == 0 && hp2 == 0)
+        return FALSE;
+
+    if (hp_out)  *hp_out  = hp1;
+    if (max_out) *max_out = mx1;
+    return TRUE;
+}
+
+emu_status emu_ram_find(emu_ram_hit *out, unsigned cap, unsigned *n_out,
+                        SIZE_T *scanned_out)
+{
+    ULONGLONG base = 0, addr;
+    SIZE_T size = 0, scanned = 0;
+    unsigned n = 0;
+    emu_status s;
+    /* One page plus the tail of a pair, so a struct straddling a page boundary
+     * is still seen whole. Without this overlap the scan has a blind seam
+     * every 4 KB -- a false negative that looks exactly like a clean sweep. */
+    static unsigned char buf[SCAN_PAGE + CVS2_STRIDE + 8];
+
+    if (n_out)       *n_out = 0;
+    if (scanned_out) *scanned_out = 0;
+
+    if (g_win_base) {
+        base = g_win_base;
+        size = g_win_size;
+    } else {
+        s = emu_arena(&base, &size);
+        if (s != EMU_OK)
+            return s;
+        /* ⚠ VirtualQuery reported 511 MB for a 256 MB request, so the region
+         * is NOT our allocation. Bound the sweep by what the constructor
+         * actually asked for; scanning a neighbour's memory would produce
+         * matches that belong to something else entirely. */
+        if (size > (SIZE_T)EMU_ARENA_SIZE)
+            size = (SIZE_T)EMU_ARENA_SIZE;
+    }
+
+    if (size == 0)
+        return EMU_UNREADABLE;
+
+    for (addr = base; addr + CVS2_STRIDE + 8 < base + size; addr += SCAN_PAGE) {
+        SIZE_T want = SCAN_PAGE + CVS2_STRIDE + 8;
+        SIZE_T run, off;
+
+        if (addr + want > base + size)
+            want = (SIZE_T)(base + size - addr);
+
+        /* ⛔ mem_readable_run() FIRST, then the guarded copy. The fault guard
+         * is a net for the race between the two, never a replacement for the
+         * check -- a guarded memcpy over a bad page is not reliably caught,
+         * and this project has the crash that proves it. */
+        run = mem_readable_run((const void *)(ULONG_PTR)addr, want);
+        if (run < CVS2_STRIDE + 8)
+            continue;                  /* a hole; the next page may be fine */
+
+        if (!mem_copy(buf, (const void *)(ULONG_PTR)addr, run))
+            continue;
+
+        scanned += run;
+
+        /* Step 4 bytes: the player struct is dword-aligned in every published
+         * layout, and a byte-wise walk costs 4x for no extra coverage of a
+         * naturally aligned field. */
+        for (off = 0; off + CVS2_STRIDE + 8 <= run; off += 4) {
+            unsigned hp = 0, mx = 0;
+            if (!pair_matches(buf, run, off, &hp, &mx))
+                continue;
+
+            if (out && n < cap) {
+                out[n].p1         = addr + off;
+                out[n].health     = hp;
+                out[n].max_health = mx;
+                /* INFERRED, and labelled as such in the header: if this really
+                 * is P1's health, guest RAM starts this far below it. */
+                out[n].guest_base = (addr + off) - CVS2_GUEST_P1;
+            }
+            n++;
+            if (n >= cap && out)
+                break;
+        }
+        if (out && n >= cap)
+            break;
+    }
+
+    if (n_out)       *n_out = n;
+    if (scanned_out) *scanned_out = scanned;
+
+    /* ⚠ A sweep that examined nothing is not a negative. Saying so is a RETURN
+     * VALUE, not a logged warning, so a caller cannot mistake "never looked"
+     * for "looked and found none". */
+    if (scanned == 0)
+        return EMU_UNREADABLE;
+
+    return EMU_OK;
+}

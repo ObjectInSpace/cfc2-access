@@ -26,6 +26,13 @@
 #include <string.h>
 #include <windows.h>
 
+/* The stride the scanner looks for. ⚠ Declared here rather than exported from
+ * emu_ram.h on purpose: if the implementation's constant ever changes, this
+ * fixture keeps planting at the OLD stride and cases 10b/10d fail loudly. A
+ * shared constant would make the test agree with the code by construction and
+ * prove nothing -- the harness must not supply the mechanism under test. */
+#define CVS2_STRIDE_T 0x5CCu
+
 static int failures;
 
 static void check(const char *name, int cond, const char *fmt, ...)
@@ -276,6 +283,116 @@ int main(void)
     check("8c name for rom 0 is cvs1 (NOT NULL -- 0 is valid)",
           emu_rom_name_for_index(0) && strcmp(emu_rom_name_for_index(0), "cvs1") == 0, "");
     check("8d out of range name is NULL", emu_rom_name_for_index(18) == NULL, "");
+
+    /* ---- 10. the guest-RAM signature scan ----------------------------
+     * ⭐⭐ A planted arena, because the real one needs a running match. What
+     * is tested is that the SIGNATURE discriminates -- that it finds a real
+     * player pair and REFUSES each look-alike. A scanner proven only to find
+     * its own plant is a scanner proven to find anything. */
+    {
+        #define ARENA_BYTES 0x8000u
+        unsigned char *ar = (unsigned char *)VirtualAlloc(
+            NULL, ARENA_BYTES, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        emu_ram_hit hits[8];
+        unsigned nh = 0;
+        SIZE_T scanned = 0;
+
+        check("10-setup arena allocated", ar != NULL, "");
+        if (ar) {
+            SIZE_T plant = 0x1400;      /* dword-aligned, mid-arena */
+            memset(ar, 0, ARENA_BYTES);
+
+            /* A real-looking pair: P1 hp 96 of 144, P2 hp 144 of 144. */
+            ar[plant + 0] = 96;  ar[plant + 1] = 0;
+            ar[plant + 4] = 144; ar[plant + 5] = 0;
+            ar[plant + CVS2_STRIDE_T + 0] = 144; ar[plant + CVS2_STRIDE_T + 1] = 0;
+            ar[plant + CVS2_STRIDE_T + 4] = 144; ar[plant + CVS2_STRIDE_T + 5] = 0;
+
+            emu_ram_test_window((ULONGLONG)(ULONG_PTR)ar, ARENA_BYTES);
+            s = emu_ram_find(hits, 8, &nh, &scanned);
+
+            check("10a scan COMPLETES and reports bytes scanned",
+                  s == EMU_OK && scanned > 0,
+                  "got %s scanned=%llu", emu_status_name(s),
+                  (unsigned long long)scanned);
+            check("10b the planted pair is FOUND",
+                  nh >= 1, "n=%u", nh);
+            {
+                unsigned i, found = 0;
+                for (i = 0; i < nh && i < 8; i++)
+                    if (hits[i].p1 == (ULONGLONG)(ULONG_PTR)(ar + plant)) {
+                        found = 1;
+                        check("10c the hit reports the right health values",
+                              hits[i].health == 96 && hits[i].max_health == 144,
+                              "hp=%u max=%u", hits[i].health, hits[i].max_health);
+                    }
+                check("10d the hit is at the planted address", found, "");
+            }
+
+            /* ---- the DECOYS. Each defeats exactly one clause; if any is
+             * reported, that clause is not doing its job. ⭐ An all-zero
+             * region satisfies "health <= max_health" trivially and is the
+             * most abundant pattern in a real arena -- case 10e is the one
+             * that matters most. */
+            memset(ar, 0, ARENA_BYTES);
+            emu_ram_test_window((ULONGLONG)(ULONG_PTR)ar, ARENA_BYTES);
+            s = emu_ram_find(hits, 8, &nh, &scanned);
+            check("10e an ALL-ZERO arena yields NO hits (not a tautology)",
+                  s == EMU_OK && nh == 0, "got %s n=%u", emu_status_name(s), nh);
+
+            memset(ar, 0, ARENA_BYTES);
+            ar[plant + 0] = 200; ar[plant + 1] = 0;   /* hp > max */
+            ar[plant + 4] = 144; ar[plant + 5] = 0;
+            ar[plant + CVS2_STRIDE_T + 0] = 144; ar[plant + CVS2_STRIDE_T + 1] = 0;
+            ar[plant + CVS2_STRIDE_T + 4] = 144; ar[plant + CVS2_STRIDE_T + 5] = 0;
+            s = emu_ram_find(hits, 8, &nh, &scanned);
+            check("10f health ABOVE max is refused", s == EMU_OK && nh == 0,
+                  "n=%u", nh);
+
+            memset(ar, 0, ARENA_BYTES);
+            ar[plant + 0] = 96;  ar[plant + 4] = 144;
+            ar[plant + CVS2_STRIDE_T + 0] = 96;
+            ar[plant + CVS2_STRIDE_T + 4] = 100;      /* caps DISAGREE */
+            s = emu_ram_find(hits, 8, &nh, &scanned);
+            check("10g disagreeing max_health is refused", s == EMU_OK && nh == 0,
+                  "n=%u", nh);
+
+            memset(ar, 0, ARENA_BYTES);
+            ar[plant + 0] = 0x10; ar[plant + 1] = 0x20;   /* cap far too big */
+            ar[plant + 4] = 0x00; ar[plant + 5] = 0x40;
+            ar[plant + CVS2_STRIDE_T + 0] = 0x10; ar[plant + CVS2_STRIDE_T + 1] = 0x20;
+            ar[plant + CVS2_STRIDE_T + 4] = 0x00; ar[plant + CVS2_STRIDE_T + 5] = 0x40;
+            s = emu_ram_find(hits, 8, &nh, &scanned);
+            check("10h an implausibly large cap is refused",
+                  s == EMU_OK && nh == 0, "n=%u", nh);
+
+            /* ⭐⭐ A pair STRADDLING a page boundary must still be found. The
+             * scan reads page+stride precisely so there is no blind seam every
+             * 4 KB -- and a seam would be a false negative indistinguishable
+             * from a clean sweep. */
+            memset(ar, 0, ARENA_BYTES);
+            {
+                SIZE_T strad = 0x1000 - 8;   /* P1 just before the boundary */
+                ar[strad + 0] = 96;  ar[strad + 4] = 144;
+                ar[strad + CVS2_STRIDE_T + 0] = 144;
+                ar[strad + CVS2_STRIDE_T + 4] = 144;
+                s = emu_ram_find(hits, 8, &nh, &scanned);
+                check("10i a pair STRADDLING a page boundary is found",
+                      s == EMU_OK && nh >= 1, "got %s n=%u",
+                      emu_status_name(s), nh);
+            }
+
+            /* A zero-size window means we never looked -- and that must be a
+             * RETURN VALUE, not a count of zero that reads like a negative. */
+            emu_ram_test_window((ULONGLONG)(ULONG_PTR)ar, 0);
+            s = emu_ram_find(hits, 8, &nh, &scanned);
+            check("10j a zero-size window -> UNREADABLE, not a clean zero",
+                  s == EMU_UNREADABLE, "got %s n=%u", emu_status_name(s), nh);
+
+            emu_ram_test_window(0, 0);
+            VirtualFree(ar, 0, MEM_RELEASE);
+        }
+    }
 
     /* ---- 9. the guard absorbed nothing unexpected --------------------
      * ⚠ A run that faulted is a PARTIAL run and must say so rather than
