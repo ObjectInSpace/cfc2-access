@@ -57,10 +57,19 @@ Known fields, read off the instructions that set them:
     +0x40/+0x48/+0x50  descriptor bytes from the 0x40-stride table 0x1411f5f18
 
 `rom_index_from_name()` is `0x1400b6250` — walks the 18-record table at
-`0x141208b00`, returns a **1-based** index. ⚠ That is an index over REVISIONS,
-not the 0..7 game index; `emu_game_from_rom_index()` maps between them with a
-TABLE, because the plausible formula `(rom-1)/2` is right for 14 of 18 rows and
-wrong for `z3uu`/`a3uu`.
+`0x141208b00`, returns a **0-BASED** index (`0 cvs1 … 3 cvs2u … 17 a3uu`).
+
+⛔⛔ **I first read it as 1-based, and the live cross-check caught it.** The
+loop looks 1-based because entry [0] is loaded BEFORE the loop and compared
+with the counter still at zero; the `+8` in the body advances past the entry
+already consumed. Two consequences, both fixed: every game was shifted by one,
+and **index 0 (cvs1) is a VALID game**, not "nothing matched" — treating it as
+NOT_RUNNING would have silenced exactly one game, invisibly.
+
+⚠ That index is over REVISIONS, not the 0..7 game index;
+`emu_game_from_rom_index()` maps between them with a TABLE, because the
+plausible formula `rom/2` is right for 16 of 18 rows and wrong for
+`z3uu`/`a3uu`.
 
 ⚠⚠ **THE ARENA IS NOT GUEST RAM.** 256 MB is the whole emulator arena; NAOMI
 system RAM is 16 MB and lives somewhere inside it. Which sub-range is the NEXT
@@ -72,13 +81,20 @@ Start **any** game and read `emu:` lines in `CFC2Access.log`. What they answer:
 
 - `emu: ✅ cross-check OK` + a plausible arena → **the anchor is live**, and
   the next work is locating guest RAM inside the arena.
+  ⭐ **First run (2026-09-16) reached this after the 0-based fix.** It reported
+  `rom_index=3 name='cvs2u'` — the user was playing CVS2 (US), read correctly.
+  Arena `0x7d81000`, VirtualQuery region **511 MB** (⚠ not the 256 MB the
+  constructor requests — use the MEASURED size, and do not assume the arena
+  starts at the region base).
 - `emu: ⛔⛔ MISMATCH` → the field map is wrong; do not build on the offsets.
 - `emu: no game is loaded` while a game IS running → the slot is not what we
   think, or it is populated later than expected.
 - `emu: ⚠ COULD NOT read` → **not a negative.** Conclude nothing.
 
-`.\tools\run_emu_test.ps1` — 28 cases, six sabotages each verified to fail the
-case that tests it.
+`.\tools\run_emu_test.ps1` — 30 cases, eight sabotages each verified to fail the
+case that tests it. Case 1e pins the live pairing (index 3 ↔ `cvs2u`) as a
+regression, so the mapping is anchored to evidence rather than to my reading of
+the disassembly, which was wrong once.
 
 ⚠ Two false leads, recorded so they are not re-chased:
 - **`mCTREmulation`** (`0x14101acc8`) is NOT a class name — it sits in a
