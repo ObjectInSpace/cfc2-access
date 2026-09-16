@@ -265,10 +265,24 @@ static const int g_lobby_filter_rows[] = {
  * ⚠ CONTINUE (250) and QUIT (256) are shared with the arcade menu even though
  * their CAPTIONS differ ("Return to training mode" vs "Return to the game"):
  * the game reuses the item labels and varies only the help text. */
+/* ⚠⚠ NEITHER MAP IS WIRED TO A SCREEN ANY MORE, deliberately. Training mode
+ * also draws EIGHT rows (…Training Menu, Change Character, Quit), so the count
+ * could not tell it from the arcade menu and the 8-row map spoke "Load Quick
+ * Save" where "Training Menu" belongs -- user-reported. The pause menu is now
+ * one MC_ROW_COLUMN entry that quotes the live column; see its g_screens row.
+ *
+ * ⭐ They are KEPT as the offline EXPECTATION that tools/test_screen_maps.py
+ * validates against the real corpus, which is what proves these indices are the
+ * strings the screen actually draws. ⚠ `used` keeps -Wunused quiet without
+ * deleting the evidence -- and deleting them would not be neutral: that script
+ * scrapes by regex and does not skip comments, so a commented-out array would
+ * still be reported as `ok`. */
+__attribute__((used))
 static const int g_training_pause_rows[] = {
     250, 1070, 253, 226, 574, 756, 256
 };
 
+__attribute__((used))
 static const int g_pause_menu_rows[] = {
     250, 1070, 253, 226, 574, 254, 255, 256
 };
@@ -1295,23 +1309,45 @@ static const mc_screen g_screens[] = {
     { 0x14009ed20ULL, -1, 4, "Keyboard Settings", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_VALUE, 0x380, NULL, 0, NULL, 0, 0 },
 
-    /* ⭐⭐⭐ THE IN-GAME PAUSE MENU. See g_pause_menu_rows: all 8 rows named by
-     * their own captions across 20 sightings. ⚠ The first screen behind the
-     * emulated ROM that this mod names -- the shell's cursor hooks fire there
-     * normally, so it needed no new mechanism at all. */
-    { 0x1400a749dULL, -1, 8, "Pause Menu", MC_VERIFIED_LIVE_TEXT,
-      MC_LIST, 0, g_pause_menu_rows, 8, NULL, 0, 0 },
-
-    /* ⭐⭐⭐ THE TRAINING-MODE PAUSE MENU -- same caller, SEVEN items. See
-     * g_training_pause_rows: all seven named by their own captions in one run.
+    /* ⭐⭐⭐ THE IN-GAME PAUSE MENU -- the first screen behind the emulated ROM
+     * that this mod names; the shell's cursor hooks fire there normally, so it
+     * needed no new mechanism at all.
      *
-     * ⚠ Without this row the 8-item map failed the count check on every visit
-     * and the whole screen spoke bare positions -- user-reported as "a lot of
-     * missing text in the pause menu". Third screen on this project where one
-     * caller serves two screens (Select Mode/Online Play, Casual/Ranked Match),
-     * which is why menu_speak_lookup_n() discriminates on caller AND count. */
-    { 0x1400a749dULL, -1, 7, "Pause Menu", MC_VERIFIED_LIVE_TEXT,
-      MC_LIST, 0, g_training_pause_rows, 7, NULL, 0, 0 },
+     * ⛔⛔ THE TWO LABEL MAPS ARE GONE, AND THIS IS WHY.
+     *
+     * USER: "In training mode it is saying quicksave/load rather than training
+     * options/return to character select." A confidently WRONG name -- the one
+     * failure worse than silence, because a blind player cannot tell it is
+     * wrong and may Load a Quick Save while trying to open the training menu.
+     *
+     * The cause: TRAINING MODE ALSO DRAWS EIGHT ROWS. The maps assumed 8 = the
+     * arcade pause menu (…Load Quick Save, Quick Save, Quit) and 7 = training,
+     * but the snapshot sweep caught FIVE distinct variants on this caller, two
+     * of them 8 rows:
+     *     8: Resume, Marquee Card, Move List, Controller Settings,
+     *        Display & Sound Settings, Training Menu, Change Character, Quit
+     *     8: Resume, Marquee Card, Move List, Controller Settings,
+     *        Display & Sound Settings, Load Quick Save, Quick Save, Quit
+     * The count cannot separate them, so the arcade map won and spoke its rows
+     * 6-7 over training's. ⚠ The 7-row entry was added for an earlier report of
+     * this same screen being silent -- the count key looked sufficient because
+     * only two variants had been seen. A third made it wrong.
+     *
+     * ⭐ ONE MC_ROW_COLUMN ENTRY REPLACES BOTH. The rows are at x=362 in all 22
+     * snapshots, counts 7 and 8, and quoting what the game drew needs no
+     * variant, no count and no map. The same reasoning that made Game Settings
+     * work across eight games: the row sets differ, the geometry does not.
+     *
+     * ⚠ Five snapshots held a BLANK row in that column. A blank still counts,
+     * so the count guard passes and the blank row alone falls back to a bare
+     * position -- a degraded row, never a misnamed one.
+     *
+     * ⚠ g_pause_menu_rows / g_training_pause_rows are KEPT as the offline
+     * expectation that tools/test_screen_maps.py validates against the corpus;
+     * nothing reads them at runtime. */
+    { .caller = 0x1400a749dULL, .base_index = -1, .count = 0,
+      .name = "Pause Menu", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_ROW_COLUMN, .coord_x = 362.0f },
 
     /* ⭐⭐⭐ TRAINING OPTIONS -- the ROW axis. See g_training_option_rows for
      * the coordinate evidence and the control that validates it.

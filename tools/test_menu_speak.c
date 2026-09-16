@@ -1660,6 +1660,47 @@ int main(void)
         }
     }
 
+    /* --- case 33j: ⛔⛔ THE PAUSE MENU MUST NOT CLAIM NAMES FROM A MAP.
+     *
+     * USER-REPORTED: "In training mode it is saying quicksave/load rather than
+     * training options/return to character select." A confidently WRONG name --
+     * worse than silence, because a blind player cannot tell it is wrong and
+     * may Load a Quick Save while trying to open the training menu.
+     *
+     * The cause was a LABEL MAP keyed on row count. Training mode also draws
+     * EIGHT rows, so 8 did not mean "arcade" and the arcade map spoke its rows
+     * 6-7 (Load Quick Save / Quick Save) over training's (Training Menu /
+     * Change Character). The snapshot sweep caught five distinct variants on
+     * this one caller.
+     *
+     * ⚠ There was NO test for this screen at all, which is how it shipped. This
+     * case pins the property that was violated: on a caller whose variants
+     * cannot be told apart by count, the entry must QUOTE the live column
+     * rather than index a table. */
+    {
+        const mc_screen *p7 = menu_speak_lookup_n(0x1400a749dULL, 7);
+        const mc_screen *p8 = menu_speak_lookup_n(0x1400a749dULL, 8);
+        int ok = p7 && p8;
+        if (ok) {
+            /* Both counts must resolve to a quoting entry with a real column,
+             * and NEITHER may carry a label map or a base to index. */
+            ok &= p7->kind == MC_ROW_COLUMN && p7->coord_x > 0.0f &&
+                  !p7->labels && p7->base_index < 0;
+            ok &= p8->kind == MC_ROW_COLUMN && p8->coord_x > 0.0f &&
+                  !p8->labels && p8->base_index < 0;
+            /* ⭐ And both must be the SAME entry: two entries here would mean
+             * the count was being used to tell the variants apart again, which
+             * is the thing that was wrong. */
+            ok &= (p7 == p8);
+        }
+        check("33j. the pause menu QUOTES its rows (count cannot separate "
+              "training from arcade)", ok,
+              "7-row kind=%d labels=%d / 8-row kind=%d labels=%d / same=%d",
+              p7 ? (int)p7->kind : -1, p7 && p7->labels,
+              p8 ? (int)p8->kind : -1, p8 && p8->labels,
+              p7 && p8 && p7 == p8);
+    }
+
     /* --- case 33b: ⭐⭐ THE VALUE COLUMN MUST ACTUALLY BE WIRED.
      *
      * ⛔⛔ THIS CASE EXISTS BECAUSE THE SABOTAGE SWEEP CAUGHT ITS ABSENCE.
