@@ -85,28 +85,42 @@ static void emu_scan_report(int beat)
         return;
     last_n = nh;
 
+    /* ⚠ Report KB, not MB. The first live run printed "examined 0 MB" beside
+     * 16 hits -- a contradiction produced by integer division, which made a
+     * truncated sweep look like an impossible one. A unit that rounds the
+     * interesting case to zero is the wrong unit. */
     if (nh == 0) {
-        log_line("emu: guest-RAM scan examined %llu MB, found NO CVS2 player "
+        log_line("emu: guest-RAM scan examined %llu KB, found NO CVS2 player "
                  "pair. ⚠ That is EXPECTED outside a match (the fighters do "
                  "not exist yet). During a live round it would mean the "
                  "signature or the 0x5CC stride is wrong.",
-                 (unsigned long long)(scanned / (1024 * 1024)));
+                 (unsigned long long)(scanned / 1024));
         return;
     }
 
     {
         unsigned k, show = nh < 6 ? nh : 6;
-        log_line("emu: ⭐ guest-RAM scan examined %llu MB, found %u candidate "
-                 "pair(s) at stride 0x5CC:",
-                 (unsigned long long)(scanned / (1024 * 1024)), nh);
-        for (k = 0; k < show; k++)
+        if (show > 16) show = 16;
+        log_line("emu: ⭐ guest-RAM scan examined %llu KB of the 256 MB arena, "
+                 "found %u candidate pair(s) at stride 0x5CC:",
+                 (unsigned long long)(scanned / 1024), nh);
+        for (k = 0; k < show && k < 16; k++)
             log_line("emu:    P1=0x%llx  hp %u / %u   (implies guest base "
                      "0x%llx)",
                      (unsigned long long)hits[k].p1,
                      hits[k].health, hits[k].max_health,
                      (unsigned long long)hits[k].guest_base);
         if (nh > show)
-            log_line("emu:    ... and %u more", nh - show);
+            log_line("emu:    ... and %u more (only the first 16 are kept; the "
+                     "sweep itself ran to completion)", nh - show);
+
+        /* ⭐ The diagnostic that would have named the first run's failure
+         * immediately: hits packed within a few bytes of each other are ONE
+         * region matching at consecutive alignments, not many fighters. */
+        if (nh >= 2 && hits[nh < 16 ? nh - 1 : 15].p1 - hits[0].p1 < 0x1000)
+            log_line("emu: ⚠ ALL candidates lie within 4 KB of one another -- "
+                     "that is ONE region matching repeatedly, not %u separate "
+                     "player structs. Treat it as a single lead at best.", nh);
 
         /* ⚠⚠ Say plainly what this is NOT. A candidate list is not a finding,
          * and this project has already mistaken one for the other -- a pointer

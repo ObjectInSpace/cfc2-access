@@ -291,6 +291,28 @@ void emu_ram_test_window(ULONGLONG base, SIZE_T size)
 /* Does a player pair live at `p1` within the buffer starting at `buf_addr`?
  * Pure arithmetic on already-copied bytes: no foreign reads happen here, so it
  * cannot fault and needs no guard of its own. */
+/* Is the dword window around `off` just a repeating pattern? A uniform run
+ * satisfies every relational test at every alignment, so it must be excluded
+ * by CONTENT, not by arithmetic.
+ *
+ * ⛔⛔ THE FIRST LIVE RUN WAS ENTIRELY THIS. Sixteen "candidates" 4-12 bytes
+ * apart, all reading hp 546 / 546, were one run of repeating 0x0222 words --
+ * `mx != 0`, `mx1 == mx2`, `hp <= mx` and "not both zero" are ALL true of
+ * 0x0222 forever, at any offset. The filter was not identifying fighters; it
+ * was reporting that a byte pattern exists. */
+static BOOL looks_uniform(const unsigned char *buf, SIZE_T off, SIZE_T buflen)
+{
+    unsigned i;
+    if (off + 16 > buflen)
+        return FALSE;
+    /* Compare 2-byte words across a 16-byte window: if every word is identical
+     * to the first, this is filler, a cleared block, or a repeating constant. */
+    for (i = 2; i < 16; i += 2)
+        if (buf[off + i] != buf[off] || buf[off + i + 1] != buf[off + 1])
+            return FALSE;
+    return TRUE;
+}
+
 static BOOL pair_matches(const unsigned char *buf, SIZE_T buflen,
                          SIZE_T off, unsigned *hp_out, unsigned *max_out)
 {
@@ -332,6 +354,13 @@ static BOOL pair_matches(const unsigned char *buf, SIZE_T buflen,
      * four bytes off the plant can satisfy the signature, so can any of the
      * millions of near-zero dwords in the real arena. */
     if (hp1 == 0 && hp2 == 0)
+        return FALSE;
+
+    /* ⛔⛔ REJECT UNIFORM RUNS at either player. This is what the first live
+     * run actually found: repeating 0x0222 words that satisfy every relational
+     * clause above at every alignment. A relational filter cannot exclude a
+     * constant -- only looking at the CONTENT can. */
+    if (looks_uniform(buf, off, buflen) || looks_uniform(buf, p2, buflen))
         return FALSE;
 
     if (hp_out)  *hp_out  = hp1;
@@ -400,6 +429,14 @@ emu_status emu_ram_find(emu_ram_hit *out, unsigned cap, unsigned *n_out,
             if (!pair_matches(buf, run, off, &hp, &mx))
                 continue;
 
+            /* ⛔⛔ THE CAP MUST NOT STOP THE SWEEP. The first live run filled
+             * 16 slots within ~0.5 MB and BROKE, leaving 99.8% of the arena
+             * unexamined -- and then reported the truncated result as if it
+             * were the answer. A cap on what you KEEP is fine; a cap that ends
+             * the SEARCH turns every negative into "I stopped early", which is
+             * indistinguishable from "it is not there".
+             * See budget-cap-what-you-encounter and
+             * sampling-gate-causes-false-negatives. */
             if (out && n < cap) {
                 out[n].p1         = addr + off;
                 out[n].health     = hp;
@@ -408,12 +445,14 @@ emu_status emu_ram_find(emu_ram_hit *out, unsigned cap, unsigned *n_out,
                  * is P1's health, guest RAM starts this far below it. */
                 out[n].guest_base = (addr + off) - CVS2_GUEST_P1;
             }
-            n++;
-            if (n >= cap && out)
-                break;
+            n++;              /* counts every ENCOUNTER, kept or not */
+
+            /* ⭐ Skip past a matched pair rather than re-testing the next
+             * dword. A uniform region (the live run hit a run of repeating
+             * 0x0222) otherwise matches at EVERY alignment and manufactures a
+             * cluster of "candidates" that are one region seen many times. */
+            off += CVS2_STRIDE;
         }
-        if (out && n >= cap)
-            break;
     }
 
     if (n_out)       *n_out = n;

@@ -382,6 +382,79 @@ int main(void)
                       emu_status_name(s), nh);
             }
 
+            /* ⛔⛔ 10l IS THE FIRST LIVE RUN, REPRODUCED. It reported 16
+             * "candidates" 4-12 bytes apart, every one reading hp 546 / 546.
+             * They were a run of repeating 0x0222 words: mx != 0, mx1 == mx2,
+             * hp <= mx and "not both zero" are ALL true of 0x0222 at EVERY
+             * alignment, forever. The filter was not finding fighters -- it
+             * was reporting that a byte pattern exists.
+             *
+             * A relational filter cannot exclude a constant. Only looking at
+             * the CONTENT can, which is what looks_uniform() does. */
+            memset(ar, 0, ARENA_BYTES);
+            {
+                SIZE_T u;
+                for (u = 0x800; u < 0x2400; u += 2) {
+                    ar[u] = 0x22; ar[u + 1] = 0x02;    /* 546, repeating */
+                }
+                emu_ram_test_window((ULONGLONG)(ULONG_PTR)ar, ARENA_BYTES);
+                s = emu_ram_find(hits, 8, &nh, &scanned);
+                check("10l a repeating 0x0222 run yields NO hits "
+                      "(the first live run's false positive)",
+                      s == EMU_OK && nh == 0,
+                      "got %s n=%u", emu_status_name(s), nh);
+            }
+
+            /* ⭐ Positive control for 10l: a REAL pair must still be found when
+             * it sits next to filler. Without this, a scanner that rejected
+             * everything would pass 10l and look fixed. */
+            memset(ar, 0, ARENA_BYTES);
+            {
+                SIZE_T u;
+                for (u = 0x800; u < 0x1000; u += 2) {
+                    ar[u] = 0x22; ar[u + 1] = 0x02;
+                }
+                /* varied, non-uniform neighbourhood around each struct */
+                for (u = 0; u < 16; u++) {
+                    ar[plant + 8 + u]                 = (unsigned char)(u * 7 + 1);
+                    ar[plant + CVS2_STRIDE_T + 8 + u] = (unsigned char)(u * 5 + 3);
+                }
+                ar[plant + 0] = 96;  ar[plant + 4] = 144;
+                ar[plant + CVS2_STRIDE_T + 0] = 120;
+                ar[plant + CVS2_STRIDE_T + 4] = 144;
+                s = emu_ram_find(hits, 8, &nh, &scanned);
+                check("10m a REAL pair beside filler is still found",
+                      s == EMU_OK && nh >= 1, "got %s n=%u",
+                      emu_status_name(s), nh);
+            }
+
+            /* ⭐⭐ THE SWEEP MUST NOT STOP AT THE CAP. Plant more distinct
+             * pairs than `cap`, spread out, and require the reported COUNT to
+             * exceed cap -- proving n counts encounters while the sweep ran on.
+             * The live run filled 16 slots in 0.5 MB and quit, reporting the
+             * truncation as the answer. */
+            memset(ar, 0, ARENA_BYTES);
+            {
+                unsigned made = 0;
+                SIZE_T q;
+                for (q = 0x100; q + CVS2_STRIDE_T + 32 < ARENA_BYTES;
+                     q += CVS2_STRIDE_T + 0x40) {
+                    unsigned j;
+                    for (j = 0; j < 16; j++) {
+                        ar[q + 8 + j]                 = (unsigned char)(j * 7 + made + 1);
+                        ar[q + CVS2_STRIDE_T + 8 + j] = (unsigned char)(j * 5 + made + 3);
+                    }
+                    ar[q + 0] = 90;  ar[q + 4] = 144;
+                    ar[q + CVS2_STRIDE_T + 0] = 130;
+                    ar[q + CVS2_STRIDE_T + 4] = 144;
+                    made++;
+                }
+                s = emu_ram_find(hits, 4, &nh, &scanned);   /* cap of only 4 */
+                check("10n the sweep RUNS ON past the cap (n counts encounters)",
+                      s == EMU_OK && made > 4 && nh > 4,
+                      "planted %u, cap 4, reported n=%u", made, nh);
+            }
+
             /* A zero-size window means we never looked -- and that must be a
              * RETURN VALUE, not a count of zero that reads like a negative. */
             emu_ram_test_window((ULONGLONG)(ULONG_PTR)ar, 0);

@@ -161,6 +161,13 @@ typedef struct {
     unsigned  max_health;
 } emu_ram_hit;
 
+/* ⚠ `*n_out` counts every pair ENCOUNTERED, which may exceed `cap`. The
+ * caller keeps at most `cap` of them but the sweep always runs to completion:
+ * a cap that ended the search would make every "found nothing further" mean
+ * "I stopped early", which is indistinguishable from a real negative. The
+ * first live run filled 16 slots inside 0.5 MB and stopped, leaving 99.8% of
+ * the arena unexamined -- and reported that as the result. */
+
 /* Scan the arena for the CVS2 player-pair signature.
  *
  * Fills up to `cap` hits and sets *n_out. The return value distinguishes:
