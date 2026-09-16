@@ -1436,6 +1436,34 @@ static const mc_screen g_screens[] = {
       .name = "Pause Menu", .how = MC_VERIFIED_LIVE_TEXT,
       .kind = MC_ROW_COLUMN, .coord_x = 362.0f },
 
+    /* ⭐⭐⭐ THE STANDBY SETTINGS (0x1400991c1, 3 rows, vertical) -- named by
+     * the SNAPSHOT, which read its column directly:
+     *
+     *     snap: === SCREEN 2C4BA0E0: 3 row(s) at x=494, cursor says 3 ===
+     *       columns: 494(3) 960(1)
+     *        1. Basic Standby
+     *        2. In-game Standby
+     *        3. Museum Standby
+     *
+     * ⭐ AN EXACT MATCH, which is what makes this shippable: the column holds
+     * THREE objects and the cursor reports THREE, with no rival column on the
+     * screen (960 is the heading). Every other 3-row capture in that run was a
+     * different screen with a competing column, and this one is unambiguous.
+     * 10 movements on this caller, all at count 3.
+     *
+     * ⛔⛔ NOT the 3-row pair on the Casual Match screens
+     * (0x14009885e/0x1400988bf, screens 2C4077F0 / 2C4902F0). I spent a round
+     * treating those as one problem with this; they are different callers on
+     * different screens and THOSE ARE STILL UNNAMED. Do not let this row's
+     * success suggest otherwise -- see the memory note.
+     *
+     * ⚠ count = 0 with MC_ROW_COLUMN: the kind quotes the row's own label from
+     * its column, so no per-count map exists to go stale. The column's
+     * population is the membership test, inside gt_column_item(). */
+    { .caller = 0x1400991c1ULL, .base_index = -1, .count = 0,
+      .name = "Standby Settings", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_ROW_COLUMN, .coord_x = 494.0f },
+
     /* ⭐⭐⭐ TRAINING OPTIONS -- the ROW axis. See g_training_option_rows for
      * the coordinate evidence and the control that validates it.
      *

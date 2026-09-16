@@ -1838,6 +1838,33 @@ int main(void)
               g_rosters[6].count, g_rosters[7].count);
     }
 
+    /* --- case 33t: ⭐⭐ THE STANDBY SETTINGS read their own column ---------
+     *
+     * 0x1400991c1, 3 rows, named by the snapshot at x=494 (Basic / In-game /
+     * Museum Standby). It quotes the live column, so there is no map to go
+     * stale -- what this pins is that the entry EXISTS with the measured
+     * column, because a wrong or missing coord_x silently names nothing.
+     *
+     * ⛔⛔ AND THAT IT IS NOT CONFUSED WITH THE OTHER 3-ROW CONTROL. The pair
+     * 0x14009885e/0x1400988bf on the Casual Match screens is ALSO three rows
+     * vertical and is STILL UNNAMED. I spent a round treating the two as one
+     * problem; they are different callers on different screens. If either of
+     * those ever acquires this screen's column by copy-paste, it would quote
+     * Casual Match's values as though they were standby rows. */
+    {
+        const mc_screen *sb = menu_speak_lookup_n(0x1400991c1ULL, 3);
+        const mc_screen *a  = menu_speak_lookup_n(0x14009885eULL, 3);
+        const mc_screen *b  = menu_speak_lookup_n(0x1400988bfULL, 3);
+        int ok = sb && sb->kind == MC_ROW_COLUMN && sb->coord_x == 494.0f &&
+                 /* the other pair must still have NO entry at all */
+                 a == NULL && b == NULL;
+        check("33t. Standby Settings reads its own column, and the Casual "
+              "Match 3-row pair is still unclaimed", ok,
+              "standby=%d x=%.0f other=%d/%d",
+              sb ? (int)sb->kind : -1, sb ? (double)sb->coord_x : -1.0,
+              a != NULL, b != NULL);
+    }
+
     /* --- case 33q: ⭐⭐ THE SOUNDTRACK CHOOSER names from its position.
      *
      * Museum > Music's 9-item strip captions nothing, so this is the one place
