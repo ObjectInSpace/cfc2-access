@@ -158,6 +158,46 @@ int main(void)
         }
     }
 
+    /* --- 6. ⛔⛔ A DESCRIPTION ALREADY IN THE RECORD DOES NOT RE-FIRE -------
+     *
+     * USER-HEARD BUG that cases 1-5 all MISSED: on the achievements grid the
+     * mod read out an unlock condition on EVERY cursor movement, with the
+     * Hints view never opened. gt_prose_at() enumerates a RETAINED HISTORY, so
+     * a description captured on an earlier visit sat in the record and
+     * re-triggered forever.
+     *
+     * ⚠ WHY THE EXISTING CASES COULD NOT CATCH IT: each one reset the record
+     * (gt_test_reset) and planted exactly one string, so "still in the record
+     * from before" was a state the fixture never built. A fixture that starts
+     * clean cannot test staleness.
+     *
+     * Here the description stays in the record while OTHER text arrives after
+     * it -- the grid's own row titles, which is exactly what the game does --
+     * and the hint path must stay silent. */
+    {
+        long before;
+        gt_test_reset();
+        gt_test_focus_enable();
+        plant(HINT);
+        menu_speak_check_hint();          /* the view opened: speaks once */
+        /* The user closes it and sweeps the grid: titles keep arriving. */
+        plant(NAME);
+        plant("Another Me");
+        plant("Photo Finish");
+        before = log_size();
+        menu_speak_check_hint();
+        menu_speak_check_hint();
+        menu_speak_check_hint();
+        if (log_size() != before) {
+            printf("  FAIL  6. a description still in the record does NOT "
+                   "re-fire while the user browses\n");
+            bad = 1;
+        } else {
+            printf("  PASS  6. a description still in the record does NOT "
+                   "re-fire while the user browses\n");
+        }
+    }
+
     printf(bad ? "\nFAILED\n" : "\nall cases passed\n");
     return bad;
 }

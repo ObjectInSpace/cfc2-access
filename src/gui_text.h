@@ -455,6 +455,16 @@ void gt_note_focus_move(void);
  * item -- that is the timing join gt_take_caption() exists to refuse. */
 BOOL gt_prose_at(int nth, char *out, int outlen);
 
+/* ⭐⭐ The newest prose, and ONLY IF IT HAS ARRIVED SINCE THE LAST CALL.
+ *
+ * ⛔ For a view that produces NO cursor movement, where gt_take_caption()'s
+ * movement stamp cannot apply and gt_prose_at()'s retained history re-fires
+ * forever. The caller sees each string once; re-opening the view sets the text
+ * again and that counts as a new arrival.
+ *
+ * ⚠ Returns FALSE when nothing new has arrived -- the normal case per poll. */
+BOOL gt_newest_prose_if_new(char *out, int outlen);
+
 BOOL gt_take_caption(char *out, int outlen);
 
 /* Log the whole ordered record, with a positive count of what was examined and

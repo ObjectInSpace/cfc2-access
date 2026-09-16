@@ -903,6 +903,57 @@ BOOL gt_take_caption(char *out, int outlen)
     return got;
 }
 
+/* ⭐⭐⭐ The newest prose, but ONLY IF IT IS NEW SINCE THE LAST CALL.
+ *
+ * ⛔⛔ THE BUG THIS EXISTS FOR. menu_speak_check_hint() scanned gt_prose_at()
+ * for an achievement description and announced it. On the achievements grid
+ * that read out an unlock condition on EVERY cursor movement, with the Hints
+ * view never opened -- because gt_prose_at() enumerates a RETAINED HISTORY,
+ * not what is on screen. A description captured on an earlier visit sat in the
+ * record and re-triggered forever.
+ *
+ * ⚠ gt_take_caption()'s movement stamp cannot serve here: the hint view
+ * produces NO cursor movement at all, which is the whole reason it needs its
+ * own announcer. So the test is ARRIVAL, not movement -- the caller sees a
+ * given string exactly once, and only while it is the newest thing the game
+ * set. Re-opening the view sets the text again, which is a new arrival.
+ *
+ * ⚠ Returns FALSE when nothing has arrived since the last call, which is the
+ * normal case on every poll. */
+BOOL gt_newest_prose_if_new(char *out, int outlen)
+{
+    static LONG last_taken = -1;
+    BOOL got = FALSE;
+
+    if (!out || outlen <= 0)
+        return FALSE;
+    out[0] = '\0';
+    if (!g_installed && !g_focus_test_mode)
+        return FALSE;
+    if (InterlockedCompareExchange(&g_focus_busy, 1, 0) != 0)
+        return FALSE;
+    {
+        LONG n = g_focus_count;
+        for (LONG i = n - 1; i >= 0; i--) {
+            if (strchr(g_focus[i].text, '<') != NULL)
+                continue;           /* a hint strip is not the view's text */
+            if (i <= last_taken)
+                break;              /* already handed out; nothing new */
+            strncpy(out, g_focus[i].text, (size_t)outlen - 1);
+            out[outlen - 1] = '\0';
+            last_taken = i;
+            got = TRUE;
+            break;
+        }
+        /* ⚠ The record can be cleared or rewound; never hold an index past its
+         * end or a later arrival at that slot would be treated as seen. */
+        if (last_taken >= n)
+            last_taken = n - 1;
+    }
+    InterlockedExchange(&g_focus_busy, 0);
+    return got;
+}
+
 BOOL gt_focus_conclusive(long *records, long *moves)
 {
     if (records) *records = (long)g_focus_count;

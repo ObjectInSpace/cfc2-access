@@ -4088,7 +4088,24 @@ void menu_speak_check_hint(void)
     char text[GT_CAPTION_MAX];
     int i;
 
-    for (i = 0; gt_prose_at(i, text, (int)sizeof(text)); i++) {
+    /* ⛔⛔ THE NEWEST STRING ONLY -- i < 1, NOT THE WHOLE RECORD.
+     *
+     * USER-HEARD BUG: on the achievements grid the mod read out an unlock
+     * condition on EVERY movement, with the Hints view never opened once. The
+     * strip in the log still said "Toggle Player Progress Page / Back"
+     * throughout, and the descriptions were NEVER set as live text in that run
+     * (zero TEXT SET lines for them) -- they were already sitting in the
+     * record from an earlier visit.
+     *
+     * ⭐ THE ERROR WAS MINE AND IT WAS CONCEPTUAL: gt_prose_at() enumerates a
+     * RETAINED HISTORY, not what is on screen now. I wrote this loop to scan
+     * "every prose string" believing that meant "the view's text", so any
+     * description ever captured kept re-triggering it. A history is not a
+     * viewport.
+     *
+     * Only index 0 -- the newest prose -- can be the view that just opened,
+     * and the guard below then requires it to be NEW. */
+    for (i = 0; i < 1 && gt_newest_prose_if_new(text, (int)sizeof(text)); i++) {
         prompt_id id;
         if (!text[0])
             continue;
@@ -4101,10 +4118,12 @@ void menu_speak_check_hint(void)
         if (strncmp(id.label, "ACHIEVEMENT_", 12) != 0 ||
             !strstr(id.label, "_DESC"))
             continue;
-        if (strcmp(last, text) == 0)
-            return;                       /* same hint, already spoken */
-        _snprintf(last, sizeof(last), "%s", text);
-        last[sizeof(last) - 1] = '\0';
+        /* ⭐ No text-equality guard here. gt_newest_prose_if_new() hands each
+         * arrival out exactly ONCE, so a repeat is impossible by construction
+         * -- and re-opening the view on the SAME achievement sets the text
+         * again, which is a new arrival and SHOULD speak. A `last` string
+         * comparison would have blocked exactly that, which is the one case
+         * the user would notice as broken. */
         {
             char flat[GT_CAPTION_MAX];
             menu_speak_flatten_prompt(text, flat, (int)sizeof(flat));
@@ -4113,10 +4132,6 @@ void menu_speak_check_hint(void)
         }
         return;
     }
-    /* ⚠ No description on screen: the view is closed. Clear the guard so the
-     * same hint opened again speaks again -- the same reasoning as the modal
-     * path's, and the reason this is not a one-shot latch. */
-    last[0] = '\0';
 }
 
 /* ⛔⛔ THE ONE-POLL CAPTION DEFERRAL IS GONE. DO NOT BRING IT BACK.
@@ -4263,8 +4278,24 @@ void menu_speak(const mc_move *m)
         if (have_cap &&
             !caption_is_stale_repeat(cap, sp.screen_name)) {
             prompt_id id = prompt_identify(cap);
+            /* ⛔⛔ _NAME ONLY, and the suffix test is load-bearing.
+             *
+             * USER-HEARD REGRESSION: "Everybody Rumored, Nobody Believed,
+             * 2 of 40. Everybody Rumored, Nobody Believed" -- the name twice,
+             * with the DESCRIPTION spoken as a separate line just before it.
+             *
+             * ⭐ THE CAUSE WAS MY OWN CHANGE ONE STEP EARLIER. Adding the 40
+             * ACHIEVEMENT_*_DESC to the prompt table for the Hints view made
+             * this rule -- which tested only the ACHIEVEMENT_ PREFIX -- start
+             * matching descriptions too. A prefix that was unambiguous became
+             * ambiguous the moment a sibling family joined the table.
+             *
+             * ⚠ The lesson generalises: widening a lookup table silently
+             * widens every prefix test that reads from it. Grep the prefix
+             * before adding a family. */
             if (id.result == PROMPT_ID_FOUND && !sp.named && id.label &&
-                strncmp(id.label, "ACHIEVEMENT_", 12) == 0) {
+                strncmp(id.label, "ACHIEVEMENT_", 12) == 0 &&
+                strstr(id.label, "_NAME")) {
                 /* ⭐⭐ AN ACHIEVEMENT TITLE *IS* THE ITEM NAME, so it LEADS
                  * rather than being appended as a description.
                  *
@@ -4294,7 +4325,21 @@ void menu_speak(const mc_move *m)
                     _snprintf(line, sizeof(line), "%s, %d of %d",
                               spoken, sp.position, sp.total);
                 line[sizeof(line) - 1] = '\0';
-            } else if (id.result == PROMPT_ID_FOUND) {
+            } else if (id.result == PROMPT_ID_FOUND &&
+                       !(id.label &&
+                         strncmp(id.label, "ACHIEVEMENT_", 12) == 0 &&
+                         strstr(id.label, "_DESC"))) {
+                /* ⛔ AN ACHIEVEMENT DESCRIPTION IS NOT A ROW CAPTION.
+                 *
+                 * It belongs to the HINTS view, which the user opens with
+                 * DECIDE and which menu_speak_check_hint() announces on its
+                 * own. Appending it here read the unlock condition aloud on
+                 * EVERY grid movement -- an extra sentence per keypress while
+                 * sweeping 40 items, which is noise on exactly the screen the
+                 * user is trying to move through quickly.
+                 *
+                 * ⚠ The descriptions entered the prompt table for the hint
+                 * view; this is where that had a side effect. */
                 char spoken[GM_OUT_MAX];
                 gm_speak(cap, spoken, sizeof(spoken));
                 if (spoken[0] && !gm_has_residue(spoken)) {
