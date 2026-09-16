@@ -69,14 +69,20 @@ static void emu_watch_report_log(void);
  * CVS2 full-health constant (144), and one run answers it either way. */
 static void emu_cap_probe_log(void)
 {
-    static int done;
+    /* ⛔⛔ THIS RAN ONCE AND THAT WAS THE BUG. `static int done` fired the
+     * probe at the FIRST moment a game was detected -- i.e. the loading
+     * screen, before the fighters exist in RAM. The user was genuinely in a
+     * match and the probe had already spent its single shot 2 s after the ROM
+     * registered.
+     *
+     * ⭐ Same error as the identity-vs-scan cadence two rounds ago: a one-shot
+     * report cannot observe a state that arrives LATER. Re-run, and speak only
+     * when the answer CHANGES. */
+    static unsigned last_paired = 0xFFFFFFFFu;
     unsigned seen = 0, paired = 0;
     ULONGLONG first = 0;
     SIZE_T scanned = 0;
     emu_status s;
-
-    if (done)
-        return;
 
     s = emu_ram_probe_cap(144, &seen, &paired, &first, &scanned);
     if (s != EMU_OK) {
@@ -84,7 +90,9 @@ static void emu_cap_probe_log(void)
                  emu_status_name(s));
         return;
     }
-    done = 1;
+    if (paired == last_paired)
+        return;                     /* nothing new to say */
+    last_paired = paired;
 
     log_line("emu: === CAP PROBE: swept %llu MB for the published CVS2 full-"
              "health value 144 ===",
@@ -92,10 +100,34 @@ static void emu_cap_probe_log(void)
     log_line("emu:    %u occurrence(s) of 144; %u of them have a SECOND 144 "
              "exactly 0x5CC later.", seen, paired);
 
-    if (paired > 0)
-        log_line("emu: ⭐⭐ THE 0x5CC STRIDE IS CONFIRMED in this build. First "
-                 "pair at 0x%llx -- that is the player pair, and the prior-art "
-                 "CVS2 layout applies.", (unsigned long long)first);
+    /* ⛔⛔ "paired > 0" IS NOT CONFIRMATION, and the first version said it was.
+     * 144 is a common byte value, so pairs occur by chance in proportion to how
+     * many 144s exist. A run reported 15530 occurrences with 13 pairs -- which
+     * is the CHANCE rate, not a finding. Only a pair rate far above chance, or
+     * a pair that BEHAVES like health, means anything.
+     *
+     * Report the rate and let it be judged; never announce a conclusion the
+     * arithmetic does not support. */
+    if (paired > 0) {
+        /* Expected pairs if 144s were placed independently: every occurrence
+         * has ~ (seen / total_u16_slots) chance of another 144 at +0x5CC.
+         * Approximated conservatively as seen^2 / (scanned/2). */
+        double slots = (double)scanned / 2.0;
+        double expect = slots > 0 ? ((double)seen * (double)seen) / slots : 0.0;
+        log_line("emu: %u pair(s) at 0x5CC; ~%.1f expected BY CHANCE from "
+                 "%u occurrences in %llu MB.",
+                 paired, expect, seen,
+                 (unsigned long long)(scanned / (1024 * 1024)));
+        if ((double)paired > expect * 4.0 && paired >= 8)
+            log_line("emu: ⭐⭐ that is well ABOVE chance -- the 0x5CC stride "
+                     "is worth pursuing. First pair at 0x%llx.",
+                     (unsigned long long)first);
+        else
+            log_line("emu: ⚠ that is CONSISTENT WITH CHANCE -- it does NOT "
+                     "confirm the stride. ⭐ Note the probe only means "
+                     "anything DURING A MATCH; on a menu there are no "
+                     "fighters to find.");
+    }
     else if (seen > 0)
         log_line("emu: ⛔ 144 occurs but NEVER 0x5CC apart. The health VALUE "
                  "may be right and the STRIDE is wrong for this build -- the "
@@ -114,14 +146,14 @@ static void emu_cap_probe_log(void)
  * it is not, the sweep finds them anyway and reports the real base. */
 static void emu_guest_map_log(void)
 {
-    static int done;
+    /* Re-runs like the cap probe, and speaks only when the ANSWER changes --
+     * the fingerprint may be staged early and relocated once the machine is
+     * actually running. A one-shot check would see only the staging copy. */
+    static ULONGLONG last_at = 1;
     ULONGLONG at = 0, implied = 0;
     BOOL predicted = FALSE;
     SIZE_T scanned = 0;
     emu_status s;
-
-    if (done)
-        return;
 
     s = emu_guest_map(&at, &implied, &predicted, &scanned);
 
@@ -129,7 +161,9 @@ static void emu_guest_map_log(void)
         log_line("emu: MAPPING TEST could not sweep -- says nothing.");
         return;
     }
-    done = 1;
+    if (at == last_at)
+        return;
+    last_at = at;
 
     if (s == EMU_NOT_RUNNING) {
         log_line("emu: ⛔ MAPPING TEST -- the ROM fingerprint is NOT in the "

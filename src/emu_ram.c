@@ -293,7 +293,13 @@ const char *emu_rom_name_for_index(int rom_index)
  * machine it is on. A stall in the user's speech is a broken mod; a diagnostic
  * that reports PARTIAL is an inconvenience. */
 #define SCAN_BLOCK     0x40000u   /* 256 KB per guarded read                */
-#define SCAN_BUDGET_MS 25         /* per sweep; resumes where it left off   */
+/* ⚠ 25 ms covered only ~2 MB per sweep in a live run -- 128 sweeps (4+ min of
+ * play) for one pass over the arena, so a match was over before the scan had
+ * looked anywhere. The stall that forced a budget was 114 SECONDS from a
+ * per-page VirtualQuery, which is fixed; the budget itself can be far more
+ * generous. 60 ms is still well under a frame's worth of the poll thread and
+ * covers the arena in a handful of sweeps. */
+#define SCAN_BUDGET_MS 60         /* per sweep; resumes where it left off   */
 
 static ULONGLONG g_win_base;    /* test override; 0 = derive from the game */
 static SIZE_T    g_win_size;
