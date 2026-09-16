@@ -28,10 +28,17 @@
  * read it. That asymmetry is what makes it trustworthy.
  *
  * ⚠⚠ THE ARENA IS NOT GUEST RAM, AND THIS HEADER MUST NOT BLUR THAT.
- * 256 MB is the emulator's whole arena. NAOMI system RAM is 16 MB; CPS-2 is far
+ * The constructor asks for 256 MB. NAOMI system RAM is 16 MB; CPS-2 is far
  * smaller. Guest RAM is expected to be a SUB-RANGE of the arena, and which
- * sub-range is exactly what emu_ram_find() has to PROVE rather than assume.
+ * sub-range is exactly what the next stage has to PROVE rather than assume.
  * "I found the structure" is not progress toward live state.
+ *
+ * ⚠ MEASURED, not assumed: the first live run reported the arena at
+ * 0x7d81000 with a VirtualQuery region of 511 MB -- i.e. the region the memory
+ * manager reports is NOT the 256 MB the constructor requested. Do not treat
+ * EMU_ARENA_SIZE as the bound of anything; it records what the code asks for,
+ * and the region size is what actually exists. A scan must use the measured
+ * size, and must not assume the arena begins at the region's base either.
  *
  * ⚠ ASLR is off and the exe carries no relocations, so the two literal
  * addresses below are valid on every launch -- but they are still verified at
@@ -86,10 +93,17 @@ emu_status emu_arena(ULONGLONG *base_out, SIZE_T *size_out);
 
 /* --- Which ROM is running ------------------------------------------------ */
 
-/* The 1-based ROM index (1..18) over REVISIONS, straight from state+0x44.
+/* The ROM index (0..17) over REVISIONS, straight from state+0x44.
+ *
+ * ⛔⛔ IT IS 0-BASED, and index 0 (cvs1) is a VALID game, not "nothing
+ * matched". The first version of this file read it as 1-based and treated 0 as
+ * NOT_RUNNING; the live cross-check caught it on the first run (the game said
+ * index 3 while its own name string said 'cvs2u'). See the long comment in
+ * emu_rom_index() for why the loop at 0x1400b6250 looks 1-based and is not.
+ *
  * ⚠ This is NOT the 0..7 canonical game index in move_list.h. Two games ship
- * two revisions each; converting between the two numberings is a real mapping,
- * not a cast -- see emu_game_from_rom_index(). */
+ * two revisions each (Z3U ships four); converting between the two numberings is
+ * a real mapping, not a cast -- see emu_game_from_rom_index(). */
 emu_status emu_rom_index(int *out);
 
 /* The ROM set's short name ("cvs2", "z3uu", ...), copied out of the state

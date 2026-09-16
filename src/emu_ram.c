@@ -135,13 +135,30 @@ emu_status emu_rom_index(int *out)
     if (!read_dword(st + EMU_OFF_ROM_INDEX, &v))
         return EMU_UNREADABLE;
 
-    /* rom_index_from_name() returns 0 when the name matched nothing, and the
-     * table has exactly 18 entries. Anything else is not an index this field
-     * can legitimately hold. ⛔ Do NOT clamp: a clamped id would name a
+    /* ⛔⛔ THE INDEX IS 0-BASED, AND READING IT AS 1-BASED SHIFTED EVERY GAME.
+     * Caught by the cross-check on the first live run, which is the entire
+     * reason that check exists. Read the loop at 0x1400b6250 carefully:
+     *
+     *     r10d = 0                       ; the counter starts at ZERO
+     *     rax  = [0x141208b00]           ; entry [0] is loaded BEFORE the loop
+     *     ...compare...                  ; and compared with r10d still 0
+     *     match -> eax = r10d            ; so "cvs1" returns 0, not 1
+     *     miss  -> rax = [rbx + r9*8 + 8]; only THEN advance to entry [1]
+     *
+     * The pre-loop load of entry [0] is what makes it look 1-based at a
+     * glance: the `+8` in the loop body advances PAST the entry already
+     * consumed, it does not index from one.
+     *
+     * ⚠ CONSEQUENCE: 0 is a VALID index (cvs1), not "nothing matched". The
+     * first version returned NOT_RUNNING for it, which would have made the mod
+     * silent for exactly one game -- invisible unless someone tested CVS1
+     * specifically, and indistinguishable from "no game loaded" when they did.
+     * The real "no game" signal is a null state slot, which emu_state()
+     * already reports.
+     *
+     * ⛔ Do NOT clamp an out-of-range value: a clamped id would name a
      * different game's characters, confidently and wrongly. */
-    if (v == 0)
-        return EMU_NOT_RUNNING;
-    if (v > 18)
+    if (v > 17)
         return EMU_UNVERIFIED;
 
     if (out)
@@ -202,23 +219,28 @@ emu_status emu_rom_name(char *out, unsigned cap)
 /* The 18 ROM records in table order, mapped to the canonical 0..7 game index
  * used by move_list.h and roster_table.h.
  *
+ * ⭐ INDEX 0 IS cvs1 -- the array index IS the value rom_index_from_name()
+ * returns. Confirmed against LIVE EVIDENCE, not reasoned from the listing: the
+ * game reported index 3 while its own name string said 'cvs2u', and only the
+ * 0-based reading reproduces that pairing.
+ *
  * ⚠ The two numberings genuinely differ and the difference is not a formula:
- * z3uu/a3uu sit at ROM slots 17-18, far from z3u/a3u at 7-8, so "divide by two"
+ * z3uu/a3uu sit at ROM slots 16-17, far from z3u/a3u at 6-7, so "divide by two"
  * is right for the first sixteen and wrong for the last two. That is exactly
  * the shape of near-miss this project has shipped before (a 7-row list fitted a
  * formula 17/19 and was still wrong), so it is a TABLE, not arithmetic.
  *
  * game: 0 CVS1  1 CVS2  2 CFJ  3 Z3U  4 PWS1  5 PWS2  6 MJUS  7 STG2 */
 static const struct { const char *name; int game; int rev; } g_rom_map[18] = {
-    /*  1 */ { "cvs1",  0, 0 },  /*  2 */ { "cvs1u", 0, 1 },
-    /*  3 */ { "cvs2",  1, 0 },  /*  4 */ { "cvs2u", 1, 1 },
-    /*  5 */ { "cfj",   2, 0 },  /*  6 */ { "cfe",   2, 1 },
-    /*  7 */ { "z3u",   3, 0 },  /*  8 */ { "a3u",   3, 1 },
-    /*  9 */ { "pws1",  4, 0 },  /* 10 */ { "pws1u", 4, 1 },
-    /* 11 */ { "pws2",  5, 0 },  /* 12 */ { "pws2u", 5, 1 },
-    /* 13 */ { "mjus",  6, 0 },  /* 14 */ { "pjus",  6, 1 },
-    /* 15 */ { "stg2",  7, 0 },  /* 16 */ { "pswd",  7, 1 },
-    /* 17 */ { "z3uu",  3, 2 },  /* 18 */ { "a3uu",  3, 3 },
+    /*  0 */ { "cvs1",  0, 0 },  /*  1 */ { "cvs1u", 0, 1 },
+    /*  2 */ { "cvs2",  1, 0 },  /*  3 */ { "cvs2u", 1, 1 },
+    /*  4 */ { "cfj",   2, 0 },  /*  5 */ { "cfe",   2, 1 },
+    /*  6 */ { "z3u",   3, 0 },  /*  7 */ { "a3u",   3, 1 },
+    /*  8 */ { "pws1",  4, 0 },  /*  9 */ { "pws1u", 4, 1 },
+    /* 10 */ { "pws2",  5, 0 },  /* 11 */ { "pws2u", 5, 1 },
+    /* 12 */ { "mjus",  6, 0 },  /* 13 */ { "pjus",  6, 1 },
+    /* 14 */ { "stg2",  7, 0 },  /* 15 */ { "pswd",  7, 1 },
+    /* 16 */ { "z3uu",  3, 2 },  /* 17 */ { "a3uu",  3, 3 },
 };
 
 BOOL emu_game_from_rom_index(int rom_index, int *game_out, int *rev_out)
@@ -226,17 +248,17 @@ BOOL emu_game_from_rom_index(int rom_index, int *game_out, int *rev_out)
     if (game_out) *game_out = -1;
     if (rev_out)  *rev_out  = -1;
 
-    if (rom_index < 1 || rom_index > 18)
+    if (rom_index < 0 || rom_index > 17)
         return FALSE;
 
-    if (game_out) *game_out = g_rom_map[rom_index - 1].game;
-    if (rev_out)  *rev_out  = g_rom_map[rom_index - 1].rev;
+    if (game_out) *game_out = g_rom_map[rom_index].game;
+    if (rev_out)  *rev_out  = g_rom_map[rom_index].rev;
     return TRUE;
 }
 
 const char *emu_rom_name_for_index(int rom_index)
 {
-    if (rom_index < 1 || rom_index > 18)
+    if (rom_index < 0 || rom_index > 17)
         return NULL;
-    return g_rom_map[rom_index - 1].name;
+    return g_rom_map[rom_index].name;
 }
