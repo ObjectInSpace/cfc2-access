@@ -12,6 +12,7 @@
  * supply the mechanism under test.
  */
 #include "../src/emu_cursor.h"
+#include "../src/emu_ram.h"
 #include "../src/memsafe.h"
 
 #include <stdio.h>
@@ -66,6 +67,28 @@ static void check(const char *name, int cond, const char *fmt, ...)
                                   * every-capture counter is caught earlier, by
                                   * the control filter, so it cannot exercise
                                   * the guard it was meant to test.            */
+
+/* A stand-in emulator state object, so the "is a ROM running?" test can be
+ * driven without launching anything. Mirrors tools/test_emu_ram.c. */
+static ULONGLONG g_slot;
+static char     *g_state;
+static void     *g_st_arena;
+static char      g_rom_name[16];
+#define STATE_SIZE 0x100
+
+static void put_q(char *p, unsigned off, ULONGLONG v) { memcpy(p + off, &v, 8); }
+static void put_d(char *p, unsigned off, unsigned  v) { memcpy(p + off, &v, 4); }
+
+static void build_state(const char *rom_name, unsigned rom_index)
+{
+    memset(g_state, 0, STATE_SIZE);
+    _snprintf(g_rom_name, sizeof g_rom_name, "%s", rom_name);
+    put_q(g_state, EMU_OFF_ARENA,     (ULONGLONG)(ULONG_PTR)g_st_arena);
+    put_q(g_state, EMU_OFF_ROM_NAME,  (ULONGLONG)(ULONG_PTR)g_rom_name);
+    put_d(g_state, EMU_OFF_ROM_INDEX, rom_index);
+    g_slot = (ULONGLONG)(ULONG_PTR)g_state;
+    emu_ram_test_redirect((ULONGLONG)(ULONG_PTR)&g_slot);
+}
 
 static BYTE *g_fx;
 static unsigned g_counter;
@@ -367,6 +390,66 @@ int main(void)
               rep.pages_seen <= rep.pages_kept || rep.truncated,
               "the cap bound but nothing said so");
         emu_cursor_test_page_cap(0);
+    }
+
+    printf("\n--- 9. ARMING: a ROM must actually be RUNNING --------------\n");
+    {
+        /* ⛔⛔ THE BUG THIS PINS, from the 2026-09-16 18:54 run.
+         * The probe armed on `emu_rom_index() == EMU_OK`, which is TRUE on the
+         * shell because index 0 is a valid game (cvs1). It armed 24 s before
+         * CVS2 loaded, burned its 30 s timeout on the title screen, and then
+         * reported "the emulated game does not use sKeyboard" -- a confident
+         * negative it had ~6 s to test. */
+        char nm[16];
+        g_state    = (char *)VirtualAlloc(NULL, STATE_SIZE,
+                                          MEM_COMMIT | MEM_RESERVE,
+                                          PAGE_READWRITE);
+        g_st_arena = VirtualAlloc(NULL, 0x10000, MEM_COMMIT | MEM_RESERVE,
+                                  PAGE_READWRITE);
+        check("9-setup state allocated", g_state && g_st_arena, "");
+
+        if (g_state && g_st_arena) {
+            /* ⛔⛔ THE SHELL: a readable state and index 0, but NO rom name.
+             * This is the exact state the 18:54 run armed in. The bug was that
+             * the caller tested emu_rom_index() -- which is EMU_OK here,
+             * because index 0 is cvs1. The distinguishing fact is the NAME. */
+            build_state("", 0);
+            {
+                int idx = -1;
+                check("9a0 the INDEX alone does NOT discriminate (index 0 is "
+                      "readable on the shell -- this is why the bug happened)",
+                      emu_rom_index(&idx) == EMU_OK && idx == 0,
+                      "emu_rom_index said %s", 
+                      emu_status_name(emu_rom_index(&idx)));
+            }
+            check("9a index 0 with an EMPTY name is NOT running (the shell)",
+                  !emu_cursor_rom_running(nm, sizeof nm),
+                  "armed on the shell -- this is the 18:54 bug");
+
+            /* cvs1 really loaded: index 0, and a name. Index 0 must not be
+             * mistaken for 'nothing matched' in the OTHER direction either. */
+            build_state("cvs1", 0);
+            check("9b index 0 WITH a name IS running (cvs1 is a real game)",
+                  emu_cursor_rom_running(nm, sizeof nm) &&
+                  strcmp(nm, "cvs1") == 0,
+                  "index 0 was treated as 'no game' -- silences exactly one "
+                  "game, invisibly");
+
+            build_state("cvs2u", 3);
+            check("9c a loaded ROM reports its NAME back to the caller",
+                  emu_cursor_rom_running(nm, sizeof nm) &&
+                  strcmp(nm, "cvs2u") == 0, "got '%s'", nm);
+
+            /* A null slot is the real 'no game' signal. */
+            g_slot = 0;
+            emu_ram_test_redirect((ULONGLONG)(ULONG_PTR)&g_slot);
+            check("9d a null state slot is NOT running",
+                  !emu_cursor_rom_running(nm, sizeof nm), "");
+
+            emu_ram_test_redirect(0);
+            VirtualFree(g_state, 0, MEM_RELEASE);
+            VirtualFree(g_st_arena, 0, MEM_RELEASE);
+        }
     }
 
     emu_cursor_test_window(0, 0);

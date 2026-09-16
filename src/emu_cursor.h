@@ -162,6 +162,24 @@ typedef struct {
     BOOL      truncated;        /* a cap bound somewhere this run            */
 } ec_report;
 
+/* Is an emulated ROM actually RUNNING right now?
+ *
+ * ⛔⛔ THIS EXISTS BECAUSE `emu_rom_index() == EMU_OK` IS NOT THAT QUESTION.
+ * Index 0 is a VALID game (cvs1), so a status check alone cannot tell "cvs1 is
+ * loaded" from "the shell is sitting on the title screen". The first live run
+ * of this probe armed 24 seconds before the ROM loaded for exactly that reason,
+ * spent its whole timeout on the shell, and then reported a confident negative
+ * about the emulated game's input path -- having had ~6 seconds to observe it.
+ *
+ * The discriminator is the ROM NAME: it is empty until a ROM is actually
+ * running, and the emu: cross-check already relies on that. `*name_out` is
+ * filled when TRUE is returned, so a caller can also notice a ROM CHANGE.
+ *
+ * ⚠ The project's own memory said "index 0 is a VALID game, not 'nothing
+ * matched'" before this bug was written. Encoding the check here means the next
+ * caller cannot make the same mistake. */
+BOOL emu_cursor_rom_running(char *name_out, unsigned cap);
+
 /* Allocate the pools and capture S0. Safe to call repeatedly; re-arming
  * discards any in-flight cycle. */
 ec_status emu_cursor_arm(void);

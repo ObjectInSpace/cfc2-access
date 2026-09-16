@@ -221,6 +221,8 @@ static BOOL     g_cursor_armed;
 static DWORD    g_cursor_armed_at;
 static unsigned g_cursor_edges;
 static BOOL     g_cursor_gave_up;
+static char     g_cursor_rom[32];
+static BOOL     g_cursor_waited_note;
 
 /* How long to wait for ANY arrow edge before concluding the emulated game does
  * not use sKeyboard. 30 s of navigation is far more than enough. */
@@ -276,6 +278,7 @@ static void cursor_probe_report(void)
 
 static void cursor_probe_tick(void)
 {
+    char rom[32];
     kbd_edges e;
     BOOL left, right;
     ec_status s;
@@ -283,11 +286,41 @@ static void cursor_probe_tick(void)
 
     if (g_cursor_gave_up) return;
 
+    /* ⛔⛔ ARM ONLY WHEN A ROM IS ACTUALLY RUNNING -- and this cost a run.
+     *
+     * The first version armed on `emu_rom_index() != EMU_OK`. But index 0 is a
+     * VALID game (cvs1), so that is TRUE on the shell as well: the probe armed
+     * at 18:54:22 with `rom_index=0 name=''`, CVS2 did not load until 18:54:46,
+     * and the 30 s timeout expired at 18:54:52. It spent 24 of its 30 seconds
+     * on the title screen and then reported "the emulated game does not take
+     * keyboard through sKeyboard" -- a confident negative it had six seconds to
+     * test.
+     *
+     * ⚠ The project's own memory already said "index 0 is a VALID game, not
+     * 'nothing matched'". Knowing a trap is not the same as encoding it. */
+    if (!emu_cursor_rom_running(rom, sizeof rom)) {
+        /* Not in a game. If we were armed, the player left -- drop the state
+         * rather than carry a half-finished cycle across the boundary. */
+        if (g_cursor_armed) {
+            log_line("cursor: left the emulated game -- probe disarmed. It "
+                     "will re-arm when a ROM loads.");
+            emu_cursor_reset();
+            g_cursor_armed = FALSE;
+            g_cursor_rom[0] = '\0';
+        }
+        return;
+    }
+
+    /* A DIFFERENT ROM means a different machine and a different arena layout;
+     * carrying candidates across would compare two games' memory. */
+    if (g_cursor_armed && strcmp(rom, g_cursor_rom) != 0) {
+        log_line("cursor: ROM changed '%s' -> '%s' -- re-arming.",
+                 g_cursor_rom, rom);
+        emu_cursor_reset();
+        g_cursor_armed = FALSE;
+    }
+
     if (!g_cursor_armed) {
-        int idx = 0;
-        /* Only arm once a game is actually loaded; arming against a null arena
-         * would report UNREADABLE and look like a failure of the probe. */
-        if (emu_rom_index(&idx) != EMU_OK) return;
         s = emu_cursor_arm();
         if (s != EC_OK) {
             log_line("cursor: could not arm -- %s. ⚠ This says nothing about "
@@ -296,10 +329,17 @@ static void cursor_probe_tick(void)
             return;
         }
         g_cursor_armed = TRUE;
+        g_cursor_edges = 0;
+        g_cursor_waited_note = FALSE;
+        /* ⭐ The clock starts HERE, with the ROM confirmed loaded -- so the
+         * timeout measures time INSIDE the emulated game. The first version
+         * started it at arm time on the shell and burned 80% of the window
+         * before the game existed. */
         g_cursor_armed_at = GetTickCount();
-        log_line("cursor: ARMED on the emulated arena. Just navigate the menu "
-                 "with LEFT and RIGHT -- each press advances the probe. "
-                 "Nothing is spoken.");
+        _snprintf(g_cursor_rom, sizeof g_cursor_rom, "%s", rom);
+        log_line("cursor: ARMED -- '%s' is running. Navigate the menu with "
+                 "LEFT and RIGHT; each press advances the probe. Nothing is "
+                 "spoken.", rom);
         return;
     }
 
@@ -314,14 +354,26 @@ static void cursor_probe_tick(void)
          * game does not receive keyboard through sKeyboard -- which is a
          * different fact from "no cursor was found", and points at different
          * work (find the emulator's own input path in the disassembly). */
-        if (g_cursor_edges == 0 &&
-            GetTickCount() - g_cursor_armed_at > CURSOR_EDGE_TIMEOUT_MS) {
-            log_line("cursor: ⛔ NO INPUT EDGES SEEN in %u s of play. The "
+        DWORD waited = GetTickCount() - g_cursor_armed_at;
+
+        /* ⚠ Say we are still waiting, and say it in terms of time spent INSIDE
+         * the game. A silent probe and a broken one look identical, and the
+         * 18:54 run's single "NO EDGES" line gave no way to notice that most
+         * of its window had been spent on the shell. */
+        if (g_cursor_edges == 0 && waited > 10000 && !g_cursor_waited_note) {
+            log_line("cursor: still waiting for a LEFT/RIGHT edge -- %u s "
+                     "inside '%s' so far, 0 edges.",
+                     (unsigned)(waited / 1000), g_cursor_rom);
+            g_cursor_waited_note = TRUE;
+        }
+
+        if (g_cursor_edges == 0 && waited > CURSOR_EDGE_TIMEOUT_MS) {
+            log_line("cursor: ⛔ NO INPUT EDGES SEEN in %u s INSIDE '%s'. The "
                      "emulated game does not take keyboard through sKeyboard, "
                      "so this probe cannot be driven by arrow presses. ⚠ This "
                      "is NOT 'no cursor found' -- nothing was ever measured. "
                      "Next step is the emulator's own input path.",
-                     CURSOR_EDGE_TIMEOUT_MS / 1000);
+                     (unsigned)(waited / 1000), g_cursor_rom);
             g_cursor_gave_up = TRUE;
         }
         return;

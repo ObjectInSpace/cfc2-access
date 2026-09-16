@@ -271,6 +271,38 @@ static ec_status hash_pass(ec_phase phase, ULONGLONG base, SIZE_T size)
     return EC_OK;
 }
 
+BOOL emu_cursor_rom_running(char *name_out, unsigned cap)
+{
+    char name[64];
+    int idx = 0;
+
+    if (name_out && cap) name_out[0] = '\0';
+
+    /* ⛔ The INDEX alone is not the test -- index 0 is cvs1, a real game, so
+     * EMU_OK here is true on the shell too. That is precisely the bug: the
+     * first live run armed on it 24 s before the ROM loaded. */
+    if (emu_rom_index(&idx) != EMU_OK)
+        return FALSE;
+
+    /* The NAME is the test.
+     *
+     * ⭐ No explicit empty-name check: emu_rom_name() ALREADY returns
+     * EMU_NOT_RUNNING for a zero-length name (emu_ram.c, `if (i == 0)`) and
+     * EMU_UNVERIFIED for an unterminated one. I wrote one anyway, and sabotage
+     * showed it could not be made to fail -- the function it wrapped already
+     * handled the case. Removed rather than kept as false coverage, exactly
+     * like the float-band guard. */
+    if (emu_rom_name(name, sizeof name) != EMU_OK)
+        return FALSE;
+
+    if (name_out && cap) {
+        unsigned i = 0;
+        while (i + 1 < cap && name[i]) { name_out[i] = name[i]; i++; }
+        name_out[i] = '\0';
+    }
+    return TRUE;
+}
+
 ec_status emu_cursor_arm(void)
 {
     ULONGLONG base;
