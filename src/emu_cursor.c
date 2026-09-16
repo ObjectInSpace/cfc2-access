@@ -400,14 +400,22 @@ static void snap_pages(ec_phase phase)
     }
 }
 
-/* Is this value plausibly an IEEE float rather than an index? The highlight's
- * position and scale animate to the new item and back, so they pass
- * reversibility perfectly and are not what we want. */
-static BOOL looks_float(unsigned v)
-{
-    return (v >= 0x38000000u && v <= 0x4A000000u) ||
-           (v >= 0xB8000000u && v <= 0xCA000000u);
-}
+/* ⛔ THE FLOAT-BAND TEST WAS DELETED AS UNREACHABLE, not merely unused.
+ *
+ * heapdiff needed it because it ranked fields with no upper bound, so animating
+ * IEEE floats (the highlight sliding to the new item and back) passed
+ * reversibility and dominated its candidate lists.
+ *
+ * Here they cannot reach it. A float in any UI range has bits around 1.1
+ * billion (22.93f -> 0x41DF70A4), and guard (e) refuses anything >= 64. The
+ * float test could only ever fire on a denormal near zero, whose delta would
+ * not be 1 anyway.
+ *
+ * ⭐ Found by SABOTAGE: deleting the float test left the whole suite green,
+ * which means either the test was worthless or the case was. It was the test --
+ * the bounds guard had been answering for it all along. A guard that cannot be
+ * made to fail is not protecting anything, and keeping it would have implied
+ * coverage that did not exist. See [[sabotage-answered-by-another-guard]]. */
 
 /* Record or update a field candidate. */
 static void note_field(ULONGLONG addr, ec_width w, unsigned base_v,
@@ -511,9 +519,10 @@ static void judge_fields(void)
                 d = (int)v2 - (int)v1;
                 if (d != 1 && d != -1) continue; /* (d) stepped by one       */
 
+                /* (e) bounded. ⭐ This also subsumes the float rejection an
+                 * earlier draft had: an animating IEEE float's BITS are ~1.1
+                 * billion, so it never survives to be tested for floatness. */
                 if (v1 >= EC_MAX_VALUE || v2 >= EC_MAX_VALUE)
-                    continue;                    /* (e) bounded              */
-                if (w == EC_U32 && (looks_float(v1) || looks_float(v2)))
                     continue;
 
                 if (v1 <= 1 && v2 <= 1) {

@@ -21,6 +21,7 @@
 #include "gmd_find.h"
 #include "pad_watch.h"
 #include "kbd_state.h"
+#include "emu_cursor.h"
 #include "gui_text.h"
 #include "menu_cursor.h"
 #include "menu_speak.h"   /* menu_speak_set_discovery() */
@@ -181,10 +182,174 @@ static void emu_guest_map_log(void)
                  "published CVS2 guest address is now readable.",
                  (unsigned long long)0x0C000000ULL);
     else
-        log_line("emu: ⚠ NOT at the predicted address -- the mapping is real "
-                 "but not the simple linear one. Implied guest-RAM base = "
-                 "0x%llx (host = guest - 0x0C000000 + this).",
+        /* ⛔⛔ THIS LINE USED TO OVERCLAIM, and it read exactly like a finding.
+         *
+         * It announced an "implied guest-RAM base" from the fingerprint's
+         * address. But the 2026-09-16 run found the fingerprint at
+         * arena+0x20D800, which is EXACTLY entry[11]'s own AFS file offset --
+         * i.e. it re-found the loaded FILE image, which `host = arena +
+         * afs_offset` already predicted. The "implied base" it then derived was
+         * 0x71BE800, BELOW the arena base, which is impossible for a sub-range.
+         *
+         * A number that cannot be true must not be printed as a result. */
+    {
+        ULONGLONG ab = 0; SIZE_T asz = 0;
+        (void)emu_arena(&ab, &asz);
+        log_line("emu: ⚠ found at 0x%llx = arena + 0x%llx. ⛔ Before treating "
+                 "this as guest RAM, check that offset against the AFS table: "
+                 "the ROM blob is loaded VERBATIM at the arena base, so a "
+                 "fingerprint at arena+<its own AFS offset> is the FILE copy, "
+                 "not guest RAM. An implied base BELOW the arena proves it. "
+                 "Implied base would be 0x%llx.",
+                 (unsigned long long)at,
+                 (unsigned long long)(ab ? at - ab : 0),
                  (unsigned long long)implied);
+    }
+}
+
+/* --- The in-game cursor probe -------------------------------------------
+ *
+ * Driven by the user simply navigating: LEFT/RIGHT arrow edges advance the
+ * phase machine. Nothing is spoken; this establishes whether a cursor value is
+ * readable at all, which is the prerequisite for everything downstream.
+ *
+ * ⚠ The log always states what the NEXT press will do. The user cannot see
+ * internal state, and ambiguous presses have cost several runs in this project.
+ */
+static BOOL     g_cursor_on;
+static BOOL     g_cursor_armed;
+static DWORD    g_cursor_armed_at;
+static unsigned g_cursor_edges;
+static BOOL     g_cursor_gave_up;
+
+/* How long to wait for ANY arrow edge before concluding the emulated game does
+ * not use sKeyboard. 30 s of navigation is far more than enough. */
+#define CURSOR_EDGE_TIMEOUT_MS  30000
+
+static void cursor_probe_report(void)
+{
+    ec_field f[12];
+    ec_report r;
+    unsigned n, i;
+
+    emu_cursor_status(&r);
+    n = emu_cursor_candidates(f, 12);
+
+    log_line("cursor: cycle %u done in %lu ms -- %u page(s) of %u reacted, "
+             "%u kept, %u field(s) examined, %u returned, %u rejected as "
+             "counters, %u toggle(s).%s",
+             r.cycles_done, (unsigned long)r.last_pass_ms,
+             r.pages_reacted, r.pages_total, r.pages_kept,
+             r.fields_examined, r.fields_returned, r.fields_counter,
+             r.fields_toggle,
+             r.truncated ? "  ⚠ A CAP BOUND -- see pages_seen." : "");
+
+    if (r.cycles_done < 2) {
+        log_line("cursor: cycle 1 only LEARNS which pages react -- it has no "
+                 "before-bytes yet. Keep navigating; cycle 2 is the first that "
+                 "can judge.");
+        return;
+    }
+
+    if (n == 0) {
+        log_line("cursor: ⛔ NO candidate survived %u cycle(s). That is a real "
+                 "negative for this window: %u field(s) were examined at three "
+                 "widths and none was quiet in the control, stepped by one AND "
+                 "returned.", r.cycles_done, r.fields_examined);
+        return;
+    }
+
+    log_line("cursor: --- %u candidate(s), best first ---", n);
+    for (i = 0; i < n; i++) {
+        log_line("cursor:   0x%llx  u%u  %u -> %u (delta %+d)  "
+                 "survived %u cycle(s)%s",
+                 (unsigned long long)f[i].addr, (unsigned)f[i].width * 8u,
+                 f[i].v_base, f[i].v_moved, f[i].delta, f[i].cycles,
+                 f[i].is_toggle ? "  ⚠ 0/1 TOGGLE -- a flag, not an index"
+                                : "");
+    }
+    if (r.cycles_done >= 3 && !f[0].is_toggle)
+        log_line("cursor: ⭐⭐ 0x%llx has tracked the cursor for %u "
+                 "consecutive cycles. THE CURSOR IS READABLE.",
+                 (unsigned long long)f[0].addr, f[0].cycles);
+}
+
+static void cursor_probe_tick(void)
+{
+    kbd_edges e;
+    BOOL left, right;
+    ec_status s;
+    ec_phase want;
+
+    if (g_cursor_gave_up) return;
+
+    if (!g_cursor_armed) {
+        int idx = 0;
+        /* Only arm once a game is actually loaded; arming against a null arena
+         * would report UNREADABLE and look like a failure of the probe. */
+        if (emu_rom_index(&idx) != EMU_OK) return;
+        s = emu_cursor_arm();
+        if (s != EC_OK) {
+            log_line("cursor: could not arm -- %s. ⚠ This says nothing about "
+                     "the game.", ec_status_name(s));
+            g_cursor_gave_up = TRUE;
+            return;
+        }
+        g_cursor_armed = TRUE;
+        g_cursor_armed_at = GetTickCount();
+        log_line("cursor: ARMED on the emulated arena. Just navigate the menu "
+                 "with LEFT and RIGHT -- each press advances the probe. "
+                 "Nothing is spoken.");
+        return;
+    }
+
+    if (!kbd_poll_edges(&e)) return;      /* could not read: not a negative */
+    if (e.first) return;                  /* seeded, not observed           */
+
+    left  = kbd_is_set(e.pressed, KBDC_LEFT);
+    right = kbd_is_set(e.pressed, KBDC_RIGHT);
+
+    if (!left && !right) {
+        /* ⛔ THE DISTINCT NEGATIVE. If no arrow edge EVER arrives, the emulated
+         * game does not receive keyboard through sKeyboard -- which is a
+         * different fact from "no cursor was found", and points at different
+         * work (find the emulator's own input path in the disassembly). */
+        if (g_cursor_edges == 0 &&
+            GetTickCount() - g_cursor_armed_at > CURSOR_EDGE_TIMEOUT_MS) {
+            log_line("cursor: ⛔ NO INPUT EDGES SEEN in %u s of play. The "
+                     "emulated game does not take keyboard through sKeyboard, "
+                     "so this probe cannot be driven by arrow presses. ⚠ This "
+                     "is NOT 'no cursor found' -- nothing was ever measured. "
+                     "Next step is the emulator's own input path.",
+                     CURSOR_EDGE_TIMEOUT_MS / 1000);
+            g_cursor_gave_up = TRUE;
+        }
+        return;
+    }
+
+    g_cursor_edges++;
+    want = emu_cursor_next_phase();
+
+    /* The phase machine wants: CONTROL (a quiet capture), then MOVED (after a
+     * forward press), then RETURNED (after the reverse). We take the control
+     * capture on the press itself -- immediately BEFORE the game has acted on
+     * it -- which is the closest we can get to "the moment before the move". */
+    if (want == EC_PHASE_CONTROL) {
+        s = emu_cursor_step(EC_PHASE_CONTROL);
+        if (s == EC_OK) s = emu_cursor_step(EC_PHASE_MOVED);
+    } else {
+        s = emu_cursor_step(want);
+    }
+
+    if (s != EC_OK) {
+        log_line("cursor: step %s -> %s. ⚠ Could not measure; this is a return "
+                 "value, not a finding.", ec_phase_name(want),
+                 ec_status_name(s));
+        return;
+    }
+
+    if (emu_cursor_next_phase() == EC_PHASE_CONTROL)
+        cursor_probe_report();            /* a cycle just completed */
 }
 
 static void emu_scan_report(int beat)
@@ -706,6 +871,12 @@ static DWORD WINAPI worker(LPVOID param)
     /* ⚠ The per-change keyboard LOG is opt-in; the hook itself still installs,
      * because the periodic snapshot below reports liveness from it. */
     BOOL kbd_log_on = opt_in_file_present("cfc2_kbd.on");
+
+    /* ⭐ The in-game cursor probe. OFF unless asked for: each arrow press costs
+     * a full hash pass over the arena (~100 ms, measured and logged), which is
+     * a handful of dropped frames. Acceptable while deliberately probing;
+     * not something to impose on ordinary play. */
+    g_cursor_on = opt_in_file_present("cfc2_cursor.on");
     if (unpacked && hook_enabled) {
         hook_ok = kbd_install();
         if (!hook_ok)
@@ -995,6 +1166,21 @@ static DWORD WINAPI worker(LPVOID param)
              * description, which is every screen but this one. */
             if (gt_ok)
                 menu_speak_check_hint();
+
+            /* ⭐⭐ THE IN-GAME CURSOR PROBE, driven by the user simply
+             * navigating. Opt-in via `cfc2_cursor.on`; speaks nothing.
+             *
+             * ⚠ On the 20 ms tick, never the 2 s beat: a measured failure in
+             * this project had SIX arrow presses land between two 2 s polls
+             * with the index returning to its start, so the guard correctly saw
+             * no change and said nothing.
+             *
+             * ⛔ Uses kbd_poll_edges(), NOT the engine's Trg bank. Trg is set
+             * for one frame (~16 ms); polling it from here caught roughly one
+             * press in six. kbd_poll_edges derives edges from successive `cur`
+             * reads, which is correct at any poll rate. */
+            if (g_cursor_on && hook_ok)
+                cursor_probe_tick();
 
             /* Watch the verified static path continuously. The last open
              * question -- is that field the selection? -- is then answered by

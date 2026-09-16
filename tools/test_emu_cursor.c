@@ -69,7 +69,7 @@ static void check(const char *name, int cond, const char *fmt, ...)
 
 static BYTE *g_fx;
 static unsigned g_counter;
-static unsigned g_churn;
+static unsigned g_churn;   /* retained: some cases still reset it */
 static unsigned g_ratchet;
 
 static BYTE *pg(unsigned page) { return g_fx + page * PAGE_T; }
@@ -90,16 +90,44 @@ static void fx_write(ec_phase phase, unsigned cursor)
     /* A counter advances on EVERY capture and never returns. */
     put32(OFF_COUNTER, ++g_counter);
 
-    /* Churn changes between S0 and S1 -- i.e. during the control window. */
-    put32(OFF_CHURN, ++g_churn);
+    /* ⭐⭐ THE CHURN FIELD MUST BE REFUSABLE ONLY BY GUARD (a).
+     * An every-capture counter would ALSO fail reversibility, so removing the
+     * control filter would leave it rejected anyway and the sabotage would
+     * pass -- a guard answering for another guard.
+     * So: it DIFFERS between S0 and S1 (only (a) can see that), then behaves
+     * exactly like a perfect cursor at S1/S2/S3 (small, +1, returns). */
+    /* ⚠ The probe derives each cycle's S0 from the PREVIOUS cycle's S3 -- in a
+     * real run the cursor is back where it started, so those are the same
+     * moment. A fixture therefore cannot set S0 directly; churn has to differ
+     * between the previous S3 and this S1, which means ALTERNATING per cycle.
+     *
+     * Values: S1 = 31 or 41 (alternating), S2 = S1+1, S3 = S1.
+     * So S0(prev S3)=31 vs S1=41 -> only guard (a) can refuse it, while the
+     * step, bounds and reversibility guards all see a perfect cursor. */
+    {
+        unsigned b = (g_churn & 1u) ? 41u : 31u;
+        switch (phase) {
+        case EC_PHASE_BASELINE: break;            /* overwritten from S3 */
+        case EC_PHASE_CONTROL:  put32(OFF_CHURN, b);      break;
+        case EC_PHASE_MOVED:    put32(OFF_CHURN, b + 1u); break;
+        case EC_PHASE_RETURNED: put32(OFF_CHURN, b); g_churn++; break;
+        }
+    }
 
     put32(OFF_FROZEN, 0x11111111u);
 
     /* Toggle follows the cursor's parity: reversible, steps by one, tiny. */
     put8(OFF_TOGGLE, cursor & 1u);
 
-    /* Reacts and returns like the cursor, but by 7 rather than 1. */
-    put32(OFF_BIGJUMP, 100u + cursor * 7u);
+    /* ⭐⭐ REFUSABLE ONLY BY GUARD (d). Both values must stay INSIDE
+     * EC_MAX_VALUE, or the bounds guard rejects it and the step sabotage
+     * passes on someone else's work. 10 -> 17 is a delta of 7, both small. */
+    switch (phase) {
+    case EC_PHASE_BASELINE:
+    case EC_PHASE_CONTROL:  put32(OFF_BIGJUMP, 10u); break;
+    case EC_PHASE_MOVED:    put32(OFF_BIGJUMP, 17u); break;  /* delta 7 */
+    case EC_PHASE_RETURNED: put32(OFF_BIGJUMP, 10u); break;  /* returns */
+    }
 
     /* An IEEE float that animates with the cursor and returns. */
     {
@@ -252,7 +280,12 @@ int main(void)
           find_cand(cands, n, p1 + OFF_FROZEN, EC_U32) == NULL, "");
     check("3d a field that steps by SEVEN is rejected",
           find_cand(cands, n, p1 + OFF_BIGJUMP, EC_U32) == NULL, "");
-    check("3e a reversible IEEE FLOAT is rejected",
+    /* ⭐ This case survives, but note WHAT rejects it: the BOUNDS guard, not a
+     * float-specific test. A float in any UI range has bits ~1.1 billion. An
+     * explicit float band was written, found unreachable by sabotage (deleting
+     * it left the suite green), and removed rather than kept as false
+     * coverage. */
+    check("3e a reversible IEEE FLOAT is rejected (by the bounds guard)",
           find_cand(cands, n, p1 + OFF_FLOAT, EC_U32) == NULL,
           "an animating float was reported as an index");
     check("3f a huge value stepping by one is rejected",
