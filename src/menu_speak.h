@@ -202,6 +202,41 @@ typedef enum {
      * population, and the row is then quoted from the live columns exactly as
      * MC_ROW_COLUMN does. No map, no GMD, no tab identity. */
     MC_ROW_VALUE_LIVE,
+    /* ⭐⭐⭐ A PER-GAME CHARACTER ROSTER, named by reading the screen's own TAB
+     * INDEX. Fighter Awards > Play Stats (Y toggles the page): each tab is one
+     * game's roster, and the 233 STATS_<GAME>_NN_NAME strings are the largest
+     * block of the corpus nothing could reach.
+     *
+     * ⭐ THE TAB IDENTITY IS A STORED FIELD: `screen + roster_off` (+0x338), a
+     * 0..7 game index. Read out of the instructions, not guessed -- the screen
+     * passes it to a bounds-checked (`cmp edx,8`) lookup at 0x14004ae90 over a
+     * table at 0x1411f7b30 to size its own list:
+     *
+     *     index 0 1 2 3 4 5 6 7
+     *     count 35 48 23 39 10 14 40 24
+     *     game  CVS1 CVS2 CFJ Z3U PWS1 PWS2 MJUS STG2
+     *
+     * ⛔⛔ WHY THE ITEM COUNT CANNOT BE THE KEY, and this field must be. Each
+     * roster size is unique AMONG THE ROSTERS, so the count alone separates the
+     * eight tabs -- but PROJECT JUSTICE HAS 40 CHARACTERS and the achievements
+     * page on the SAME caller has 40 achievements. A count-keyed map speaks
+     * achievement titles over character names on exactly one tab, confidently
+     * and undetectably. The tab index is the only thing that tells them apart.
+     *
+     * ⛔ And the live-text discriminator ("Total Play Sessions: N" on a roster
+     * vs an achievement TITLE) is a confirmation, not a key: measured, the game
+     * draws text on only 17 of 78 movements while the user sweeps, so on the
+     * other 61 it says nothing at all. A stored field is read every movement.
+     *
+     * ⭐ THE CROSS-CHECK IS THE SAFETY. The roster the index names must have
+     * exactly the live item count, or the row is refused. Two independent
+     * sources -- the exe's table (via roster_table.h, generated) and the live
+     * count the cursor helper reports -- have to agree before a name is spoken.
+     * That is what makes a stale or misread index harmless rather than wrong.
+     *
+     * Character N is `base + 2*N` (NAME alternates with _DESC); uniformity is
+     * checked by tools/gen_roster_table.py, not assumed here. */
+    MC_GAME_ROSTER,
     /* ⭐⭐⭐ THE IN-GAME MOVE LIST, named from the game's OWN indirection
      * rather than from what is on screen.
      *
@@ -370,6 +405,15 @@ typedef struct {
      * otherwise yield SOME row number, and a plausible-looking wrong row is
      * what this file exists to refuse. */
     int        row_off;
+    /* ⭐⭐⭐ For MC_GAME_ROSTER: the byte offset, from the screen object, of the
+     * int holding the 0..7 TAB INDEX (the game whose roster is on screen).
+     * 0 means unset and the entry then names nothing.
+     *
+     * ⚠ Read under the fault guard and cross-checked against the live item
+     * count before any name is spoken -- see MC_GAME_ROSTER. An index that
+     * names a roster of a different size is REFUSED, which is what stops a
+     * misread field from speaking another game's characters. */
+    int        roster_off;
 } mc_screen;
 
 /* ⭐ The heading column. The shell draws a screen's own title at X=960 -- the
@@ -597,6 +641,20 @@ const mc_screen *menu_speak_screen_at(int i);
  * ⛔ The count DISCRIMINATES between verified rows; it never admits an
  * unverified one. Every row still needs MC_VERIFIED_LIVE_TEXT. */
 const mc_screen *menu_speak_lookup_n(ULONGLONG caller, int item_count);
+
+/* ⭐⭐⭐ The SCREEN-AWARE lookup, used by menu_speak_build().
+ *
+ * Identical to menu_speak_lookup_n() except that an entry which CLAIMS the
+ * live screen -- on evidence only the screen object carries -- wins over a
+ * plain count match. Needed because Fighter Awards' 40 achievements and
+ * Project Justice's 40-character Play Stats roster share a caller AND a count,
+ * so no caller+count rule can separate them.
+ *
+ * ⚠ `screen` may be NULL, and then this is exactly menu_speak_lookup_n().
+ * A claim that cannot be established is not a claim: unreadable memory, an
+ * out-of-range field or a size disagreement all fall back to the count match. */
+const mc_screen *menu_speak_lookup_for(ULONGLONG caller, int item_count,
+                                       const void *screen);
 
 
 /* Enable the DISCOVERY candidate sweep. OFF by default.

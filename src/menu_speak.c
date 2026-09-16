@@ -5,6 +5,7 @@
 #include "menu_speak.h"
 #include "gmd_find.h"
 #include "rom_table.h"
+#include "roster_table.h" /* the 8 per-game rosters, generated */
 #include "memsafe.h"
 #include "speech.h"
 #include "log.h"
@@ -1251,6 +1252,32 @@ static const mc_screen g_screens[] = {
     { 0x140079739ULL, -1, 40, "Fighter Awards", MC_VERIFIED_LIVE_TEXT,
       MC_LIST, 0, g_fighter_awards_rows, 40, NULL, 0, 0 },
 
+    /* ⭐⭐⭐ THE PLAY STATS ROSTERS -- the same caller's other page (Y toggles
+     * it). Each tab is one game's character roster, and the game is read from
+     * the screen's own tab index at +0x338. See MC_GAME_ROSTER.
+     *
+     * ⚠⚠ count = 0 ON PURPOSE, and it is not a relaxation. The eight tabs have
+     * eight DIFFERENT sizes (35/48/23/39/10/14/40/24), so no single count could
+     * describe this entry, and a fixed one would disable seven tabs. The count
+     * check simply MOVES: menu_speak_build cross-checks the live count against
+     * the count of the roster the tab index names, which is strictly stronger
+     * than a constant -- it verifies the identity, not just the shape.
+     *
+     * ⛔⛔ THE COLLISION THIS ENTRY MUST SURVIVE. A plain caller+count lookup
+     * returns an exact count match first, so a 40-item list would always reach
+     * the achievements row above -- right on the achievements page, and WRONG
+     * on Project Justice's 40-character tab, where it would speak an
+     * achievement title where a character name belongs.
+     *
+     * ⭐ THE FIX IS IN THE LOOKUP, NOT IN THIS TABLE'S ORDER.
+     * menu_speak_lookup_for() asks each entry whether it CLAIMS the live
+     * screen, and this entry claims it only when the tab index at +0x338 reads
+     * 0..7 AND names a roster whose size equals the live count. On the
+     * achievements page that field must independently read 6 for the claim to
+     * succeed. Evidence decides, not row order. */
+    { 0x140079739ULL, -1, 0, "Play Stats", MC_VERIFIED_LIVE_TEXT,
+      MC_GAME_ROSTER, 0, NULL, 0, NULL, 0, 0, 0, 0, 0.0f, 0.0f, 0, 0x338 },
+
     /* ⭐⭐ THE RANKED LEADERBOARD's game strip (Online Play > Ranked
      * Leaderboard), 8 items, horizontal. Caller 0x1400ac059.
      *
@@ -2216,6 +2243,18 @@ const mc_screen *menu_speak_lookup_n(ULONGLONG caller, int item_count)
     for (int i = 0; i < NSCREENS; i++) {
         if (g_screens[i].caller != caller)
             continue;
+        /* ⛔⛔ A CLAIM-ONLY entry is NOT a catch-all. MC_GAME_ROSTER carries
+         * count == 0 because its eight tabs have eight different sizes -- but
+         * its identity comes from a field on the screen object, so without a
+         * screen it can establish nothing and must not stand in for one.
+         *
+         * Letting it act as the caller's catch-all made it swallow EVERY
+         * unmatched count on 0x140079739: the 35-item page stopped reporting
+         * COUNT_MISMATCH and reported "text unreadable" instead, which is the
+         * shadowing this function's comments already warn about. Caught by case
+         * 33n, which asserts the user-visible refusal rather than table shape. */
+        if (g_screens[i].kind == MC_GAME_ROSTER)
+            continue;
         if (g_screens[i].count > 0 && g_screens[i].count == item_count)
             return &g_screens[i];          /* exact: caller AND count agree */
         /* ⭐⭐ A count == 0 entry is a deliberate CATCH-ALL and must beat the
@@ -2235,6 +2274,69 @@ const mc_screen *menu_speak_lookup_n(ULONGLONG caller, int item_count)
             caller_only = &g_screens[i];
     }
     return any_count ? any_count : caller_only;
+}
+
+/* ⭐⭐⭐ Does this entry CLAIM the live screen, on evidence only the screen
+ * object carries?
+ *
+ * ⛔⛔ THE PROBLEM IT SOLVES. Fighter Awards' achievements grid and Project
+ * Justice's Play Stats roster share a caller AND an item count of 40. A
+ * caller+count lookup necessarily picks one, and picking the achievements row
+ * makes MJUS's tab speak achievement titles where character names belong --
+ * confidently, and undetectably to a listener.
+ *
+ * ⭐ A count cannot separate them, so the claim is decided by a FIELD the
+ * screen itself carries: the 0..7 tab index at +roster_off. The roster entry
+ * claims the screen only when that index is in range AND names a roster whose
+ * size equals the live count. On the achievements page the same field must
+ * independently read 6 for the claim to succeed, so the two pages are
+ * separated by evidence rather than by table order.
+ *
+ * ⚠ Returns FALSE for anything it cannot establish -- an unreadable pointer, a
+ * field out of range, a size disagreement. "Could not tell" must never read as
+ * "yes": the fallback is the count match, which is what shipped before.
+ *
+ * ⚠ Guarded read. `screen` comes from a live game thread; this module reads it
+ * and never trusts it. */
+static BOOL mc_entry_claims(const mc_screen *s, const void *screen,
+                            int item_count)
+{
+    int tab = -1;
+
+    if (!s || s->kind != MC_GAME_ROSTER || !screen || s->roster_off <= 0)
+        return FALSE;
+    {
+        const void *tc = (const char *)screen + s->roster_off;
+        if (!mem_readable(tc, sizeof(tab)) ||
+            !mem_copy(&tab, tc, sizeof(tab)))
+            return FALSE;
+    }
+    if (tab < 0 || tab >= 8)
+        return FALSE;
+    return g_rosters[tab].count == item_count;
+}
+
+/* The screen-aware lookup. Identical to menu_speak_lookup_n() except that an
+ * entry which CLAIMS the live screen wins over a plain count match.
+ *
+ * ⭐ Claims are checked before count matches, but a claim is itself gated on
+ * the live count agreeing with the identity the screen reports -- so this
+ * strengthens the count test rather than bypassing it.
+ *
+ * ⚠ With `screen` NULL this is exactly menu_speak_lookup_n(), which is what
+ * every offline test that does not model a screen object still exercises. */
+const mc_screen *menu_speak_lookup_for(ULONGLONG caller, int item_count,
+                                       const void *screen)
+{
+    if (screen) {
+        for (int i = 0; i < NSCREENS; i++) {
+            if (g_screens[i].caller != caller)
+                continue;
+            if (mc_entry_claims(&g_screens[i], screen, item_count))
+                return &g_screens[i];
+        }
+    }
+    return menu_speak_lookup_n(caller, item_count);
 }
 
 /* ⭐⭐ THE ROW DERIVATION -- see the header for why this is arithmetic and not
@@ -2346,8 +2448,11 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
      * heading, because the heading object is refreshed on a different schedule
      * from the rows and leads them by one tab. MC_ROW_COLUMN names those rows
      * without identifying the tab at all. */
-    const mc_screen *s = menu_speak_lookup_n((ULONGLONG)(ULONG_PTR)m->caller,
-                                             out->total);
+    /* ⭐⭐ Screen-aware: two entries on this caller can share an item count
+     * (the 40 achievements vs Project Justice's 40 characters), and only a
+     * field on the screen object separates them. See menu_speak_lookup_for(). */
+    const mc_screen *s = menu_speak_lookup_for((ULONGLONG)(ULONG_PTR)m->caller,
+                                               out->total, m->screen);
     if (!s) {
         out->why = MC_UNNAMED_SCREEN_UNKNOWN;
         return;                        /* unknown screen -> position only */
@@ -2437,6 +2542,103 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
             return;
         }
         out->why = MC_UNNAMED_COUNT_MISMATCH;
+        return;
+    }
+
+    /* ⭐⭐⭐ A PER-GAME CHARACTER ROSTER (Fighter Awards > Play Stats).
+     *
+     * The tab -- which game's roster is on screen -- is a STORED FIELD on the
+     * screen object, so this works on every movement, including the many where
+     * the game draws no text at all. See MC_GAME_ROSTER for why the item count
+     * cannot be the key (Project Justice has 40 characters; the achievements
+     * page on this same caller has 40 achievements).
+     *
+     * ⚠ Read guarded. `screen` is a pointer from a live game thread: this
+     * module reads it and never trusts it. mem_readable first, then the copy --
+     * the fault guard is a net for the race, never the check. */
+    if (s->kind == MC_GAME_ROSTER) {
+        const mc_roster *r;
+        int tab = -1, idx;
+
+        if (!m->screen || s->roster_off <= 0) {
+            out->why = MC_UNNAMED_TEXT_UNREADABLE;
+            return;
+        }
+        {
+            const void *tc = (const char *)m->screen + s->roster_off;
+            if (!mem_readable(tc, sizeof(tab)) ||
+                !mem_copy(&tab, tc, sizeof(tab))) {
+                out->why = MC_UNNAMED_ROW_UNDERIVABLE;
+                return;
+            }
+        }
+        /* ⭐ The game's own lookup is bounds-checked with `cmp edx,8`; so is
+         * this. An out-of-range index means the field is not what we think on
+         * this screen, which is a reason to say nothing -- never to clamp into
+         * some roster and name a character from it. */
+        if (tab < 0 || tab >= 8) {
+            static BOOL warned;
+            if (!warned) {
+                warned = TRUE;
+                log_line("mcspeak: %s -- the tab index at +0x%x reads %d, "
+                         "outside 0..7. Refusing to name a roster.",
+                         s->name ? s->name : "(unnamed)",
+                         (unsigned)s->roster_off, tab);
+            }
+            out->why = MC_UNNAMED_ROW_UNDERIVABLE;
+            return;
+        }
+        r = &g_rosters[tab];
+
+        /* ⭐⭐ THE CROSS-CHECK, and the whole safety argument. The roster this
+         * index names must have exactly the number of items the cursor helper
+         * just reported. Two independent sources -- the exe's own count table
+         * (baked into roster_table.h and verified against the corpus by the
+         * generator) and the live count -- must agree.
+         *
+         * ⛔ This is what makes a misread index HARMLESS instead of wrong: a
+         * stale or wrong tab almost always names a roster of a different size,
+         * and is refused here. It is also what keeps the ACHIEVEMENTS page out:
+         * it reaches this entry only with 40 items, and then only if the tab
+         * field independently reads 6 (Project Justice). */
+        if (out->total != r->count) {
+            static BOOL warned;
+            if (!warned) {
+                warned = TRUE;
+                log_line("mcspeak: %s -- tab %d (%s) has %d character(s) but "
+                         "this list has %d. Refusing rather than naming from "
+                         "the wrong roster.",
+                         s->name ? s->name : "(unnamed)", tab, r->tag,
+                         r->count, out->total);
+            }
+            out->why = MC_UNNAMED_COUNT_MISMATCH;
+            return;
+        }
+
+        idx = out->position - 1;
+        if (idx < 0 || idx >= r->count) {
+            out->why = MC_UNNAMED_ROW_UNDERIVABLE;
+            return;
+        }
+        /* Character N is base + 2*N: the NAME labels alternate with _DESC.
+         * Uniformity of that run is checked by the generator, not here. */
+        {
+            char text[GT_CAPTION_MAX];
+            if (!gmd_text_by_index(r->base + 2 * idx, text, sizeof(text)) ||
+                !text[0]) {
+                out->why = MC_UNNAMED_TEXT_UNREADABLE;
+                return;
+            }
+            _snprintf(out->item, sizeof(out->item), "%s", text);
+            out->item[sizeof(out->item) - 1] = '\0';
+        }
+        /* ⭐ Name the GAME as the screen, not the generic page title. On a
+         * page of eight identical-looking tabs, "Capcom vs. SNK 2" is the one
+         * thing a listener cannot otherwise recover -- the game is NOT drawn
+         * anywhere on this screen (measured: no captured string names it). */
+        _snprintf(out->screen_name, sizeof(out->screen_name), "%s", r->name);
+        out->screen_name[sizeof(out->screen_name) - 1] = '\0';
+        out->named = TRUE;
         return;
     }
 

@@ -62,6 +62,10 @@
 
 #include "../src/menu_speak.h"
 #include "../src/menu_cursor.h"
+/* ⚠ The generated roster table, so case 33p can check it against the exe's own
+ * counts in the C build too -- a hand-edit of the generated header would
+ * otherwise only be caught by re-running the generator. */
+#include "../src/roster_table.h"
 /* ⭐ For case 33c: planting a Game Settings screen needs the instance-table
  * seams (gt_test_settext_body) and the class constants. The suite already
  * LINKS gui_text.c; only the declarations were missing. */
@@ -1724,6 +1728,104 @@ int main(void)
               "labels=%d", grid40 && grid40->labels,
               grid40 ? grid40->nlabels : -1, (int)s35.named, (int)s35.why,
               list7 && list7->labels);
+    }
+
+    /* --- case 33o: ⭐⭐⭐ THE PLAY STATS ROSTERS, and the MJUS COLLISION.
+     *
+     * Fighter Awards' achievements grid and Project Justice's Play Stats
+     * roster share caller 0x140079739 AND an item count of 40. No caller+count
+     * rule can separate them, so the tab index at screen+0x338 decides.
+     *
+     * ⛔⛔ THE FAILURE THIS PINS: on MJUS's tab, a count-keyed lookup returns
+     * the achievements entry and speaks an ACHIEVEMENT TITLE where a CHARACTER
+     * NAME belongs -- confidently, and undetectably to a listener.
+     *
+     * ⚠ gmd_text_by_index() fails offline, so the NAME cannot be asserted here.
+     * What is asserted is the decision that precedes it: WHICH ENTRY CLAIMS THE
+     * SCREEN. That is where the bug lives; the name is a lookup afterwards. */
+    {
+        /* A stand-in screen object. Only the int at +0x338 is ever read. */
+        static unsigned char screen[0x400];
+        int *tab = (int *)(screen + 0x338);
+        const mc_screen *e;
+        int ok = 1;
+
+        /* Tab 1 = CVS2, 48 characters. The roster entry must claim it. */
+        *tab = 1;
+        e = menu_speak_lookup_for(0x140079739ULL, 48, screen);
+        ok &= (e && e->kind == MC_GAME_ROSTER);
+
+        /* ⭐⭐ THE COLLISION. Tab 6 = Project Justice, 40 characters, on the
+         * same caller and count as the 40 achievements. The ROSTER must win. */
+        *tab = 6;
+        e = menu_speak_lookup_for(0x140079739ULL, 40, screen);
+        ok &= (e && e->kind == MC_GAME_ROSTER);
+
+        /* ⭐ And the achievements page must still reach its own map. Its tab
+         * field does NOT read 6-with-40-items: any other value fails the
+         * claim's size cross-check, so the count match stands. */
+        *tab = 0;                      /* CVS1: 35 != 40, so no claim */
+        e = menu_speak_lookup_for(0x140079739ULL, 40, screen);
+        ok &= (e && e->kind == MC_LIST && e->nlabels == 40);
+
+        /* ⛔ A tab index outside 0..7 establishes nothing. It must NOT claim,
+         * and must NOT be clamped into some roster. */
+        *tab = 99;
+        e = menu_speak_lookup_for(0x140079739ULL, 40, screen);
+        ok &= (e && e->kind == MC_LIST);
+        *tab = -1;
+        e = menu_speak_lookup_for(0x140079739ULL, 40, screen);
+        ok &= (e && e->kind == MC_LIST);
+
+        /* ⛔⛔ A SIZE DISAGREEMENT IS A REFUSAL, not a near-miss. Tab 1 is
+         * CVS2 (48); on a 35-item list the identity and the live count
+         * disagree, so the roster must not claim -- this is what makes a
+         * MISREAD field harmless instead of wrong. */
+        *tab = 1;
+        e = menu_speak_lookup_for(0x140079739ULL, 35, screen);
+        ok &= !(e && e->kind == MC_GAME_ROSTER);
+
+        /* ⚠ With no screen, nothing can be established: the roster entry must
+         * not act as the caller's catch-all. The 35-item page then reports
+         * COUNT_MISMATCH against the achievements entry, exactly as case 33n
+         * requires -- these two cases pin the same property from both sides. */
+        e = menu_speak_lookup_for(0x140079739ULL, 35, NULL);
+        ok &= !(e && e->kind == MC_GAME_ROSTER);
+
+        check("33o. the Play Stats roster is claimed by the TAB INDEX, so "
+              "Project Justice's 40 characters beat the 40 achievements", ok,
+              "(see the case body for which assertion failed)");
+    }
+
+    /* --- case 33p: the roster table agrees with the game's OWN count table.
+     *
+     * ⭐⭐ The eight counts are read from the exe at 0x1411f7b30 and are what
+     * the claim cross-check compares against. They are generated from the
+     * corpus by tools/gen_roster_table.py, which fails if the two sources
+     * disagree -- this pins the result in the C build as well, so a hand-edit
+     * of the generated header cannot slip through.
+     *
+     * ⚠ Order is the GAME'S index, not alphabetical: it is what +0x338 holds. */
+    {
+        static const int exe_counts[8] = { 35, 48, 23, 39, 10, 14, 40, 24 };
+        int ok = 1;
+        for (int i = 0; i < 8; i++) {
+            ok &= (g_rosters[i].count == exe_counts[i]);
+            ok &= (g_rosters[i].base > 0);
+            ok &= (g_rosters[i].name && g_rosters[i].name[0]);
+        }
+        /* ⭐ Every roster must occupy its own GMD range: overlapping runs
+         * would name one game's characters from another's labels. */
+        for (int i = 0; i + 1 < 8; i++)
+            ok &= (g_rosters[i].base + 2 * g_rosters[i].count
+                   <= g_rosters[i + 1].base);
+
+        check("33p. the 8 rosters match the exe's count table and do not "
+              "overlap in the GMD", ok,
+              "counts %d,%d,%d,%d,%d,%d,%d,%d",
+              g_rosters[0].count, g_rosters[1].count, g_rosters[2].count,
+              g_rosters[3].count, g_rosters[4].count, g_rosters[5].count,
+              g_rosters[6].count, g_rosters[7].count);
     }
 
     /* --- case 33j: ⛔⛔ THE PAUSE MENU MUST NOT CLAIM NAMES FROM A MAP.
