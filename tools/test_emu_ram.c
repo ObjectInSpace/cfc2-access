@@ -455,6 +455,49 @@ int main(void)
                       "planted %u, cap 4, reported n=%u", made, nh);
             }
 
+            /* ⭐⭐ 10o: ONE pair must be reported ONCE, not once per alignment.
+             * The sabotage sweep caught this as untested: removing the
+             * post-match `off += CVS2_STRIDE` skip left the whole suite green,
+             * because every other case plants pairs whose neighbouring
+             * alignments happen not to match.
+             *
+             * A non-uniform struct can still match at several nearby offsets
+             * (the health/max words need only land plausibly). Without the
+             * skip, one genuine pair inflates into a cluster -- which is
+             * exactly how the live run's single region became "16 candidates",
+             * and the count is what a reader judges the result by. */
+            memset(ar, 0, ARENA_BYTES);
+            {
+                /* ⚠⚠ MY FIRST FIXTURE HERE COULD NOT DISCRIMINATE, and the
+                 * sabotage proved it: it produced exactly ONE matching offset,
+                 * so "reported once" and "reported per alignment" gave the
+                 * identical answer and the case passed either way. The code
+                 * was fine; the test was.
+                 *
+                 * This layout cycles hp/max word pairs so FOUR consecutive
+                 * dword alignments each read as a valid, non-uniform pair.
+                 * With the stride skip one hit is reported; without it, four.
+                 * Verified by computing the matching offsets before writing
+                 * the case, rather than assuming the bytes would behave. */
+                static const unsigned short w[16] = {
+                    60, 110, 70, 110,  62, 112, 72, 112,
+                    64, 114, 74, 114,  66, 116, 76, 116
+                };
+                SIZE_T q = 0x1400;
+                unsigned i;
+                for (i = 0; i < 16; i++) {
+                    ar[q + i * 2]     = (unsigned char)(w[i] & 0xFF);
+                    ar[q + i * 2 + 1] = (unsigned char)(w[i] >> 8);
+                    ar[q + CVS2_STRIDE_T + i * 2]     = (unsigned char)(w[i] & 0xFF);
+                    ar[q + CVS2_STRIDE_T + i * 2 + 1] = (unsigned char)(w[i] >> 8);
+                }
+                s = emu_ram_find(hits, 8, &nh, &scanned);
+                check("10o one region is reported ONCE, not once per alignment",
+                      s == EMU_OK && nh <= 2,
+                      "got %s n=%u (4 means the stride skip is gone)",
+                      emu_status_name(s), nh);
+            }
+
             /* A zero-size window means we never looked -- and that must be a
              * RETURN VALUE, not a count of zero that reads like a negative. */
             emu_ram_test_window((ULONGLONG)(ULONG_PTR)ar, 0);
