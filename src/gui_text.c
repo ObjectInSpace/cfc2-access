@@ -3234,12 +3234,31 @@ BOOL gt_test_sc_entry_at(int i, const char **label, const char **value,
 
 static const void   *g_snap_last;
 static const void   *g_snap_declined;   /* rate-limits the "nothing captured" line */
+/* ⭐⭐ The last capture's SHAPE, so a screen that CHANGES under one pointer is
+ * captured again.
+ *
+ * ⛔⛔ Keying on the pointer alone missed every screen worth capturing. Both
+ * Fighter Awards axes share one screen object, and pressing Y swaps the whole
+ * page (40 achievements -> 35 progress items) WITHOUT changing it -- so the
+ * snapshot fired once on arrival and never again, and two runs were spent
+ * learning nothing about the page the user had been asked to open.
+ *
+ * ⚠ The shape is (row count, column X, cursor total). A page swap changes at
+ * least one; a plain cursor movement changes none, so the once-per-screen cost
+ * control still holds. */
+static int           g_snap_rows;
+static float         g_snap_x;
+
 static volatile LONG g_snap_on;
 static volatile LONG g_snap_count;
 
 void gt_snapshot_enable(BOOL on) { InterlockedExchange(&g_snap_on, on ? 1 : 0); }
 long gt_snapshot_count(void)     { return (long)g_snap_count; }
-void gt_test_snapshot_reset(void) { g_snap_last = NULL; g_snap_count = 0; }
+void gt_test_snapshot_reset(void)
+{
+    g_snap_last = NULL; g_snap_rows = 0; g_snap_x = 0.0f;
+    g_snap_declined = NULL; g_snap_count = 0;
+}
 
 /* ⭐⭐ THE COLUMNS THIS SCREEN ACTUALLY HAS, discovered rather than assumed.
  *
@@ -3286,10 +3305,6 @@ void gt_snapshot(const void *screen, float row_x, float val_x, int total)
         return;
     if ((!g_installed && !g_focus_test_mode) || !screen)
         return;
-    /* ⭐ THE WHOLE COST CONTROL: one report per screen object. */
-    if (screen == g_snap_last)
-        return;
-
     /* ⚠ The suggested row_x is a HINT, not a requirement. If this screen draws
      * nothing there -- as CVS1's Game Settings does -- fall back to the
      * left-most populated column, which is what a row label column is on every
@@ -3321,7 +3336,28 @@ void gt_snapshot(const void *screen, float row_x, float val_x, int total)
         }
         return;
     }
-    g_snap_last = screen;
+    /* ⭐⭐ THE COST CONTROL: one report per screen SHAPE, not per pointer.
+     *
+     * ⛔ Keying on the pointer missed every screen worth capturing: both
+     * Fighter Awards axes share one screen object, and pressing Y swaps 40
+     * achievements for 35 progress items WITHOUT changing it. Two runs were
+     * spent learning nothing about the page the user had been asked to open.
+     *
+     * ⚠ Compared AFTER resolving the column, because the column is part of the
+     * shape -- a page that moves its rows elsewhere is a different screen to
+     * capture even at the same count.
+     *
+     * ⛔ `total` is DELIBERATELY NOT in the key. It is the count of the AXIS
+     * that moved, not a property of the screen: on a settings screen the row
+     * axis reports 7 while the value axis reports 2/3/4/5/9, so including it
+     * would re-snapshot on every switch between rows and values and spam the
+     * log on the screens that already work. Row count and column are screen
+     * properties; the axis total is not. */
+    if (screen == g_snap_last && n == g_snap_rows && row_x == g_snap_x)
+        return;
+    g_snap_last  = screen;
+    g_snap_rows  = n;
+    g_snap_x     = row_x;
     InterlockedIncrement(&g_snap_count);
 
     log_line("snap: === SCREEN %p: %d row(s) at x=%.0f, cursor says %d ===",

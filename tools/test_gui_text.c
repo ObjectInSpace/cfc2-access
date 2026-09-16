@@ -1921,6 +1921,49 @@ int main(void)
                     check("54o. a different screen DOES report",
                           gt_snapshot_count() == 2, d);
                 }
+
+                /* case 54p: ⭐⭐ A PAGE SWAP UNDER ONE POINTER MUST REPORT.
+                 *
+                 * ⛔⛔ THIS IS WHY TWO RUNS WERE WASTED. Both Fighter Awards
+                 * axes share ONE screen object, and pressing Y swaps 40
+                 * achievements for 35 progress items without changing it. A
+                 * key of "same pointer -> already done" fired once on arrival
+                 * and never again, so the user opened the page I had asked for
+                 * and the log said nothing about it. Twice.
+                 *
+                 * ⭐ The key is now the screen SHAPE (pointer + row count +
+                 * column). Replacing this screen's contents with a different
+                 * number of rows must produce a second report. */
+                {
+                    /* ⚠ Re-snapshot S1 FIRST so it is the last-seen pointer.
+                     * Without this the preceding case left S2 there, the
+                     * pointer check passed trivially, and the case passed with
+                     * the pointer-only key restored -- it was not reproducing
+                     * the real sequence (the SAME screen, twice running). */
+                    gt_snapshot(S1, 320.0f, 835.0f, 3);
+                    long before = gt_snapshot_count();
+                    static unsigned char po[3][GT_CLASS_SIZE];
+                    static const float PX[3] = { 600.f, 600.f, 600.f };
+                    static const float PY[3] = { 286.f, 366.f, 446.f };
+                    static const char *const PT[3] = {
+                        "Progress A", "Progress B", "Progress C" };
+                    /* Same pointer S1, but now THREE rows where there were two
+                     * -- the page swapped under it. */
+                    for (int i = 0; i < 3; i++) {
+                        memset(po[i], 0, sizeof po[i]);
+                        *(ULONGLONG *)po[i] = GT_VTABLE_ADDR;
+                        memcpy(po[i] + 0x40, &PX[i], sizeof(float));
+                        memcpy(po[i] + 0x44, &PY[i], sizeof(float));
+                        memcpy(po[i] + 0x88, &S1, sizeof(void *));
+                        gt_test_settext_body(po[i], PT[i], NULL, 0);
+                    }
+                    gt_snapshot(S1, 320.0f, 835.0f, 3);
+                    snprintf(d, sizeof d, "page swapped under the same "
+                             "pointer: %ld -> %ld (want +1)",
+                             before, gt_snapshot_count());
+                    check("54p. a page swap under ONE pointer reports again",
+                          gt_snapshot_count() == before + 1, d);
+                }
                 gt_snapshot_enable(FALSE);
             }
 
