@@ -237,6 +237,35 @@ typedef enum {
      * Character N is `base + 2*N` (NAME alternates with _DESC); uniformity is
      * checked by tools/gen_roster_table.py, not assumed here. */
     MC_GAME_ROSTER,
+    /* ⭐⭐ A SOUNDTRACK CHOOSER: Museum > Music's 9-item strip, named from its
+     * POSITION alone. Position 1 is the collection's own music and 2-9 are the
+     * eight games in ROM-table order -- see soundtrack_table.h.
+     *
+     * ⛔⛔ WHY POSITION, WHEN THIS FILE REFUSES POSITION-BASED NAMING
+     * EVERYWHERE ELSE. Every other route is closed with evidence: there is no
+     * 9-item run of game names in the GMD, the confirm handler indexes
+     * resource/layout ids rather than label indices, and the strip CAPTIONS
+     * NOTHING -- measured across five runs, the only live text near its
+     * movements is the player's "0:00 / 0:00". So MC_GAME_STRIP, which names
+     * from a caption and corroborates against the ROM table, has no caption to
+     * name from.
+     *
+     * ⭐ WHAT MAKES IT SAFE ANYWAY -- two independent sources, the same
+     * standard MC_GAME_ROSTER meets:
+     *   1. the user CONFIRMED position 1 by opening it (a five-track list of
+     *      SOUND_DINGO_*, and DINGO_2400430 is CFC2's own engine codename);
+     *   2. the nine SOUND_ families appear in the GMD in exactly this order,
+     *      which the generator verifies rather than assumes.
+     * And the TRACK COUNTS are a live cross-check available whenever the user
+     * opens a soundtrack: all nine differ, so the size of the list that opens
+     * confirms which one it was.
+     *
+     * ⚠ Only position 1 is directly observed. 2-9 rest on the corpus ordering
+     * matching the ROM table -- which holds for the rosters and the leaderboard
+     * strip, but has not been heard here. The count is what would expose a
+     * wrong mapping, and the generator refuses to emit a table whose counts
+     * collide. */
+    MC_SOUNDTRACK_STRIP,
     /* ⭐⭐⭐ THE IN-GAME MOVE LIST, named from the game's OWN indirection
      * rather than from what is on screen.
      *

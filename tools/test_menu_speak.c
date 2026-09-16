@@ -1838,6 +1838,65 @@ int main(void)
               g_rosters[6].count, g_rosters[7].count);
     }
 
+    /* --- case 33q: ⭐⭐ THE SOUNDTRACK CHOOSER names from its position.
+     *
+     * Museum > Music's 9-item strip captions nothing, so this is the one place
+     * this file names from a position -- see MC_SOUNDTRACK_STRIP. Position 1
+     * is the collection's own music (user-confirmed by opening it: five
+     * SOUND_DINGO_* tracks), and 2-9 are the games in ROM-table order. */
+    {
+        mc_speech sp1, sp2, sp9;
+        mc_move m1 = mk(0x14009af21ULL, 0, 0, 8);   /* 9 items, position 1 */
+        mc_move m2 = mk(0x14009af21ULL, 1, 0, 8);
+        mc_move m9 = mk(0x14009af21ULL, 8, 0, 8);
+        m1.vertical = m2.vertical = m9.vertical = FALSE;
+        menu_speak_build(&m1, &sp1);
+        menu_speak_build(&m2, &sp2);
+        menu_speak_build(&m9, &sp9);
+        int ok = sp1.named && strstr(sp1.item, "Collection") != NULL &&
+                 sp2.named && strcmp(sp2.item, "Capcom vs. SNK") == 0 &&
+                 sp9.named && strcmp(sp9.item, "Plasma Sword") == 0;
+        check("33q. the Music strip names position 1 as the collection and "
+              "2..9 as the games in ROM order", ok,
+              "1=\"%s\" 2=\"%s\" 9=\"%s\"", sp1.item, sp2.item, sp9.item);
+    }
+
+    /* --- case 33r: ⛔ a DIFFERENT count is not this strip ------------------
+     * The map is keyed to nine items. A screen on this caller with any other
+     * count is not the soundtrack chooser and must name NOTHING rather than
+     * index into the table -- the confidently-wrong-name failure this file
+     * exists to refuse. */
+    {
+        mc_speech sp;
+        mc_move m = mk(0x14009af21ULL, 2, 0, 5);   /* 6 items, not 9 */
+        m.vertical = FALSE;
+        menu_speak_build(&m, &sp);
+        check("33r. a non-9-item screen on the Music caller names nothing",
+              !sp.named && sp.why == MC_UNNAMED_COUNT_MISMATCH,
+              "named=%d why=%d item=\"%s\"", (int)sp.named, (int)sp.why,
+              sp.item);
+    }
+
+    /* --- case 33s: ⛔⛔ GALLERY'S 9-ITEM SIBLING MUST NOT GET THIS MAP.
+     *
+     * 0x14009a482 is Museum > Gallery's chooser: also nine items, also
+     * horizontal, and it DOES caption -- so it is an MC_GAME_STRIP and its
+     * position 1 is the collection too, but it is a DIFFERENT SCREEN reached a
+     * different way. If the soundtrack map ever matched it, Gallery would
+     * speak soundtrack names.
+     *
+     * ⚠ This is the pairing that has caught two wrong maps in this file
+     * already: two screens of identical shape on different callers. */
+    {
+        const mc_screen *music = menu_speak_lookup_n(0x14009af21ULL, 9);
+        const mc_screen *gal   = menu_speak_lookup_n(0x14009a482ULL, 9);
+        int ok = music && music->kind == MC_SOUNDTRACK_STRIP &&
+                 gal   && gal->kind   == MC_GAME_STRIP;
+        check("33s. the Music strip and Gallery's sibling stay distinct kinds",
+              ok, "music=%d gallery=%d",
+              music ? (int)music->kind : -1, gal ? (int)gal->kind : -1);
+    }
+
     /* --- case 33j: ⛔⛔ THE PAUSE MENU MUST NOT CLAIM NAMES FROM A MAP.
      *
      * USER-REPORTED: "In training mode it is saying quicksave/load rather than

@@ -6,6 +6,7 @@
 #include "gmd_find.h"
 #include "rom_table.h"
 #include "roster_table.h" /* the 8 per-game rosters, generated */
+#include "soundtrack_table.h" /* Museum > Music's 9 soundtracks, generated */
 #include "memsafe.h"
 #include "speech.h"
 #include "log.h"
@@ -1855,6 +1856,28 @@ static const mc_screen g_screens[] = {
     { 0x1400b2ebbULL, -1, 0, "Music", MC_VERIFIED_LIVE_TEXT,
       MC_NUMBERED_LIVE, 0, NULL, 0, NULL, 0 },
 
+    /* ⭐⭐ THE SOUNDTRACK CHOOSER ITSELF (0x14009af21, 9 items, horizontal) --
+     * the strip that reaches the track list above. It spoke bare positions
+     * ("2 of 9") in every run because it captions NOTHING; see
+     * MC_SOUNDTRACK_STRIP for the evidence closing every other route.
+     *
+     * ⭐ Position 1 is USER-CONFIRMED: opening it gave a five-track list of
+     * SOUND_DINGO_*, and DINGO_2400430 is CFC2's own engine codename, so the
+     * first entry is the collection's own music and the eight games follow in
+     * ROM-table order. The families appear in the corpus in exactly that
+     * order, which tools/gen_soundtrack_table.py verifies rather than assumes.
+     *
+     * ⚠ count = 9 is a REAL invariant here, unlike the track list's 0: the
+     * strip is always the collection plus eight games. It is the membership
+     * test that keeps this map off any other nine-item screen.
+     *
+     * ⛔ NOT MC_GAME_STRIP, which names from a caption -- there is none. And
+     * NOT to be confused with Gallery's 9-item sibling (0x14009a482), which
+     * DOES caption and is handled as a game strip. Two nine-item horizontal
+     * choosers, different channels, separate evidence. */
+    { 0x14009af21ULL, -1, 9, "Music", MC_VERIFIED_LIVE_TEXT,
+      MC_SOUNDTRACK_STRIP, 0, NULL, 0, NULL, 0 },
+
     /* ⭐ PC Settings -- 4 rows, every one named by its own live caption.
      * See g_pc_settings_rows for why no base works here.
      *
@@ -2708,6 +2731,28 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
          * anywhere on this screen (measured: no captured string names it). */
         _snprintf(out->screen_name, sizeof(out->screen_name), "%s", r->name);
         out->screen_name[sizeof(out->screen_name) - 1] = '\0';
+        out->named = TRUE;
+        return;
+    }
+
+    /* ⭐⭐ A SOUNDTRACK CHOOSER (Museum > Music's 9-item strip).
+     *
+     * Named from the position, which this file refuses everywhere else --
+     * see MC_SOUNDTRACK_STRIP for why every other route is closed here and
+     * what supplies the second source.
+     *
+     * ⚠ The count IS checked: the strip is nine items, and a nine-item screen
+     * that is not this one would have to share the caller too. A different
+     * count means this is not the strip and nothing is named. */
+    if (s->kind == MC_SOUNDTRACK_STRIP) {
+        int idx = out->position - 1;
+        if (out->total != 9 || idx < 0 || idx >= 9) {
+            out->why = MC_UNNAMED_COUNT_MISMATCH;
+            return;
+        }
+        _snprintf(out->item, sizeof(out->item), "%s",
+                  g_soundtracks[idx].name);
+        out->item[sizeof(out->item) - 1] = '\0';
         out->named = TRUE;
         return;
     }
