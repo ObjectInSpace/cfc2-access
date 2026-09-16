@@ -532,10 +532,19 @@ int main(void)
             w[0] = 0; w[1] = 2;
             emu_cursor_scan_tick(FALSE);          /* prime */
 
-            for (i = 0; i < 20; i++) {
-                BOOL pressed = (i % 4) == 0;      /* input on every 4th tick */
-                if (pressed) w[0] = (BYTE)(w[0] + 1);   /* cursor advances */
-                w[1] = (BYTE)(w[1] == 2 ? 3 : 2);       /* blink always flips */
+            /* ⛔⛔ THE BLINK MUST OUT-SCORE THE CURSOR ON EVERY OTHER METRIC.
+             * A first version gave the blink only 2 distinct values, so the
+             * "most distinct" tiebreak ranked the cursor first on its own and
+             * the quiet-first rule could be deleted with the suite still green
+             * -- a guard answering for another guard, third time on this
+             * branch. Here the blink cycles through MORE values than the
+             * cursor, so ONLY "changed while idle" can separate them.
+             * This is also the realistic case: run 6's blink took {2,3,16}
+             * while a cursor parked in one spot takes very few. */
+            for (i = 0; i < 24; i++) {
+                BOOL pressed = (i % 8) == 0;     /* the player acts rarely   */
+                if (pressed) w[0] = (BYTE)(w[0] + 1);   /* cursor: 3 values  */
+                w[1] = (BYTE)(10 + (i % 12));           /* blink: 12 values  */
                 emu_cursor_scan_tick(pressed);
             }
 
@@ -548,9 +557,13 @@ int main(void)
             check("11c the cursor has ZERO idle changes",
                   ns >= 1 && sc[0].idle_changes == 0,
                   "idle_changes=%u", ns ? sc[0].idle_changes : 999);
-            check("11d the cursor reached MANY distinct values",
-                  ns >= 1 && sc[0].distinct >= 5,
-                  "distinct=%u", ns ? sc[0].distinct : 0);
+            /* ⚠ The cursor deliberately has FEWER distinct values than the
+             * animation here, so this asserts it was ranked first DESPITE
+             * losing every other metric. */
+            check("11d the cursor ranks first despite FEWER distinct values",
+                  ns >= 2 && sc[0].distinct < sc[1].distinct,
+                  "cursor distinct=%u, next=%u",
+                  ns ? sc[0].distinct : 0, ns > 1 ? sc[1].distinct : 0);
 
             /* The blink must be present, flagged by idle changes, and ranked
              * below -- not silently dropped. */
