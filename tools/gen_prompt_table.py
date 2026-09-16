@@ -118,6 +118,31 @@ def main():
         # not because the screen needs rescuing.
         if label.startswith("ACHIEVEMENT_") and label.endswith("_NAME"):
             return True
+        # ⭐⭐⭐ ACHIEVEMENT DESCRIPTIONS ARE THE "HINTS" VIEW'S ENTIRE CONTENT.
+        #
+        # MEASURED 2026-09-30 (02:38 run). The Fighter Awards button strip
+        # offers "<ICON DECIDE>Hints"; pressing it opens a modal whose strip
+        # collapses to "<ICON CANCEL>Back", and the only text it sets is one
+        # achievement DESCRIPTION -- the hint for the row you are standing on:
+        #
+        #     "Encounter Shin Akuma or Ultimate Rugal in Arcade Mode of
+        #      Capcom vs. SNK 2..."   = ACHIEVEMENT_11_DESC
+        #
+        # and the cursor was on "The True(r) Final Battle" = ACHIEVEMENT_11_NAME.
+        # The pairing is exact.
+        #
+        # ⛔ It was REFUSED -- "caption not in the corpus, not spoken" -- so the
+        # mod discarded the one string that answers the screen. Precisely the
+        # bug the _NAME clause above was added to fix, one family over.
+        #
+        # ⚠ Same standard as every other entry, not a rescue: all 40 texts are
+        # UNIQUE within the family AND against the whole 4165-string corpus
+        # (0 collisions, verified), so identification cannot be ambiguous.
+        #
+        # ⚠ These are DESCRIPTIONS, so a caller must not speak one as a row
+        # LABEL. The hint view has no cursor rows at all -- see the modal path.
+        if label.startswith("ACHIEVEMENT_") and label.endswith("_DESC"):
+            return True
         return False
 
     # index every prompt string by its exact text

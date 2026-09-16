@@ -549,6 +549,16 @@ void menu_speak_line(const char *line);
  * produce no cursor movements at all. */
 void menu_speak_check_modal(void);
 
+/* ⭐⭐⭐ Announce the HINTS view (Fighter Awards -> DECIDE) if one has just
+ * appeared. Like the modal announcer it is driven by TEXT, because the view
+ * produces no cursor movement at all -- measured in the 02:38 run, where the
+ * hint sat on screen for 4 seconds in silence.
+ *
+ * ⚠ Separate from menu_speak_check_modal() on purpose: this view has no
+ * question and no options, so that function's prompt list and "X or Y" option
+ * reading do not apply to it. */
+void menu_speak_check_hint(void);
+
 /* Test seams for the modal path -- the only parts that can run offline, since
  * gmd_text_by_index() has no table in the test process. */
 /* ⚠ TEST ONLY: substitute the GMD resolver menu_speak_check_modal() uses, so

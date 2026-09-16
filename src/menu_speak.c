@@ -2298,6 +2298,44 @@ const mc_screen *menu_speak_lookup_n(ULONGLONG caller, int item_count)
  *
  * ⚠ Guarded read. `screen` comes from a live game thread; this module reads it
  * and never trusts it. */
+/* ⭐⭐ WHY a claim was refused -- reported, never inferred.
+ *
+ * ⛔ USER-VISIBLE BUG THIS EXISTS FOR: in the 02:38 run, 5 of 6 roster
+ * movements named correctly and ONE fell through to the achievements entry,
+ * speaking a bare "3 of 48". The log could not say whether the field was
+ * unreadable, out of range, or named a roster of the wrong size -- three
+ * different bugs with three different fixes, and one indistinguishable log
+ * line. A refusal that cannot be diagnosed costs a whole run to re-measure. */
+typedef enum {
+    MC_CLAIM_OK = 0,
+    MC_CLAIM_NOT_APPLICABLE,   /* not a roster entry, or no screen/offset */
+    MC_CLAIM_UNREADABLE,       /* the field could not be read at all */
+    MC_CLAIM_OUT_OF_RANGE,     /* read, but not a 0..7 game index */
+    MC_CLAIM_SIZE_DISAGREES    /* in range, but that roster is a different size */
+} mc_claim_why;
+
+static mc_claim_why mc_entry_claims_why(const mc_screen *s, const void *screen,
+                                        int item_count, int *out_tab)
+{
+    int tab = -1;
+
+    if (out_tab) *out_tab = -1;
+    if (!s || s->kind != MC_GAME_ROSTER || !screen || s->roster_off <= 0)
+        return MC_CLAIM_NOT_APPLICABLE;
+    {
+        const void *tc = (const char *)screen + s->roster_off;
+        if (!mem_readable(tc, sizeof(tab)) ||
+            !mem_copy(&tab, tc, sizeof(tab)))
+            return MC_CLAIM_UNREADABLE;
+    }
+    if (out_tab) *out_tab = tab;
+    if (tab < 0 || tab >= 8)
+        return MC_CLAIM_OUT_OF_RANGE;
+    if (g_rosters[tab].count != item_count)
+        return MC_CLAIM_SIZE_DISAGREES;
+    return MC_CLAIM_OK;
+}
+
 static BOOL mc_entry_claims(const mc_screen *s, const void *screen,
                             int item_count)
 {
@@ -2334,6 +2372,38 @@ const mc_screen *menu_speak_lookup_for(ULONGLONG caller, int item_count,
                 continue;
             if (mc_entry_claims(&g_screens[i], screen, item_count))
                 return &g_screens[i];
+
+            /* ⭐⭐ A ROSTER ENTRY THAT DECLINED SAYS WHY, ONCE PER REASON.
+             *
+             * ⛔ Measured in the 02:38 run: 5 of 6 roster movements named and
+             * ONE spoke a bare "3 of 48". Three different causes produce that
+             * same outcome and the log could not tell them apart, so the next
+             * step would have been a guess. It reports the tab VALUE too --
+             * an out-of-range read and a mid-update read look identical
+             * without it.
+             *
+             * ⚠ Per-reason, not per-movement: a user sweeping a 48-item
+             * roster must not generate 48 log lines. */
+            if (g_screens[i].kind == MC_GAME_ROSTER) {
+                static BOOL said[5];
+                int tab = -1;
+                mc_claim_why w = mc_entry_claims_why(&g_screens[i], screen,
+                                                     item_count, &tab);
+                if (w != MC_CLAIM_OK && w != MC_CLAIM_NOT_APPLICABLE &&
+                    (unsigned)w < 5 && !said[w]) {
+                    said[w] = TRUE;
+                    log_line("mcspeak: the roster entry declined: %s "
+                             "(tab field at +0x%x read %d, live count %d). "
+                             "Speaking position only.",
+                             w == MC_CLAIM_UNREADABLE   ? "the tab field could "
+                                 "not be READ -- nothing is concluded" :
+                             w == MC_CLAIM_OUT_OF_RANGE ? "the tab index is "
+                                 "OUTSIDE 0..7" :
+                                 "that tab's roster is a DIFFERENT SIZE",
+                             (unsigned)g_screens[i].roster_off, tab,
+                             item_count);
+                }
+            }
         }
     }
     return menu_speak_lookup_n(caller, item_count);
@@ -3984,6 +4054,69 @@ void menu_speak_check_modal(void)
      * outcome, not an accident of an empty buffer. */
     if (flat[0])
         menu_speak_line(flat);
+}
+
+/* ⭐⭐⭐ THE HINTS VIEW (Fighter Awards -> DECIDE).
+ *
+ * MEASURED 2026-09-30, 02:38 run. The button strip offers
+ * "<ICON DECIDE>Hints"; pressing it collapses the strip to "<ICON CANCEL>Back"
+ * and the view sets exactly ONE string -- the achievement DESCRIPTION for the
+ * row the cursor is on:
+ *
+ *     cursor on "The True(r) Final Battle"  (= ACHIEVEMENT_11_NAME)
+ *     view sets "Encounter Shin Akuma or Ultimate Rugal in Arcade Mode of
+ *                Capcom vs. SNK 2..."       (= ACHIEVEMENT_11_DESC)
+ *
+ * ⛔⛔ WHY THIS NEEDS ITS OWN ANNOUNCER: the view produces NO CURSOR MOVEMENT,
+ * so the movement path never runs and the user sat in silence for 4 seconds
+ * with the hint on screen. It is a modal in shape -- but not in content: it has
+ * no question and no options, so menu_speak_check_modal()'s prompt list and its
+ * "X or Y" option reading do not apply. Folding it in there would have meant
+ * teaching that function to sometimes have no options, on a path whose comments
+ * record two user-reported bugs about saying too much.
+ *
+ * ⭐ IDENTIFIED BY THE CORPUS, not by position or timing. All 40 descriptions
+ * are unique within the family AND against the whole corpus (0 collisions,
+ * verified by the generator), so prompt_identify() resolves one exactly or not
+ * at all. A string that is not an achievement description is not this view.
+ *
+ * ⚠ The guard is the TEXT, so re-opening the view on a DIFFERENT row speaks
+ * again while holding the same one stays silent. Closing the view clears it. */
+void menu_speak_check_hint(void)
+{
+    static char last[GT_CAPTION_MAX];
+    char text[GT_CAPTION_MAX];
+    int i;
+
+    for (i = 0; gt_prose_at(i, text, (int)sizeof(text)); i++) {
+        prompt_id id;
+        if (!text[0])
+            continue;
+        id = prompt_identify(text);
+        if (id.result != PROMPT_ID_FOUND || !id.label)
+            continue;
+        /* ⚠ Descriptions ONLY. An achievement NAME reaching here would be the
+         * grid's own row text, which the movement path already speaks -- and
+         * announcing it again would double every movement. */
+        if (strncmp(id.label, "ACHIEVEMENT_", 12) != 0 ||
+            !strstr(id.label, "_DESC"))
+            continue;
+        if (strcmp(last, text) == 0)
+            return;                       /* same hint, already spoken */
+        _snprintf(last, sizeof(last), "%s", text);
+        last[sizeof(last) - 1] = '\0';
+        {
+            char flat[GT_CAPTION_MAX];
+            menu_speak_flatten_prompt(text, flat, (int)sizeof(flat));
+            if (flat[0])
+                menu_speak_line(flat);
+        }
+        return;
+    }
+    /* ⚠ No description on screen: the view is closed. Clear the guard so the
+     * same hint opened again speaks again -- the same reasoning as the modal
+     * path's, and the reason this is not a one-shot latch. */
+    last[0] = '\0';
 }
 
 /* ⛔⛔ THE ONE-POLL CAPTION DEFERRAL IS GONE. DO NOT BRING IT BACK.

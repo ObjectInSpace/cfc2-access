@@ -510,6 +510,17 @@ static DWORD WINAPI worker(LPVOID param)
             if (gt_ok)
                 menu_speak_check_modal();
 
+            /* ⭐⭐⭐ THE HINTS VIEW, on the same fast poll and for the same
+             * reason: it produces NO cursor movement, so the movement path is
+             * blind to it. Measured in the 02:38 run -- the hint was on screen
+             * for 4 seconds and the mod said nothing.
+             *
+             * ⚠ Cheap at this rate: it walks the bounded focus record and
+             * returns on the first string that is not an achievement
+             * description, which is every screen but this one. */
+            if (gt_ok)
+                menu_speak_check_hint();
+
             /* Watch the verified static path continuously. The last open
              * question -- is that field the selection? -- is then answered by
              * simply navigating the menus, with no protocol for the user to
