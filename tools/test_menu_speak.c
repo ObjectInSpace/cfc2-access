@@ -96,10 +96,24 @@ static void check(const char *name, int cond, const char *fmt, ...)
 #define MODAL_EXIT_APP "If you exit the application, all unsaved\r\nprogress will be lost. Continue?"
 #define MODAL_BACK_TITLE "If you return to the title screen,\r\nall unsaved progress will be lost.\r\nContinue?"
 
+/* ⭐ More of the shipped prompts, verbatim from the corpus. The list grew from
+ * 2 to 20 after the user reported "you also are not reading many of the yes/no
+ * prompts", and a resolver that still knew only the original two would leave
+ * every added index untested -- it would answer FALSE for them and the matcher
+ * would look correct while covering nothing. */
+#define MODAL_QUIT_TR    "Exit training mode?"
+#define MODAL_SCORE_RST  "Reset high score data?"
+#define MODAL_RESET_GAME "Restart the game?"
+#define MODAL_LOAD_CHECK "Load quick save data?"
+
 static BOOL test_modal_resolve(int idx, char *out, unsigned outlen)
 {
-    const char *s = (idx == 384) ? MODAL_EXIT_APP :
-                    (idx == 383) ? MODAL_BACK_TITLE : NULL;
+    const char *s = (idx == 384)  ? MODAL_EXIT_APP :
+                    (idx == 383)  ? MODAL_BACK_TITLE :
+                    (idx == 279)  ? MODAL_QUIT_TR :
+                    (idx == 385)  ? MODAL_SCORE_RST :
+                    (idx == 4117) ? MODAL_RESET_GAME :
+                    (idx == 269)  ? MODAL_LOAD_CHECK : NULL;
     if (!s || !out || outlen == 0) return FALSE;
     _snprintf(out, outlen, "%s", s);
     out[outlen - 1] = '\0';
@@ -811,8 +825,30 @@ int main(void)
          * one-sided test and announce ordinary menu prose as a quit warning. */
         int ok = menu_speak_is_modal_prompt(MODAL_EXIT_APP, test_modal_resolve) &&
                  menu_speak_is_modal_prompt(MODAL_BACK_TITLE, test_modal_resolve) &&
+                 /* ⭐ The prompts added after the user reported that most
+                  * confirmations were silent. Without these the list could be
+                  * reverted to its original two and this case would not
+                  * notice. */
+                 menu_speak_is_modal_prompt(MODAL_QUIT_TR, test_modal_resolve) &&
+                 menu_speak_is_modal_prompt(MODAL_SCORE_RST,
+                                            test_modal_resolve) &&
+                 menu_speak_is_modal_prompt(MODAL_RESET_GAME,
+                                            test_modal_resolve) &&
+                 menu_speak_is_modal_prompt(MODAL_LOAD_CHECK,
+                                            test_modal_resolve) &&
                  !menu_speak_is_modal_prompt("Play offline.", test_modal_resolve) &&
                  !menu_speak_is_modal_prompt("Exit the application.",
+                                             test_modal_resolve) &&
+                 /* ⛔⛔ THE SONG TITLES. Two corpus strings end in a question
+                  * mark -- SOUND_CFJ_06 "06. At Ease!?" and SOUND_MJUS_46
+                  * "46. Who's the Number one?" -- so a matcher that keyed on
+                  * punctuation instead of on the known indices would announce a
+                  * music track as a confirmation dialog the moment the player
+                  * opened the sound test. That is why the list is chosen by
+                  * STEM FAMILY and this case asserts the trap directly. */
+                 !menu_speak_is_modal_prompt("06. At Ease!?",
+                                             test_modal_resolve) &&
+                 !menu_speak_is_modal_prompt("46. Who's the Number one?",
                                              test_modal_resolve) &&
                  !menu_speak_is_modal_prompt("", test_modal_resolve) &&
                  !menu_speak_is_modal_prompt(NULL, test_modal_resolve);

@@ -3408,9 +3408,49 @@ BOOL menu_speak_test_caption_repeat(const char *cap, const char *screen_name)
  *
  * ⚠ Announced ONCE per appearance: the dialog re-sets its text while open, and
  * a prompt repeating every redraw would talk over the user. */
+/* ⛔ USER: "You also are not reading many of the yes/no prompts." Correct --
+ * this list held exactly TWO, the quit dialogs it was built for, so every other
+ * confirmation in the collection was silent. A blind player was being asked a
+ * question they could not hear, and some of these END A MATCH or OVERWRITE A
+ * SAVE.
+ *
+ * ⭐ Chosen by STEM FAMILY (POP_*, SYS_*, ASK_*), not by "the text ends in a
+ * question mark". Two song titles in the corpus end in '?' -- SOUND_CFJ_06
+ * "06. At Ease!?" and SOUND_MJUS_46 "46. Who's the Number one?" -- and a
+ * punctuation rule would announce a music track as a dialog the moment the
+ * player opened the sound test.
+ *
+ * ⚠ These are INDICES, resolved against the live corpus at match time, so the
+ * mod follows the game's language. A hardcoded English literal would break for
+ * 13 of the 14 shipped languages. */
 static const int K_MODAL_PROMPTS[] = {
-    384,    /* SYS_EXIT_APP    'If you exit the application, ...Continue?'   */
-    383,    /* SYS_BACK_TITLE  'If you return to the title screen, ...'      */
+    384,    /* SYS_EXIT_APP     'If you exit the application, ...Continue?'  */
+    383,    /* SYS_BACK_TITLE   'If you return to the title screen, ...'     */
+    278,    /* POP_QUIT         'Exit the game?'                             */
+    279,    /* POP_QUIT_TR      'Exit training mode?'                        */
+    280,    /* POP_QUIT_HOST    'Exit the game and return to the lobby?'     */
+    281,    /* POP_QUIT_GUEST   'Exit the game and leave the lobby?'         */
+    4117,   /* POP_RESET_GAME   'Restart the game?'                          */
+    269,    /* POP_LOAD_CHECK   'Load quick save data?'                      */
+    270,    /* POP_SAVE_CHECK   'Overwrite game data?'                       */
+    /* ⚠ 271 POP_SAVE_CHECK2 is DELIBERATELY ABSENT. Its corpus text contains a
+     * "%s" that the game substitutes with the save name, so the live string can
+     * never equal the template and an exact match would never fire. Listing it
+     * would look like coverage while changing nothing -- worse than the gap,
+     * because it hides it. Matching it needs a prefix rule, which is a wider
+     * change than this one and would need its own evidence that no other
+     * string shares the prefix. */
+    385,    /* SYS_SCORE_RESET  'Reset high score data?'                     */
+    389,    /* SYS_NOTFIND_SAVEDATA 'Could not find save data. Create new?'  */
+    400,    /* SYS_SAVEDATA_NOCREATE 'You will not be able to create ...'    */
+    402,    /* SYS_AUTOSAVE_NOSAVING_01 'Unable to save. Return to title?'   */
+    150,    /* POP_LEAVE_LOBBY  'Leave this lobby?'                          */
+    933,    /* POP_SEARCH_NO_MATCH 'Unable to find an opponent. Search again?' */
+    935,    /* ASK_MATCH        'Begin match?'                               */
+    945,    /* ASK_REMATCH      'Rematch?'                                   */
+    946,    /* POP_ASK_MATCH    'Stop waiting for opponents and exit standby?' */
+    1062,   /* POP_DECLINED_MATCH 'You have left the match. Search again?'   */
+    1082,   /* ASK_REPLAY       'Play again?'                                */
 };
 
 /* ⭐ Collapse the corpus strings' CR/LF layout to single spaces.
