@@ -50,11 +50,31 @@ MOVE = re.compile(r"item (?P<pos>\d+) of (?P<total>\d+).*?caller=0*(?P<c>[0-9A-F
 LIVE_KINDS = {"MC_NUMBERED_LIVE", "MC_CHAR_PICKER", "MC_GAME_STRIP",
               # Named by the objects' own screen coordinates -- no map, and the
               # count check in gt_item_at_position() is what keeps it honest.
-              "MC_COORD_LIVE"}
+              "MC_COORD_LIVE",
+              # ⛔⛔ THESE WERE MISSING, AND THE TOOL CALLED THEM "no label
+              # map" -- which is true and irrelevant: they are the kinds that
+              # deliberately HAVE no map because they QUOTE the column the game
+              # drew. Coverage read 26% while naming Game Settings, Training
+              # Options and the pause menu as gaps, minutes after each was
+              # fixed and confirmed working by the user.
+              #
+              # ⚠ The lesson is the one this file's own docstring states about
+              # aging logs, in a second form: a coverage model DRIFTS from the
+              # code as new naming MECHANISMS are added, not just new rows. Any
+              # kind that names an item without indexing a map belongs here.
+              "MC_ROW_COLUMN",      # quotes the row label column (x)
+              "MC_ROW_VALUE_LIVE",  # quotes row+value on a value movement
+              "MC_MOVE_LIST",       # the game's own per-game move table
+              "MC_MOVE_ROSTER"}     # the move list's character heading
 
 # A value axis speaks "<row>, <value>" and is driven by the row map of its
 # SIBLING screen (same `name`), not by a map of its own.
 VALUE_KINDS = {"MC_SETTINGS_VALUE"}
+
+# ⭐ Screens whose ROW 0 is the GAME, named from the exe's ROM table rather than
+# from a label map -- so their map carries a deliberate hole at that position.
+# Kept in step with the `s->caller == ...` test in menu_speak.c's value path.
+ROM_TABLE_ROW0_CALLERS = {0x1400b1bd9, 0x140098986, 0x140082d16, 0x14008e813}
 
 
 def parse_maps(src):
@@ -89,6 +109,52 @@ def parse_screens(src):
     rows = []
     for entry in re.findall(r"\{([^{}]*)\}", body):
         f = [x.strip() for x in entry.split(",")]
+        if len(f) < 3:
+            continue
+
+        # ⛔⛔ DESIGNATED INITIALISERS WERE SILENTLY SKIPPED, and the tool
+        # reported their screens as UNNAMED. The old rule was
+        # `if not f[0].startswith("0x"): continue`, which drops every entry
+        # written `{ .caller = 0x..., ... }` -- the style every row added since
+        # MC_ROW_COLUMN uses. Coverage read 26% when the table covered those
+        # screens, naming Game Settings and the pause menu as gaps minutes
+        # after they were fixed.
+        #
+        # ⚠ A measurement that cannot see half the table is worse than no
+        # measurement: it points at work already done. Both styles are parsed
+        # here, and a row matching NEITHER is counted and reported rather than
+        # skipped -- an unparsed row must never look like an absent one.
+        if any(x.startswith(".") for x in f):
+            kv = {}
+            for x in f:
+                if "=" not in x or not x.startswith("."):
+                    continue
+                k, v = x.split("=", 1)
+                kv[k.strip().lstrip(".")] = v.strip()
+            if "caller" not in kv:
+                rows.append(None)          # unparsed: counted below
+                continue
+            try:
+                caller = int(kv["caller"].rstrip("ULul"), 16)
+            except ValueError:
+                rows.append(None)
+                continue
+            try:
+                base = int(kv.get("base_index", "-1"))
+            except ValueError:
+                base = -1
+            try:
+                count = int(kv.get("count", "0"))
+            except ValueError:
+                count = 0
+            name = kv.get("name", "").strip('"')
+            kind = kv.get("kind", "")
+            labels = kv.get("labels")
+            if labels and not labels.startswith("g_"):
+                labels = None
+            rows.append((caller, base, count, name, kind, labels))
+            continue
+
         if len(f) < 6 or not f[0].startswith("0x"):
             continue
         caller = int(f[0].rstrip("ULul"), 16)
@@ -101,7 +167,13 @@ def parse_screens(src):
         kind = f[5]
         labels = next((x for x in f if x.startswith("g_") and "row" in x), None)
         rows.append((caller, base, count, name, kind, labels))
-    return rows
+
+    unparsed = sum(1 for r in rows if r is None)
+    if unparsed:
+        print(f"⚠ {unparsed} table row(s) could not be parsed and are NOT "
+              f"counted as covered. Fix the parser before trusting the "
+              f"percentage below.")
+    return [r for r in rows if r is not None]
 
 
 def main():
@@ -170,6 +242,19 @@ def main():
 
             idxs = maps[lab]
             if pos - 1 < len(idxs) and idxs[pos - 1] is not None:
+                named += 1
+            elif caller in ROM_TABLE_ROW0_CALLERS and count == 8:
+                # ⛔ A FOURTH NAMING MECHANISM the model was missing. Row 0 of
+                # these screens is the GAME, named from the ROM table in the
+                # exe (rom_table_ready()), never from a label map -- so the map
+                # carries a deliberate hole there and every row-0 movement was
+                # counted as "row unestablished".
+                #
+                # ⚠ The log proves it: this caller speaks "Game, Capcom vs.
+                # SNK: Millennium Fight 2000 Pro, 1 of 8". A gap the game is
+                # demonstrably not showing is a defect in the MEASUREMENT, and
+                # reporting it would have sent the next session chasing a
+                # screen that already works.
                 named += 1
             else:
                 gaps.setdefault(("row unestablished", caller, count), 0)
