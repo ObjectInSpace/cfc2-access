@@ -244,4 +244,16 @@ void emu_ram_test_window(ULONGLONG base, SIZE_T size);
  * must not read "found nothing" from one budgeted sweep as "it is not there". */
 void emu_ram_scan_rewind(void);
 
+/* Force the number of BLOCKS one sweep may examine, instead of the wall-clock
+ * budget. 0 restores the timed behaviour.
+ *
+ * ⚠⚠ THE OFFLINE SUITE MUST NOT DEPEND ON WALL-CLOCK TIMING. A fixture sized
+ * so that "one 25 ms sweep" happens not to finish it is only true on some
+ * machines: sized at 64 MB it passed here and would silently stop
+ * discriminating on a faster one -- a flaky test, which is worse than none,
+ * because it reports a mechanism as protected when it is not. A deterministic
+ * block cap makes "the budget bit, and the scan resumed" reproducible
+ * everywhere. */
+void emu_ram_test_block_limit(unsigned blocks);
+
 #endif /* CFC2_EMU_RAM_H */

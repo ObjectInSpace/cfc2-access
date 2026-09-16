@@ -535,28 +535,29 @@ int main(void)
      * the worker thread, so speech was dead for nearly two minutes. That is a
      * broken mod, not a slow diagnostic.
      *
-     * The fix is a wall-clock budget plus RESUMPTION, and resumption is the
-     * part that can silently destroy coverage: if the resume point does not
-     * advance, or wraps wrongly, the scan re-reads the same slice forever and
-     * everything past it is never examined -- a false negative that looks
-     * exactly like a completed sweep. These cases pin that. */
+     * The fix is a budget plus RESUMPTION, and resumption is the part that can
+     * silently destroy coverage: if the resume point does not advance, the
+     * scan re-reads one slice forever and everything past it is never
+     * examined -- a false negative indistinguishable from a completed sweep.
+     *
+     * ⚠⚠ THESE CASES USE A DETERMINISTIC BLOCK LIMIT, NOT THE CLOCK. My first
+     * version sized a 64 MB fixture so that "one 25 ms sweep" would not finish
+     * it -- and the sabotage proved that was luck: pinning the resume point to
+     * the base left the suite GREEN, because on this machine one sweep already
+     * covered the whole fixture. A timing-dependent case reports a mechanism
+     * as protected when it is not, which is worse than having no case. */
     {
-        /* Large enough that one 25 ms budget cannot cover it in a single pass
-         * on any plausible machine, with a pair planted near the END so only a
-         * scan that actually RESUMES will ever reach it. */
-        SIZE_T big = 64u * 1024u * 1024u;
+        SIZE_T big = 0x40000u * 6u;           /* exactly 6 scan blocks */
         unsigned char *bar = (unsigned char *)VirtualAlloc(
             NULL, big, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        emu_ram_hit hits12[8];
+        unsigned nh12 = 0;
 
-        emu_ram_hit hits[8];
-        unsigned nh = 0;
-
-        check("12-setup large arena allocated", bar != NULL, "");
+        check("12-setup arena allocated", bar != NULL, "");
         if (bar) {
-            SIZE_T late = big - 0x10000;      /* near the far end */
-            unsigned total = 0, sweeps = 0, found_late = 0;
-            SIZE_T sc = 0;
-            unsigned j;
+            SIZE_T late = big - 0x20000;      /* in the LAST block */
+            unsigned sweeps, found_late = 0, j;
+            SIZE_T sc = 0, first_sc = 0;
 
             for (j = 0; j < 16; j++) {
                 bar[late + 8 + j]                 = (unsigned char)(j * 7 + 1);
@@ -566,45 +567,45 @@ int main(void)
             bar[late + CVS2_STRIDE_T + 0] = 120;
             bar[late + CVS2_STRIDE_T + 4] = 144;
 
+            /* ONE block per sweep: six sweeps are needed to cross the arena,
+             * on every machine, regardless of speed. */
+            emu_ram_test_block_limit(1);
             emu_ram_test_window((ULONGLONG)(ULONG_PTR)bar, big);
 
-            /* One sweep must NOT cover the whole arena -- otherwise the budget
-             * is not doing anything and the rest of this case proves nothing. */
-            s = emu_ram_find(hits, 8, &nh, &sc);
+            s = emu_ram_find(hits12, 8, &nh12, &first_sc);
             check("12a one budgeted sweep covers only PART of the arena",
-                  s == EMU_OK && sc < big,
+                  s == EMU_OK && first_sc > 0 && first_sc < big,
                   "got %s scanned=%llu of %llu", emu_status_name(s),
-                  (unsigned long long)sc, (unsigned long long)big);
+                  (unsigned long long)first_sc, (unsigned long long)big);
 
-            /* Sweeping repeatedly must eventually reach the far end. If the
-             * resume point were broken this loop would never find it. */
-            for (sweeps = 0; sweeps < 400 && !found_late; sweeps++) {
+            /* The planted pair is in the LAST block, so only a scan that
+             * actually RESUMES can ever reach it. */
+            for (sweeps = 0; sweeps < 12 && !found_late; sweeps++) {
                 unsigned k;
-                s = emu_ram_find(hits, 8, &nh, &sc);
+                s = emu_ram_find(hits12, 8, &nh12, &sc);
                 if (s != EMU_OK) break;
-                total += nh;
-                for (k = 0; k < nh && k < 8; k++)
-                    if (hits[k].p1 == (ULONGLONG)(ULONG_PTR)(bar + late))
+                for (k = 0; k < nh12 && k < 8; k++)
+                    if (hits12[k].p1 == (ULONGLONG)(ULONG_PTR)(bar + late))
                         found_late = 1;
             }
-            check("12b RESUMPTION reaches a pair planted near the far end",
-                  found_late, "after %u sweeps, %u total hit(s)", sweeps, total);
+            check("12b RESUMPTION reaches a pair in the LAST block",
+                  found_late, "not found after %u further sweep(s)", sweeps);
 
-            /* ⭐ And rewinding must actually rewind: the first sweep after a
-             * rewind starts at the base again, so it cannot immediately see
-             * the pair that lives at the far end. */
+            /* Rewind must actually rewind: the next sweep starts at the base
+             * again, so with a one-block budget it cannot see the far pair. */
             emu_ram_scan_rewind();
-            s = emu_ram_find(hits, 8, &nh, &sc);
+            s = emu_ram_find(hits12, 8, &nh12, &sc);
             {
                 unsigned k, saw = 0;
-                for (k = 0; k < nh && k < 8; k++)
-                    if (hits[k].p1 == (ULONGLONG)(ULONG_PTR)(bar + late))
+                for (k = 0; k < nh12 && k < 8; k++)
+                    if (hits12[k].p1 == (ULONGLONG)(ULONG_PTR)(bar + late))
                         saw = 1;
-                check("12c rewind restarts at the base (far pair not seen yet)",
+                check("12c rewind restarts at the base (far pair not seen)",
                       s == EMU_OK && !saw, "got %s saw=%u",
                       emu_status_name(s), saw);
             }
 
+            emu_ram_test_block_limit(0);
             emu_ram_test_window(0, 0);
             VirtualFree(bar, 0, MEM_RELEASE);
         }

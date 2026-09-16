@@ -309,6 +309,14 @@ void emu_ram_scan_rewind(void)
     g_resume = 0;
 }
 
+/* Deterministic stand-in for the wall-clock budget, for the offline suite. */
+static unsigned g_block_limit;
+
+void emu_ram_test_block_limit(unsigned blocks)
+{
+    g_block_limit = blocks;
+}
+
 /* ⚠ Also clears the resume point. Without this, a budgeted sweep's leftover
  * position would carry into the next fixture and a case would silently scan
  * only part of its own planted arena -- a false negative produced by test
@@ -408,6 +416,7 @@ emu_status emu_ram_find(emu_ram_hit *out, unsigned cap, unsigned *n_out,
     unsigned n = 0;
     emu_status s;
     DWORD t0 = GetTickCount();
+    unsigned blocks_done = 0;
     MEMORY_BASIC_INFORMATION mbi;
     ULONGLONG region_end = 0;
     /* One block plus the tail of a pair, so a struct straddling a block
@@ -449,10 +458,12 @@ emu_status emu_ram_find(emu_ram_hit *out, unsigned cap, unsigned *n_out,
          * an earlier scanner in this project put its deadline in an outer loop
          * over regions, which could not fire for minutes and voided the very
          * guarantee it existed to provide. */
-        if (GetTickCount() - t0 >= SCAN_BUDGET_MS) {
+        if (g_block_limit ? (blocks_done >= g_block_limit)
+                          : (GetTickCount() - t0 >= SCAN_BUDGET_MS)) {
             g_resume = addr;           /* continue here next sweep */
             break;
         }
+        blocks_done++;
 
         if (addr + want > end)
             want = (SIZE_T)(end - addr);
