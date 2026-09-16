@@ -24,8 +24,120 @@
 #include "gui_text.h"
 #include "menu_cursor.h"
 #include "menu_speak.h"   /* menu_speak_set_discovery() */
+#include "emu_ram.h"      /* the emulated machine's state (world 2)         */
 
 #include <stdio.h>
+
+/* --- The emulator probe (world 2, stage 1) -------------------------------
+ * Read-only: two pointer reads and some dwords. No hooks, no writes, no calls
+ * into game code. Hooking has crashed this game before, and nothing in stages
+ * 1-4 of the in-game work needs one.
+ *
+ * ⭐⭐ WHAT A NEGATIVE LOOKS LIKE, stated up front so a null result cannot be
+ * misread as a broken probe -- the distinction this project has paid for more
+ * than once:
+ *
+ *   "no game is loaded"   -> the slot is null. A REAL answer; expected on the
+ *                            title screen and in every shell menu.
+ *   "COULD NOT READ"      -> we never looked. NOT a negative; the anchor or
+ *                            the memory is wrong and nothing may be concluded.
+ *   "UNVERIFIED"          -> we looked, found something, and it FAILED its own
+ *                            content check. The anchor is suspect.
+ *
+ * ⚠ The falsifiable check is the CROSS-CHECK: the ROM index cached at
+ * state+0x44 is produced by the game's own rom_index_from_name() over the
+ * table at 0x141208b00, so the name it implies must equal the live string at
+ * state+0x30. If those two disagree, the field map is wrong -- and the probe
+ * says so rather than printing a plausible line. */
+static BOOL g_emu_probe_on;
+
+static void emu_probe_report(int beat)
+{
+    static int last_rom = -1;
+    static int said_absent;
+
+    ULONGLONG st = 0, arena = 0;
+    SIZE_T size = 0;
+    emu_status s_st, s_ar, s_ix;
+    int rom = 0, game = -1, rev = -1;
+    char live[32];
+
+    s_st = emu_state(&st);
+    if (s_st != EMU_OK) {
+        /* Only say it once per state, or a quiet session becomes a wall of
+         * identical lines -- and the ONE interesting transition gets buried. */
+        if (!said_absent) {
+            said_absent = 1;
+            if (s_st == EMU_NOT_RUNNING)
+                log_line("emu: no game is loaded (state slot is null). This is "
+                         "the expected, CORRECT reading in the shell menus -- "
+                         "not a failure to read.");
+            else
+                log_line("emu: ⚠ %s -- the state slot at 0x%llx could NOT be "
+                         "read. Nothing may be concluded from this; it is not "
+                         "a negative.",
+                         emu_status_name(s_st), (unsigned long long)EMU_STATE_SLOT);
+        }
+        last_rom = -1;
+        return;
+    }
+    said_absent = 0;
+
+    s_ix = emu_rom_index(&rom);
+    if (s_ix != EMU_OK) {
+        log_line("emu: state=0x%llx resolved, but the ROM index is %s -- the "
+                 "field map may be wrong.",
+                 (unsigned long long)st, emu_status_name(s_ix));
+        return;
+    }
+
+    /* Report on CHANGE. Re-printing an unchanged ROM every 10 s would bury the
+     * transition that actually matters (entering or leaving a game). */
+    if (rom == last_rom && beat != 3)
+        return;
+    last_rom = rom;
+
+    s_ar = emu_arena(&arena, &size);
+
+    live[0] = '\0';
+    (void)emu_rom_name(live, sizeof(live));
+
+    if (!emu_game_from_rom_index(rom, &game, &rev))
+        game = rev = -1;
+
+    log_line("emu: state=0x%llx rom_index=%d name='%s' -> game=%d rev=%d",
+             (unsigned long long)st, rom, live, game, rev);
+
+    /* ⭐⭐ THE CROSS-CHECK. Two independent sources: the live string the game
+     * stored, and the name our table says that index means. Agreement is
+     * evidence; disagreement means the map is wrong and must be said plainly
+     * rather than papered over with the value that happens to look right. */
+    {
+        const char *expect = emu_rom_name_for_index(rom);
+        if (!expect)
+            log_line("emu: ⚠ rom_index %d is outside the 18-record table.", rom);
+        else if (live[0] && strcmp(live, expect) != 0)
+            log_line("emu: ⛔⛔ MISMATCH -- state+0x30 says '%s' but rom_index "
+                     "%d means '%s'. The field map is WRONG; do not build on "
+                     "these offsets.", live, rom, expect);
+        else if (live[0])
+            log_line("emu: ✅ cross-check OK -- the live name and the index "
+                     "agree on '%s'.", expect);
+        else
+            log_line("emu: ⚠ the live name string was unreadable, so the "
+                     "cross-check did NOT run (the index alone is unconfirmed).");
+    }
+
+    if (s_ar == EMU_OK)
+        log_line("emu: arena=0x%llx region=%llu MB (the constructor asks for "
+                 "%llu MB). ⚠ This is the whole arena, NOT guest RAM -- NAOMI "
+                 "system RAM is 16 MB and lives somewhere INSIDE it.",
+                 (unsigned long long)arena,
+                 (unsigned long long)(size / (1024 * 1024)),
+                 (unsigned long long)(EMU_ARENA_SIZE / (1024 * 1024)));
+    else
+        log_line("emu: arena is %s", emu_status_name(s_ar));
+}
 
 static HANDLE g_thread;
 static volatile LONG g_quit;
@@ -393,6 +505,22 @@ static DWORD WINAPI worker(LPVOID param)
         gt_settings_census_enable(FALSE);
     }
 
+    /* ⭐ THE EMULATOR PROBE (world 2, stage 1). Opt-in, READ-ONLY, nothing
+     * spoken, nothing hooked. It answers one question the dump cannot: does
+     * the anchor derived offline actually resolve in a live process, and does
+     * the ROM it names match the game the user chose?
+     *
+     * ⚠ It is gated because it is a development aid. The lesson that made the
+     * discovery sweep opt-in applies: a diagnostic that does not run is an
+     * inconvenience to the developer; one that stalls the user's speech is a
+     * broken mod. This one is two pointer reads, so the cost is nil -- but it
+     * also has nothing to say to a player, which is the real reason to gate it. */
+    g_emu_probe_on = opt_in_file_present("cfc2_emu.on");
+    if (g_emu_probe_on)
+        log_line("mod: cfc2_emu.on -- the EMULATOR probe is ENABLED. Start any "
+                 "game and the log reports the emulator state object, the ROM "
+                 "it says is running, and the arena. Nothing is spoken.");
+
     /* ⚠ OPT-IN. The offline tools (disasm.py, find_callers.py,
      * build_riprefs.py, analyze_dump.py) all read this dump, and it is the
      * machinery that cracked sPad, sKeyboard and the cursor chokepoint -- so it
@@ -710,6 +838,15 @@ static DWORD WINAPI worker(LPVOID param)
             }
         }
         beat++;
+
+        /* ⭐ The emulator probe reports on CHANGE, plus once early for
+         * liveness. ⚠ A fixed beat schedule has already missed a whole run in
+         * this project (beats 10/30/60 covered 2 of 22 movements), and "which
+         * ROM is loaded" changes only when the user starts or leaves a game --
+         * so the interesting moments are edges, not ticks. */
+        if (g_emu_probe_on && (beat == 3 || beat % 5 == 0))
+            emu_probe_report(beat);
+
         /* ⚠ Every 5 beats (10 s), not every 30 (60 s). A session ended with
          * the log stopping mid-navigation and the user reporting the mod had
          * "stopped reading" -- and the heartbeat could not distinguish a dead
