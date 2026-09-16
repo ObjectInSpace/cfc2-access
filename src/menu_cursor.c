@@ -582,13 +582,7 @@ void mc_poll_and_log(void)
     /* ⚠ `if`, not `while`: only the most recent movement is kept, so a loop
      * would suggest a queue that does not exist. */
     mc_move m;
-    if (!mc_take_move(&m)) {
-        /* ⭐ Nothing new this poll: speak anything held back waiting for its
-         * caption to arrive. ⚠ Only on an IDLE poll -- a new movement
-         * supersedes a pending one (menu_speak clears it), because announcing
-         * a row the cursor has already left is worse than skipping it. */
-        menu_speak_flush_deferred();
-    } else {
+    if (mc_take_move(&m)) {
         /* ⭐ The screen snapshot, on the CONSUMING path.
          *
          * ⛔ It used to hang only off mc_peek_rest() in mod.c, which is reached

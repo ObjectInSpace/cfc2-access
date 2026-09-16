@@ -3725,74 +3725,37 @@ void menu_speak_check_modal(void)
         menu_speak_line(flat);
 }
 
-/* ⭐⭐ ONE-POLL DEFERRAL FOR A CAPTION THAT HAS NOT ARRIVED YET.
+/* ⛔⛔ THE ONE-POLL CAPTION DEFERRAL IS GONE. DO NOT BRING IT BACK.
  *
- * ⛔⛔ MEASURED, user-reported as Fighter Awards reading inconsistently: of 13
- * movements, 7 spoke a title and 6 spoke a BARE NUMBER -- and in three of those
- * the game set the title in the SAME MILLISECOND, just AFTER we spoke:
- *     spoke "29 of 40" while the screen showed "Let Friendship Prevail!"
- *     spoke "1 of 40"  while the screen showed "Fighting Game Fans Rejoice!"
- * The 40-item grid named 0 of 3. The caption channel is that screen's ONLY
- * naming route, so losing the race means losing the name entirely.
+ * It held an unnamed movement for one poll so a caption arriving 0-1 ms late
+ * could still name the row. It fixed the race it targeted -- the achievement
+ * grid went 0/3 to 7/10 named -- and it was WRONG ANYWAY, twice over:
  *
- * ⚠ NOT A TIME WINDOW. Every title arrived 0-1 ms after its movement, so a
- * delay tuned in milliseconds would be guesswork. What differs is ORDERING
- * within the poll: sometimes setText has run when we ask, sometimes not. So
- * this waits for the NEXT POLL (100 ms) and asks again -- the same ordering
- * fact gt_take_caption() already keys on, given one more chance to be true.
+ *   1. A new movement discarded the pending one and the retry fires only on an
+ *      IDLE poll, which a moving user never has. 12 of 25 movements spoke
+ *      NOTHING. User: "it takes that much longer before I can hear anything."
+ *   2. Fixed so a supersede speaks immediately -- and it was STILL worse. User:
+ *      "now it doesn't read any labels at all, and when it reads the item
+ *      count, that is getting slower."
  *
- * ⛔ DEFERRED AT MOST ONCE, and only when the movement has NO name and NO
- * caption. A screen that genuinely never sets text must not be silenced: it
- * speaks its position one poll later, which is the behaviour it had before.
+ * ⭐⭐ THE LESSON, which is about latency and not about this screen: ANY delay
+ * on the path between a keypress and speech is paid on EVERY movement, while
+ * the thing it buys is paid only on the few that were racing. The user holds a
+ * direction and cycles hundreds of items -- "there are hundreds of options in
+ * there" -- so a per-movement cost of even one poll is not a trade, it is a
+ * tax. Speak immediately, always; if a name is not ready, the position is the
+ * answer, not a reason to wait.
  *
- * ⛔ AND A NEWER MOVEMENT WINS. If the user moves again while one is pending,
- * the pending one is DROPPED -- announcing a row the cursor has already left
- * is worse than skipping it, and mc_take_move() keeps only the most recent
- * movement for exactly this reason. */
-static BOOL     g_defer_pending;
-static mc_move  g_defer_move;
-/* ⛔⛔ Set only while the RETRY is running, and it blocks a second deferral.
- *
- * Without it the retry can defer again -- menu_speak() clears `pending` on
- * entry for any movement, so the guard `!g_defer_pending` is true again by the
- * time the retry reaches it. A screen that genuinely never sets text would then
- * defer on EVERY poll and never speak at all: silence introduced by a fix for
- * a missing word, which is strictly worse than the bug. Caught by tracing the
- * path before shipping, and pinned by a case. */
-static BOOL     g_defer_retrying;
-/* ⛔ Set when a new movement discarded a pending one: that movement speaks
- * IMMEDIATELY rather than deferring in turn. Without it, a user moving steadily
- * has every movement deferred and then discarded by the next -- 12 of 25
- * movements spoke NOTHING in the run that reported this. */
-static BOOL     g_defer_superseded;
+ * ⛔ And two of my own tests asserted the broken behaviour as correct before
+ * the user felt it. A test written from the author's reasoning rather than the
+ * user's experience passes exactly when it should fail. */
 
 void menu_speak(const mc_move *m)
 {
     mc_speech sp;
 
-    /* ⛔⛔ A NEW MOVEMENT SUPERSEDES A PENDING ONE -- AND THAT MUST NOT MEAN
-     * SILENCE.
-     *
-     * USER-REPORTED REGRESSION: "every time I press an arrow key on the fighter
-     * screen it takes that much longer before I can hear anything." Measured in
-     * that run: 13 movements spoke and **12 SPOKE NOTHING AT ALL**. Moving
-     * steadily (~1.6 s apart) each movement deferred, and the next one
-     * discarded it before the idle-poll retry could fire -- so speech arrived
-     * only once the user STOPPED moving.
-     *
-     * ⭐ So a supersede FORBIDS deferring the new movement: it speaks
-     * immediately with whatever it has, a position at minimum. The deferral is
-     * for a user who has PAUSED on a row, never for one still moving.
-     *
-     * ⛔ Case 33m asserted the dropping behaviour as CORRECT -- "announcing a
-     * row the cursor has already left is worse than skipping it". True of the
-     * OLD row, and I dropped it without speaking the NEW one either. The test
-     * encoded the mistake, which is why it passed. */
-    if (m) {
-        if (g_defer_pending)
-            g_defer_superseded = TRUE;   /* do not defer this one as well */
-        g_defer_pending = FALSE;
-    }
+    /* ⚠ No deferral: speech is immediate on every movement. See the note
+     * above menu_speak()'s definition for why that is not negotiable. */
 
     menu_speak_build(m, &sp);
 
@@ -3885,22 +3848,9 @@ void menu_speak(const mc_move *m)
         char cap[GT_CAPTION_MAX];
         BOOL have_cap = gt_take_caption(cap, (int)sizeof(cap));
 
-        /* ⭐⭐ THE DEFERRAL. An unnamed row with no caption yet is the shape of
-         * the race above: the game is about to set the title and we asked too
-         * early. Hold this movement for one poll and ask again.
-         *
-         * ⚠ Only when BOTH are missing. A row that already has a name loses
-         * nothing by speaking now, and a row with a caption is not racing. */
-        if (!have_cap && !sp.named && m && !g_defer_pending &&
-            !g_defer_retrying && !g_defer_superseded) {
-            g_defer_pending = TRUE;
-            g_defer_move = *m;
-            return;                 /* speak on the next poll instead */
-        }
-        /* ⚠ Consumed here, not at entry: it must survive until the deferral
-         * decision above, and must not persist past it. */
-        g_defer_superseded = FALSE;
-
+        /* ⚠ No deferral here: a movement always speaks now. If the caption has
+         * not arrived, the position is the answer -- waiting for it costs every
+         * movement to rescue a few. */
         if (have_cap &&
             !caption_is_stale_repeat(cap, sp.screen_name)) {
             prompt_id id = prompt_identify(cap);
@@ -4089,33 +4039,7 @@ void menu_speak(const mc_move *m)
     menu_speak_line(line);
 }
 
-/* ⭐⭐ Speak a movement that was held back one poll waiting for its caption.
- *
- * Called from the poll loop when NO new movement arrived: a new one supersedes
- * the pending one (menu_speak() clears the flag), so this only ever fires on an
- * otherwise idle poll ~100 ms after the movement -- by which time the game has
- * long since drawn the row's text.
- *
- * ⚠ The flag is cleared BEFORE speaking, so a second failure cannot defer
- * again: the retry speaks whatever it has, name or position. One poll of
- * patience, never a loop. */
-/* Test seam: is a movement being held back? ⭐ A case needs this to prove the
- * deferral happens AT MOST ONCE -- the retry must speak, not defer again, or a
- * screen that never sets text is silenced rather than delayed. */
-BOOL menu_speak_test_deferred(void) { return g_defer_pending; }
 
-void menu_speak_flush_deferred(void)
-{
-    if (!g_defer_pending)
-        return;
-    g_defer_pending = FALSE;
-    {
-        mc_move held = g_defer_move;
-        g_defer_retrying = TRUE;
-        menu_speak(&held);
-        g_defer_retrying = FALSE;
-    }
-}
 
 /* ⭐ The one place a line reaches the speech backend. Extracted from
  * menu_speak() so the modal announcer shares it rather than duplicating the

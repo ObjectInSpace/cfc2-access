@@ -466,10 +466,30 @@ static DWORD WINAPI worker(LPVOID param)
     while (!InterlockedCompareExchange(&g_quit, 0, 0)) {
         /* Poll the hotkey at 100 ms so a press is never missed, but only do
          * the (expensive) work on an edge. The 2 s beat below is unchanged. */
-        for (int t = 0; t < 20; t++) {
+        /* ⭐⭐ 100 x 20 ms, not 20 x 100 ms -- the 2 s beat is unchanged.
+         *
+         * ⛔ USER: "it is impractical for me to wait... there are hundreds of
+         * options in there. You will have to make it so that it reads each one
+         * as soon as I find it with no delay, while I hold the button down."
+         *
+         * The movement poll WAS the delay. A keypress moves the cursor on the
+         * render thread instantly, but nothing speaks until this loop notices --
+         * 0-100 ms, averaging 50. Held on a direction through a 40-item grid
+         * that is a stutter behind every single item.
+         *
+         * ⚠ 20 ms is a FIFTH of the old worst case and still 20x slower than
+         * the render thread, so the cheap per-tick work (a sequence compare and
+         * a modal check) stays cheap. Everything expensive is gated on the 2 s
+         * beat below, which still fires every 100 ticks exactly as before.
+         *
+         * ⛔ Speech does NOT move to the detour. That runs on the render thread
+         * and speech_say() calls into NVDA -- a stall there is a frozen game,
+         * which this project has already paid for twice. The poll is the right
+         * place; it just had to be faster. */
+        for (int t = 0; t < 100; t++) {
             if (InterlockedCompareExchange(&g_quit, 0, 0))
                 break;
-            Sleep(100);
+            Sleep(20);
 
             /* ⭐⭐⭐ THE MODAL CHECK RUNS AT 100 ms, NOT ON THE 2 s BEAT.
              *

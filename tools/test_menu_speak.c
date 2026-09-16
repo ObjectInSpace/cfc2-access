@@ -1660,76 +1660,20 @@ int main(void)
         }
     }
 
-    /* --- cases 33k-33l: ⭐⭐ THE ONE-POLL CAPTION DEFERRAL.
+    /* ⛔⛔ CASES 33k-33m ARE GONE WITH THE DEFERRAL THEY TESTED.
      *
-     * ⛔⛔ MEASURED on Fighter Awards: 7 of 13 movements named, 6 spoke a bare
-     * number, and in three of those the game set the title in the SAME
-     * MILLISECOND just AFTER we spoke. The caption channel is that screen's
-     * only naming route, so losing the race loses the name. Every title
-     * arrived 0-1 ms after its movement, so it is an ORDERING problem: wait one
-     * poll and ask again.
+     * They pinned a one-poll hold that waited for a late caption. It fixed its
+     * race and was still wrong: a delay on the keypress->speech path is paid on
+     * EVERY movement to rescue the few that were racing, and the user cycles
+     * hundreds of items with the button held. Reported first as "it takes that
+     * much longer before I can hear anything", then as "now it doesn't read any
+     * labels at all... that is getting slower".
      *
-     * ⛔⛔ AND THE DANGEROUS HALF IS THE RETRY. menu_speak() clears the pending
-     * flag for ANY movement, so without a separate "retrying" guard the retry
-     * re-enters the same branch and defers AGAIN -- a screen that genuinely
-     * sets no text would defer on every poll and NEVER SPEAK. That is silence
-     * introduced by a fix for a missing word, which is strictly worse than the
-     * bug. Traced before shipping; case 33l is what keeps it fixed. */
-    {
-        /* An unknown caller with no live text: nothing can name it, and in this
-         * process there is no caption either -- exactly the shape that must
-         * defer once and then speak. */
-        /* ⚠ Advance the focus sequence FIRST. Earlier cases planted objects
-         * and stamped movements, so the caption mailbox still holds records
-         * matching the current seq -- gt_take_caption() would return one and
-         * the deferral would never fire. A fresh movement with no text set
-         * after it is precisely the condition being modelled. */
-        gt_note_focus_move();
-        mc_move dm = mk(0xC0FFEE01ULL, 2, 0, 5);
-        menu_speak(&dm);
-        check("33k. an unnamed movement with no caption DEFERS one poll",
-              menu_speak_test_deferred(),
-              "deferred=%d", (int)menu_speak_test_deferred());
-
-        /* ⛔ The retry must SPEAK, not defer again. */
-        menu_speak_flush_deferred();
-        check("33l. the retry SPEAKS rather than deferring again -- a "
-              "caption-less screen is delayed, never silenced",
-              !menu_speak_test_deferred(),
-              "still deferred=%d", (int)menu_speak_test_deferred());
-    }
-    {
-        /* ⛔⛔ 33m ONCE ASSERTED THE OPPOSITE, AND THE USER FELT IT.
-         *
-         * It required the second movement to ALSO be pending -- "a new movement
-         * supersedes the pending one" -- reasoning that announcing a row the
-         * cursor has already left is worse than skipping it. True of the OLD
-         * row. But the NEW row was then deferred in turn and discarded by the
-         * movement after it, so a user moving steadily heard NOTHING until they
-         * stopped: 12 of 25 movements spoke nothing at all in the reported run,
-         * and it felt like "it takes that much longer before I can hear
-         * anything".
-         *
-         * ⭐ The rule now: a supersede means the new movement speaks
-         * IMMEDIATELY, with a position at minimum. Deferral is for a user who
-         * has PAUSED, never for one still moving.
-         *
-         * ⚠ A test that encodes the author's reasoning rather than the user's
-         * experience passes exactly when it should fail. */
-        gt_note_focus_move();
-        mc_move a = mk(0xC0FFEE02ULL, 1, 0, 5);
-        menu_speak(&a);
-        int was = menu_speak_test_deferred();
-        mc_move b = mk(0xC0FFEE02ULL, 2, 0, 5);
-        menu_speak(&b);
-        check("33m. a superseding movement SPEAKS NOW rather than deferring "
-              "in turn (a moving user must not go silent)",
-              was && !menu_speak_test_deferred(),
-              "first deferred=%d, after a second movement deferred=%d "
-              "(want 1 then 0)",
-              was, (int)menu_speak_test_deferred());
-        menu_speak_flush_deferred();
-    }
+     * ⚠ TWO of those cases had ASSERTED the broken behaviour as correct before
+     * the user felt it -- they encoded my reasoning about what was better,
+     * which is not the same thing as what the user experiences. Deleting them
+     * with the feature is right; keeping them would preserve the claim that the
+     * behaviour was desirable. */
 
     /* --- case 33j: ⛔⛔ THE PAUSE MENU MUST NOT CLAIM NAMES FROM A MAP.
      *
