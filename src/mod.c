@@ -51,6 +51,75 @@
  * says so rather than printing a plausible line. */
 static BOOL g_emu_probe_on;
 
+/* ⭐ The guest-RAM hunt. Only meaningful for CVS2 (the signature is that game's
+ * published player layout), and only DURING A MATCH -- on a menu screen the
+ * fighters do not exist and finding nothing is the CORRECT answer, not a
+ * failure. The log says so, because "expected negative" and "broken scanner"
+ * are otherwise the same line.
+ *
+ * ⚠ Stays quiet while it keeps finding nothing: a sweep every 10 s that
+ * reported every time would flood the log and bury the round that matters.
+ * It speaks on a CHANGE in what it found, and once at the start. */
+static void emu_scan_report(int beat)
+{
+    static unsigned last_n = 0xFFFFFFFFu;
+    static int      said_fail;
+
+    emu_ram_hit hits[16];
+    unsigned nh = 0;
+    SIZE_T scanned = 0;
+    emu_status s = emu_ram_find(hits, 16, &nh, &scanned);
+
+    if (s != EMU_OK) {
+        if (!said_fail) {
+            said_fail = 1;
+            log_line("emu: guest-RAM scan %s -- it did NOT run to completion, "
+                     "so this says NOTHING about the game. Not a negative.",
+                     emu_status_name(s));
+        }
+        return;
+    }
+    said_fail = 0;
+
+    if (nh == last_n && beat != 3)
+        return;
+    last_n = nh;
+
+    if (nh == 0) {
+        log_line("emu: guest-RAM scan examined %llu MB, found NO CVS2 player "
+                 "pair. ⚠ That is EXPECTED outside a match (the fighters do "
+                 "not exist yet). During a live round it would mean the "
+                 "signature or the 0x5CC stride is wrong.",
+                 (unsigned long long)(scanned / (1024 * 1024)));
+        return;
+    }
+
+    {
+        unsigned k, show = nh < 6 ? nh : 6;
+        log_line("emu: ⭐ guest-RAM scan examined %llu MB, found %u candidate "
+                 "pair(s) at stride 0x5CC:",
+                 (unsigned long long)(scanned / (1024 * 1024)), nh);
+        for (k = 0; k < show; k++)
+            log_line("emu:    P1=0x%llx  hp %u / %u   (implies guest base "
+                     "0x%llx)",
+                     (unsigned long long)hits[k].p1,
+                     hits[k].health, hits[k].max_health,
+                     (unsigned long long)hits[k].guest_base);
+        if (nh > show)
+            log_line("emu:    ... and %u more", nh - show);
+
+        /* ⚠⚠ Say plainly what this is NOT. A candidate list is not a finding,
+         * and this project has already mistaken one for the other -- a pointer
+         * pair that survived 13 trials with clean controls turned out to be a
+         * monotonic allocation counter. */
+        log_line("emu: ⚠ CANDIDATES, not guest RAM. Fitting the arithmetic is "
+                 "not being the fighters. The deciding test is REVERSIBILITY: "
+                 "take a hit, watch hp FALL, then reset and watch it RETURN. "
+                 "⭐ And if several candidates agree on ONE implied guest "
+                 "base, that agreement is the real evidence.");
+    }
+}
+
 static void emu_probe_report(int beat)
 {
     static int last_rom = -1;
@@ -93,9 +162,27 @@ static void emu_probe_report(int beat)
 
     /* Report on CHANGE. Re-printing an unchanged ROM every 10 s would bury the
      * transition that actually matters (entering or leaving a game). */
-    if (rom == last_rom && beat != 3)
-        return;
-    last_rom = rom;
+    /* ⚠ The IDENTITY lines report on change only -- re-printing an unchanged
+     * ROM every 10 s would bury the transition that matters. But the guest-RAM
+     * SCAN must keep running: the fighters only exist during a match, which
+     * begins long after the ROM was selected, so a change-only scan would look
+     * exactly once, on a menu screen, and correctly find nothing.
+     *
+     * ⭐ Same lesson as the report cadence that covered 2 of 22 movements:
+     * pick a schedule the user's actual session can reach. Here that means
+     * identity on the edge, scan on the beat. */
+    {
+        BOOL first_sight = (rom != last_rom) || (beat == 3);
+        last_rom = rom;
+        if (!first_sight) {
+            /* Not a new ROM -- but still sweep for the fighters, and say
+             * nothing unless something is found or the sweep failed. */
+            int g2 = -1;
+            if (emu_game_from_rom_index(rom, &g2, NULL) && g2 == 1)
+                emu_scan_report(beat);
+            return;
+        }
+    }
 
     s_ar = emu_arena(&arena, &size);
 
@@ -137,6 +224,9 @@ static void emu_probe_report(int beat)
                  (unsigned long long)(EMU_ARENA_SIZE / (1024 * 1024)));
     else
         log_line("emu: arena is %s", emu_status_name(s_ar));
+
+    if (game == 1)
+        emu_scan_report(beat);
 }
 
 static HANDLE g_thread;
