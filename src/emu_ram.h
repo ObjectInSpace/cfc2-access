@@ -1,0 +1,118 @@
+/*
+ * emu_ram -- reach the emulated arcade machine's RAM (CFC2 "world 2").
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * The shell is MTFramework and has real text; the 8 games are raw CPS-2/NAOMI
+ * ROM sets under Capcom's own emulator, and they draw every character name,
+ * gauge and round announcement as SPRITES. There is no string to hook. The only
+ * route to in-game state is to read the emulated machine's RAM out of this
+ * process.
+ *
+ * HOW THE ANCHOR WAS FOUND -- and why it is not a memory scan
+ * -----------------------------------------------------------
+ * This project's record is unambiguous: reading the answer out of the
+ * INSTRUCTIONS is 4 for 4 (sPad, sKeyboard, the GMD table, the menu-cursor
+ * chokepoint); searching memory for something SHAPED like the answer is 0 for 4
+ * and burned many of the user's play sessions debugging our own scanners.
+ *
+ * So all of the following came from the dump + riprefs, with zero game launches:
+ *
+ *     0x140048270   mov [rip -> 0x141c14f98], rcx     ; the ONLY write
+ *     0x140048283   edx = 0x10000000                  ; 256 MB
+ *     0x140048288   r8d = 0x1000                      ; page aligned
+ *     0x140048291   call [rax+0x40]                   ; alloc(size, align)
+ *     0x1400482a6   [rcx] = rax                       ; arena at state+0x00
+ *
+ * Exactly ONE instruction in the image writes the singleton slot, while 3070
+ * read it. That asymmetry is what makes it trustworthy.
+ *
+ * ⚠⚠ THE ARENA IS NOT GUEST RAM, AND THIS HEADER MUST NOT BLUR THAT.
+ * 256 MB is the emulator's whole arena. NAOMI system RAM is 16 MB; CPS-2 is far
+ * smaller. Guest RAM is expected to be a SUB-RANGE of the arena, and which
+ * sub-range is exactly what emu_ram_find() has to PROVE rather than assume.
+ * "I found the structure" is not progress toward live state.
+ *
+ * ⚠ ASLR is off and the exe carries no relocations, so the two literal
+ * addresses below are valid on every launch -- but they are still verified at
+ * runtime before use, because a wrong pointer here reads someone else's memory.
+ */
+#ifndef CFC2_EMU_RAM_H
+#define CFC2_EMU_RAM_H
+
+#include <windows.h>
+
+/* --- The anchors (image-relative, ASLR off -> literal is fine) ------------ */
+
+/* The emulator session singleton. Written by exactly one instruction. */
+#define EMU_STATE_SLOT   0x141c14f98ULL
+
+/* Field offsets within the emulator state object, read off the instructions
+ * that set them (0x140049dcd.. and 0x1400524c0..). */
+#define EMU_OFF_ARENA        0x00   /* the 256 MB page-aligned arena          */
+#define EMU_OFF_ROM_NAME     0x30   /* const char* e.g. "cvs2"                */
+#define EMU_OFF_DESC_A       0x40   /* descriptor byte (+0x28)                */
+#define EMU_OFF_ROM_INDEX    0x44   /* 1..18, from rom_index_from_name()      */
+#define EMU_OFF_DESC_B       0x48   /* descriptor byte (+0x29)                */
+#define EMU_OFF_DERIVED_ID   0x4c   /* from 0x1400b6190(rom_index)            */
+#define EMU_OFF_DESC_C       0x50   /* descriptor byte (+0x2a)                */
+
+#define EMU_ARENA_SIZE   0x10000000ULL   /* 256 MB, as the constructor asks   */
+
+/* --- Outcomes ------------------------------------------------------------
+ * ⭐⭐ "Could not measure" is a RETURN VALUE here, never an all-false struct
+ * and never merely a logged warning. This project has already shipped a tool
+ * that printed "coverage is INCOMPLETE" while every assertion stayed green; a
+ * caller must not be able to confuse "looked and found nothing" with "never
+ * looked". Every function below reports which of the two happened. */
+typedef enum {
+    EMU_OK = 0,           /* proven, and the out-params are meaningful        */
+    EMU_NOT_RUNNING,      /* looked: no game is loaded (a real, clean answer) */
+    EMU_UNREADABLE,       /* could NOT look: memory refused. NOT a negative.  */
+    EMU_UNVERIFIED        /* found a candidate that FAILED its content check  */
+} emu_status;
+
+const char *emu_status_name(emu_status s);
+
+/* --- The emulator state object ------------------------------------------ */
+
+/* Resolve the singleton. Fills *out with the state object's address.
+ * EMU_NOT_RUNNING when the slot is null (the shell is up, no game started). */
+emu_status emu_state(ULONGLONG *out);
+
+/* The arena: *(void**)state. Page-aligned, nominally EMU_ARENA_SIZE.
+ * ⚠ Being the right size is NOT evidence of anything; this only locates. */
+emu_status emu_arena(ULONGLONG *base_out, SIZE_T *size_out);
+
+/* --- Which ROM is running ------------------------------------------------ */
+
+/* The 1-based ROM index (1..18) over REVISIONS, straight from state+0x44.
+ * ⚠ This is NOT the 0..7 canonical game index in move_list.h. Two games ship
+ * two revisions each; converting between the two numberings is a real mapping,
+ * not a cast -- see emu_game_from_rom_index(). */
+emu_status emu_rom_index(int *out);
+
+/* The ROM set's short name ("cvs2", "z3uu", ...), copied out of the state
+ * object's own string pointer. Bounded copy; never returns unterminated. */
+emu_status emu_rom_name(char *out, unsigned cap);
+
+/* Map the 1-based ROM index to the canonical 0..7 game index used by
+ * move_list.h / roster_table.h, and to a revision ordinal within that game.
+ * Returns FALSE for an out-of-range index rather than clamping -- a silently
+ * clamped id would name the WRONG GAME's characters, which is the worst
+ * failure class in this project. */
+BOOL emu_game_from_rom_index(int rom_index, int *game_out, int *rev_out);
+
+/* The expected short name for a 1-based ROM index, or NULL if out of range.
+ * Lets a caller CROSS-CHECK the live string at state+0x30 against the table the
+ * game's own rom_index_from_name() must have used to produce state+0x44. Two
+ * independent sources agreeing is the standard used throughout this project;
+ * one source "looking right" is not. */
+const char *emu_rom_name_for_index(int rom_index);
+
+/* --- Offline test seam ---------------------------------------------------
+ * Point the state slot at a planted fixture. The shipping code never calls
+ * this; passing 0 restores the real constant. */
+void emu_ram_test_redirect(ULONGLONG state_slot);
+
+#endif /* CFC2_EMU_RAM_H */
