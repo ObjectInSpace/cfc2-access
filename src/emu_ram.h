@@ -235,4 +235,13 @@ void emu_ram_test_redirect(ULONGLONG state_slot);
  * (derive the window from the live state object). */
 void emu_ram_test_window(ULONGLONG base, SIZE_T size);
 
+/* Restart the budgeted sweep from the beginning of the window.
+ *
+ * ⚠ The sweep is TIME-BUDGETED and resumes where it left off, because a single
+ * full-arena pass stalled the mod for 114 seconds. One call to emu_ram_find()
+ * therefore covers only part of the arena; full coverage accrues across
+ * several calls, and `scanned_out` says how much this one examined. A caller
+ * must not read "found nothing" from one budgeted sweep as "it is not there". */
+void emu_ram_scan_rewind(void);
+
 #endif /* CFC2_EMU_RAM_H */

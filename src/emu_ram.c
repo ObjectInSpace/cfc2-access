@@ -274,18 +274,50 @@ const char *emu_rom_name_for_index(int rom_index)
 #define CVS2_MAXHP_OFF     0x04u      /* max_health, u16                    */
 #define CVS2_GUEST_P1      0x2419A8u  /* P1 health's offset in guest RAM    */
 
-/* A page at a time, so a 256 MB sweep costs ~65k reads rather than 65 million.
- * ⭐ A per-item VirtualQuery is never affordable at scale -- every scanner in
- * this project has hit that wall, and three had to be rewritten for it. */
-#define SCAN_PAGE 0x1000u
+/* ⛔⛔⛔ THIS BLOCK SIZE, AND THE BUDGET BELOW, ARE LOAD-BEARING.
+ *
+ * The first full-arena sweep STALLED THE MOD FOR 114.6 SECONDS -- speech dead,
+ * the game unusable. Cause: one mem_readable_run() (a VirtualQuery syscall)
+ * per 4 KB page = ~65,000 syscalls per sweep, plus as many guarded copies.
+ *
+ * ⚠ THAT IS THE FOURTH TIME THIS PROJECT HAS HIT THE SAME WALL (gmd_find, the
+ * heapdiff capture, the span scan, now this) and I wrote the comment warning
+ * about it directly above the code that did it. A rule you can quote is not a
+ * rule you have applied.
+ *
+ * Fix, the same one that worked the previous three times: ask the memory
+ * manager ONCE PER REGION (a few hundred queries for the whole arena, not
+ * 65,000), then read large blocks out of that region.
+ *
+ * ⭐ And a wall-clock BUDGET, because a budget cannot be wrong about the
+ * machine it is on. A stall in the user's speech is a broken mod; a diagnostic
+ * that reports PARTIAL is an inconvenience. */
+#define SCAN_BLOCK     0x40000u   /* 256 KB per guarded read                */
+#define SCAN_BUDGET_MS 25         /* per sweep; resumes where it left off   */
 
 static ULONGLONG g_win_base;    /* test override; 0 = derive from the game */
 static SIZE_T    g_win_size;
 
+/* ⭐ Resume point: a budgeted sweep covers part of the arena and the NEXT
+ * sweep continues from here, so full coverage is still reached -- just across
+ * several beats instead of one 114-second stall. File scope so the test seam
+ * can rewind it. */
+static ULONGLONG g_resume;
+
+void emu_ram_scan_rewind(void)
+{
+    g_resume = 0;
+}
+
+/* ⚠ Also clears the resume point. Without this, a budgeted sweep's leftover
+ * position would carry into the next fixture and a case would silently scan
+ * only part of its own planted arena -- a false negative produced by test
+ * order, which is among the hardest kinds to notice. */
 void emu_ram_test_window(ULONGLONG base, SIZE_T size)
 {
     g_win_base = base;
     g_win_size = size;
+    emu_ram_scan_rewind();
 }
 
 /* Does a player pair live at `p1` within the buffer starting at `buf_addr`?
@@ -371,14 +403,17 @@ static BOOL pair_matches(const unsigned char *buf, SIZE_T buflen,
 emu_status emu_ram_find(emu_ram_hit *out, unsigned cap, unsigned *n_out,
                         SIZE_T *scanned_out)
 {
-    ULONGLONG base = 0, addr;
+    ULONGLONG base = 0, addr, end;
     SIZE_T size = 0, scanned = 0;
     unsigned n = 0;
     emu_status s;
-    /* One page plus the tail of a pair, so a struct straddling a page boundary
-     * is still seen whole. Without this overlap the scan has a blind seam
-     * every 4 KB -- a false negative that looks exactly like a clean sweep. */
-    static unsigned char buf[SCAN_PAGE + CVS2_STRIDE + 8];
+    DWORD t0 = GetTickCount();
+    MEMORY_BASIC_INFORMATION mbi;
+    ULONGLONG region_end = 0;
+    /* One block plus the tail of a pair, so a struct straddling a block
+     * boundary is still seen whole. Without this overlap the scan has a blind
+     * seam every block -- a false negative that looks like a clean sweep. */
+    static unsigned char buf[SCAN_BLOCK + CVS2_STRIDE + 8];
 
     if (n_out)       *n_out = 0;
     if (scanned_out) *scanned_out = 0;
@@ -401,21 +436,56 @@ emu_status emu_ram_find(emu_ram_hit *out, unsigned cap, unsigned *n_out,
     if (size == 0)
         return EMU_UNREADABLE;
 
-    for (addr = base; addr + CVS2_STRIDE + 8 < base + size; addr += SCAN_PAGE) {
-        SIZE_T want = SCAN_PAGE + CVS2_STRIDE + 8;
+    end = base + size;
+
+    /* Resume where the last budgeted sweep stopped; wrap when past the end. */
+    addr = (g_resume >= base && g_resume < end) ? g_resume : base;
+
+    for (; addr + CVS2_STRIDE + 8 < end; addr += SCAN_BLOCK) {
+        SIZE_T want = SCAN_BLOCK + CVS2_STRIDE + 8;
         SIZE_T run, off;
 
-        if (addr + want > base + size)
-            want = (SIZE_T)(base + size - addr);
+        /* ⭐⭐ THE BUDGET. Checked in the INNERMOST loop that can run long --
+         * an earlier scanner in this project put its deadline in an outer loop
+         * over regions, which could not fire for minutes and voided the very
+         * guarantee it existed to provide. */
+        if (GetTickCount() - t0 >= SCAN_BUDGET_MS) {
+            g_resume = addr;           /* continue here next sweep */
+            break;
+        }
 
-        /* ⛔ mem_readable_run() FIRST, then the guarded copy. The fault guard
-         * is a net for the race between the two, never a replacement for the
-         * check -- a guarded memcpy over a bad page is not reliably caught,
-         * and this project has the crash that proves it. */
-        run = mem_readable_run((const void *)(ULONG_PTR)addr, want);
-        if (run < CVS2_STRIDE + 8)
-            continue;                  /* a hole; the next page may be fine */
+        if (addr + want > end)
+            want = (SIZE_T)(end - addr);
 
+        /* ⭐⭐ ONE VirtualQuery PER REGION, not per block. This is the fix for
+         * the 114-second stall: the arena is a handful of regions, so this
+         * runs a few hundred times per full sweep rather than 65,000. */
+        if (addr >= region_end) {
+            if (VirtualQuery((LPCVOID)(ULONG_PTR)addr, &mbi, sizeof(mbi))
+                    != sizeof(mbi)) {
+                region_end = addr + SCAN_BLOCK;   /* step over and continue */
+                continue;
+            }
+            region_end = (ULONGLONG)(ULONG_PTR)mbi.BaseAddress + mbi.RegionSize;
+            if (mbi.State != MEM_COMMIT ||
+                (mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD))) {
+                /* Skip the whole unreadable region in one step. */
+                addr = region_end - SCAN_BLOCK;   /* loop adds SCAN_BLOCK */
+                continue;
+            }
+        }
+
+        /* Do not read past the end of the region we just validated. */
+        if (addr + want > region_end)
+            want = (SIZE_T)(region_end - addr);
+        if (want < CVS2_STRIDE + 8)
+            continue;
+
+        /* ⛔ The region query above establishes the range; the fault guard is
+         * the NET for the race between that check and this copy, never a
+         * replacement for it. A guarded memcpy over a bad page is not
+         * reliably caught -- this project has the crash that proves it. */
+        run = want;
         if (!mem_copy(buf, (const void *)(ULONG_PTR)addr, run))
             continue;
 
@@ -454,6 +524,11 @@ emu_status emu_ram_find(emu_ram_hit *out, unsigned cap, unsigned *n_out,
             off += CVS2_STRIDE;
         }
     }
+
+    /* Ran to the end without exhausting the budget -- start over next sweep so
+     * the arena is re-examined as the match progresses. */
+    if (addr + CVS2_STRIDE + 8 >= end)
+        g_resume = base;
 
     if (n_out)       *n_out = n;
     if (scanned_out) *scanned_out = scanned;
