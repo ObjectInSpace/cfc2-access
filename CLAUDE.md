@@ -38,6 +38,59 @@ The game is two different things and they need different approaches:
   string to hook.** Character names, gauges and round state must come from
   emulated machine RAM, not from a text hook.
 
+## ▶▶ IN-GAME (world 2) STAGE 1: the emulator anchor is FOUND — needs one run
+
+**2026-09-16. Derived OFFLINE from `cfc2_dump/` + a rebuilt `riprefs.pkl`.
+Zero game launches.** Full detail in memory `cfc2-emu-state-object`.
+
+    emu_state = *(void**)0x141c14f98      ; the emulator session singleton
+    emu_arena = *(void**)emu_state        ; 256 MB, page aligned (state+0x00)
+
+**Exactly ONE instruction writes that slot** (`0x140048270`, the constructor);
+**3070 read it.** That asymmetry is what makes it trustworthy. The constructor
+is an allocation sequence: `alloc(0x10000000, 0x1000)` through the allocator
+singleton at `0x14221ef88`, stored to `state+0x00`.
+
+Known fields, read off the instructions that set them:
+
+    +0x00 arena   +0x30 ROM name ptr   +0x44 ROM index 1..18   +0x4c derived id
+    +0x40/+0x48/+0x50  descriptor bytes from the 0x40-stride table 0x1411f5f18
+
+`rom_index_from_name()` is `0x1400b6250` — walks the 18-record table at
+`0x141208b00`, returns a **1-based** index. ⚠ That is an index over REVISIONS,
+not the 0..7 game index; `emu_game_from_rom_index()` maps between them with a
+TABLE, because the plausible formula `(rom-1)/2` is right for 14 of 18 rows and
+wrong for `z3uu`/`a3uu`.
+
+⚠⚠ **THE ARENA IS NOT GUEST RAM.** 256 MB is the whole emulator arena; NAOMI
+system RAM is 16 MB and lives somewhere inside it. Which sub-range is the NEXT
+thing to prove — `src/emu_ram.h` says so rather than implying the work is done.
+
+### ▶ THE RUN THAT IS NEEDED (cfc2_emu.on is already deployed and on)
+
+Start **any** game and read `emu:` lines in `CFC2Access.log`. What they answer:
+
+- `emu: ✅ cross-check OK` + a plausible arena → **the anchor is live**, and
+  the next work is locating guest RAM inside the arena.
+- `emu: ⛔⛔ MISMATCH` → the field map is wrong; do not build on the offsets.
+- `emu: no game is loaded` while a game IS running → the slot is not what we
+  think, or it is populated later than expected.
+- `emu: ⚠ COULD NOT read` → **not a negative.** Conclude nothing.
+
+`.\tools\run_emu_test.ps1` — 28 cases, six sabotages each verified to fail the
+case that tests it.
+
+⚠ Two false leads, recorded so they are not re-chased:
+- **`mCTREmulation`** (`0x14101acc8`) is NOT a class name — it sits in a
+  reflection *property-name* pool between `mBloomColor` and `mSunDir`.
+- **Scanning code for size immediates** is useless here: 13007 raw occurrences
+  of the 16 MB byte pattern. Chasing common constants produced this project's
+  earlier false leads.
+
+⚠ Tooling: `riprefs.pkl` goes stale silently and its guard correctly refuses it
+— rebuild first (~55 s). **Capstone's linear sweep over a whole code section
+yields NOTHING** here; search byte encodings like `find_callers.py` does.
+
 ## Scope (user's call — do not silently re-order)
 
 **BUILD ORDER: the MTFramework shell FIRST**, then in-game state.
