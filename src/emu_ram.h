@@ -245,6 +245,23 @@ void emu_ram_test_window(ULONGLONG base, SIZE_T size);
  * must not read "found nothing" from one budgeted sweep as "it is not there". */
 void emu_ram_scan_rewind(void);
 
+/* --- THE GUEST -> HOST MAPPING TEST -------------------------------------
+ * A prediction with a KNOWN RIGHT ANSWER. We hold 71088 bytes from the shipped
+ * ROM blob whose own pointer values say they load at guest 0x0CE80000, and
+ * NAOMI system RAM is 0x0C000000. If CFC2 maps guest RAM linearly (Flycast's
+ * model), those bytes are at arena + 0xE80000.
+ *
+ * ⚠ The test does NOT only check the prediction: on a miss it sweeps the whole
+ * arena for the fingerprint, so a hit anywhere still yields the real mapping.
+ * A probe that can only confirm is not a test.
+ *
+ * EMU_OK          - found; *found_at and *implied_base are meaningful, and
+ *                   *matched_prediction says whether the linear model held
+ * EMU_NOT_RUNNING - swept and NOT present (a real negative)
+ * EMU_UNREADABLE  - could not sweep; says nothing */
+emu_status emu_guest_map(ULONGLONG *found_at, ULONGLONG *implied_base,
+                         BOOL *matched_prediction, SIZE_T *scanned_out);
+
 /* How much of the CURRENT pass has been swept, and how many full passes have
  * completed. ⚠ A caller must report this alongside any negative: "found
  * nothing" after 3% of the arena is not a finding, and the live run printed

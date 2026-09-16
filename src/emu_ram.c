@@ -804,3 +804,113 @@ emu_status emu_ram_probe_cap(unsigned cap_value, unsigned *seen_out,
     if (scanned_out)    *scanned_out = scanned;
     return scanned ? EMU_OK : EMU_UNREADABLE;
 }
+
+/* --- THE GUEST -> HOST MAPPING TEST -------------------------------------
+ *
+ * ⭐⭐⭐ THIS IS A PREDICTION WITH A KNOWN RIGHT ANSWER, which is what every
+ * probe before it lacked.
+ *
+ * Offline, from the shipped ROM blob (game_10.arc -> IBIS -> AFS entry 11),
+ * we have 71088 bytes that are demonstrably a table of 233 pointers with a
+ * uniform 0xF8 stride, and whose OWN pointer values say where it lives in the
+ * emulated machine: guest address 0x0CE80000. (0x0C000000-0x0CFFFFFF is NAOMI
+ * system RAM -- confirmed against MAME's memory map.)
+ *
+ * So we know exact BYTES and the exact GUEST ADDRESS they load at. If CFC2
+ * maps guest RAM linearly into its arena -- the model Flycast uses
+ * (`ram_base` + guest offset) -- those bytes sit at:
+ *
+ *     arena + (0x0CE80000 - 0x0C000000)  ==  arena + 0xE80000
+ *
+ * ⚠ AND IF THE PREDICTION IS WRONG, THE TEST STILL ANSWERS. It searches the
+ * whole arena for the fingerprint, so a hit anywhere yields the real mapping
+ * (host_addr - guest_addr = the base), and a miss everywhere is a real
+ * negative about the arena rather than about my arithmetic. A probe that can
+ * only confirm is not a test. */
+
+/* First 32 bytes of AFS entry 11 -- a pointer table, so it is highly
+ * distinctive and cannot occur by chance. */
+static const unsigned char k_guest_fingerprint[32] = {
+    0x10,0x00,0xe8,0x0c, 0xe9,0x00,0x00,0x00, 0xb8,0x03,0xe8,0x0c, 0x48,0x04,0xe8,0x0c,
+    0x48,0x04,0xe8,0x0c, 0x40,0x05,0xe8,0x0c, 0x38,0x06,0xe8,0x0c, 0x30,0x07,0xe8,0x0c
+};
+
+#define GUEST_FP_GUEST_ADDR  0x0CE80000ULL
+#define GUEST_RAM_BASE       0x0C000000ULL
+
+emu_status emu_guest_map(ULONGLONG *found_at, ULONGLONG *implied_base,
+                         BOOL *matched_prediction, SIZE_T *scanned_out)
+{
+    ULONGLONG base = 0, addr, end, predicted;
+    SIZE_T size = 0, scanned = 0;
+    emu_status s;
+    MEMORY_BASIC_INFORMATION mbi;
+    ULONGLONG region_end = 0;
+    static unsigned char buf[SCAN_BLOCK + 64];
+
+    if (found_at)           *found_at = 0;
+    if (implied_base)       *implied_base = 0;
+    if (matched_prediction) *matched_prediction = FALSE;
+    if (scanned_out)        *scanned_out = 0;
+
+    if (g_win_base) { base = g_win_base; size = g_win_size; }
+    else {
+        s = emu_arena(&base, &size);
+        if (s != EMU_OK) return s;
+        if (size > (SIZE_T)EMU_ARENA_SIZE) size = (SIZE_T)EMU_ARENA_SIZE;
+    }
+    if (size == 0) return EMU_UNREADABLE;
+    end = base + size;
+
+    /* Check the PREDICTED location first, so the log can say plainly whether
+     * the linear model held. */
+    predicted = base + (GUEST_FP_GUEST_ADDR - GUEST_RAM_BASE);
+    if (predicted + sizeof(k_guest_fingerprint) < end) {
+        unsigned char probe[sizeof(k_guest_fingerprint)];
+        if (mem_readable_run((const void *)(ULONG_PTR)predicted, sizeof(probe))
+                == sizeof(probe) &&
+            mem_copy(probe, (const void *)(ULONG_PTR)predicted, sizeof(probe)) &&
+            memcmp(probe, k_guest_fingerprint, sizeof(probe)) == 0) {
+            if (found_at)           *found_at = predicted;
+            if (implied_base)       *implied_base = base;
+            if (matched_prediction) *matched_prediction = TRUE;
+            if (scanned_out)        *scanned_out = sizeof(probe);
+            return EMU_OK;
+        }
+    }
+
+    /* Prediction missed -- sweep the whole arena for the fingerprint. */
+    for (addr = base; addr + sizeof(k_guest_fingerprint) < end; addr += SCAN_BLOCK) {
+        SIZE_T want = SCAN_BLOCK + 64, i;
+
+        if (addr + want > end) want = (SIZE_T)(end - addr);
+        if (addr >= region_end) {
+            if (VirtualQuery((LPCVOID)(ULONG_PTR)addr, &mbi, sizeof(mbi))
+                    != sizeof(mbi)) { region_end = addr + SCAN_BLOCK; continue; }
+            region_end = (ULONGLONG)(ULONG_PTR)mbi.BaseAddress + mbi.RegionSize;
+            if (mbi.State != MEM_COMMIT ||
+                (mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD))) {
+                addr = region_end - SCAN_BLOCK; continue;
+            }
+        }
+        if (addr + want > region_end) want = (SIZE_T)(region_end - addr);
+        if (want < sizeof(k_guest_fingerprint)) continue;
+        if (!mem_copy(buf, (const void *)(ULONG_PTR)addr, want)) continue;
+        scanned += want;
+
+        for (i = 0; i + sizeof(k_guest_fingerprint) <= want; i += 4) {
+            if (memcmp(buf + i, k_guest_fingerprint,
+                       sizeof(k_guest_fingerprint)) != 0)
+                continue;
+            if (found_at)     *found_at = addr + i;
+            /* host = guest + X  =>  X = host - guest */
+            if (implied_base) *implied_base = (addr + i) - (GUEST_FP_GUEST_ADDR
+                                                            - GUEST_RAM_BASE);
+            if (scanned_out)  *scanned_out = scanned;
+            return EMU_OK;
+        }
+    }
+
+    if (scanned_out) *scanned_out = scanned;
+    return scanned ? EMU_NOT_RUNNING : EMU_UNREADABLE;
+}

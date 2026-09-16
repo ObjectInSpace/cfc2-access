@@ -107,9 +107,56 @@ static void emu_cap_probe_log(void)
                  "dead -- the layout must be derived from scratch.");
 }
 
+/* ⭐⭐⭐ THE MAPPING TEST -- a prediction with a KNOWN RIGHT ANSWER, which is
+ * what every probe before it lacked. We hold bytes from the shipped ROM whose
+ * OWN pointers say they live at guest 0x0CE80000; NAOMI RAM starts at
+ * 0x0C000000. If the mapping is linear they are at arena + 0xE80000 -- and if
+ * it is not, the sweep finds them anyway and reports the real base. */
+static void emu_guest_map_log(void)
+{
+    static int done;
+    ULONGLONG at = 0, implied = 0;
+    BOOL predicted = FALSE;
+    SIZE_T scanned = 0;
+    emu_status s;
+
+    if (done)
+        return;
+
+    s = emu_guest_map(&at, &implied, &predicted, &scanned);
+
+    if (s == EMU_UNREADABLE) {
+        log_line("emu: MAPPING TEST could not sweep -- says nothing.");
+        return;
+    }
+    done = 1;
+
+    if (s == EMU_NOT_RUNNING) {
+        log_line("emu: ⛔ MAPPING TEST -- the ROM fingerprint is NOT in the "
+                 "arena (swept %llu MB). The emulator either transforms the "
+                 "data on load or keeps guest RAM somewhere else.",
+                 (unsigned long long)(scanned / (1024 * 1024)));
+        return;
+    }
+
+    log_line("emu: ⭐⭐⭐ MAPPING TEST -- ROM fingerprint FOUND at 0x%llx",
+             (unsigned long long)at);
+    if (predicted)
+        log_line("emu: ✅ it is exactly where the LINEAR model predicted "
+                 "(arena + 0xE80000). guest->host = host - 0x%llx, so ANY "
+                 "published CVS2 guest address is now readable.",
+                 (unsigned long long)0x0C000000ULL);
+    else
+        log_line("emu: ⚠ NOT at the predicted address -- the mapping is real "
+                 "but not the simple linear one. Implied guest-RAM base = "
+                 "0x%llx (host = guest - 0x0C000000 + this).",
+                 (unsigned long long)implied);
+}
+
 static void emu_scan_report(int beat)
 {
     /* Ask the decisive question first, once. */
+    emu_guest_map_log();
     emu_cap_probe_log();
 
     static unsigned last_n = 0xFFFFFFFFu;
