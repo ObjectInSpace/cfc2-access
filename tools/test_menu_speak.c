@@ -1675,6 +1675,57 @@ int main(void)
      * with the feature is right; keeping them would preserve the claim that the
      * behaviour was desirable. */
 
+    /* --- case 33n: ⭐⭐ FIGHTER AWARDS' GRID NAMES FROM THE CORPUS, AND ONLY
+     * AT 40 ITEMS.
+     *
+     * ⭐ The 40-item grid is named from a map (position N == achievement N,
+     * proven against 16 pairs the game drew), so it does NOT depend on the game
+     * having drawn a title -- measured, it draws one for only 17 of 78
+     * movements while the user sweeps. That is the whole point: it works at any
+     * speed.
+     *
+     * ⛔⛔ THE SAME CALLER ALSO DRIVES A 35-ITEM AXIS on the Player Progress
+     * page (Y toggles it). The map must NOT reach that screen -- nothing here
+     * knows what those 35 are, and speaking achievement names over them would
+     * be the confident-wrong-name failure. The count is the guard.
+     *
+     * ⛔ And the 7-row LIST on the sibling caller is a scrolling window over
+     * the same 40 (its position 2 showed achievement 7), so it must have no map
+     * at all. */
+    {
+        const mc_screen *grid40 = menu_speak_lookup_n(0x140079739ULL, 40);
+        int ok = grid40 && grid40->labels && grid40->nlabels == 40 &&
+                 grid40->count == 40;
+
+        /* ⛔⛔ ASSERT WHAT THE USER WOULD HEAR, not what lookup_n returns.
+         *
+         * lookup_n(caller, 35) falls back to the count=40 entry, because no
+         * entry matches 35 -- so a table-shape assertion FAILS while the
+         * behaviour is actually safe: menu_speak_build's staleness check
+         * compares the entry's count against the LIVE total and refuses. That
+         * refusal is the thing worth pinning, and pinning it here means a
+         * future change to that check cannot silently re-open this.
+         *
+         * At 35 items the Player Progress page must come back UNNAMED, with
+         * the reason stated -- never an achievement name over a stat row. */
+        mc_speech s35;
+        mc_move m35 = mk(0x140079739ULL, 3, 0, 34);   /* 35 items */
+        m35.vertical = FALSE;
+        menu_speak_build(&m35, &s35);
+        ok &= (!s35.named && s35.why == MC_UNNAMED_COUNT_MISMATCH);
+
+        /* And the 7-row window must carry no map of its own. */
+        const mc_screen *list7 = menu_speak_lookup_n(0x140079833ULL, 7);
+        ok &= !(list7 && list7->labels);
+
+        check("33n. the awards grid names at 40 items, and the 35-item page "
+              "REFUSES rather than borrowing its map", ok,
+              "grid40 labels=%d n=%d / 35-item named=%d why=%d / list7 "
+              "labels=%d", grid40 && grid40->labels,
+              grid40 ? grid40->nlabels : -1, (int)s35.named, (int)s35.why,
+              list7 && list7->labels);
+    }
+
     /* --- case 33j: ⛔⛔ THE PAUSE MENU MUST NOT CLAIM NAMES FROM A MAP.
      *
      * USER-REPORTED: "In training mode it is saying quicksave/load rather than

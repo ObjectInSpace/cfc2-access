@@ -31,6 +31,34 @@ from name_screens import load_corpus  # noqa: E402
 # run that established it, not from the corpus -- so a corpus reshuffle or a
 # fat-fingered index fails here instead of in the user's ear.
 EXPECTED = {
+    # ⭐⭐ Fighter Awards' 40-item grid. The mapping (position N == achievement
+    # N) was proven against 16 (position, title) pairs the GAME drew in the
+    # user's own run -- 15 agreed, and the one that did not was a stale title
+    # from the known caption race. Several of these strings appear verbatim in
+    # that log: "The True(r) Final Battle", "Shinobi Raid", "A Rarefied Item".
+    #
+    # ⛔ The 7-row list on the sibling caller is a SCROLLING WINDOW over these
+    # same 40 and deliberately has no map: its position 2 showed achievement 7.
+    "g_fighter_awards_rows": [
+        'Fighting Game Fans Rejoice!', 'Everybody Rumored, Nobody Believed',
+        'Another Me', 'Pinpoint Input Accuracy', 'Challenge This!',
+        'Love at First Fight', 'The Year We Made Contact', 'Photo Finish',
+        'The Root of All Evil', 'The True Final Battle',
+        'The True(r) Final Battle', "That's What I Call a Fight!",
+        'Thou Hast Witnessed the Power', 'Daughter of a Submariner!',
+        'Messenger from the Stars', 'Triumph or Die, Go for Broke',
+        'Gwoooooooaaaaahh!!', 'The Ultimate Tag-Team',
+        'Straight to the Climax', 'Until Your Last Breath',
+        'Welcome to the Power Stone World!',
+        'The Power to Make Any Dream Come True', 'Barroom Brawl',
+        'Coming Out Swinging', 'A Solid Beginning', 'A Perfect Ending',
+        'Hijacking Hijinx', 'A Rarefied Item', 'Let Friendship Prevail!',
+        'Team Up Towards Victory', 'Teamwork Makes the Dream Work',
+        'A True Tale of Justice', 'The Bilstein Strikes Back',
+        "Nothing I Can't Slash", 'The Smaller They Are...', 'Shinobi Raid',
+        'Earning the True Future', 'Neither Run nor Hide from a Challenge',
+        'Give All of Yourself, Without Regret', 'Fighter Perfection!',
+    ],
     "g_online_play_rows": [
         "Casual Match", "Ranked Match", "Custom Match",
         "Ranked Leaderboard", "High Score Challenge",

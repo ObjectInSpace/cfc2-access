@@ -602,6 +602,46 @@ static const mc_value_set g_ingame_av_values[] = {
  * SYS_WINDOW_YES/NO (25/26) are both exactly "Yes"/"No" and nothing in the
  * corpus separates them. Picking one would be the shape of guess that has
  * mislabelled two screens on this project. The game draws the words; quote them. */
+/* ⭐⭐⭐ FIGHTER AWARDS' 40-ITEM GRID -- named from the CORPUS, not from what
+ * the game happens to have drawn.
+ *
+ * ⛔⛔ WHY NOT THE CAPTION CHANNEL, which every other live screen uses.
+ * MEASURED while the user held a direction: **78 grid movements, and the game
+ * set a title for only 17 of them** -- the cursor jumps 7-11 positions between
+ * the movements our hook sees, and the game does not draw a title for each one
+ * as it sweeps. So the string does not EXIST to be read most of the time.
+ *
+ * ⚠ That is why a one-poll deferral could never have worked, and I built one
+ * before measuring this. It was reported twice as making things worse ("it
+ * takes that much longer before I can hear anything", then "now it doesn't read
+ * any labels at all") and is removed. The user's own suggestion -- "or find all
+ * of them at once" -- is what this map is.
+ *
+ * ⭐ THE MAPPING IS PROVEN, not assumed: 16 (position, title) pairs the game
+ * itself drew were checked against the corpus and 15 AGREE. The one that did
+ * not (position 18 showing #25) is a STALE title the game had not yet redrawn
+ * -- the known race, not a counter-example.
+ *
+ * ⚠ The indices are a regular run (base 2994, stride 2) because names and
+ * descriptions alternate. A map rather than base_index because that model adds
+ * `new_index - min_index` with an implied stride of ONE; a stride field would
+ * have to be threaded through every entry to express this.
+ *
+ * ⛔ THE 7-ROW LIST (0x140079833) DELIBERATELY DOES NOT GET THIS MAP. It is a
+ * SCROLLING WINDOW over the same 40: measured, its position 2 showed
+ * achievement 7 and its position 5 showed 28. Applying this map there would
+ * speak a confidently wrong name on every row. */
+static const int g_fighter_awards_rows[] = {
+    2994, 2996, 2998, 3000, 3002,
+    3004, 3006, 3008, 3010, 3012,
+    3014, 3016, 3018, 3020, 3022,
+    3024, 3026, 3028, 3030, 3032,
+    3034, 3036, 3038, 3040, 3042,
+    3044, 3046, 3048, 3050, 3052,
+    3054, 3056, 3058, 3060, 3062,
+    3064, 3066, 3068, 3070, 3072,
+};
+
 static const int g_kbd_settings_rows[] = {
     464, 168, 573, 238, 572, 241, 239, 242, 240,
     243, 244, 245, 246, 247, 248, 234
@@ -1191,6 +1231,25 @@ static const mc_screen g_screens[] = {
      * 9-item horizontal choosers, different behaviour, separate evidence. */
     { 0x14009a482ULL, -1, 0, "Gallery", MC_VERIFIED_LIVE_TEXT,
       MC_GAME_STRIP, 0, NULL, 0, NULL, 0 },
+
+    /* ⭐⭐⭐ FIGHTER AWARDS' 40-ITEM GRID (0x140079739, horizontal).
+     *
+     * See g_fighter_awards_rows for the evidence: position N is achievement N,
+     * checked against 16 (position, title) pairs the game drew (15 agree, the
+     * one exception being a stale title from the known race).
+     *
+     * ⭐ Named from the CORPUS, so it does not depend on the game having drawn
+     * a title -- which, measured, it does for only 17 of 78 movements while the
+     * user sweeps. This works at any speed, which is the point: "there are
+     * hundreds of options in there."
+     *
+     * ⚠ count = 40 is a REAL invariant and it is the guard: the same caller
+     * also drives a 35-item axis on the Player Progress page (Y toggles it),
+     * and this map must not reach that screen. menu_speak_lookup_n() requires
+     * caller AND count, so the 35-item page falls through to position only --
+     * correct, because nothing here knows what those 35 are. */
+    { 0x140079739ULL, -1, 40, "Fighter Awards", MC_VERIFIED_LIVE_TEXT,
+      MC_LIST, 0, g_fighter_awards_rows, 40, NULL, 0, 0 },
 
     /* ⭐⭐ THE RANKED LEADERBOARD's game strip (Online Play > Ranked
      * Leaderboard), 8 items, horizontal. Caller 0x1400ac059.
