@@ -226,6 +226,7 @@ static unsigned g_cursor_waited_note;
 static unsigned g_cursor_reads;
 static unsigned g_cursor_unreadable;
 static unsigned g_cursor_other;
+static int      g_cursor_axis;
 
 /* How long to wait for ANY arrow edge before concluding the emulated game does
  * not use sKeyboard. 30 s of navigation is far more than enough. */
@@ -419,8 +420,23 @@ static void cursor_probe_tick(void)
         if (e.first)  return;   /* seeded, not observed                  */
     }
 
-    left  = kbd_is_set(e.pressed, KBDC_LEFT);
-    right = kbd_is_set(e.pressed, KBDC_RIGHT);
+    /* ⭐⭐ ALL FOUR DIRECTIONS, because a grid cursor moves on either axis.
+     *
+     * ⚠⚠ AND A CORRECTION TO MY OWN READING OF RUN 3. I saw UP/DOWN in the
+     * "saw key code" lines, saw no LEFT/RIGHT there, and concluded the probe
+     * was watching the wrong axis. The user said plainly they had moved left
+     * and right -- and they were right.
+     *
+     * Those lines only print for keys that are NOT left/right. LEFT and RIGHT
+     * took the other branch and DROVE THE PHASE MACHINE; a full cycle completed
+     * at 19:12:55, which nothing but left/right could have caused. Their
+     * absence from that list was EXPECTED, not evidence of absence -- I read a
+     * filtered list as if it were a complete one.
+     *
+     * Accepting UP/DOWN as well is still right (a grid moves both ways), but
+     * the reason is coverage, not a broken axis. */
+    left  = kbd_is_set(e.pressed, KBDC_LEFT)  || kbd_is_set(e.pressed, KBDC_UP);
+    right = kbd_is_set(e.pressed, KBDC_RIGHT) || kbd_is_set(e.pressed, KBDC_DOWN);
 
     /* ⭐ Log ANY key that arrives, not just arrows.
      *
@@ -445,6 +461,17 @@ static void cursor_probe_tick(void)
         }
         return;                 /* the timeout above handles "nothing ever
                                  * arrives" */
+    }
+
+    {
+        /* Latch the axis on the forward press; require the reverse on it. */
+        int axis = (kbd_is_set(e.pressed, KBDC_UP) ||
+                    kbd_is_set(e.pressed, KBDC_DOWN)) ? 1 : 0;
+        if (emu_cursor_next_phase() == EC_PHASE_CONTROL)
+            g_cursor_axis = axis;               /* starting a fresh cycle */
+        else if (axis != g_cursor_axis)
+            return;    /* a press on the other axis mid-cycle: ignore it,
+                        * it would not return the cursor to its start */
     }
 
     g_cursor_edges++;

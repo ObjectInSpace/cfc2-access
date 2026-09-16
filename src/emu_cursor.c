@@ -188,7 +188,6 @@ ec_phase emu_cursor_next_phase(void) { return g_next; }
  * handful of times per pass rather than 65,536. */
 static ec_status hash_pass(ec_phase phase, ULONGLONG base, SIZE_T size)
 {
-    static BYTE buf[EC_CHUNK];
     ULONGLONG addr = base, end = base + size;
     ULONGLONG region_end = 0;
     MEMORY_BASIC_INFORMATION mbi;
@@ -245,19 +244,44 @@ static ec_status hash_pass(ec_phase phase, ULONGLONG base, SIZE_T size)
             if (want == 0) { addr += got; continue; }
         }
 
-        /* ⚠ The fault guard is a NET, not the check -- mem_readable_run above
-         * is the check. mem_copy does both and reports failure rather than
-         * leaving a half-filled buffer that would hash as real data. */
-        if (!mem_copy(buf, (const void *)(ULONG_PTR)addr, want)) {
-            for (k = 0; k < want / EC_PAGE && idx < g_hash_n; k++)
-                g_hash[phase][idx++] = 0;
-            addr += want;
-            continue;
-        }
-
+        /* ⭐⭐ HASH IN PLACE -- do NOT stage through a buffer first.
+         *
+         * MEASURED on the first real run: 256 MB in 2093 ms = 122 MB/s, which
+         * is TWENTY TIMES slower than the ~104 ms I predicted from heapdiff's
+         * throughput. At 2 s per pass and ~4 s per cycle, presses arriving
+         * 0.3 s apart were swallowed whole and the run managed ONE cycle --
+         * one short of the two needed to judge anything.
+         *
+         * The staging memcpy was the cost: every byte was touched twice, once
+         * to copy and once to hash, and the copy bought nothing. The range is
+         * already proven readable by mem_readable_run above, and the fault
+         * guard covers the TOCTOU race either way.
+         *
+         * ⚠ The guard is still a NET, not the check. A fault mid-chunk marks
+         * those pages unknown rather than letting a partial read hash as data.
+         *
+         * ⭐ And the number that matters is the one in the log, not this
+         * comment: last_pass_ms is measured every pass for exactly that
+         * reason. A predicted throughput was wrong by 20x here. */
         npages = (unsigned)(want / EC_PAGE);
-        for (k = 0; k < npages && idx < g_hash_n; k++)
-            g_hash[phase][idx++] = ec_hash_block(buf + k * EC_PAGE, EC_PAGE);
+        {
+            BOOL faulted;
+            unsigned start_idx = idx;
+            MEM_GUARDED(faulted, {
+                unsigned kk;
+                for (kk = 0; kk < npages && start_idx + kk < g_hash_n; kk++)
+                    g_hash[phase][start_idx + kk] =
+                        ec_hash_block((const BYTE *)(ULONG_PTR)addr
+                                          + kk * EC_PAGE, EC_PAGE);
+            });
+            if (faulted) {
+                for (k = 0; k < npages && idx < g_hash_n; k++)
+                    g_hash[phase][idx++] = 0;
+                addr += want;
+                continue;
+            }
+            for (k = 0; k < npages && idx < g_hash_n; k++) idx++;
+        }
         hashed += want;
         addr += want;
     }
