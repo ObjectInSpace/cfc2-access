@@ -1865,14 +1865,33 @@ int main(void)
      * The map is keyed to nine items. A screen on this caller with any other
      * count is not the soundtrack chooser and must name NOTHING rather than
      * index into the table -- the confidently-wrong-name failure this file
-     * exists to refuse. */
+     * exists to refuse.
+     *
+     * ⚠⚠ TWO GUARDS PRODUCE THIS REFUSAL and they must be told apart. The
+     * table row carries count = 9, so menu_speak_lookup_n() rejects a 6-item
+     * screen before the kind's own check ever runs -- sabotage proved it:
+     * deleting `out->total != 9` from the build case left this GREEN.
+     *
+     * ⭐ So the assertion below is deliberately about the OBSERVABLE outcome
+     * (nothing is named), and the case does NOT claim to pin either check
+     * individually. Sabotage, in full:
+     *   remove the kind's `out->total != 9`  -> PASSES (the lookup refuses)
+     *   remove the row's count key (9 -> 0)  -> PASSES (the kind refuses)
+     *   remove BOTH                          -> ⛔ FAILS, speaking
+     *                                           "Capcom vs. SNK 2" on a
+     *                                           SIX-item screen
+     * That last line is the wrong-name failure this case exists for, and it is
+     * what the case genuinely pins. The two guards are redundant on purpose;
+     * neither is individually testable while the other stands. See the memory
+     * on a sabotage answered by another guard. */
     {
         mc_speech sp;
         mc_move m = mk(0x14009af21ULL, 2, 0, 5);   /* 6 items, not 9 */
         m.vertical = FALSE;
         menu_speak_build(&m, &sp);
-        check("33r. a non-9-item screen on the Music caller names nothing",
-              !sp.named && sp.why == MC_UNNAMED_COUNT_MISMATCH,
+        check("33r. a non-9-item screen on the Music caller names nothing "
+              "(the lookup's count key refuses it)",
+              !sp.named && sp.item[0] == '\0',
               "named=%d why=%d item=\"%s\"", (int)sp.named, (int)sp.why,
               sp.item);
     }
