@@ -183,6 +183,48 @@ typedef struct {
 emu_status emu_ram_find(emu_ram_hit *out, unsigned cap, unsigned *n_out,
                         SIZE_T *scanned_out);
 
+/* --- Watching a candidate over time (this is what decides it) ------------
+ *
+ * ⭐⭐ A REAL MATCH IS A BETTER INSTRUMENT THAN A STATIC SWEEP, and it does not
+ * need training mode. Finding a pair that fits the arithmetic proves nothing;
+ * what separates the fighters from filler is how the values BEHAVE:
+ *
+ *   - health DIVERGES between the two players (filler and lookup tables do
+ *     not have P1 at 87 while P2 is at 132);
+ *   - health FALLS during a round, in irregular steps, as hits land;
+ *   - health RETURNS TO THE CAP at a round transition -- which is
+ *     reversibility, supplied by the game on its own schedule rather than by
+ *     asking the player to do anything special.
+ *
+ * A constant scores zero on all three, however well it satisfies the
+ * arithmetic. This is [[anchor-on-what-changes]] step 6 applied without
+ * requiring a particular game mode.
+ *
+ * emu_watch_sample() is called on each sweep; it re-reads every tracked
+ * candidate and accumulates the evidence. Candidates are keyed by address, so
+ * a pair that stops matching still keeps its history. */
+typedef struct {
+    ULONGLONG p1;
+    unsigned  samples;      /* how many times this address was read          */
+    unsigned  changes;      /* how often P1's health CHANGED                 */
+    unsigned  drops;        /* ... changed downward (a hit landing)          */
+    unsigned  resets;       /* ... jumped back UP to the cap (a new round)   */
+    unsigned  diverged;     /* ... samples where P1 and P2 health DIFFERED   */
+    unsigned  max_health;   /* the cap as first seen                         */
+    unsigned  last_h1, last_h2;
+} emu_watch;
+
+/* Sample all tracked candidates, adopting any new ones from `hits`.
+ * Returns the number currently tracked. */
+unsigned emu_watch_sample(const emu_ram_hit *hits, unsigned n);
+
+/* Read back the tracked candidates, best evidence first. A candidate with
+ * drops AND resets AND divergence is the fighters; one with samples but no
+ * changes is filler that happened to fit. */
+unsigned emu_watch_report(emu_watch *out, unsigned cap);
+
+void emu_watch_reset(void);
+
 /* --- Offline test seam ---------------------------------------------------
  * Point the state slot at a planted fixture. The shipping code never calls
  * this; passing 0 restores the real constant. */

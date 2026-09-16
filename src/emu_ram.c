@@ -466,3 +466,118 @@ emu_status emu_ram_find(emu_ram_hit *out, unsigned cap, unsigned *n_out,
 
     return EMU_OK;
 }
+
+/* --- Watching candidates over time --------------------------------------
+ *
+ * ⭐⭐ This is what actually decides it, and it needs no special game mode.
+ * A static sweep can only ask "does this fit the arithmetic?", which filler
+ * answers yes to. Watching asks "does it BEHAVE like health?", which filler
+ * cannot fake: divergence between the players, downward steps as hits land,
+ * and a jump back to the cap when a round ends.
+ *
+ * ⚠ Keyed by ADDRESS and kept even after a candidate stops matching -- a pair
+ * that vanishes from the sweep still has a history worth reporting, and
+ * dropping it would silently discard the most interesting case (a struct that
+ * is only valid mid-round). */
+#define WATCH_MAX 64
+static emu_watch g_watch[WATCH_MAX];
+static unsigned  g_watch_n;
+
+void emu_watch_reset(void)
+{
+    memset(g_watch, 0, sizeof(g_watch));
+    g_watch_n = 0;
+}
+
+static emu_watch *watch_find(ULONGLONG p1)
+{
+    unsigned i;
+    for (i = 0; i < g_watch_n; i++)
+        if (g_watch[i].p1 == p1)
+            return &g_watch[i];
+    return NULL;
+}
+
+unsigned emu_watch_sample(const emu_ram_hit *hits, unsigned n)
+{
+    unsigned i;
+
+    /* Adopt new candidates, up to the table's capacity. */
+    for (i = 0; i < n && g_watch_n < WATCH_MAX; i++) {
+        if (!watch_find(hits[i].p1)) {
+            emu_watch *w = &g_watch[g_watch_n++];
+            memset(w, 0, sizeof(*w));
+            w->p1         = hits[i].p1;
+            w->max_health = hits[i].max_health;
+            w->last_h1    = hits[i].health;
+        }
+    }
+
+    /* Re-read every tracked address, including ones not in this sweep. */
+    for (i = 0; i < g_watch_n; i++) {
+        emu_watch *w = &g_watch[i];
+        unsigned char b[CVS2_STRIDE + 8];
+        unsigned h1, h2;
+
+        if (mem_readable_run((const void *)(ULONG_PTR)w->p1, sizeof(b)) < sizeof(b))
+            continue;
+        if (!mem_copy(b, (const void *)(ULONG_PTR)w->p1, sizeof(b)))
+            continue;
+
+        h1 = (unsigned)(b[CVS2_HP_OFF] | (b[CVS2_HP_OFF + 1] << 8));
+        h2 = (unsigned)(b[CVS2_STRIDE + CVS2_HP_OFF] |
+                        (b[CVS2_STRIDE + CVS2_HP_OFF + 1] << 8));
+
+        w->samples++;
+        if (h1 != h2)
+            w->diverged++;
+
+        if (w->samples > 1 && h1 != w->last_h1) {
+            w->changes++;
+            if (h1 < w->last_h1)
+                w->drops++;
+            /* A jump back UP to (or near) the cap is a round reset -- the
+             * reversibility test, supplied by the game rather than by asking
+             * the player to do anything. */
+            else if (w->max_health && h1 >= w->max_health)
+                w->resets++;
+        }
+        w->last_h1 = h1;
+        w->last_h2 = h2;
+    }
+
+    return g_watch_n;
+}
+
+/* Rank: behaving like health beats merely fitting the arithmetic. */
+static int watch_score(const emu_watch *w)
+{
+    int s = 0;
+    if (w->drops)    s += 4;
+    if (w->resets)   s += 4;   /* the strongest single signal */
+    if (w->diverged) s += 2;
+    if (w->changes)  s += 1;
+    return s;
+}
+
+unsigned emu_watch_report(emu_watch *out, unsigned cap)
+{
+    unsigned i, j, n = 0;
+    if (!out || cap == 0)
+        return 0;
+
+    for (i = 0; i < g_watch_n && n < cap; i++)
+        out[n++] = g_watch[i];
+
+    /* Insertion sort, best first. n is <= 64, so the cost is irrelevant. */
+    for (i = 1; i < n; i++) {
+        emu_watch key = out[i];
+        j = i;
+        while (j > 0 && watch_score(&out[j - 1]) < watch_score(&key)) {
+            out[j] = out[j - 1];
+            j--;
+        }
+        out[j] = key;
+    }
+    return n;
+}

@@ -529,6 +529,99 @@ int main(void)
         }
     }
 
+    /* ---- 11. the BEHAVIOUR watcher ----------------------------------
+     * ⭐⭐ This is the half that actually identifies guest RAM, and it is why
+     * a NORMAL MATCH is a sufficient instrument -- no training mode needed.
+     * A static sweep can only ask "does this fit the arithmetic?", which
+     * filler answers yes to. The watcher asks "does it BEHAVE like health?" */
+    {
+        unsigned char *ar2 = (unsigned char *)VirtualAlloc(
+            NULL, 0x4000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        emu_watch wr[8];
+        unsigned nw;
+        emu_ram_hit fake[2];
+
+        check("11-setup arena allocated", ar2 != NULL, "");
+        if (ar2) {
+            SIZE_T a = 0x100;                    /* the "real" pair   */
+            SIZE_T b = 0x2000;                   /* the filler pair   */
+            ULONGLONG addr_a = (ULONGLONG)(ULONG_PTR)(ar2 + a);
+            ULONGLONG addr_b = (ULONGLONG)(ULONG_PTR)(ar2 + b);
+            unsigned i;
+
+            emu_watch_reset();
+            memset(ar2, 0, 0x4000);
+
+            /* Both start at full health and both FIT the arithmetic. */
+            #define SETPAIR(base, h1, h2) do {                                \
+                ar2[(base) + 0] = (unsigned char)((h1) & 0xFF);               \
+                ar2[(base) + 1] = (unsigned char)((h1) >> 8);                 \
+                ar2[(base) + 4] = 144; ar2[(base) + 5] = 0;                   \
+                ar2[(base) + CVS2_STRIDE_T + 0] = (unsigned char)((h2) & 0xFF); \
+                ar2[(base) + CVS2_STRIDE_T + 1] = (unsigned char)((h2) >> 8); \
+                ar2[(base) + CVS2_STRIDE_T + 4] = 144;                        \
+                ar2[(base) + CVS2_STRIDE_T + 5] = 0;                          \
+            } while (0)
+
+            SETPAIR(a, 144, 144);
+            SETPAIR(b, 144, 144);
+            fake[0].p1 = addr_a; fake[0].health = 144; fake[0].max_health = 144;
+            fake[1].p1 = addr_b; fake[1].health = 144; fake[1].max_health = 144;
+            emu_watch_sample(fake, 2);
+
+            /* Play a "round": A's health diverges and falls; B never moves. */
+            SETPAIR(a, 120, 144); emu_watch_sample(fake, 2);
+            SETPAIR(a,  96, 131); emu_watch_sample(fake, 2);
+            SETPAIR(a,  51, 131); emu_watch_sample(fake, 2);
+            /* Round ends: both return to the cap -- reversibility, supplied by
+             * the game rather than by asking the player for anything. */
+            SETPAIR(a, 144, 144); emu_watch_sample(fake, 2);
+
+            nw = emu_watch_report(wr, 8);
+            check("11a both candidates are tracked", nw == 2, "n=%u", nw);
+
+            /* The real one must RANK FIRST -- that is the whole product. */
+            check("11b the behaving pair ranks FIRST",
+                  nw >= 1 && wr[0].p1 == addr_a,
+                  "first was 0x%llx, wanted 0x%llx",
+                  (unsigned long long)(nw ? wr[0].p1 : 0),
+                  (unsigned long long)addr_a);
+
+            check("11c it recorded DROPS", nw >= 1 && wr[0].drops >= 2,
+                  "drops=%u", nw ? wr[0].drops : 0);
+            check("11d it recorded DIVERGENCE",
+                  nw >= 1 && wr[0].diverged >= 2,
+                  "diverged=%u", nw ? wr[0].diverged : 0);
+            check("11e it recorded a RESET to the cap (the round change)",
+                  nw >= 1 && wr[0].resets >= 1,
+                  "resets=%u", nw ? wr[0].resets : 0);
+
+            /* ⭐ THE DISCRIMINATING ASSERTION. Filler was sampled just as often
+             * and fits the arithmetic identically -- it must score ZERO on
+             * every behavioural axis. Without this, a watcher that credited
+             * everything would pass 11b-11e. */
+            for (i = 0; i < nw; i++) {
+                if (wr[i].p1 != addr_b)
+                    continue;
+                check("11f the FILLER pair was sampled as often",
+                      wr[i].samples == wr[0].samples,
+                      "filler %u vs real %u", wr[i].samples, wr[0].samples);
+                check("11g the FILLER pair shows NO drops, NO divergence",
+                      wr[i].drops == 0 && wr[i].diverged == 0 &&
+                      wr[i].changes == 0,
+                      "drops=%u diverged=%u changes=%u",
+                      wr[i].drops, wr[i].diverged, wr[i].changes);
+            }
+
+            emu_watch_reset();
+            nw = emu_watch_report(wr, 8);
+            check("11h reset clears the table", nw == 0, "n=%u", nw);
+
+            #undef SETPAIR
+            VirtualFree(ar2, 0, MEM_RELEASE);
+        }
+    }
+
     /* ---- 9. the guard absorbed nothing unexpected --------------------
      * ⚠ A run that faulted is a PARTIAL run and must say so rather than
      * presenting itself as clean. */

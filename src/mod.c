@@ -60,6 +60,8 @@ static BOOL g_emu_probe_on;
  * ⚠ Stays quiet while it keeps finding nothing: a sweep every 10 s that
  * reported every time would flood the log and bury the round that matters.
  * It speaks on a CHANGE in what it found, and once at the start. */
+static void emu_watch_report_log(void);
+
 static void emu_scan_report(int beat)
 {
     static unsigned last_n = 0xFFFFFFFFu;
@@ -80,6 +82,17 @@ static void emu_scan_report(int beat)
         return;
     }
     said_fail = 0;
+
+    /* ⭐ Sample EVERY sweep, before the change-gate below. The candidate COUNT
+     * goes quiet as soon as the set is stable, but the whole point is watching
+     * those addresses change over time -- gating the sample on the count would
+     * stop collecting evidence exactly when the match starts producing it. */
+    emu_watch_sample(hits, nh < 16 ? nh : 16);
+
+    /* The behaviour report is the finding; print it on a slower cadence so it
+     * accumulates real history between lines. */
+    if (beat % 15 == 0)
+        emu_watch_report_log();
 
     if (nh == last_n && beat != 3)
         return;
@@ -127,11 +140,48 @@ static void emu_scan_report(int beat)
          * pair that survived 13 trials with clean controls turned out to be a
          * monotonic allocation counter. */
         log_line("emu: ⚠ CANDIDATES, not guest RAM. Fitting the arithmetic is "
-                 "not being the fighters. The deciding test is REVERSIBILITY: "
-                 "take a hit, watch hp FALL, then reset and watch it RETURN. "
-                 "⭐ And if several candidates agree on ONE implied guest "
-                 "base, that agreement is the real evidence.");
+                 "not being the fighters -- the BEHAVIOUR report below is what "
+                 "decides it.");
     }
+}
+
+/* ⭐⭐ The behaviour report -- the half that actually identifies guest RAM.
+ * A NORMAL MATCH supplies everything this needs; training mode is not
+ * required. Health diverging between players, falling in irregular steps, and
+ * jumping back to the cap at a round transition are three things filler cannot
+ * do, and the game produces all of them on its own. */
+static void emu_watch_report_log(void)
+{
+    emu_watch w[16];
+    unsigned n = emu_watch_report(w, 16);
+    unsigned i, show = n < 6 ? n : 6;
+    unsigned convincing = 0;
+
+    if (n == 0)
+        return;
+
+    for (i = 0; i < n; i++)
+        if (w[i].drops && w[i].diverged)
+            convincing++;
+
+    log_line("emu: --- behaviour of %u tracked candidate(s), best first ---", n);
+    for (i = 0; i < show; i++)
+        log_line("emu:    0x%llx  hp %u/%u  samples %u  changes %u  drops %u  "
+                 "resets %u  diverged %u",
+                 (unsigned long long)w[i].p1, w[i].last_h1, w[i].max_health,
+                 w[i].samples, w[i].changes, w[i].drops, w[i].resets,
+                 w[i].diverged);
+
+    if (convincing == 0)
+        log_line("emu: ⚠ NO candidate has both dropped and diverged yet. If a "
+                 "round has been fought, these are all filler and the 0x5CC "
+                 "stride or the health offsets are wrong. If you have not "
+                 "reached a match yet, this is simply too early.");
+    else
+        log_line("emu: ⭐⭐ %u candidate(s) DROP and DIVERGE -- that is health "
+                 "behaving like health. A `resets` count above zero means it "
+                 "also returned to the cap at a round change, which is the "
+                 "reversibility test passed.", convincing);
 }
 
 static void emu_probe_report(int beat)
