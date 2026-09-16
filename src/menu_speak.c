@@ -4151,6 +4151,21 @@ void menu_speak(const mc_move *m)
     /* ⚠ No deferral: speech is immediate on every movement. See the note
      * above menu_speak()'s definition for why that is not negotiable. */
 
+    /* ⭐⭐⭐ TIME THE WHOLE ANNOUNCEMENT. User-reported "about a second of lag
+     * per keypress" that survived both the log fix and the speech-queue fix.
+     *
+     * ⛔ Every component measured so far is fast, and two hypotheses about the
+     * string read have now been REFUTED by the run's own log (the blob sits in
+     * ONE 520 MB region, so mem_readable_run does a single query, not many).
+     * Rather than guess a third time, measure the thing the user actually
+     * waits for: entry to exit of this function, on the worker thread.
+     *
+     * ⚠ Threshold-reported, never per call: a log line per movement would put
+     * file I/O back on the path this is trying to measure. */
+    LARGE_INTEGER t0, t1, qf;
+    QueryPerformanceFrequency(&qf);
+    QueryPerformanceCounter(&t0);
+
     menu_speak_build(m, &sp);
 
     /* ⭐ The builder already spoke a whole PANEL (the move list). Saying
@@ -4431,6 +4446,29 @@ void menu_speak(const mc_move *m)
     }
 
     menu_speak_line(line);
+
+    /* ⭐ The end-to-end cost of one announcement, on the worker thread. */
+    QueryPerformanceCounter(&t1);
+    {
+        static double worst, total;
+        static long   calls;
+        static double next_report = 200.0;
+        double el = (double)(t1.QuadPart - t0.QuadPart) * 1000.0 /
+                    (double)qf.QuadPart;
+        calls++;
+        total += el;
+        if (el > worst) worst = el;
+        /* ⚠ 20 ms is the poll period, so anything at or above it is already a
+         * whole tick of delay and worth naming. Reported on a growing
+         * threshold so a long session cannot flood the log. */
+        if (worst >= 20.0 && total >= next_report) {
+            next_report = total * 2.0;
+            log_line("mcspeak: ⚠ the ANNOUNCEMENT itself is slow -- %ld call(s), "
+                     "worst %.1f ms, mean %.1f ms (build + text + speechSay). "
+                     "This is time the user waits after the cursor moves.",
+                     calls, worst, total / (double)calls);
+        }
+    }
 }
 
 
