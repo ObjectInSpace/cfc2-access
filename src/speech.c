@@ -130,6 +130,29 @@ BOOL speech_say(const wchar_t *text, BOOL interrupt)
     LARGE_INTEGER t0, t1, freq;
     QueryPerformanceFrequency(&freq);
     QueryPerformanceCounter(&t0);
+    /* ⭐⭐⭐ STOP BEFORE SAYING, rather than trusting speechSay's own flag.
+     *
+     * ⛔⛔ USER-REPORTED, and the detail that identified it: "it starts okay but
+     * it ACCUMULATES delay the more button presses are made." That is a QUEUE
+     * draining behind the user -- not a constant per-press cost, which is what
+     * the earlier measurements were looking for and why they all came back
+     * fast. Each press was still being announced; they were just announced in
+     * turn, so the backlog grew with every keypress.
+     *
+     * ⭐ WHY THE interrupt FLAG WAS NOT ENOUGH. NVDA's own client exports
+     * `nvdaController_speakText`, which takes NO interrupt parameter -- it
+     * queues, full stop. Cancelling is a SEPARATE export,
+     * `nvdaController_cancelSpeech`. So on the NVDA path "interrupt" can only
+     * work if UniversalSpeech chooses to call cancel for us, and the mod was
+     * relying on that without ever verifying it.
+     *
+     * ⚠ speech_stop() existed the whole time and NOTHING EVER CALLED IT.
+     *
+     * This is correct regardless of which layer was at fault: an explicit stop
+     * before each announcement is exactly the semantics a cursor readout wants
+     * -- the previous row is stale the moment the user moves. */
+    if (interrupt && g_stop)
+        g_stop();
     int rc = g_say(text, interrupt ? 1 : 0);
     QueryPerformanceCounter(&t1);
     {
