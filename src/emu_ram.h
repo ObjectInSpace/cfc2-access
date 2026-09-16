@@ -251,6 +251,20 @@ void emu_ram_scan_rewind(void);
  * exactly that in language that read like one. */
 void emu_ram_coverage(SIZE_T *scanned_out, unsigned *passes_out);
 
+/* --- THE DECISIVE TEST ---------------------------------------------------
+ * Hunt the published CVS2 full-health constant (144) rather than a
+ * relationship, and report how many occurrences have a SECOND one exactly
+ * 0x5CC later. One run settles the prior-art question:
+ *   paired > 0  -> the stride is confirmed in this build
+ *   seen > 0, paired == 0 -> health value right, stride wrong
+ *   seen == 0 during a live match -> the published layout does not apply
+ * ⚠ `seen` alone means nothing (144 is a common value); the PAIRING is the
+ * signal. Scans the whole arena in one call -- no budget, because it does far
+ * less work per byte than the relational scan. */
+emu_status emu_ram_probe_cap(unsigned cap_value, unsigned *seen_out,
+                             unsigned *paired_out, ULONGLONG *first_pair_out,
+                             SIZE_T *scanned_out);
+
 /* Force the number of BLOCKS one sweep may examine, instead of the wall-clock
  * budget. 0 restores the timed behaviour.
  *

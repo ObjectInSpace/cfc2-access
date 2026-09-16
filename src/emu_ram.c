@@ -709,3 +709,98 @@ unsigned emu_watch_report(emu_watch *out, unsigned cap)
     }
     return n;
 }
+
+/* --- THE DECISIVE TEST: hunt the published CONSTANT, not a relationship ---
+ *
+ * ⭐⭐ WHY THIS REPLACES THE RELATIONAL SCAN AS THE PRIMARY PROBE.
+ *
+ * Four play sessions went into the relational scan and it produced no usable
+ * conclusion, because "P2 == P1 + 0x5CC and health <= max" is satisfied by
+ * enormous amounts of ordinary data. Every filter I added removed one class of
+ * look-alike and left the rest.
+ *
+ * The published CVS2 layout gives a SPECIFIC constant: a full health bar is
+ * 144 (0x90). That is far more discriminating than any relationship, and it
+ * makes the question falsifiable in ONE run:
+ *
+ *   - 144 appears, with a second 144 exactly 0x5CC later  -> the prior-art
+ *     stride is CONFIRMED in this build, and we have the player pair;
+ *   - 144 appears, but never 0x5CC apart                  -> the layout is
+ *     right about health and WRONG about the stride;
+ *   - 144 never appears during a live match               -> the published
+ *     CVS2 layout does not apply to CFC2's build at all, and the whole
+ *     prior-art route is dead. That is a real, actionable conclusion.
+ *
+ * ⚠ 144 is a common byte value, so the count alone means nothing. What
+ * matters is the PAIRING at 0x5CC, which is why both numbers are reported.
+ *
+ * ⛔ Note this deliberately does NOT try to be clever. No behaviour tracking,
+ * no ranking, no scoring. It answers one question. */
+emu_status emu_ram_probe_cap(unsigned cap_value, unsigned *seen_out,
+                             unsigned *paired_out, ULONGLONG *first_pair_out,
+                             SIZE_T *scanned_out)
+{
+    ULONGLONG base = 0, addr, end;
+    SIZE_T size = 0, scanned = 0;
+    unsigned seen = 0, paired = 0;
+    ULONGLONG first_pair = 0;
+    emu_status s;
+    MEMORY_BASIC_INFORMATION mbi;
+    ULONGLONG region_end = 0;
+    static unsigned char buf[SCAN_BLOCK + CVS2_STRIDE + 8];
+
+    if (seen_out)       *seen_out = 0;
+    if (paired_out)     *paired_out = 0;
+    if (first_pair_out) *first_pair_out = 0;
+    if (scanned_out)    *scanned_out = 0;
+
+    if (g_win_base) { base = g_win_base; size = g_win_size; }
+    else {
+        s = emu_arena(&base, &size);
+        if (s != EMU_OK) return s;
+        if (size > (SIZE_T)EMU_ARENA_SIZE) size = (SIZE_T)EMU_ARENA_SIZE;
+    }
+    if (size == 0) return EMU_UNREADABLE;
+    end = base + size;
+
+    for (addr = base; addr + CVS2_STRIDE + 8 < end; addr += SCAN_BLOCK) {
+        SIZE_T want = SCAN_BLOCK + CVS2_STRIDE + 8, off;
+
+        if (addr + want > end) want = (SIZE_T)(end - addr);
+
+        if (addr >= region_end) {
+            if (VirtualQuery((LPCVOID)(ULONG_PTR)addr, &mbi, sizeof(mbi))
+                    != sizeof(mbi)) { region_end = addr + SCAN_BLOCK; continue; }
+            region_end = (ULONGLONG)(ULONG_PTR)mbi.BaseAddress + mbi.RegionSize;
+            if (mbi.State != MEM_COMMIT ||
+                (mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD))) {
+                addr = region_end - SCAN_BLOCK;
+                continue;
+            }
+        }
+        if (addr + want > region_end) want = (SIZE_T)(region_end - addr);
+        if (want < CVS2_STRIDE + 8) continue;
+
+        if (!mem_copy(buf, (const void *)(ULONG_PTR)addr, want)) continue;
+        scanned += want;
+
+        for (off = 0; off + CVS2_STRIDE + 8 <= want; off += 2) {
+            unsigned v = (unsigned)(buf[off] | (buf[off + 1] << 8));
+            unsigned w;
+            if (v != cap_value) continue;
+            seen++;
+            w = (unsigned)(buf[off + CVS2_STRIDE] |
+                           (buf[off + CVS2_STRIDE + 1] << 8));
+            if (w == cap_value) {
+                paired++;
+                if (!first_pair) first_pair = addr + off;
+            }
+        }
+    }
+
+    if (seen_out)       *seen_out = seen;
+    if (paired_out)     *paired_out = paired;
+    if (first_pair_out) *first_pair_out = first_pair;
+    if (scanned_out)    *scanned_out = scanned;
+    return scanned ? EMU_OK : EMU_UNREADABLE;
+}

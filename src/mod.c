@@ -62,8 +62,56 @@ static BOOL g_emu_probe_on;
  * It speaks on a CHANGE in what it found, and once at the start. */
 static void emu_watch_report_log(void);
 
+/* ⭐⭐ THE DECISIVE TEST, and now the PRIMARY one. Four play sessions went into
+ * the relational scan without producing a usable conclusion, because
+ * "P2 == P1 + 0x5CC and health <= max" is satisfied by huge amounts of
+ * ordinary data. This asks a falsifiable question instead, using the published
+ * CVS2 full-health constant (144), and one run answers it either way. */
+static void emu_cap_probe_log(void)
+{
+    static int done;
+    unsigned seen = 0, paired = 0;
+    ULONGLONG first = 0;
+    SIZE_T scanned = 0;
+    emu_status s;
+
+    if (done)
+        return;
+
+    s = emu_ram_probe_cap(144, &seen, &paired, &first, &scanned);
+    if (s != EMU_OK) {
+        log_line("emu: CAP PROBE could not run (%s) -- says nothing.",
+                 emu_status_name(s));
+        return;
+    }
+    done = 1;
+
+    log_line("emu: === CAP PROBE: swept %llu MB for the published CVS2 full-"
+             "health value 144 ===",
+             (unsigned long long)(scanned / (1024 * 1024)));
+    log_line("emu:    %u occurrence(s) of 144; %u of them have a SECOND 144 "
+             "exactly 0x5CC later.", seen, paired);
+
+    if (paired > 0)
+        log_line("emu: ⭐⭐ THE 0x5CC STRIDE IS CONFIRMED in this build. First "
+                 "pair at 0x%llx -- that is the player pair, and the prior-art "
+                 "CVS2 layout applies.", (unsigned long long)first);
+    else if (seen > 0)
+        log_line("emu: ⛔ 144 occurs but NEVER 0x5CC apart. The health VALUE "
+                 "may be right and the STRIDE is wrong for this build -- the "
+                 "player struct is a different size here.");
+    else
+        log_line("emu: ⛔⛔ 144 does NOT occur anywhere in the arena. If this "
+                 "was logged during a live match, the published CVS2 layout "
+                 "does NOT apply to CFC2's build and the prior-art route is "
+                 "dead -- the layout must be derived from scratch.");
+}
+
 static void emu_scan_report(int beat)
 {
+    /* Ask the decisive question first, once. */
+    emu_cap_probe_log();
+
     static unsigned last_n = 0xFFFFFFFFu;
     static int      said_fail;
 
@@ -112,20 +160,18 @@ static void emu_scan_report(int beat)
     }
 
     {
-        unsigned k, show = nh < 6 ? nh : 6;
-        if (show > 16) show = 16;
-        log_line("emu: ⭐ guest-RAM scan examined %llu KB of the 256 MB arena, "
-                 "found %u candidate pair(s) at stride 0x5CC:",
+        unsigned k, show = nh < 3 ? nh : 3;
+        /* ⚠ QUIETER ON PURPOSE. The per-candidate dump was the bulk of the
+         * log and none of it was ever actionable -- the CAP PROBE above is
+         * the line that decides anything. Three examples are enough to see
+         * the shape; the behaviour report is what earns attention. */
+        log_line("emu: guest-RAM scan examined %llu KB, found %u candidate "
+                 "pair(s) at stride 0x5CC (see CAP PROBE for what matters):",
                  (unsigned long long)(scanned / 1024), nh);
         for (k = 0; k < show && k < 16; k++)
-            log_line("emu:    P1=0x%llx  hp %u / %u   (implies guest base "
-                     "0x%llx)",
+            log_line("emu:    P1=0x%llx  hp %u / %u",
                      (unsigned long long)hits[k].p1,
-                     hits[k].health, hits[k].max_health,
-                     (unsigned long long)hits[k].guest_base);
-        if (nh > show)
-            log_line("emu:    ... and %u more (only the first 16 are kept; the "
-                     "sweep itself ran to completion)", nh - show);
+                     hits[k].health, hits[k].max_health);
 
         /* ⭐ The diagnostic that would have named the first run's failure
          * immediately: hits packed within a few bytes of each other are ONE
@@ -139,9 +185,7 @@ static void emu_scan_report(int beat)
          * and this project has already mistaken one for the other -- a pointer
          * pair that survived 13 trials with clean controls turned out to be a
          * monotonic allocation counter. */
-        log_line("emu: ⚠ CANDIDATES, not guest RAM. Fitting the arithmetic is "
-                 "not being the fighters -- the BEHAVIOUR report below is what "
-                 "decides it.");
+
     }
 }
 

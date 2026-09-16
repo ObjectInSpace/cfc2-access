@@ -753,6 +753,65 @@ int main(void)
         }
     }
 
+    /* ---- 13. THE CAP PROBE -- the decisive test ----------------------
+     * ⭐⭐ This exists because four play sessions of relational scanning
+     * produced no usable conclusion. It asks a falsifiable question using the
+     * published CVS2 full-health constant, and its three outcomes are all
+     * actionable. These cases prove it can say YES, and -- more importantly --
+     * that it says NO when the stride is wrong. */
+    {
+        unsigned char *cr = (unsigned char *)VirtualAlloc(
+            NULL, 0x8000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        unsigned seen = 0, paired = 0;
+        ULONGLONG first = 0;
+        SIZE_T sc = 0;
+
+        check("13-setup arena allocated", cr != NULL, "");
+        if (cr) {
+            SIZE_T q = 0x800;
+
+            /* (a) a correctly strided pair of caps */
+            memset(cr, 0, 0x8000);
+            cr[q] = 144; cr[q + 1] = 0;
+            cr[q + CVS2_STRIDE_T] = 144; cr[q + CVS2_STRIDE_T + 1] = 0;
+            emu_ram_test_window((ULONGLONG)(ULONG_PTR)cr, 0x8000);
+            s = emu_ram_probe_cap(144, &seen, &paired, &first, &sc);
+            check("13a a 0x5CC-strided pair of 144s is PAIRED",
+                  s == EMU_OK && seen >= 2 && paired >= 1 &&
+                  first == (ULONGLONG)(ULONG_PTR)(cr + q),
+                  "got %s seen=%u paired=%u", emu_status_name(s), seen, paired);
+
+            /* (b) ⭐ THE DISCRIMINATING CASE: 144s present but at the WRONG
+             * stride must report seen>0 and paired==0. Without this, a probe
+             * that paired everything would pass 13a. */
+            memset(cr, 0, 0x8000);
+            cr[q] = 144; cr[q + 1] = 0;
+            cr[q + 0x400] = 144; cr[q + 0x401] = 0;    /* 0x400, not 0x5CC */
+            s = emu_ram_probe_cap(144, &seen, &paired, &first, &sc);
+            check("13b 144s at the WRONG stride are NOT paired",
+                  s == EMU_OK && seen >= 2 && paired == 0,
+                  "got %s seen=%u paired=%u", emu_status_name(s), seen, paired);
+
+            /* (c) absent entirely -- the outcome that would kill the
+             * prior-art route, and it must be reported as a clean zero. */
+            memset(cr, 0, 0x8000);
+            s = emu_ram_probe_cap(144, &seen, &paired, &first, &sc);
+            check("13c no 144 anywhere -> seen 0, and the sweep RAN",
+                  s == EMU_OK && seen == 0 && paired == 0 && sc > 0,
+                  "got %s seen=%u scanned=%llu", emu_status_name(s), seen,
+                  (unsigned long long)sc);
+
+            /* (d) "could not look" stays distinct from "looked and found none" */
+            emu_ram_test_window(0x10000ULL, 0x8000);
+            s = emu_ram_probe_cap(144, &seen, &paired, &first, &sc);
+            check("13d an unreadable window -> UNREADABLE, not a clean zero",
+                  s == EMU_UNREADABLE, "got %s", emu_status_name(s));
+
+            emu_ram_test_window(0, 0);
+            VirtualFree(cr, 0, MEM_RELEASE);
+        }
+    }
+
     /* ---- 9. the guard absorbed nothing unexpected --------------------
      * ⚠ A run that faulted is a PARTIAL run and must say so rather than
      * presenting itself as clean. */
