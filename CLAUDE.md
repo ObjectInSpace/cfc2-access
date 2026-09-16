@@ -99,6 +99,31 @@ Two more faults the same run exposed:
 bytes.** The log now says so explicitly when the whole candidate set fits in
 4 KB — that is ONE region matching repeatedly, not many structures.
 
+### ⛔⛔⛔ THE SCAN STALLED THE MOD FOR 114 SECONDS (2026-09-16, fixed)
+
+The full-arena sweep called `mem_readable_run()` -- a `VirtualQuery` syscall --
+**once per 4 KB page**: ~65,000 syscalls per sweep. Speech was dead for nearly
+two minutes.
+
+⚠⚠ **FOURTH time this project has hit that exact wall** (`gmd_find`, the
+heapdiff capture, the span scan, now this), and the comment warning about it
+was directly above the code that did it.
+
+⚠ **The heartbeat HID it**: it logs `beats * 2`, so a stalled worker
+under-reports its own age -- 126 s of wall clock read as "alive 20 s". A
+liveness counter derived from the loop it monitors cannot detect that loop
+stalling.
+
+**Fix:** one `VirtualQuery` per REGION then 256 KB block reads; a 25 ms
+wall-clock budget checked in the INNERMOST loop; and RESUMPTION so coverage
+still completes across sweeps. **Measured: 256 MB in 125 ms over 8 sweeps,
+worst sweep 32 ms** (was 114,600 ms).
+
+⭐⭐ **The trigger worth keeping, since remembering the rule has failed four
+times: before any loop over memory, COUNT THE SYSCALLS it will make.** If that
+number scales with items rather than regions, it is already too slow -- no
+profiling needed, just multiplication.
+
 ### ▶ THE RUN THAT IS NEEDED (cfc2_emu.on is already deployed and on)
 
 Start **any** game and read `emu:` lines in `CFC2Access.log`. What they answer:
@@ -115,7 +140,7 @@ Start **any** game and read `emu:` lines in `CFC2Access.log`. What they answer:
   think, or it is populated later than expected.
 - `emu: ⚠ COULD NOT read` → **not a negative.** Conclude nothing.
 
-`.\tools\run_emu_test.ps1` — 46 cases, twelve sabotages each verified to fail the
+`.\tools\run_emu_test.ps1` — 59 cases, sixteen sabotages each verified to fail the
 case that tests it. Case 1e pins the live pairing (index 3 ↔ `cvs2u`) as a
 regression, so the mapping is anchored to evidence rather than to my reading of
 the disassembly, which was wrong once.
