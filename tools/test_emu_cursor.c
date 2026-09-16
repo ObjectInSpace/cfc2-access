@@ -452,6 +452,62 @@ int main(void)
         }
     }
 
+    printf("\n--- 10. THE DIRECT WATCH ----------------------------------\n");
+    {
+        /* A window big enough to contain the real offsets, so the watch
+         * resolves them rather than bounds-rejecting. */
+        SIZE_T big = 0x8200000;
+        BYTE *w = (BYTE *)VirtualAlloc(NULL, big, MEM_RESERVE, PAGE_NOACCESS);
+        ec_watch t[EC_WATCH_MAX];
+        unsigned n;
+
+        check("10-setup reserved a window", w != NULL, "");
+        if (w) {
+            /* Commit just the pages the watch will touch. */
+            VirtualAlloc(w, 0x1000, MEM_COMMIT, PAGE_READWRITE);
+            VirtualAlloc(w + 0x8030000, 0x1000, MEM_COMMIT, PAGE_READWRITE);
+            VirtualAlloc(w + 0x8105000, 0x1000, MEM_COMMIT, PAGE_READWRITE);
+
+            emu_cursor_watch_reset();
+            emu_cursor_test_window((ULONGLONG)(ULONG_PTR)w, big);
+
+            w[0x8030134] = 7;
+            check("10a the watch samples a committed offset",
+                  emu_cursor_watch_tick(), "tick returned FALSE");
+            n = emu_cursor_watch_report(t, EC_WATCH_MAX);
+            check("10b it reports every watched offset", n >= 5, "got %u", n);
+            check("10c it read the planted value",
+                  t[0].readable && t[0].value == 7,
+                  "readable=%d value=%u", t[0].readable, t[0].value);
+
+            /* A change must be counted, and distinct values tracked. */
+            w[0x8030134] = 8;
+            emu_cursor_watch_tick();
+            emu_cursor_watch_report(t, EC_WATCH_MAX);
+            check("10d a change is counted", t[0].changes == 1,
+                  "changes=%u", t[0].changes);
+            check("10e distinct values are tracked", t[0].distinct == 2,
+                  "distinct=%u", t[0].distinct);
+
+            /* ⛔ The case that matters: UNREADABLE must not read as "did not
+             * move". An offset past the window must be flagged, not silently
+             * treated as a stable zero. */
+            emu_cursor_watch_reset();
+            emu_cursor_test_window((ULONGLONG)(ULONG_PTR)w, 0x1000);
+            emu_cursor_watch_tick();
+            emu_cursor_watch_report(t, EC_WATCH_MAX);
+            check("10f an offset past the window is NOT readable "
+                  "(not a stable zero)",
+                  !t[0].readable,
+                  "an out-of-range offset reported readable value %u",
+                  t[0].value);
+
+            emu_cursor_test_window(0, 0);
+            emu_cursor_watch_reset();
+            VirtualFree(w, 0, MEM_RELEASE);
+        }
+    }
+
     emu_cursor_test_window(0, 0);
     emu_cursor_reset();
     VirtualFree(g_fx, 0, MEM_RELEASE);

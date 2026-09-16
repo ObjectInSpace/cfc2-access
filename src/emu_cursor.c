@@ -295,6 +295,87 @@ static ec_status hash_pass(ec_phase phase, ULONGLONG base, SIZE_T size)
     return EC_OK;
 }
 
+/* --- The direct watch ----------------------------------------------------
+ *
+ * ⭐⭐ Confirming a KNOWN address needs a byte read, not a snapshot pass. See
+ * emu_cursor.h for why the cycle machinery structurally cannot do it. */
+
+static const ULONGLONG g_watch_off[] = {
+    EC_WATCH_CURSOR, EC_WATCH_FLAG0, EC_WATCH_FLAG1,
+    EC_WATCH_FLAG2,  EC_WATCH_FLAG3
+};
+#define WATCH_N ((unsigned)(sizeof g_watch_off / sizeof g_watch_off[0]))
+
+static ec_watch  g_watch[EC_WATCH_MAX];
+static unsigned  g_watch_seen[EC_WATCH_MAX];   /* bitmap of values 0..63 */
+static BOOL      g_watch_init;
+
+void emu_cursor_watch_reset(void)
+{
+    memset(g_watch, 0, sizeof g_watch);
+    memset(g_watch_seen, 0, sizeof g_watch_seen);
+    g_watch_init = FALSE;
+}
+
+BOOL emu_cursor_watch_tick(void)
+{
+    ULONGLONG base;
+    SIZE_T size;
+    unsigned i;
+
+    if (window(&base, &size) != EC_OK)
+        return FALSE;
+
+    if (!g_watch_init) {
+        for (i = 0; i < WATCH_N; i++) {
+            g_watch[i].offset = g_watch_off[i];
+            g_watch[i].vmin   = 0xFFFFFFFFu;
+        }
+        g_watch_init = TRUE;
+    }
+
+    for (i = 0; i < WATCH_N; i++) {
+        ULONGLONG a = base + g_watch[i].offset;
+        BYTE v;
+
+        g_watch[i].addr = a;
+
+        /* ⚠ Bounds FIRST. An offset past the arena is a bug in the offset, not
+         * something to discover by faulting -- and reporting it as a readable
+         * zero would make "the offset is wrong" look like "the field never
+         * moves", which are different findings. */
+        if (g_watch[i].offset + 1 > (ULONGLONG)size) {
+            g_watch[i].readable = FALSE;
+            continue;
+        }
+        if (!mem_copy(&v, (const void *)(ULONG_PTR)a, 1)) {
+            g_watch[i].readable = FALSE;   /* could not read != did not move */
+            continue;
+        }
+
+        if (g_watch[i].readable && v != g_watch[i].value)
+            g_watch[i].changes++;
+
+        g_watch[i].readable = TRUE;
+        g_watch[i].value = v;
+        if (v < g_watch[i].vmin) g_watch[i].vmin = v;
+        if (v > g_watch[i].vmax) g_watch[i].vmax = v;
+        if (v < 64 && !(g_watch_seen[i] & (1u << v))) {
+            g_watch_seen[i] |= (1u << v);
+            g_watch[i].distinct++;
+        }
+    }
+    return TRUE;
+}
+
+unsigned emu_cursor_watch_report(ec_watch *out, unsigned cap)
+{
+    unsigned n = WATCH_N < cap ? WATCH_N : cap;
+    if (!out || !cap || !g_watch_init) return 0;
+    memcpy(out, g_watch, n * sizeof(ec_watch));
+    return n;
+}
+
 BOOL emu_cursor_rom_running(char *name_out, unsigned cap)
 {
     char name[64];

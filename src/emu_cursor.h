@@ -205,6 +205,64 @@ void emu_cursor_status(ec_report *out);
 
 void emu_cursor_reset(void);
 
+/* --- THE DIRECT WATCH ----------------------------------------------------
+ *
+ * ⭐⭐ THIS SUPERSEDES THE CYCLE MACHINERY ABOVE FOR CONFIRMATION, and it is
+ * what should have been tried first.
+ *
+ * The differential probe exists to FIND an unknown address. Once run 5 named
+ * one (`arena + 0x8030134`, which went 3 -> 2 on a cursor move), confirming it
+ * needs none of that: just read the byte every tick and log when it changes.
+ *
+ * ⛔ The cycle probe could never confirm it, for a structural reason: an 828 ms
+ * blocking capture cannot bracket a one-frame change when presses arrive every
+ * ~0.3 s, so "quiet in the control" was measured across a window in which the
+ * cursor was moving. The field verdict swung 330x between cycles that should
+ * have been identical. See [[probe-samples-on-the-wrong-schedule]].
+ *
+ * A 1-byte read costs nothing and has NO phase at all. If the value tracks the
+ * cursor 0..47 on character select, it IS the cursor -- and the answer arrives
+ * from ordinary play with no protocol.
+ *
+ * ⚠ THE ADDRESS IS AN OFFSET, NEVER AN ABSOLUTE. The arena base moves every
+ * launch (0x7d81000, 0x7e11000, 0x7e31000, 0x7ea1000, 0x7dc1000 all observed),
+ * so the watch resolves `arena + offset` fresh each time.
+ *
+ * ⚠ And whether that OFFSET is stable across launches is itself UNTESTED -- one
+ * observation. The watch reports the value it finds without asserting the
+ * offset is right; a field that never moves is evidence the offset did not
+ * survive the relaunch, which is a different finding from "not the cursor". */
+
+/* The offsets run 5 produced. Watched together so a session answers both. */
+#define EC_WATCH_CURSOR   0x8030134ULL   /* went 3 -> 2 on a cursor move   */
+#define EC_WATCH_FLAG0    0x810563cULL   /* 0 -> 1, one of four            */
+#define EC_WATCH_FLAG1    0x8105690ULL
+#define EC_WATCH_FLAG2    0x81056acULL
+#define EC_WATCH_FLAG3    0x81056d4ULL
+
+#define EC_WATCH_MAX      8
+
+typedef struct {
+    ULONGLONG offset;       /* offset into the arena                       */
+    ULONGLONG addr;         /* where it resolved this launch               */
+    unsigned  value;        /* the byte as last read                       */
+    unsigned  changes;      /* how many times it changed                   */
+    unsigned  vmin, vmax;
+    unsigned  distinct;     /* distinct values seen (capped at 64)         */
+    BOOL      readable;     /* ⚠ FALSE means we could not read it -- that is
+                             * not "it never moved"                        */
+} ec_watch;
+
+/* Sample every watched offset once. Cheap: a handful of byte reads, no
+ * snapshot, no allocation. Returns FALSE if the arena could not be resolved,
+ * which is a return value and not a statement about any field. */
+BOOL emu_cursor_watch_tick(void);
+
+/* Read back the watch table. Returns how many entries were written. */
+unsigned emu_cursor_watch_report(ec_watch *out, unsigned cap);
+
+void emu_cursor_watch_reset(void);
+
 /* --- Offline test seam ---------------------------------------------------
  * Point the probe at a planted fixture instead of the live arena. Passing
  * (0, 0) restores live derivation.

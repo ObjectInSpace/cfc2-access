@@ -227,6 +227,7 @@ static unsigned g_cursor_reads;
 static unsigned g_cursor_unreadable;
 static unsigned g_cursor_other;
 static int      g_cursor_axis;
+static unsigned g_cursor_watch_logged;
 
 /* How long to wait for ANY arrow edge before concluding the emulated game does
  * not use sKeyboard. 30 s of navigation is far more than enough. */
@@ -287,6 +288,58 @@ static void cursor_probe_tick(void)
     BOOL left, right;
     ec_status s;
     ec_phase want;
+
+    /* ⚠ The WATCH runs even after the cycle probe has given up, and even
+     * while it is armed. It is independent of presses, phases and timeouts --
+     * that independence is the whole point. Gating it behind any of them would
+     * reproduce the bug that made run 2 silent. */
+    if (emu_cursor_rom_running(NULL, 0)) {
+    /* ⭐⭐ THE DIRECT WATCH RUNS FIRST, AND IT NEEDS NO PRESSES AT ALL.
+     *
+     * Run 5 named an address (arena + 0x8030134, 3 -> 2 on a cursor move). The
+     * cycle machinery below exists to FIND an unknown address; confirming a
+     * known one needs a byte read, not a 828 ms snapshot pass -- and the cycle
+     * probe structurally CANNOT confirm it, because its capture is far wider
+     * than the one-frame change it is trying to bracket.
+     *
+     * So: sample the named offsets every tick and log changes. The user simply
+     * plays; if the value walks 0..47 on character select, it is the cursor. */
+    {
+        static unsigned last[EC_WATCH_MAX];
+        static BOOL     have_last;
+        ec_watch w[EC_WATCH_MAX];
+        unsigned n, i;
+
+        if (emu_cursor_watch_tick()) {
+            n = emu_cursor_watch_report(w, EC_WATCH_MAX);
+            for (i = 0; i < n; i++) {
+                if (!w[i].readable) continue;
+                if (have_last && w[i].value == last[i]) continue;
+                if (have_last && g_cursor_watch_logged < 200) {
+                    g_cursor_watch_logged++;
+                    log_line("watch: +0x%llx = %u (was %u, delta %+d) "
+                             "[range %u..%u, %u distinct, %u change(s)]",
+                             (unsigned long long)w[i].offset, w[i].value,
+                             last[i], (int)w[i].value - (int)last[i],
+                             w[i].vmin, w[i].vmax, w[i].distinct,
+                             w[i].changes);
+                }
+                last[i] = w[i].value;
+            }
+            if (!have_last) {
+                for (i = 0; i < n; i++) last[i] = w[i].value;
+                have_last = TRUE;
+                for (i = 0; i < n; i++)
+                    log_line("watch: +0x%llx resolved to 0x%llx, initial "
+                             "value %u%s",
+                             (unsigned long long)w[i].offset,
+                             (unsigned long long)w[i].addr, w[i].value,
+                             w[i].readable ? "" :
+                             "  (NOT READABLE -- says nothing about the field)");
+            }
+        }
+    }
+    }
 
     if (g_cursor_gave_up) return;
 
