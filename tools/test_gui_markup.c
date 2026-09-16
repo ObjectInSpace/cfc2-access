@@ -306,6 +306,92 @@ int main(void)
         }
     }
 
+    /* --- the per-game icon legend ------------------------------------------
+     *
+     * ⛔⛔ THE BUG: C_A is "Any Attack" in Cybots and "Vertical Slash" in Star
+     * Gladiator; C_EX has NINE readings. The static table carries the generic
+     * one, so the move list spoke Cybots' names on other games. Measured live:
+     * C_A appeared 8 times, C_B 3, C_EX 4 -- the "shell menus only show UI
+     * icons" assumption was false.
+     *
+     * ⭐ The strings below are VERBATIM from the corpus, so these cases test
+     * the real input rather than a convenient one. */
+    {
+        /* Star Gladiator's legend, exactly as HELP_MOVES_STG2 ships. */
+        const char *stg2 =
+            "<SIZE 58><ICON C_A></SIZE>Vertical Slash"
+            "<SIZE 58><ICON C_B></SIZE>Horizontal Slash"
+            "<SIZE 58><ICON C_K2></SIZE>Kick";
+        char out[GM_OUT_MAX];
+
+        /* Before learning: the generic reading, which is WRONG for this game. */
+        gm_icon_overrides_clear();
+        gm_speak("<ICON C_A>", out, sizeof(out));
+        g_checked++;
+        if (strstr(out, "Any Attack") == NULL) {
+            printf("FAIL  baseline: C_A should read generic, got \"%s\"\n", out);
+            g_failed++;
+        } else {
+            printf("ok    baseline: C_A reads the generic \"Any Attack\"\n");
+        }
+
+        /* After learning the screen's legend: the game's OWN word. */
+        int learned = gm_icon_learn_legend(stg2);
+        gm_speak("<ICON C_A>", out, sizeof(out));
+        g_checked++;
+        if (learned < 2 || strstr(out, "Vertical Slash") == NULL) {
+            printf("FAIL  legend: C_A should read \"Vertical Slash\", "
+                   "learned=%d got \"%s\"\n", learned, out);
+            g_failed++;
+        } else {
+            printf("ok    legend: C_A reads this game's \"Vertical Slash\"\n");
+        }
+
+        /* ⛔⛔ A ONE-TOKEN STRING IS NOT A LEGEND. Ordinary move rows are
+         * written "<ICON C_S2> and" / "Hold <ICON C_4T> then", and letting one
+         * of those redefine a token would be the same class of error as the
+         * bug being fixed -- a move's incidental wording renaming an icon for
+         * the whole screen. */
+        gm_icon_overrides_clear();
+        int bogus = gm_icon_learn_legend("Hold <SIZE 58><ICON C_A></SIZE> and");
+        gm_speak("<ICON C_A>", out, sizeof(out));
+        g_checked++;
+        if (bogus != 0 || strstr(out, "Any Attack") == NULL) {
+            printf("FAIL  a one-token string must NOT redefine: took=%d "
+                   "got \"%s\"\n", bogus, out);
+            g_failed++;
+        } else {
+            printf("ok    a one-token move row does not redefine a token\n");
+        }
+
+        /* ⚠ And a token the legend does NOT mention keeps the table's reading,
+         * so learning one game's names cannot blank the rest. */
+        gm_icon_overrides_clear();
+        gm_icon_learn_legend(stg2);
+        gm_speak("<ICON DECIDE>", out, sizeof(out));
+        g_checked++;
+        if (strstr(out, "Confirm") == NULL) {
+            printf("FAIL  unrelated token lost its name: \"%s\"\n", out);
+            g_failed++;
+        } else {
+            printf("ok    a token the legend omits keeps the table's name\n");
+        }
+
+        /* ⚠ CLEARING really clears -- a stale override from the previous game
+         * is the same bug one game late. */
+        gm_icon_overrides_clear();
+        gm_speak("<ICON C_A>", out, sizeof(out));
+        g_checked++;
+        if (gm_icon_override_count() != 0 ||
+            strstr(out, "Any Attack") == NULL) {
+            printf("FAIL  clear left %d override(s), got \"%s\"\n",
+                   gm_icon_override_count(), out);
+            g_failed++;
+        } else {
+            printf("ok    clearing restores the generic reading\n");
+        }
+    }
+
     printf("\n%d checked, %d failed\n", g_checked, g_failed);
     return g_failed ? 1 : 0;
 }

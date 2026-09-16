@@ -77,6 +77,31 @@ const char *gm_icon(const char *token, char *tmp, SIZE_T tmpsz);
  * all), and a visible token is a bug report from the field. */
 SIZE_T gm_speak(const char *in, char *out, SIZE_T outsz);
 
+/* ⭐⭐ PER-GAME ICON NAMES, LEARNED FROM THE SCREEN'S OWN LEGEND.
+ *
+ * ⛔ Three tokens mean different attacks in different games: C_A is "Any
+ * Attack" in Cybots and "Vertical Slash" in Star Gladiator, and C_EX has NINE
+ * readings. The static table carries the generic one, so the move list spoke
+ * Cybots' names on other games -- a confident wrong reading.
+ *
+ * ⭐ The game prints its own legend on that screen ("<ICON C_A>Vertical
+ * Slash<ICON C_B>Horizontal Slash…") and it is co-resident with the moves, so
+ * the right names are READ rather than guessed -- and they follow the game's
+ * language for free.
+ *
+ * Usage: clear, then feed each candidate string; gm_icon() prefers what was
+ * learned. ⚠ Clear on every screen change: a stale override from the previous
+ * game is the same bug, one game late. */
+void gm_icon_overrides_clear(void);
+BOOL gm_icon_override_add(const char *token, const char *say);
+int  gm_icon_override_count(void);
+
+/* Parse one legend string; returns how many names it defined, 0 if the string
+ * is not a legend. ⚠ Requires TWO OR MORE definitions: "<ICON C_S2> and" is an
+ * ordinary move row, and letting one of those redefine a token would be the
+ * same class of error this exists to fix. */
+int  gm_icon_learn_legend(const char *s);
+
 /* TRUE if `s` still contains a markup tag. The shipping speech path asserts on
  * this: no tag may ever reach the user.
  *

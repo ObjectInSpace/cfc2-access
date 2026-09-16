@@ -2744,6 +2744,38 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
                 used += _snprintf(line + used, sizeof(line) - used - 1,
                                   "%s", spoken);
         }
+        /* ⭐⭐ LEARN THIS GAME'S ICON NAMES FROM ITS OWN LEGEND.
+         *
+         * ⛔⛔ C_A is "Any Attack" in Cybots and "Vertical Slash" in Star
+         * Gladiator; C_EX has NINE readings. The static table carries the
+         * generic one, so this screen spoke Cybots' names on other games -- a
+         * confident wrong reading, measured in the user's sweep (C_A live 8
+         * times, C_B 3, C_EX 4).
+         *
+         * ⭐ The game draws its legend on this very screen and it is
+         * co-resident with the moves: one instance-report block held the STG2
+         * legend AND all nine ambiguous uses. So ask the screen.
+         *
+         * ⚠ CLEARED FIRST, every visit. A leftover override from the previous
+         * game would be the same bug one game late, and the roster axis can
+         * change the game without leaving the screen.
+         *
+         * ⚠ The legend is not at a fixed column -- it is prose among the move
+         * rows -- so every live string on this screen is offered, and
+         * gm_icon_learn_legend() takes only those defining TWO OR MORE tokens.
+         * A one-token string is an ordinary move row ("Hold <ICON C_S2> and")
+         * and must never redefine a token. */
+        gm_icon_overrides_clear();
+        {
+            char cand[GT_CAPTION_MAX];
+            int learned = 0;
+            for (int i = 0; gt_prose_at(i, cand, (int)sizeof(cand)); i++)
+                learned += gm_icon_learn_legend(cand);
+            if (learned)
+                log_line("mcspeak: move list -- learned %d icon name(s) from "
+                         "this game's own legend.", learned);
+        }
+
         n = gt_column_count(m->screen, 84.0f);
         /* ⛔⛔ THIS LOOP USED TO STOP EARLY: `used < sizeof(line) - 64` quietly
          * abandoned the remaining rows once the line filled. A panel that read

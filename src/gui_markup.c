@@ -171,10 +171,148 @@ static const struct icon_row ICONS[] = {
 
 #define ICON_COUNT (sizeof(ICONS) / sizeof(ICONS[0]))
 
+/* ⭐⭐ THE PER-GAME OVERRIDES, LEARNED FROM THE SCREEN'S OWN LEGEND.
+ *
+ * ⛔⛔ THE BUG THIS FIXES. Three tokens mean different attacks in different
+ * games -- C_A is "Any Attack" in Cybots and "Vertical Slash" in Star
+ * Gladiator; C_EX has NINE readings. The static table below carries the generic
+ * one, and its comment argued that was safe because "the icons that actually
+ * appear [in shell menus] are the UI ones". Measured in the user's sweep, that
+ * is FALSE: C_A appeared live 8 times, C_B 3, C_EX 4. So the move list said
+ * "Any Attack" where the screen showed Vertical Slash -- Cybots' name spoken on
+ * a different game, which is a confident wrong reading, not a gap.
+ *
+ * ⭐ THE GAME DRAWS ITS OWN LEGEND on that screen: HELP_MOVES_STG2 is
+ * "<ICON C_A>Vertical Slash<ICON C_B>Horizontal Slash…", and it is co-resident
+ * with the moves in the instance set (verified: one report block held the
+ * legend and all nine ambiguous uses). So the right names are READ, never
+ * guessed, and they follow the game's language for free. "The game draws the
+ * words; quote them."
+ *
+ * ⚠ Bounded and overwritten wholesale on each new legend: a stale override from
+ * the previous game would be exactly the bug being fixed, one game late. */
+#define GM_OVERRIDE_MAX 16
+#define GM_OVERRIDE_TOK 16
+#define GM_OVERRIDE_SAY 40
+
+static struct {
+    char token[GM_OVERRIDE_TOK];
+    char say[GM_OVERRIDE_SAY];
+} g_override[GM_OVERRIDE_MAX];
+static int g_override_n;
+
+void gm_icon_overrides_clear(void)
+{
+    g_override_n = 0;
+}
+
+BOOL gm_icon_override_add(const char *token, const char *say)
+{
+    if (!token || !*token || !say || !*say)
+        return FALSE;
+    if (g_override_n >= GM_OVERRIDE_MAX)
+        return FALSE;
+    /* ⚠ A token already present is REPLACED, not duplicated: a legend that
+     * names the same token twice must not leave the first reading reachable. */
+    for (int i = 0; i < g_override_n; i++) {
+        if (strcmp(g_override[i].token, token) == 0) {
+            lstrcpynA(g_override[i].say, say, GM_OVERRIDE_SAY);
+            return TRUE;
+        }
+    }
+    lstrcpynA(g_override[g_override_n].token, token, GM_OVERRIDE_TOK);
+    lstrcpynA(g_override[g_override_n].say, say, GM_OVERRIDE_SAY);
+    g_override_n++;
+    return TRUE;
+}
+
+int gm_icon_override_count(void) { return g_override_n; }
+
+/* ⭐⭐ Read a legend string into the override table.
+ *
+ * A legend pairs each icon with its name in THIS game:
+ *     "<SIZE 58><ICON C_A></SIZE>Vertical Slash<SIZE 58><ICON C_B></SIZE>..."
+ * so the rule is: a token, then the plain text up to the next tag, trimmed.
+ *
+ * ⛔ IT MUST DEFINE AT LEAST TWO TOKENS TO COUNT. A single "<ICON X>word" is
+ * how ordinary move rows are written ("Hold <ICON C_S2> and"), and treating one
+ * of those as a legend would let a MOVE's incidental wording redefine a token
+ * for the whole screen -- the same class of error as the bug being fixed. The
+ * real legends define 2-5 tokens in one string; HELP_EXMOVE_* define exactly
+ * one, so they are deliberately NOT accepted here and C_EX keeps its generic
+ * reading until a two-token legend names it.
+ *
+ * ⚠ Returns the number of overrides taken, 0 if this was not a legend. The
+ * caller CLEARS first; a partial legend must not merge with the last game's.
+ */
+int gm_icon_learn_legend(const char *s)
+{
+    int taken = 0;
+    const char *p;
+
+    if (!s || !*s)
+        return 0;
+
+    /* First pass: count the definitions, so a non-legend changes nothing. */
+    for (int pass = 0; pass < 2; pass++) {
+        int found = 0;
+        for (p = s; (p = strstr(p, "<ICON ")) != NULL; ) {
+            char tok[GM_OVERRIDE_TOK];
+            char say[GM_OVERRIDE_SAY];
+            int n = 0;
+            p += 6;
+            while (*p && *p != '>' && n < (int)sizeof(tok) - 1)
+                tok[n++] = *p++;
+            tok[n] = '\0';
+            if (*p != '>')
+                break;
+            p++;
+            /* Skip any tags between the icon and its name. */
+            while (*p == '<') {
+                const char *close = strchr(p, '>');
+                if (!close)
+                    break;
+                p = close + 1;
+            }
+            /* The name is the plain run up to the next tag. */
+            n = 0;
+            while (*p && *p != '<' && n < (int)sizeof(say) - 1)
+                say[n++] = *p++;
+            say[n] = '\0';
+            /* Trim. */
+            while (n > 0 && (say[n-1] == ' ' || say[n-1] == '\t'))
+                say[--n] = '\0';
+            const char *start = say;
+            while (*start == ' ' || *start == '\t')
+                start++;
+            /* ⚠ A name must be WORDS. "+" and "/" join moves together
+             * ("<ICON C_236>+<ICON C_A>"), and accepting those would record
+             * "+" as a token's name. */
+            if (!*start || !((*start >= 'A' && *start <= 'Z') ||
+                             (*start >= 'a' && *start <= 'z')))
+                continue;
+            found++;
+            if (pass == 1 && gm_icon_override_add(tok, start))
+                taken++;
+        }
+        if (pass == 0 && found < 2)
+            return 0;              /* not a legend: change nothing */
+    }
+    return taken;
+}
+
 const char *gm_icon(const char *token, char *tmp, SIZE_T tmpsz)
 {
     if (!token || !*token)
         return NULL;
+
+    /* ⭐ The screen's own legend WINS over the generic table. It is the game's
+     * word for this token in THIS game; the table's is a fallback for screens
+     * that print no legend. */
+    for (int i = 0; i < g_override_n; i++) {
+        if (strcmp(g_override[i].token, token) == 0)
+            return g_override[i].say;
+    }
 
     for (SIZE_T i = 0; i < ICON_COUNT; i++) {
         if (strcmp(ICONS[i].token, token) == 0)
