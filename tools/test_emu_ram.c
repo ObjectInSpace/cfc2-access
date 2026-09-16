@@ -704,6 +704,46 @@ int main(void)
                       wr[i].drops, wr[i].diverged, wr[i].changes);
             }
 
+            /* ⛔⛔ 11i-11k ARE THE LIVE RUN'S FALSE POSITIVE, as cases.
+             * It announced "4 candidates DROP and DIVERGE -- that is health
+             * behaving like health" about values that had changed exactly ONCE
+             * in five samples and then frozen, two of them reading hp
+             * 65526/256 -- health ABOVE its own maximum (0xFFF6 = -10 as
+             * int16), which my `>= max` reset test counted as returning to the
+             * cap. A confidently wrong headline is the worst failure here. */
+            emu_watch_reset();
+            memset(ar2, 0, 0x4000);
+            SETPAIR(a, 144, 144);
+            fake[0].p1 = addr_a; fake[0].health = 144; fake[0].max_health = 144;
+            emu_watch_sample(fake, 1);
+            /* One change, then frozen -- exactly the live shape. */
+            SETPAIR(a, 0, 100);
+            emu_watch_sample(fake, 1);
+            emu_watch_sample(fake, 1);
+            emu_watch_sample(fake, 1);
+            emu_watch_sample(fake, 1);
+            nw = emu_watch_report(wr, 8);
+            check("11i ONE change then frozen is NOT sustained behaviour",
+                  nw == 1 && wr[0].changes < 3,
+                  "changes=%u (a field written once at load is not a fight)",
+                  nw ? wr[0].changes : 99);
+
+            /* Health above its own maximum: impossible, must be flagged. */
+            emu_watch_reset();
+            memset(ar2, 0, 0x4000);
+            SETPAIR(a, 144, 144);
+            emu_watch_sample(fake, 1);
+            SETPAIR(a, 65526, 144);      /* 0xFFF6 -- the live value */
+            emu_watch_sample(fake, 1);
+            nw = emu_watch_report(wr, 8);
+            check("11j health ABOVE its own max is flagged impossible",
+                  nw == 1 && wr[0].impossible >= 1,
+                  "impossible=%u", nw ? wr[0].impossible : 0);
+            check("11k ... and it is NOT counted as a reset to the cap",
+                  nw == 1 && wr[0].resets == 0,
+                  "resets=%u (the live run scored 65526/256 as a reset)",
+                  nw ? wr[0].resets : 99);
+
             emu_watch_reset();
             nw = emu_watch_report(wr, 8);
             check("11h reset clears the table", nw == 0, "n=%u", nw);

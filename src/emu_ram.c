@@ -304,9 +304,22 @@ static SIZE_T    g_win_size;
  * can rewind it. */
 static ULONGLONG g_resume;
 
+static SIZE_T g_pass_scanned;   /* bytes covered in the CURRENT pass */
+static unsigned g_passes;       /* completed full passes             */
+
 void emu_ram_scan_rewind(void)
 {
     g_resume = 0;
+    g_pass_scanned = 0;
+}
+
+/* ⭐ Coverage of the pass in progress. Without this a caller cannot tell
+ * "swept the arena and found nothing" from "has looked at 3% so far" -- and
+ * the live run reported the latter in language that read like the former. */
+void emu_ram_coverage(SIZE_T *scanned_out, unsigned *passes_out)
+{
+    if (scanned_out) *scanned_out = g_pass_scanned;
+    if (passes_out)  *passes_out  = g_passes;
 }
 
 /* Deterministic stand-in for the wall-clock budget, for the offline suite. */
@@ -538,8 +551,12 @@ emu_status emu_ram_find(emu_ram_hit *out, unsigned cap, unsigned *n_out,
 
     /* Ran to the end without exhausting the budget -- start over next sweep so
      * the arena is re-examined as the match progresses. */
-    if (addr + CVS2_STRIDE + 8 >= end)
+    g_pass_scanned += scanned;
+    if (addr + CVS2_STRIDE + 8 >= end) {
         g_resume = base;
+        g_passes++;
+        g_pass_scanned = 0;      /* a new pass starts */
+    }
 
     if (n_out)       *n_out = n;
     if (scanned_out) *scanned_out = scanned;
@@ -625,8 +642,17 @@ unsigned emu_watch_sample(const emu_ram_hit *hits, unsigned n)
             /* A jump back UP to (or near) the cap is a round reset -- the
              * reversibility test, supplied by the game rather than by asking
              * the player to do anything. */
-            else if (w->max_health && h1 >= w->max_health)
+            /* ⛔⛔ `h1 >= max` COUNTED IMPOSSIBLE VALUES AS RESETS. The live
+             * run reported hp 65526/256 and 65039/256 as "returned to the
+             * cap" -- 0xFFF6 and 0xFE0F, i.e. -10 and -497 read as int16.
+             * Health ABOVE its own maximum is not a reset; it is proof the
+             * field is not health at all. A reset is a return to EXACTLY the
+             * cap, and anything above it now DISQUALIFIES the candidate. */
+            else if (w->max_health && h1 == w->max_health)
                 w->resets++;
+
+            if (w->max_health && h1 > w->max_health)
+                w->impossible++;
         }
         w->last_h1 = h1;
         w->last_h2 = h2;
@@ -639,10 +665,26 @@ unsigned emu_watch_sample(const emu_ram_hit *hits, unsigned n)
 static int watch_score(const emu_watch *w)
 {
     int s = 0;
-    if (w->drops)    s += 4;
-    if (w->resets)   s += 4;   /* the strongest single signal */
-    if (w->diverged) s += 2;
-    if (w->changes)  s += 1;
+
+    /* ⛔⛔ HEALTH ABOVE ITS OWN MAXIMUM DISQUALIFIES. Not a penalty -- proof
+     * the field is not health. The live run ranked two such candidates in the
+     * top four because `>= max` was counted as a reset. */
+    if (w->impossible)
+        return -1;
+
+    /* ⛔⛔ ONE CHANGE IS NOT A FIGHT. Every candidate in the live run had
+     * exactly ONE change across five samples -- a value that moved once (at
+     * load) and then froze. Real health during a round changes repeatedly, so
+     * sustained activity is required before anything scores at all.
+     * ⚠ This is the difference between "it varied" and "it is state": a field
+     * written once during initialisation satisfies every one-shot test. */
+    if (w->changes < 3)
+        return 0;
+
+    if (w->drops >= 2) s += 4;
+    if (w->resets)     s += 4;   /* the strongest single signal */
+    if (w->diverged)   s += 2;
+    s += 1;
     return s;
 }
 

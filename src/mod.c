@@ -160,28 +160,93 @@ static void emu_watch_report_log(void)
     if (n == 0)
         return;
 
+    /* ⛔⛔ THE BAR WAS FAR TOO LOW AND THE HEADLINE OVERCLAIMED. The live run
+     * announced "4 candidates DROP and DIVERGE -- that is health behaving like
+     * health" about four values that had changed exactly ONCE in five samples
+     * and then frozen, two of them reading hp 65526/256 (health ABOVE its own
+     * maximum -- 0xFFF6, i.e. -10 as int16).
+     *
+     * A field written once at load satisfies "it dropped" and "they differ".
+     * Only SUSTAINED activity distinguishes a fight from initialisation. */
     for (i = 0; i < n; i++)
-        if (w[i].drops && w[i].diverged)
+        if (w[i].changes >= 3 && w[i].drops >= 2 && w[i].diverged &&
+            !w[i].impossible)
             convincing++;
+
+    /* ⚠ THE LIVE SWEEP MANAGED ~1 MB WHERE THE BENCHMARK DOES 256 MB IN 31 ms.
+     * That gap is a fact about the real arena that no offline benchmark can
+     * supply -- mine modelled both a dense and a sparse arena and BOTH finish
+     * in one sweep, so the real one is shaped like neither. Rather than guess
+     * a third time, report the arena's actual region layout once and read it.
+     * (benchmark-drifts-from-the-code: I benchmarked something easier than
+     * reality and believed the number.) */
+    {
+        static int said_layout;
+        if (!said_layout) {
+            ULONGLONG ab = 0, p;
+            SIZE_T asz = 0;
+            said_layout = 1;
+            if (emu_arena(&ab, &asz) == EMU_OK) {
+                MEMORY_BASIC_INFORMATION mbi;
+                int regions = 0;
+                ULONGLONG committed = 0;
+                p = ab;
+                while (p < ab + EMU_ARENA_SIZE && regions < 400) {
+                    if (VirtualQuery((LPCVOID)(ULONG_PTR)p, &mbi, sizeof(mbi))
+                            != sizeof(mbi))
+                        break;
+                    regions++;
+                    if (mbi.State == MEM_COMMIT)
+                        committed += mbi.RegionSize;
+                    if (regions <= 8)
+                        log_line("emu: region %2d: base=0x%llx size=%llu KB "
+                                 "state=%lx protect=%lx",
+                                 regions,
+                                 (unsigned long long)(ULONG_PTR)mbi.BaseAddress,
+                                 (unsigned long long)(mbi.RegionSize / 1024),
+                                 (unsigned long)mbi.State,
+                                 (unsigned long)mbi.Protect);
+                    p = (ULONGLONG)(ULONG_PTR)mbi.BaseAddress + mbi.RegionSize;
+                }
+                log_line("emu: ARENA LAYOUT -- %d region(s) in the first "
+                         "256 MB, %llu MB committed.",
+                         regions, (unsigned long long)(committed / (1024*1024)));
+            }
+        }
+    }
+
+    {
+        SIZE_T cov = 0; unsigned passes = 0;
+        emu_ram_coverage(&cov, &passes);
+        log_line("emu: COVERAGE -- %llu MB of the current pass, %u full "
+                 "pass(es) completed. %s",
+                 (unsigned long long)(cov / (1024 * 1024)), passes,
+                 passes ? "The arena HAS been swept end to end."
+                        : "⚠ The arena has NOT yet been swept once; a negative "
+                          "here means NOT LOOKED YET.");
+    }
 
     log_line("emu: --- behaviour of %u tracked candidate(s), best first ---", n);
     for (i = 0; i < show; i++)
         log_line("emu:    0x%llx  hp %u/%u  samples %u  changes %u  drops %u  "
-                 "resets %u  diverged %u",
+                 "resets %u  diverged %u%s",
                  (unsigned long long)w[i].p1, w[i].last_h1, w[i].max_health,
                  w[i].samples, w[i].changes, w[i].drops, w[i].resets,
-                 w[i].diverged);
+                 w[i].diverged,
+                 w[i].impossible ? "  ⛔ hp EXCEEDED max: not health" : "");
 
     if (convincing == 0)
-        log_line("emu: ⚠ NO candidate has both dropped and diverged yet. If a "
-                 "round has been fought, these are all filler and the 0x5CC "
-                 "stride or the health offsets are wrong. If you have not "
-                 "reached a match yet, this is simply too early.");
+        log_line("emu: ⚠ NO candidate shows SUSTAINED health behaviour "
+                 "(3+ changes, 2+ drops, divergence, never above its own max). "
+                 "A value that moved once and froze is initialisation, not a "
+                 "fight. ⚠ Check the COVERAGE line before concluding anything: "
+                 "if only a few %% of the arena has been swept, this is 'not "
+                 "looked yet', NOT 'not there'.");
     else
-        log_line("emu: ⭐⭐ %u candidate(s) DROP and DIVERGE -- that is health "
-                 "behaving like health. A `resets` count above zero means it "
-                 "also returned to the cap at a round change, which is the "
-                 "reversibility test passed.", convincing);
+        log_line("emu: ⭐⭐ %u candidate(s) show SUSTAINED health behaviour. "
+                 "A `resets` count above zero means one also returned to "
+                 "EXACTLY its cap at a round change -- the reversibility test "
+                 "passed.", convincing);
 }
 
 static void emu_probe_report(int beat)

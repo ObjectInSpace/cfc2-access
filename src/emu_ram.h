@@ -210,6 +210,7 @@ typedef struct {
     unsigned  drops;        /* ... changed downward (a hit landing)          */
     unsigned  resets;       /* ... jumped back UP to the cap (a new round)   */
     unsigned  diverged;     /* ... samples where P1 and P2 health DIFFERED   */
+    unsigned  impossible;   /* ... samples where health EXCEEDED its own max  */
     unsigned  max_health;   /* the cap as first seen                         */
     unsigned  last_h1, last_h2;
 } emu_watch;
@@ -243,6 +244,12 @@ void emu_ram_test_window(ULONGLONG base, SIZE_T size);
  * several calls, and `scanned_out` says how much this one examined. A caller
  * must not read "found nothing" from one budgeted sweep as "it is not there". */
 void emu_ram_scan_rewind(void);
+
+/* How much of the CURRENT pass has been swept, and how many full passes have
+ * completed. ⚠ A caller must report this alongside any negative: "found
+ * nothing" after 3% of the arena is not a finding, and the live run printed
+ * exactly that in language that read like one. */
+void emu_ram_coverage(SIZE_T *scanned_out, unsigned *passes_out);
 
 /* Force the number of BLOCKS one sweep may examine, instead of the wall-clock
  * budget. 0 restores the timed behaviour.
