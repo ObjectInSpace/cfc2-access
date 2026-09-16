@@ -389,6 +389,25 @@ int main(void)
             check("10j a zero-size window -> UNREADABLE, not a clean zero",
                   s == EMU_UNREADABLE, "got %s n=%u", emu_status_name(s), nh);
 
+            /* ⛔⛔ 10j WAS A BLIND TEST, and the sabotage sweep caught it.
+             * Deleting the `scanned == 0 -> UNREADABLE` guard left the whole
+             * suite GREEN, because 10j is satisfied by the earlier
+             * `size == 0` early return and never reaches the guard at all.
+             * A case that passes for a different reason than the one it names
+             * tests nothing.
+             *
+             * This case reaches it: a window with a real SIZE but pointing at
+             * memory that cannot be read. Every page is skipped, so the loop
+             * completes having examined nothing -- "I could not look", which
+             * must NOT be reportable as "I looked and found none".
+             * See probe-zero-checked-looks-like-zero-failed. */
+            emu_ram_test_window(0x10000ULL, 0x8000);   /* sized, unreadable */
+            s = emu_ram_find(hits, 8, &nh, &scanned);
+            check("10k a sized but UNREADABLE window -> UNREADABLE, scanned 0",
+                  s == EMU_UNREADABLE && scanned == 0,
+                  "got %s scanned=%llu n=%u", emu_status_name(s),
+                  (unsigned long long)scanned, nh);
+
             emu_ram_test_window(0, 0);
             VirtualFree(ar, 0, MEM_RELEASE);
         }
