@@ -932,13 +932,42 @@ static int   g_text_count;
 /* Defined below, beside the index it frees. */
 static void text_index_free(void);
 
+/* ⚠ Set by gmd_text_recheck_language() to force a fresh read of config.ini.
+ *
+ * ⛔ The cache used to be permanent (`static int tried`), which meant a language
+ * changed in Options > System was never noticed: the mod kept serving the blob
+ * it resolved at startup for the rest of the session, with every structural
+ * check passing. That is the same failure mode as the stale-blob bug this file
+ * already documents, just triggered later. */
+static int g_lang_recheck;
+
+/* ⭐ Test seam: stands in for config.ini, which does not exist beside the test
+ * exe.
+ *
+ * ⛔⛔ IT EXISTS BECAUSE A CASE PASSED FOR THE WRONG REASON. Case 6b claimed to
+ * prove "an unidentifiable blob is left alone", and it passed with that guard
+ * SABOTAGED -- because with no config.ini the function returned at the later
+ * `!want` check before the sabotage could matter. A case that cannot reach the
+ * code it names is testing something else. */
+static const char *g_lang_expected_override;
+
+void gmd_test_set_expected_language(const char *code)
+{
+    g_lang_expected_override = code;
+}
+
 static const char *gmd_expected_language(void)
 {
+    if (g_lang_expected_override)
+        return g_lang_expected_override;
+
     static char code[8];
     static int  tried;
-    if (tried)
+    if (tried && !g_lang_recheck)
         return code[0] ? code : NULL;
     tried = 1;
+    g_lang_recheck = 0;
+    code[0] = '\0';
 
     char path[MAX_PATH];
     DWORD n = GetModuleFileNameA(NULL, path, MAX_PATH);
@@ -1114,6 +1143,62 @@ BOOL gmd_text_ready(void)
     g_text_count = 0;
     log_line("gmdtext: could not resolve the string blob this run.");
     return FALSE;
+}
+
+/* ⭐⭐ FOLLOW A LANGUAGE CHANGED IN OPTIONS > SYSTEM.
+ *
+ * ⛔ USER: "Ensure that it will pick the correct tables for all of the
+ * languages when its language is selected from settings." It did not. The blob
+ * was resolved once and `gmd_text_ready()` returns early forever after, so
+ * switching language mid-session left every item name coming from the OLD
+ * language -- and nothing looked wrong: the label hashes are
+ * language-independent, so every structural check still passed. That is the
+ * stale-blob bug this file already documents, arriving by a different route.
+ *
+ * ⭐ THE CHECK IS THE ONE ALREADY TRUSTED AT STARTUP, just repeated: ask the
+ * resolved blob which language it is and compare against config.ini, which the
+ * game writes when the setting changes. Agreement costs one indexed read of
+ * string 0; only a DISAGREEMENT pays for a re-resolve.
+ *
+ * ⚠ Returns TRUE only when it actually re-resolved, so a caller can log the
+ * event rather than guess. A read that cannot decide (either side NULL) changes
+ * NOTHING and returns FALSE -- "unknown" must never be treated as "changed",
+ * or a transient unreadable blob would drop a working table.
+ */
+BOOL gmd_text_recheck_language(void)
+{
+    const char *have, *want;
+
+    if (!g_text_blob)
+        return FALSE;                  /* nothing resolved yet: not our job */
+
+    have = gmd_text_language();
+    if (!have)
+        return FALSE;                  /* cannot tell: change nothing */
+
+    g_lang_recheck = 1;                /* force a fresh config.ini read */
+    want = gmd_expected_language();
+    if (!want || strcmp(want, have) == 0)
+        return FALSE;                  /* agrees, or nothing to check against */
+
+    log_line("gmdtext: ⚠ LANGUAGE CHANGED -- the resolved blob is \"%s\" but "
+             "config.ini now says \"%s\". Re-resolving.", have, want);
+
+    /* Drop the resolution and let gmd_text_ready() redo the full per-language
+     * search. ⚠ The index must go too: it maps indices into the OLD blob. */
+    text_index_free();
+    g_text_blob = NULL;
+    g_text_count = 0;
+
+    if (gmd_text_ready()) {
+        const char *now = gmd_text_language();
+        log_line("gmdtext: ⭐ re-resolved; the table is now \"%s\".",
+                 now ? now : "(unreadable)");
+        return TRUE;
+    }
+    log_line("gmdtext: ⛔ re-resolve FAILED -- no table is being served. Item "
+             "names will be silent until one resolves.");
+    return TRUE;
 }
 
 int gmd_text_count(void) { return g_text_blob ? g_text_count : 0; }

@@ -102,6 +102,25 @@ int  gmd_test_label_count(void);
  * recognise, and must be reported rather than used. */
 const char *gmd_text_language(void);
 
+/* ⭐⭐ Re-resolve the string blob if the game's language has changed since it
+ * was resolved. Returns TRUE only when a re-resolve actually happened.
+ *
+ * ⛔ Without this, a language selected in Options > System was never followed:
+ * the blob is resolved once and gmd_text_ready() returns early thereafter, so
+ * every item name kept coming from the OLD language while every structural
+ * check passed (label hashes are language-independent).
+ *
+ * ⚠ Cheap in the common case -- one indexed read of string 0 plus a config.ini
+ * read; only a genuine disagreement pays for the full re-search. A state it
+ * cannot read changes NOTHING: "unknown" must never be treated as "changed". */
+BOOL gmd_text_recheck_language(void);
+
+/* Test seam: stand in for config.ini, which does not exist beside the test exe.
+ * ⚠ NULL restores the real read. Without this a re-check case cannot reach the
+ * comparison at all -- it returns early on "no expected language" and passes
+ * whatever the code under test does. */
+void gmd_test_set_expected_language(const char *code);
+
 /* Drop the cached blob and index so the next call re-resolves. Use when the
  * game may have rebuilt its table -- a language change does exactly that. */
 void gmd_text_invalidate(void);

@@ -823,6 +823,22 @@ static DWORD WINAPI worker(LPVOID param)
         if (gt_ok && (beat == 10 || beat % 5 == 0))
             gt_focus_report();
 
+        /* ⭐⭐ FOLLOW A LANGUAGE CHANGED IN OPTIONS > SYSTEM.
+         *
+         * ⛔ USER: "Ensure that it will pick the correct tables for all of the
+         * languages when its language is selected from settings." The blob is
+         * resolved once and gmd_text_ready() returns early forever after, so
+         * switching language mid-session left every item name coming from the
+         * OLD language -- and nothing looked wrong, because the label hashes
+         * are language-independent and every structural check still passed.
+         *
+         * ⚠ On the SLOW beat (10 s), never the 100 ms poll: this reads
+         * config.ini from disk, and a language change is a human-speed event.
+         * The common case costs one indexed read plus that file read; only a
+         * genuine disagreement pays for the full re-search. */
+        if (mc_ok && (beat == 10 || beat % 5 == 0))
+            gmd_text_recheck_language();
+
         /* ⭐⭐ The INSTANCE SET -- step 1 of the GUI-instance route. Logged
          * only, never spoken; see gt_instance_report(). Same cadence as the
          * focus record so one run carries both, and on the slow beats only

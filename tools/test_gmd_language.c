@@ -176,6 +176,63 @@ int main(void)
               amb == NULL, "got %s", amb ? amb : "(null)");
     }
 
+    /* --- cases 6a-6b: ⭐⭐ THE LANGUAGE RE-CHECK -------------------------
+     *
+     * ⛔ USER: "Ensure that it will pick the correct tables for all of the
+     * languages when its language is selected from settings." It did not: the
+     * blob resolves once and gmd_text_ready() returns early forever after, so
+     * a language chosen mid-session left every item name coming from the OLD
+     * table -- with every structural check passing, because the label hashes
+     * are language-independent.
+     *
+     * ⚠ These cases pin the SAFETY half, which is the half that can do harm.
+     * The happy path (a real change triggers a re-resolve) needs a live game
+     * table and belongs in a run, not here -- claiming otherwise would be a
+     * test whose fixture supplies the mechanism. */
+    {
+        /* case 6a: ⛔⛔ NO BLOB -> do nothing. A re-check that "helpfully"
+         * re-resolved from nothing would throw away a table the caller is
+         * still using. */
+        gmd_test_set_blob(NULL, 0);
+        BOOL acted = gmd_text_recheck_language();
+        check("6a. with no blob resolved, the re-check does NOTHING",
+              !acted, "returned %d", (int)acted);
+    }
+    {
+        /* case 6b: ⛔⛔ AN UNREADABLE BLOB IS "UNKNOWN", NEVER "CHANGED".
+         * A blob whose language cannot be identified must leave the resolution
+         * alone. Treating unknown as changed would drop a WORKING table every
+         * time a read glitched -- silence in place of speech, caused by the
+         * safety check itself. */
+        plant(en, cap, "Zzzz [qq]", N, "xx");     /* unidentifiable */
+        gmd_test_set_blob((BYTE *)en, N);
+        /* ⚠ The override is what makes this case REACH the guard. Without it
+         * the function returns at "no expected language" and the case passes
+         * whatever the guard does -- which is exactly how an earlier version
+         * of this case passed with the guard sabotaged. */
+        gmd_test_set_expected_language("fre");
+        BOOL acted = gmd_text_recheck_language();
+        gmd_test_set_expected_language(NULL);
+        check("6b. an UNIDENTIFIABLE blob is left alone, not re-resolved",
+              !acted && gmd_text_count() == N,
+              "returned %d, count=%d (want 0 and %d)",
+              (int)acted, gmd_text_count(), N);
+    }
+    {
+        /* case 6c: ⭐ AND A BLOB THAT AGREES IS ALSO LEFT ALONE. Without this
+         * the pair above would be satisfied by a re-check that NEVER acts --
+         * "does nothing" is only meaningful beside a case proving it can tell
+         * agreement from disagreement. */
+        plant(en, cap, "Japanese [jp]", N, "en");
+        gmd_test_set_blob((BYTE *)en, N);
+        gmd_test_set_expected_language("eng");     /* agrees */
+        BOOL acted = gmd_text_recheck_language();
+        gmd_test_set_expected_language(NULL);
+        check("6c. a blob that AGREES with the expected language is not "
+              "re-resolved", !acted && gmd_text_count() == N,
+              "returned %d, count=%d", (int)acted, gmd_text_count());
+    }
+
     VirtualFree(fr, 0, MEM_RELEASE);
     VirtualFree(en, 0, MEM_RELEASE);
 
