@@ -395,9 +395,10 @@ unsigned emu_cursor_watch_report(ec_watch *out, unsigned cap)
 
 /* 4 MB reads in ~4.4 ms at the measured 911 MB/s -- comfortably inside a 20 ms
  * tick, which is what makes CONTINUOUS sampling affordable at all. */
-#define SCAN_MAX_LEN   (4u * 1024u * 1024u)
+#define SCAN_MAX_PAGES 256u        /* 1 MB, ~1.1 ms per tick at 911 MB/s */
 
-static ULONGLONG  g_scan_off;
+static ULONGLONG *g_scan_pages;    /* arena offsets of the watched pages    */
+static unsigned   g_scan_npages;
 static SIZE_T     g_scan_len;
 static BYTE      *g_scan_prev;     /* last sample, for change detection     */
 static ec_scan   *g_scan;          /* one per byte                          */
@@ -409,32 +410,40 @@ void emu_cursor_scan_reset(void)
     if (g_scan_prev) { free(g_scan_prev); g_scan_prev = NULL; }
     if (g_scan)      { free(g_scan);      g_scan = NULL; }
     if (g_scan_seen) { free(g_scan_seen); g_scan_seen = NULL; }
+    if (g_scan_pages) { free(g_scan_pages); g_scan_pages = NULL; }
     g_scan_len = 0;
-    g_scan_off = 0;
+    g_scan_npages = 0;
     g_scan_primed = FALSE;
 }
 
-BOOL emu_cursor_scan_set(ULONGLONG offset, SIZE_T len)
+BOOL emu_cursor_scan_set_pages(const ULONGLONG *offsets, unsigned n)
 {
-    SIZE_T i;
+    SIZE_T i, total;
+    unsigned k;
 
     emu_cursor_scan_reset();
-    if (len == 0) return TRUE;
-    if (len > SCAN_MAX_LEN) len = SCAN_MAX_LEN;
+    if (!offsets || n == 0) return TRUE;
+    if (n > SCAN_MAX_PAGES) n = SCAN_MAX_PAGES;
 
-    g_scan_prev = (BYTE *)calloc(len, 1);
-    g_scan      = (ec_scan *)calloc(len, sizeof(ec_scan));
-    g_scan_seen = (unsigned *)calloc(len, sizeof(unsigned));
-    if (!g_scan_prev || !g_scan || !g_scan_seen) {
+    total = (SIZE_T)n * EC_PAGE;
+    g_scan_pages = (ULONGLONG *)calloc(n, sizeof(ULONGLONG));
+    g_scan_prev  = (BYTE *)calloc(total, 1);
+    g_scan       = (ec_scan *)calloc(total, sizeof(ec_scan));
+    g_scan_seen  = (unsigned *)calloc(total, sizeof(unsigned));
+    if (!g_scan_pages || !g_scan_prev || !g_scan || !g_scan_seen) {
         emu_cursor_scan_reset();
         return FALSE;
     }
-    for (i = 0; i < len; i++) {
-        g_scan[i].offset = offset + i;
-        g_scan[i].vmin   = 0xFFFFFFFFu;
+    for (k = 0; k < n; k++) {
+        g_scan_pages[k] = offsets[k];
+        for (i = 0; i < EC_PAGE; i++) {
+            SIZE_T x = (SIZE_T)k * EC_PAGE + i;
+            g_scan[x].offset = offsets[k] + i;
+            g_scan[x].vmin   = 0xFFFFFFFFu;
+        }
     }
-    g_scan_off = offset;
-    g_scan_len = len;
+    g_scan_npages = n;
+    g_scan_len = total;
     return TRUE;
 }
 
@@ -442,56 +451,60 @@ BOOL emu_cursor_scan_tick(BOOL input_recent)
 {
     ULONGLONG base;
     SIZE_T size, i;
-    static BYTE *buf;
-    static SIZE_T buf_len;
+    unsigned k;
+    static BYTE buf[EC_PAGE];
 
     if (!g_scan_len) return FALSE;
     if (window(&base, &size) != EC_OK) return FALSE;
-    if (g_scan_off + g_scan_len > (ULONGLONG)size) return FALSE;
 
-    if (buf_len < g_scan_len) {
-        BYTE *nb = (BYTE *)realloc(buf, g_scan_len);
-        if (!nb) return FALSE;
-        buf = nb; buf_len = g_scan_len;
-    }
-    if (!mem_copy(buf, (const void *)(ULONG_PTR)(base + g_scan_off), g_scan_len))
-        return FALSE;
+    for (k = 0; k < g_scan_npages; k++) {
+        SIZE_T off = (SIZE_T)k * EC_PAGE;
 
-    /* ⚠ The FIRST sample is a seed, not an observation. Counting it as a set of
-     * changes would give every byte one phantom change and make the idle
-     * discriminator meaningless on short sessions. */
-    if (!g_scan_primed) {
-        memcpy(g_scan_prev, buf, g_scan_len);
-        for (i = 0; i < g_scan_len; i++) {
+        if (g_scan_pages[k] + EC_PAGE > (ULONGLONG)size) continue;
+        if (!mem_copy(buf, (const void *)(ULONG_PTR)(base + g_scan_pages[k]),
+                      EC_PAGE))
+            continue;   /* unreadable this tick: skip, never invent a value */
+
+        /* ⚠ The FIRST sample of a page is a seed, not an observation. Counting
+         * it would give every byte a phantom change and make the idle
+         * discriminator meaningless on short sessions. */
+        if (!g_scan_primed) {
+            memcpy(g_scan_prev + off, buf, EC_PAGE);
+            for (i = 0; i < EC_PAGE; i++) {
+                BYTE v = buf[i];
+                g_scan[off + i].value = v;
+                g_scan[off + i].vmin = g_scan[off + i].vmax = v;
+                if (v < 64) {
+                    g_scan_seen[off + i] = 1u << v;
+                    g_scan[off + i].distinct = 1;
+                }
+            }
+            continue;
+        }
+
+        for (i = 0; i < EC_PAGE; i++) {
+            SIZE_T x = off + i;
             BYTE v = buf[i];
-            g_scan[i].value = v;
-            g_scan[i].vmin = g_scan[i].vmax = v;
-            if (v < 64) { g_scan_seen[i] = 1u << v; g_scan[i].distinct = 1; }
+            if (v == g_scan_prev[x]) continue;
+
+            g_scan[x].changes++;
+            /* ⭐⭐ THE DISCRIMINATOR. A cursor changes ONLY when the player
+             * acts; a blink phase changes on its own. This is the fact an
+             * event-triggered probe is structurally blind to. */
+            if (input_recent) g_scan[x].input_changes++;
+            else              g_scan[x].idle_changes++;
+
+            g_scan[x].value = v;
+            if (v < g_scan[x].vmin) g_scan[x].vmin = v;
+            if (v > g_scan[x].vmax) g_scan[x].vmax = v;
+            if (v < 64 && !(g_scan_seen[x] & (1u << v))) {
+                g_scan_seen[x] |= (1u << v);
+                g_scan[x].distinct++;
+            }
+            g_scan_prev[x] = v;
         }
-        g_scan_primed = TRUE;
-        return TRUE;
     }
-
-    for (i = 0; i < g_scan_len; i++) {
-        BYTE v = buf[i];
-        if (v == g_scan_prev[i]) continue;
-
-        g_scan[i].changes++;
-        /* ⭐⭐ THE DISCRIMINATOR. A cursor changes ONLY when the player acts;
-         * a blink phase changes on its own. This is the fact the differential
-         * probe was structurally blind to. */
-        if (input_recent) g_scan[i].input_changes++;
-        else              g_scan[i].idle_changes++;
-
-        g_scan[i].value = v;
-        if (v < g_scan[i].vmin) g_scan[i].vmin = v;
-        if (v > g_scan[i].vmax) g_scan[i].vmax = v;
-        if (v < 64 && !(g_scan_seen[i] & (1u << v))) {
-            g_scan_seen[i] |= (1u << v);
-            g_scan[i].distinct++;
-        }
-        g_scan_prev[i] = v;
-    }
+    g_scan_primed = TRUE;
     return TRUE;
 }
 

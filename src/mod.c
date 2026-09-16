@@ -229,6 +229,7 @@ static unsigned g_cursor_other;
 static int      g_cursor_axis;
 static unsigned g_cursor_watch_logged;
 static BOOL     g_scan_len_set;
+static unsigned g_scan_npages_set;
 static DWORD    g_last_input_ms;
 static DWORD    g_scan_report_ms;
 
@@ -271,34 +272,30 @@ static void cursor_probe_report(void)
         }
     }
 
-    /* ⭐ AIM THE CONTINUOUS SCAN at the reacting pages. The differential probe
-     * is good at NARROWING and bad at DECIDING; this hands its one useful
-     * output to the method that can actually decide. */
-    if (!g_scan_len_set) {
-        ULONGLONG pg[32];
-        unsigned np = emu_cursor_pages(pg, 32);
-        if (np) {
-            ULONGLONG lo = pg[0], hi = pg[0];
-            unsigned k;
-            for (k = 1; k < np; k++) {
-                if (pg[k] < lo) lo = pg[k];
-                if (pg[k] > hi) hi = pg[k];
-            }
-            /* Cover the span if it is small enough, else just the first page. */
-            {
-                SIZE_T span = (SIZE_T)(hi - lo) + EC_PAGE;
-                if (span > 4u * 1024u * 1024u) span = EC_PAGE;
-                if (emu_cursor_scan_set(lo, span)) {
-                    g_scan_len_set = TRUE;
-                    log_line("cursor: continuous scan AIMED at +0x%llx .. "
-                             "+0x%llx (%llu KB). It samples every 20 ms and "
-                             "separates IDLE changes from input-driven ones -- "
-                             "a blink phase changes while you do nothing, a "
-                             "cursor does not.",
-                             (unsigned long long)lo,
-                             (unsigned long long)(lo + span),
-                             (unsigned long long)(span / 1024));
-                }
+    /* ⭐ AIM THE CONTINUOUS SCAN at the reacting pages.
+     *
+     * ⛔ An earlier version took a single (offset,len) range and, when the
+     * pages turned out to be scattered over 100+ MB, silently fell back to ONE
+     * page -- which had stopped reacting by the next cycle. It watched a stale
+     * page for a whole run. The pages are a LIST, so pass a LIST: all 31
+     * observed pages are 124 KB, about 3% of a tick's budget, so there was
+     * never a need to narrow at all.
+     *
+     * ⚠ Re-aimed whenever the set CHANGES, not once. The reacting set shifts
+     * between cycles (the first cycle's +0x8000000 was gone by the second), and
+     * a scan pinned to a stale set reports on memory nothing is using. */
+    {
+        ULONGLONG pg[64];
+        unsigned np = emu_cursor_pages(pg, 64);
+        if (np && np != g_scan_npages_set) {
+            if (emu_cursor_scan_set_pages(pg, np)) {
+                g_scan_npages_set = np;
+                g_scan_len_set = TRUE;
+                log_line("cursor: continuous scan AIMED at %u page(s) "
+                         "(%u KB). It samples every 20 ms and separates IDLE "
+                         "changes from input-driven ones -- animation changes "
+                         "while you do nothing, a cursor does not.",
+                         np, np * 4);
             }
         }
     }

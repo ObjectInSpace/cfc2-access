@@ -514,7 +514,6 @@ int main(void)
          * A blink phase satisfies every differential filter. The ONLY thing
          * that separates it from a cursor is that it changes while the player
          * is idle. This asserts that distinction directly. */
-        SIZE_T len = 64;
         BYTE *w = (BYTE *)VirtualAlloc(NULL, 0x1000, MEM_COMMIT | MEM_RESERVE,
                                        PAGE_READWRITE);
         ec_scan sc[8];
@@ -524,7 +523,7 @@ int main(void)
         if (w) {
             memset(w, 0, 0x1000);
             emu_cursor_test_window((ULONGLONG)(ULONG_PTR)w, 0x1000);
-            emu_cursor_scan_set(0, len);
+            { ULONGLONG one = 0; emu_cursor_scan_set_pages(&one, 1); }
 
             /* offset 0 = a CURSOR: changes only when input_recent is TRUE,
              * and walks a wide range.
@@ -575,7 +574,60 @@ int main(void)
             check("11g the blink ranks BELOW the cursor", i > 0,
                   "the animation outranked the cursor");
 
-            emu_cursor_scan_set(0, 0);
+            emu_cursor_scan_set_pages(NULL, 0);
+            emu_cursor_test_window(0, 0);
+            VirtualFree(w, 0, MEM_RELEASE);
+        }
+    }
+
+    printf("\n--- 12. SCATTERED pages are ALL scanned -------------------\n");
+    {
+        /* ⛔⛔ THE BUG THIS PINS: the scan used to take one (offset,len). Real
+         * reacting pages are scattered over 100+ MB in nine clusters, so the
+         * span blew the cap and the code silently narrowed to ONE page -- which
+         * had stopped reacting by the next cycle. A whole run watched stale
+         * memory and reported 8 fields.
+         *
+         * A field on the LAST page must be found, or the list is not really
+         * being scanned. */
+        SIZE_T big = 0x400000;                 /* 4 MB of address space */
+        BYTE *w = (BYTE *)VirtualAlloc(NULL, big, MEM_RESERVE, PAGE_NOACCESS);
+        ULONGLONG pgs[3];
+        ec_scan sc[8];
+        unsigned ns, i;
+
+        check("12-setup", w != NULL, "");
+        if (w) {
+            /* Three pages, deliberately FAR apart. */
+            pgs[0] = 0x0000; pgs[1] = 0x100000; pgs[2] = 0x3FF000;
+            for (i = 0; i < 3; i++)
+                VirtualAlloc(w + pgs[i], 0x1000, MEM_COMMIT, PAGE_READWRITE);
+
+            emu_cursor_test_window((ULONGLONG)(ULONG_PTR)w, big);
+            check("12a the scan accepts a scattered page LIST",
+                  emu_cursor_scan_set_pages(pgs, 3), "");
+
+            /* Put the cursor-like field on the LAST page only. */
+            w[pgs[2] + 0x10] = 0;
+            emu_cursor_scan_tick(FALSE);       /* prime */
+            for (i = 0; i < 12; i++) {
+                w[pgs[2] + 0x10] = (BYTE)(i + 1);
+                emu_cursor_scan_tick(TRUE);    /* always "after input" */
+            }
+
+            ns = emu_cursor_scan_report(sc, 8);
+            check("12b a field on the LAST scattered page is FOUND",
+                  ns >= 1 && sc[0].offset == pgs[2] + 0x10,
+                  "top offset +0x%llx, expected +0x%llx",
+                  ns ? (unsigned long long)sc[0].offset : 0,
+                  (unsigned long long)(pgs[2] + 0x10));
+            check("12c it is quiet while idle (only input changes counted)",
+                  ns >= 1 && sc[0].idle_changes == 0 &&
+                  sc[0].input_changes >= 10,
+                  "idle=%u input=%u",
+                  ns ? sc[0].idle_changes : 0, ns ? sc[0].input_changes : 0);
+
+            emu_cursor_scan_set_pages(NULL, 0);
             emu_cursor_test_window(0, 0);
             VirtualFree(w, 0, MEM_RELEASE);
         }

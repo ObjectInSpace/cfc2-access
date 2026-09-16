@@ -313,9 +313,20 @@ typedef struct {
     unsigned  value;
 } ec_scan;
 
-/* Set the region to scan continuously, as an arena offset and a length.
- * Length is clamped so one pass fits a tick. Passing len 0 stops the scan. */
-BOOL emu_cursor_scan_set(ULONGLONG offset, SIZE_T len);
+/* Set the PAGES to scan continuously, as a list of arena offsets.
+ *
+ * ⛔⛔ IT TAKES A LIST, NOT A RANGE, AND THAT WAS A REAL BUG. The first version
+ * took one (offset,len). The reacting pages are scattered over 100+ MB in nine
+ * clusters, so the span blew the 4 MB cap and the code silently fell back to
+ * scanning ONE page -- which had stopped reacting by the next cycle. It watched
+ * a stale page for the whole run and reported 8 fields.
+ *
+ * ⚠ The fallback is the wrong shape of safety: narrowing to something
+ * arbitrary looks like working. All 31 observed pages are 124 KB -- 3% of a
+ * tick's budget -- so there was never a need to choose.
+ *
+ * Passing n = 0 stops the scan. */
+BOOL emu_cursor_scan_set_pages(const ULONGLONG *offsets, unsigned n);
 
 /* Sample the whole region once. `input_recent` tells it whether a key went
  * down within the last few hundred ms, which is what separates idle changes
