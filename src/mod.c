@@ -228,6 +228,9 @@ static unsigned g_cursor_unreadable;
 static unsigned g_cursor_other;
 static int      g_cursor_axis;
 static unsigned g_cursor_watch_logged;
+static BOOL     g_scan_len_set;
+static DWORD    g_last_input_ms;
+static DWORD    g_scan_report_ms;
 
 /* How long to wait for ANY arrow edge before concluding the emulated game does
  * not use sKeyboard. 30 s of navigation is far more than enough. */
@@ -250,6 +253,55 @@ static void cursor_probe_report(void)
              r.fields_examined, r.fields_returned, r.fields_counter,
              r.fields_toggle,
              r.truncated ? "  ⚠ A CAP BOUND -- see pages_seen." : "");
+
+    /* ⛔ Log WHERE the reacting pages are, not just how many. Six runs
+     * reported only a count, which made the probe's one reusable output
+     * invisible and left the continuous scan with nowhere to point. */
+    {
+        ULONGLONG pg[32];
+        unsigned np = emu_cursor_pages(pg, 32), k;
+        if (np) {
+            char line[512]; int used = 0;
+            for (k = 0; k < np && used < 440; k++)
+                used += _snprintf(line + used, sizeof line - used,
+                                  "+0x%llx ", (unsigned long long)pg[k]);
+            line[used > 0 ? used : 0] = ' ';
+            log_line("cursor: reacting page offsets (%u of %u): %s",
+                     np, r.pages_kept, line);
+        }
+    }
+
+    /* ⭐ AIM THE CONTINUOUS SCAN at the reacting pages. The differential probe
+     * is good at NARROWING and bad at DECIDING; this hands its one useful
+     * output to the method that can actually decide. */
+    if (!g_scan_len_set) {
+        ULONGLONG pg[32];
+        unsigned np = emu_cursor_pages(pg, 32);
+        if (np) {
+            ULONGLONG lo = pg[0], hi = pg[0];
+            unsigned k;
+            for (k = 1; k < np; k++) {
+                if (pg[k] < lo) lo = pg[k];
+                if (pg[k] > hi) hi = pg[k];
+            }
+            /* Cover the span if it is small enough, else just the first page. */
+            {
+                SIZE_T span = (SIZE_T)(hi - lo) + EC_PAGE;
+                if (span > 4u * 1024u * 1024u) span = EC_PAGE;
+                if (emu_cursor_scan_set(lo, span)) {
+                    g_scan_len_set = TRUE;
+                    log_line("cursor: continuous scan AIMED at +0x%llx .. "
+                             "+0x%llx (%llu KB). It samples every 20 ms and "
+                             "separates IDLE changes from input-driven ones -- "
+                             "a blink phase changes while you do nothing, a "
+                             "cursor does not.",
+                             (unsigned long long)lo,
+                             (unsigned long long)(lo + span),
+                             (unsigned long long)(span / 1024));
+                }
+            }
+        }
+    }
 
     if (r.cycles_done < 2) {
         log_line("cursor: cycle 1 only LEARNS which pages react -- it has no "
@@ -309,6 +361,40 @@ static void cursor_probe_tick(void)
         static BOOL     have_last;
         ec_watch w[EC_WATCH_MAX];
         unsigned n, i;
+
+        /* ⭐⭐ THE CONTINUOUS SCAN. Independent of presses -- it samples every
+         * tick and separates changes that happened while IDLE from those that
+         * followed input. That one distinction is what the differential probe
+         * was structurally blind to, and it is what rejects a blink phase. */
+        if (g_scan_len_set) {
+            DWORD now = GetTickCount();
+            BOOL recent = (now - g_last_input_ms) < 400;
+            emu_cursor_scan_tick(recent);
+
+            /* Report every 5 s. ⚠ Unconditionally, including the population
+             * counts -- "no candidate" and "nothing moved" must never look the
+             * same, which has cost this project real runs. */
+            if (now - g_scan_report_ms > 5000) {
+                ec_scan sc[8];
+                unsigned ns = emu_cursor_scan_report(sc, 8), k;
+                unsigned quiet = 0;
+                g_scan_report_ms = now;
+                for (k = 0; k < ns; k++) if (!sc[k].idle_changes) quiet++;
+                log_line("scan: %u field(s) moved at all; %u of those changed "
+                         "ONLY after input.", ns, quiet);
+                for (k = 0; k < ns && k < 6; k++)
+                    log_line("scan:   +0x%llx  val %u  range %u..%u  "
+                             "%u distinct  %u change(s) [%u idle, %u input]%s",
+                             (unsigned long long)sc[k].offset, sc[k].value,
+                             sc[k].vmin, sc[k].vmax, sc[k].distinct,
+                             sc[k].changes, sc[k].idle_changes,
+                             sc[k].input_changes,
+                             (sc[k].idle_changes == 0 && sc[k].distinct >= 5)
+                               ? "  <== CURSOR-SHAPED: many values, never moves"
+                                 " on its own"
+                               : (sc[k].idle_changes ? "  (animation)" : ""));
+            }
+        }
 
         if (emu_cursor_watch_tick()) {
             n = emu_cursor_watch_report(w, EC_WATCH_MAX);
@@ -488,6 +574,16 @@ static void cursor_probe_tick(void)
      *
      * Accepting UP/DOWN as well is still right (a grid moves both ways), but
      * the reason is coverage, not a broken axis. */
+    /* ⭐ ANY key edge marks "the player just acted", which is what the
+     * continuous scan needs to separate idle changes from input-driven ones.
+     * Recorded before the direction filter, because a press that is not an
+     * arrow still means the player was not idle. */
+    {
+        int b;
+        for (b = 0; b < KBD_BANK_WORDS; b++)
+            if (e.pressed[b]) { g_last_input_ms = GetTickCount(); break; }
+    }
+
     left  = kbd_is_set(e.pressed, KBDC_LEFT)  || kbd_is_set(e.pressed, KBDC_UP);
     right = kbd_is_set(e.pressed, KBDC_RIGHT) || kbd_is_set(e.pressed, KBDC_DOWN);
 

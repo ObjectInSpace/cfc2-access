@@ -368,11 +368,163 @@ BOOL emu_cursor_watch_tick(void)
     return TRUE;
 }
 
+unsigned emu_cursor_pages(ULONGLONG *out, unsigned cap)
+{
+    ULONGLONG base;
+    SIZE_T size;
+    unsigned i, n;
+
+    if (!out || !cap || !g_pages_n) return 0;
+    if (window(&base, &size) != EC_OK) return 0;
+
+    n = g_pages_n < cap ? g_pages_n : cap;
+    for (i = 0; i < n; i++)
+        out[i] = g_pages[i].addr - base;   /* OFFSET, never an absolute */
+    return n;
+}
+
 unsigned emu_cursor_watch_report(ec_watch *out, unsigned cap)
 {
     unsigned n = WATCH_N < cap ? WATCH_N : cap;
     if (!out || !cap || !g_watch_init) return 0;
     memcpy(out, g_watch, n * sizeof(ec_watch));
+    return n;
+}
+
+/* --- The continuous scan ------------------------------------------------- */
+
+/* 4 MB reads in ~4.4 ms at the measured 911 MB/s -- comfortably inside a 20 ms
+ * tick, which is what makes CONTINUOUS sampling affordable at all. */
+#define SCAN_MAX_LEN   (4u * 1024u * 1024u)
+
+static ULONGLONG  g_scan_off;
+static SIZE_T     g_scan_len;
+static BYTE      *g_scan_prev;     /* last sample, for change detection     */
+static ec_scan   *g_scan;          /* one per byte                          */
+static unsigned  *g_scan_seen;     /* value bitmap 0..63 per byte           */
+static BOOL       g_scan_primed;
+
+void emu_cursor_scan_reset(void)
+{
+    if (g_scan_prev) { free(g_scan_prev); g_scan_prev = NULL; }
+    if (g_scan)      { free(g_scan);      g_scan = NULL; }
+    if (g_scan_seen) { free(g_scan_seen); g_scan_seen = NULL; }
+    g_scan_len = 0;
+    g_scan_off = 0;
+    g_scan_primed = FALSE;
+}
+
+BOOL emu_cursor_scan_set(ULONGLONG offset, SIZE_T len)
+{
+    SIZE_T i;
+
+    emu_cursor_scan_reset();
+    if (len == 0) return TRUE;
+    if (len > SCAN_MAX_LEN) len = SCAN_MAX_LEN;
+
+    g_scan_prev = (BYTE *)calloc(len, 1);
+    g_scan      = (ec_scan *)calloc(len, sizeof(ec_scan));
+    g_scan_seen = (unsigned *)calloc(len, sizeof(unsigned));
+    if (!g_scan_prev || !g_scan || !g_scan_seen) {
+        emu_cursor_scan_reset();
+        return FALSE;
+    }
+    for (i = 0; i < len; i++) {
+        g_scan[i].offset = offset + i;
+        g_scan[i].vmin   = 0xFFFFFFFFu;
+    }
+    g_scan_off = offset;
+    g_scan_len = len;
+    return TRUE;
+}
+
+BOOL emu_cursor_scan_tick(BOOL input_recent)
+{
+    ULONGLONG base;
+    SIZE_T size, i;
+    static BYTE *buf;
+    static SIZE_T buf_len;
+
+    if (!g_scan_len) return FALSE;
+    if (window(&base, &size) != EC_OK) return FALSE;
+    if (g_scan_off + g_scan_len > (ULONGLONG)size) return FALSE;
+
+    if (buf_len < g_scan_len) {
+        BYTE *nb = (BYTE *)realloc(buf, g_scan_len);
+        if (!nb) return FALSE;
+        buf = nb; buf_len = g_scan_len;
+    }
+    if (!mem_copy(buf, (const void *)(ULONG_PTR)(base + g_scan_off), g_scan_len))
+        return FALSE;
+
+    /* ⚠ The FIRST sample is a seed, not an observation. Counting it as a set of
+     * changes would give every byte one phantom change and make the idle
+     * discriminator meaningless on short sessions. */
+    if (!g_scan_primed) {
+        memcpy(g_scan_prev, buf, g_scan_len);
+        for (i = 0; i < g_scan_len; i++) {
+            BYTE v = buf[i];
+            g_scan[i].value = v;
+            g_scan[i].vmin = g_scan[i].vmax = v;
+            if (v < 64) { g_scan_seen[i] = 1u << v; g_scan[i].distinct = 1; }
+        }
+        g_scan_primed = TRUE;
+        return TRUE;
+    }
+
+    for (i = 0; i < g_scan_len; i++) {
+        BYTE v = buf[i];
+        if (v == g_scan_prev[i]) continue;
+
+        g_scan[i].changes++;
+        /* ⭐⭐ THE DISCRIMINATOR. A cursor changes ONLY when the player acts;
+         * a blink phase changes on its own. This is the fact the differential
+         * probe was structurally blind to. */
+        if (input_recent) g_scan[i].input_changes++;
+        else              g_scan[i].idle_changes++;
+
+        g_scan[i].value = v;
+        if (v < g_scan[i].vmin) g_scan[i].vmin = v;
+        if (v > g_scan[i].vmax) g_scan[i].vmax = v;
+        if (v < 64 && !(g_scan_seen[i] & (1u << v))) {
+            g_scan_seen[i] |= (1u << v);
+            g_scan[i].distinct++;
+        }
+        g_scan_prev[i] = v;
+    }
+    return TRUE;
+}
+
+static int cmp_scan(const void *a, const void *b)
+{
+    const ec_scan *x = (const ec_scan *)a, *y = (const ec_scan *)b;
+    /* ⚠ Any idle change demotes a field below every quiet one -- but it is
+     * still REPORTED. Silently dropping animation would hide the population
+     * and make "nothing found" indistinguishable from "all chrome". */
+    BOOL xq = (x->idle_changes == 0), yq = (y->idle_changes == 0);
+    if (xq != yq) return xq ? -1 : 1;
+    if (x->distinct != y->distinct) return (int)y->distinct - (int)x->distinct;
+    return (int)y->input_changes - (int)x->input_changes;
+}
+
+unsigned emu_cursor_scan_report(ec_scan *out, unsigned cap)
+{
+    ec_scan *tmp;
+    SIZE_T i;
+    unsigned n = 0;
+
+    if (!out || !cap || !g_scan_len) return 0;
+
+    /* Only fields that moved at all are worth ranking. */
+    tmp = (ec_scan *)malloc(g_scan_len * sizeof(ec_scan));
+    if (!tmp) return 0;
+    for (i = 0; i < g_scan_len; i++)
+        if (g_scan[i].changes) tmp[n++] = g_scan[i];
+
+    qsort(tmp, n, sizeof(ec_scan), cmp_scan);
+    if (n > cap) n = cap;
+    memcpy(out, tmp, n * sizeof(ec_scan));
+    free(tmp);
     return n;
 }
 

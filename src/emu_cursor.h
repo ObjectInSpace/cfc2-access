@@ -258,10 +258,79 @@ typedef struct {
  * which is a return value and not a statement about any field. */
 BOOL emu_cursor_watch_tick(void);
 
+/* The arena OFFSETS of the pages that reacted, so a caller can aim the
+ * continuous scan at them.
+ *
+ * ⛔ The differential probe reported only a COUNT of reacting pages for six
+ * runs. That made its one genuinely reusable output -- WHERE they are --
+ * invisible, and is why the scan had nowhere to point. A count is not a
+ * location. */
+unsigned emu_cursor_pages(ULONGLONG *out, unsigned cap);
+
 /* Read back the watch table. Returns how many entries were written. */
 unsigned emu_cursor_watch_report(ec_watch *out, unsigned cap);
 
 void emu_cursor_watch_reset(void);
+
+/* --- THE CONTINUOUS SCAN, with an IDLE discriminator ---------------------
+ *
+ * ⭐⭐⭐ THIS IS THE LESSON FROM RUN 6, ENCODED.
+ *
+ * The differential probe named a field that satisfied every filter it had --
+ * quiet in the control, stepped by +/-1, returned, small and bounded -- and it
+ * was a blink phase flipping 2<->3 every 38 ms on its own.
+ *
+ * ⛔ The differential method CANNOT reject that, structurally: the
+ * disqualifying fact is that it changes WITHOUT INPUT, and that happens between
+ * the events the probe samples around. No extra cycles or tighter filters help.
+ *
+ * ⭐ A continuous sampler sees it immediately, with one number:
+ *
+ *     idle_changes  = times the byte changed while NO key was pressed
+ *       a real cursor : 0, however long you wait
+ *       a blink phase : ~50 per 2 s idle window
+ *
+ * And the SPAN test rules out the rest: a 48-item grid cursor must reach ~47
+ * distinct values; chrome reaches 2-3 forever.
+ *
+ * So a field is a cursor candidate only if it has MANY distinct values AND
+ * changes ONLY when the player pressed something. Both are properties of a
+ * SERIES, invisible to a delta.
+ *
+ * ⚠ Bounded so it fits one 20 ms tick: 4 MB reads in ~4.4 ms at the measured
+ * 911 MB/s. The window is set from the reacting pages the differential probe
+ * reports, which is what that probe is actually good for -- NARROWING, not
+ * deciding. */
+
+/* Per-offset accounting. One of these per watched byte. */
+typedef struct {
+    ULONGLONG offset;        /* offset into the arena                      */
+    unsigned  changes;       /* total changes seen                         */
+    unsigned  idle_changes;  /* ⭐ changed while NO input -- the killer     */
+    unsigned  input_changes; /* changed within the input window            */
+    unsigned  distinct;      /* distinct values (capped at 64)             */
+    unsigned  vmin, vmax;
+    unsigned  value;
+} ec_scan;
+
+/* Set the region to scan continuously, as an arena offset and a length.
+ * Length is clamped so one pass fits a tick. Passing len 0 stops the scan. */
+BOOL emu_cursor_scan_set(ULONGLONG offset, SIZE_T len);
+
+/* Sample the whole region once. `input_recent` tells it whether a key went
+ * down within the last few hundred ms, which is what separates idle changes
+ * from input-driven ones.
+ *
+ * ⚠ The caller owns that judgement because only it sees the keyboard; passing
+ * it in keeps this module testable without an input hook. */
+BOOL emu_cursor_scan_tick(BOOL input_recent);
+
+/* Best candidates first: most distinct values, then fewest idle changes.
+ * ⚠ A field with ANY idle changes is reported but ranked below every field
+ * with none -- animation must be visible, not silently dropped. */
+unsigned emu_cursor_scan_report(ec_scan *out, unsigned cap);
+
+void emu_cursor_scan_reset(void);
 
 /* --- Offline test seam ---------------------------------------------------
  * Point the probe at a planted fixture instead of the live arena. Passing

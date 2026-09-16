@@ -508,6 +508,66 @@ int main(void)
         }
     }
 
+    printf("\n--- 11. THE IDLE DISCRIMINATOR ----------------------------\n");
+    {
+        /* ⭐⭐ THE CASE THAT WOULD HAVE SAVED SIX RUNS.
+         * A blink phase satisfies every differential filter. The ONLY thing
+         * that separates it from a cursor is that it changes while the player
+         * is idle. This asserts that distinction directly. */
+        SIZE_T len = 64;
+        BYTE *w = (BYTE *)VirtualAlloc(NULL, 0x1000, MEM_COMMIT | MEM_RESERVE,
+                                       PAGE_READWRITE);
+        ec_scan sc[8];
+        unsigned ns, i;
+
+        check("11-setup", w != NULL, "");
+        if (w) {
+            memset(w, 0, 0x1000);
+            emu_cursor_test_window((ULONGLONG)(ULONG_PTR)w, 0x1000);
+            emu_cursor_scan_set(0, len);
+
+            /* offset 0 = a CURSOR: changes only when input_recent is TRUE,
+             * and walks a wide range.
+             * offset 1 = a BLINK: flips every tick regardless of input. */
+            w[0] = 0; w[1] = 2;
+            emu_cursor_scan_tick(FALSE);          /* prime */
+
+            for (i = 0; i < 20; i++) {
+                BOOL pressed = (i % 4) == 0;      /* input on every 4th tick */
+                if (pressed) w[0] = (BYTE)(w[0] + 1);   /* cursor advances */
+                w[1] = (BYTE)(w[1] == 2 ? 3 : 2);       /* blink always flips */
+                emu_cursor_scan_tick(pressed);
+            }
+
+            ns = emu_cursor_scan_report(sc, 8);
+            check("11a both fields are reported", ns >= 2, "got %u", ns);
+
+            check("11b the CURSOR ranks FIRST (no idle changes)",
+                  ns >= 1 && sc[0].offset == 0,
+                  "first was +0x%llx", ns ? (unsigned long long)sc[0].offset : 0);
+            check("11c the cursor has ZERO idle changes",
+                  ns >= 1 && sc[0].idle_changes == 0,
+                  "idle_changes=%u", ns ? sc[0].idle_changes : 999);
+            check("11d the cursor reached MANY distinct values",
+                  ns >= 1 && sc[0].distinct >= 5,
+                  "distinct=%u", ns ? sc[0].distinct : 0);
+
+            /* The blink must be present, flagged by idle changes, and ranked
+             * below -- not silently dropped. */
+            for (i = 0; i < ns; i++) if (sc[i].offset == 1) break;
+            check("11e the BLINK is still REPORTED (not hidden)", i < ns, "");
+            check("11f the blink has MANY idle changes -- the tell",
+                  i < ns && sc[i].idle_changes > 5,
+                  "idle_changes=%u", i < ns ? sc[i].idle_changes : 0);
+            check("11g the blink ranks BELOW the cursor", i > 0,
+                  "the animation outranked the cursor");
+
+            emu_cursor_scan_set(0, 0);
+            emu_cursor_test_window(0, 0);
+            VirtualFree(w, 0, MEM_RELEASE);
+        }
+    }
+
     emu_cursor_test_window(0, 0);
     emu_cursor_reset();
     VirtualFree(g_fx, 0, MEM_RELEASE);
