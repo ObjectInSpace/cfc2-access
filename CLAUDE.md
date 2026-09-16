@@ -75,6 +75,30 @@ plausible formula `rom/2` is right for 16 of 18 rows and wrong for
 system RAM is 16 MB and lives somewhere inside it. Which sub-range is the NEXT
 thing to prove — `src/emu_ram.h` says so rather than implying the work is done.
 
+### ⛔⛔ THE FIRST GUEST-RAM SCAN WAS A FALSE POSITIVE (2026-09-16)
+
+It reported **16 candidates**. All were one run of repeating `0x0222` words,
+matched at 16 consecutive dword offsets — 4-12 bytes apart, every one reading
+`hp 546 / 546`.
+
+⭐⭐ **A signature built only from RELATIONSHIPS cannot reject a CONSTANT.**
+`mx != 0`, `mx1 == mx2`, `mx <= 0x2000`, `hp <= mx`, "not both zero" are ALL
+true of `0x0222` at every alignment, forever. Uniformity is the best-behaved
+input a relational test can receive, and memory is full of it. Fixed by adding
+a CONTENT test (`looks_uniform()`) — see memory
+`relational-filter-cannot-exclude-a-constant`.
+
+Two more faults the same run exposed:
+- **The 16-hit cap ended the SWEEP**, leaving 99.8% of the arena unexamined
+  and reporting the truncation as the answer. `n` now counts ENCOUNTERS and the
+  sweep always completes.
+- **"examined 0 MB" beside 16 hits** was integer division, not a measurement.
+  Reports KB now, and names the arena size it is a fraction of.
+
+⭐ The tell that would have named it on sight: **all 16 hits fitted in 0x1c
+bytes.** The log now says so explicitly when the whole candidate set fits in
+4 KB — that is ONE region matching repeatedly, not many structures.
+
 ### ▶ THE RUN THAT IS NEEDED (cfc2_emu.on is already deployed and on)
 
 Start **any** game and read `emu:` lines in `CFC2Access.log`. What they answer:
@@ -91,7 +115,7 @@ Start **any** game and read `emu:` lines in `CFC2Access.log`. What they answer:
   think, or it is populated later than expected.
 - `emu: ⚠ COULD NOT read` → **not a negative.** Conclude nothing.
 
-`.\tools\run_emu_test.ps1` — 30 cases, eight sabotages each verified to fail the
+`.\tools\run_emu_test.ps1` — 46 cases, twelve sabotages each verified to fail the
 case that tests it. Case 1e pins the live pairing (index 3 ↔ `cvs2u`) as a
 regression, so the mapping is anchored to evidence rather than to my reading of
 the disassembly, which was wrong once.
