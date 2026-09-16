@@ -1232,6 +1232,12 @@ static unsigned *g_text_off;      /* byte offset of each string from the blob */
  * replacement for the check. */
 static const BYTE *g_text_span_lo;
 static const BYTE *g_text_span_hi;
+/* ⭐⭐ Set only when the WHOLE span has been proven readable in one go, which
+ * is what licenses gmd_text_by_index() to skip the per-string VirtualQuery.
+ * ⚠ Without this the span bounds alone would be a claim, not a check -- and
+ * the log line below already ASSERTED that reads skipped VirtualQuery while
+ * they still called it on every string. A message is not a mechanism. */
+static BOOL g_text_span_ok;
 static int       g_text_indexed;
 
 static void text_index_free(void)
@@ -1245,6 +1251,7 @@ static void text_index_free(void)
      * could become unsafe. */
     g_text_span_lo = NULL;
     g_text_span_hi = NULL;
+    g_text_span_ok = FALSE;
     g_text_indexed = 0;
 }
 
@@ -1330,6 +1337,24 @@ static BOOL text_index_build(void)
     g_text_span_lo  = g_text_blob;
     g_text_span_hi  = g_text_blob + pos;
 
+    /* ⭐⭐⭐ VALIDATE THE WHOLE SPAN ONCE -- this is what pays for skipping the
+     * per-string query. mem_readable_run() loops until it has accumulated the
+     * requested run, so one call here covers every string, and it either proves
+     * the entire extent readable or the fast path stays off.
+     *
+     * ⚠ An "ok" that is merely assumed would reintroduce the reverted crash, so
+     * this is a MEASUREMENT, and the log reports which path is live. */
+    {
+        SIZE_T ext = (SIZE_T)(g_text_span_hi - g_text_span_lo);
+        SIZE_T got = mem_readable_run(g_text_span_lo, ext);
+        g_text_span_ok = (got >= ext);
+        if (!g_text_span_ok)
+            log_line("gmdtext: ⚠ only %llu of %llu span byte(s) are readable in "
+                     "one run -- per-string reads keep the VirtualQuery. Slower, "
+                     "and correct.",
+                     (unsigned long long)got, (unsigned long long)ext);
+    }
+
     /* ⭐ Report the blob's REGION SHAPE, because that is the remaining
      * hypothesis for why per-string reads cost ~2.9 ms in-game while every
      * offline benchmark says microseconds.
@@ -1352,10 +1377,12 @@ static BOOL text_index_build(void)
         }
     }
     log_line("gmdtext: ⭐ indexed %d string offsets in one pass; blob spans "
-             "%p..%p (%llu bytes) and is validated ONCE -- per-string reads no "
-             "longer call VirtualQuery.",
+             "%p..%p (%llu bytes). Per-string VirtualQuery: %s.",
              g_text_count, (void *)g_text_span_lo, (void *)g_text_span_hi,
-             (unsigned long long)pos);
+             (unsigned long long)pos,
+             g_text_span_ok ? "SKIPPED (span validated in one run; reads are a "
+                              "guarded scalar loop)"
+                            : "STILL CALLED (span not validated)");
     return TRUE;
 }
 
@@ -1403,6 +1430,53 @@ BOOL gmd_text_by_index(int index, char *out, unsigned out_cap)
      * The stall it was trying to fix is real, but it must be fixed WITHOUT
      * dropping the pre-check -- the resumable, budgeted classification in
      * menu_speak.c is what bounds it now. */
+    /* ⭐⭐⭐ THE FAST PATH, DONE THE WAY CASE B ALLOWS -- a SCALAR BYTE LOOP.
+     *
+     * ⛔⛔ USER-REPORTED: "there's still about a second of lag per keypress",
+     * AFTER the queue fix. A constant per-press cost, so a slow STEP, and this
+     * is it: read_cstr() calls mem_readable_run() -- a VirtualQuery -- on every
+     * string, measured at ~2.9 ms in this process (2336 regions / 1.6 GB). One
+     * announcement reads a NAME and a CAPTION and the prompt table walks more,
+     * so the queries stack up into most of a second.
+     *
+     * ⭐ WHY THIS IS SAFE WHERE THE REVERTED VERSION WAS NOT. That one skipped
+     * the query AND used memcpy, and tools/test_span_safety.c shows exactly why
+     * it crashed: a fault inside MinGW's VECTORISED memcpy is not recoverable
+     * through the VEH+longjmp guard (case C), while a guarded SCALAR byte loop
+     * IS (case B). So the fix is not "skip the check" -- it is "skip the check
+     * and read the way the guard can actually protect".
+     *
+     * ⚠ THREE conditions, all required:
+     *   1. the whole read lies inside the extent validated at index time;
+     *   2. the copy is a byte loop, never memcpy or anything it can be
+     *      optimised into (the pointers are volatile to keep it scalar);
+     *   3. it still runs under the fault guard, so a page decommitted since
+     *      indexing degrades to a refusal rather than a crash.
+     * Miss any one and this becomes the bug that was reverted. */
+    if (g_text_span_ok &&
+        src >= g_text_span_lo && src < g_text_span_hi) {
+        BOOL faulted = FALSE;
+        unsigned n = 0;
+        /* volatile: forbids the compiler from turning this back into a
+         * vectorised copy, which is the exact hazard case C documents. */
+        volatile const BYTE *p = src;
+        const BYTE *limit = g_text_span_hi;
+        MEM_GUARDED(faulted, {
+            while (n < sizeof(buf) - 1 && (const BYTE *)p + n < limit) {
+                buf[n] = (char)p[n];
+                if (buf[n] == '\0')
+                    break;
+                n++;
+            }
+        });
+        if (faulted)
+            return FALSE;
+        buf[n < sizeof(buf) ? n : sizeof(buf) - 1] = '\0';
+        _snprintf(out, out_cap, "%s", buf);
+        out[out_cap - 1] = '\0';
+        return TRUE;
+    }
+
     if (!read_cstr(src, buf, sizeof(buf)))
         return FALSE;
     _snprintf(out, out_cap, "%s", buf);
