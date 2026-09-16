@@ -565,8 +565,17 @@ int main(void)
 
             SETPAIR(a, 144, 144);
             SETPAIR(b, 144, 144);
-            fake[0].p1 = addr_a; fake[0].health = 144; fake[0].max_health = 144;
-            fake[1].p1 = addr_b; fake[1].health = 144; fake[1].max_health = 144;
+            /* ⚠⚠ THE FILLER IS ADOPTED FIRST, DELIBERATELY. An earlier
+             * version listed the real pair first, and the sabotage sweep
+             * showed that made 11b worthless: with watch_score() hardwired to
+             * 0 the suite stayed GREEN, because a stable sort simply preserved
+             * insertion order and the real pair was already at the front.
+             * The case was passing on fixture order, not on ranking.
+             *
+             * With the filler inserted first, "best first" can only be
+             * achieved by actually scoring behaviour. */
+            fake[0].p1 = addr_b; fake[0].health = 144; fake[0].max_health = 144;
+            fake[1].p1 = addr_a; fake[1].health = 144; fake[1].max_health = 144;
             emu_watch_sample(fake, 2);
 
             /* Play a "round": A's health diverges and falls; B never moves. */
