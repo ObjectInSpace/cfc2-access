@@ -115,7 +115,43 @@ BOOL speech_say(const wchar_t *text, BOOL interrupt)
     if (!text || !*text)
         return FALSE;
 
+    /* ⭐⭐⭐ TIME THE BACKEND CALL. This runs on the GAME'S OWN THREAD inside
+     * the cursor hook, so if speechSay blocks, the game and the readout both
+     * wait -- and that is indistinguishable by ear from a slow mod.
+     *
+     * ⛔ USER-REPORTED: "a lot of lag between me pressing an arrow key and then
+     * hearing the change echoed back." Everything the mod controls was measured
+     * and is fast (0 ms median from movement to speech decision; 14-85 ms from
+     * keypress to the hook). This is the one link that could not be measured
+     * from outside the process, so it is now measured from inside.
+     *
+     * ⚠ Reports the WORST and the mean, not every call: a per-call line would
+     * itself be log I/O on the keypress path -- the very thing just removed. */
+    LARGE_INTEGER t0, t1, freq;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&t0);
     int rc = g_say(text, interrupt ? 1 : 0);
+    QueryPerformanceCounter(&t1);
+    {
+        static double worst, total;
+        static long   calls;
+        static double next_report = 50.0;   /* report once past 50 ms total */
+        double el = (double)(t1.QuadPart - t0.QuadPart) * 1000.0 /
+                    (double)freq.QuadPart;
+        calls++;
+        total += el;
+        if (el > worst) worst = el;
+        /* ⭐ Report on a THRESHOLD, not a schedule: a run that ends early must
+         * still have said something, and a fast backend should stay silent
+         * rather than printing "all is well" forever. */
+        if (worst >= 5.0 && total >= next_report) {
+            next_report = total * 2.0;
+            log_line("speech: ⚠ speechSay is SLOW -- %ld call(s), worst %.1f ms, "
+                     "mean %.1f ms. This runs on the game's thread, so this "
+                     "time is added to every keypress before you hear it.",
+                     calls, worst, total / (double)calls);
+        }
+    }
 
     /* UniversalSpeech returns non-zero on success; 0 means no backend took it. */
     if (rc == 0) {

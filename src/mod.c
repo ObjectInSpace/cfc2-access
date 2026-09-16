@@ -247,6 +247,9 @@ static DWORD WINAPI worker(LPVOID param)
      * MOUSE path only (5 buttons). The keyboard arrives via DirectInput
      * GetDeviceState inside the builder we now hook instead. */
     BOOL hook_ok = FALSE;
+    /* ⚠ The per-change keyboard LOG is opt-in; the hook itself still installs,
+     * because the periodic snapshot below reports liveness from it. */
+    BOOL kbd_log_on = opt_in_file_present("cfc2_kbd.on");
     if (unpacked && hook_enabled) {
         hook_ok = kbd_install();
         if (!hook_ok)
@@ -557,7 +560,20 @@ static DWORD WINAPI worker(LPVOID param)
              * so the log shows navigation rather than a per-frame flood.
              * ⭐ This is a two-read compare against a pointer the game handed
              * us, not a search -- the whole point of the offline work. */
-            if (hook_ok)
+            /* ⛔⛔ OFF BY DEFAULT (cfc2_kbd.on). This is a DIAGNOSTIC that
+             * speaks nothing, and it was the single largest source of log I/O
+             * during play: 92 of 210 lines in the 02:38 run, one file write per
+             * key change, on the 20 ms poll.
+             *
+             * ⭐ Its question is ANSWERED and recorded: sKeyboard's state block
+             * is this+0x138, the banks are cur/old/Trg/Rel/Chg, and the shell
+             * reads DirectInput rather than GetAsyncKeyState. Nothing in the
+             * speech path consumes it -- it exists for the in-game work ahead.
+             *
+             * ⚠ The periodic kbd_snapshot() summary on the slow beat is kept:
+             * it is four lines a run and it is the liveness context that makes
+             * a null result interpretable. */
+            if (hook_ok && kbd_log_on)
                 kbd_poll_and_log();
 
             /* ⭐ The menu cursor. The hook records movements on the game's own

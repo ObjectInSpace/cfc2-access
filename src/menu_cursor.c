@@ -593,14 +593,27 @@ void mc_poll_and_log(void)
          *
          * ⚠ Still once per screen pointer, and it declines loudly rather than
          * silently, so a screen it cannot read says so in the log. */
-        gt_snapshot(m.screen, 320.0f, 835.0f,
-                    m.max_index - m.min_index + 1);
-
         /* ⭐ Speak first, log second: the user is waiting on the readout, and
          * the log is for us. menu_speak() falls back to position-only whenever
          * the screen is unknown or the text cannot be read -- it never guesses
          * a name. */
         menu_speak(&m);
+
+        /* ⛔⛔ THE SNAPSHOT MOVED BELOW menu_speak() -- IT USED TO RUN FIRST.
+         *
+         * USER-REPORTED: "a lot of lag between me pressing an arrow key and
+         * then hearing the change echoed back." This is a DIAGNOSTIC, and it
+         * ran on the game's own thread, ahead of the readout, walking the
+         * widget tree and writing one log line PER ROW. On the first movement
+         * of every screen the user waited for all of that before hearing
+         * anything.
+         *
+         * ⭐ The rule this encodes, which the discovery sweep already taught us
+         * once: a stall in the user's speech is a broken mod; a diagnostic that
+         * is late is an inconvenience to the developer. Nothing here needs to
+         * precede the announcement -- it captures the same screen either way. */
+        gt_snapshot(m.screen, 320.0f, 835.0f,
+                    m.max_index - m.min_index + 1);
         if (!menu_speak_lookup((ULONGLONG)(ULONG_PTR)m.caller))
             menu_speak_log_unknown(&m);
 
