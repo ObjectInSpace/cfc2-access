@@ -1699,17 +1699,34 @@ int main(void)
               "still deferred=%d", (int)menu_speak_test_deferred());
     }
     {
-        /* ⭐ And a NEW movement supersedes a pending one: announcing a row the
-         * cursor has already left is worse than skipping it. */
+        /* ⛔⛔ 33m ONCE ASSERTED THE OPPOSITE, AND THE USER FELT IT.
+         *
+         * It required the second movement to ALSO be pending -- "a new movement
+         * supersedes the pending one" -- reasoning that announcing a row the
+         * cursor has already left is worse than skipping it. True of the OLD
+         * row. But the NEW row was then deferred in turn and discarded by the
+         * movement after it, so a user moving steadily heard NOTHING until they
+         * stopped: 12 of 25 movements spoke nothing at all in the reported run,
+         * and it felt like "it takes that much longer before I can hear
+         * anything".
+         *
+         * ⭐ The rule now: a supersede means the new movement speaks
+         * IMMEDIATELY, with a position at minimum. Deferral is for a user who
+         * has PAUSED, never for one still moving.
+         *
+         * ⚠ A test that encodes the author's reasoning rather than the user's
+         * experience passes exactly when it should fail. */
         gt_note_focus_move();
         mc_move a = mk(0xC0FFEE02ULL, 1, 0, 5);
         menu_speak(&a);
         int was = menu_speak_test_deferred();
         mc_move b = mk(0xC0FFEE02ULL, 2, 0, 5);
         menu_speak(&b);
-        check("33m. a new movement supersedes the pending one",
-              was && menu_speak_test_deferred(),
-              "first deferred=%d, after a second movement deferred=%d",
+        check("33m. a superseding movement SPEAKS NOW rather than deferring "
+              "in turn (a moving user must not go silent)",
+              was && !menu_speak_test_deferred(),
+              "first deferred=%d, after a second movement deferred=%d "
+              "(want 1 then 0)",
               was, (int)menu_speak_test_deferred());
         menu_speak_flush_deferred();
     }

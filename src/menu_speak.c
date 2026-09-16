@@ -3760,14 +3760,39 @@ static mc_move  g_defer_move;
  * a missing word, which is strictly worse than the bug. Caught by tracing the
  * path before shipping, and pinned by a case. */
 static BOOL     g_defer_retrying;
+/* ⛔ Set when a new movement discarded a pending one: that movement speaks
+ * IMMEDIATELY rather than deferring in turn. Without it, a user moving steadily
+ * has every movement deferred and then discarded by the next -- 12 of 25
+ * movements spoke NOTHING in the run that reported this. */
+static BOOL     g_defer_superseded;
 
 void menu_speak(const mc_move *m)
 {
     mc_speech sp;
 
-    /* A new movement supersedes anything held over. */
-    if (m)
+    /* ⛔⛔ A NEW MOVEMENT SUPERSEDES A PENDING ONE -- AND THAT MUST NOT MEAN
+     * SILENCE.
+     *
+     * USER-REPORTED REGRESSION: "every time I press an arrow key on the fighter
+     * screen it takes that much longer before I can hear anything." Measured in
+     * that run: 13 movements spoke and **12 SPOKE NOTHING AT ALL**. Moving
+     * steadily (~1.6 s apart) each movement deferred, and the next one
+     * discarded it before the idle-poll retry could fire -- so speech arrived
+     * only once the user STOPPED moving.
+     *
+     * ⭐ So a supersede FORBIDS deferring the new movement: it speaks
+     * immediately with whatever it has, a position at minimum. The deferral is
+     * for a user who has PAUSED on a row, never for one still moving.
+     *
+     * ⛔ Case 33m asserted the dropping behaviour as CORRECT -- "announcing a
+     * row the cursor has already left is worse than skipping it". True of the
+     * OLD row, and I dropped it without speaking the NEW one either. The test
+     * encoded the mistake, which is why it passed. */
+    if (m) {
+        if (g_defer_pending)
+            g_defer_superseded = TRUE;   /* do not defer this one as well */
         g_defer_pending = FALSE;
+    }
 
     menu_speak_build(m, &sp);
 
@@ -3866,11 +3891,15 @@ void menu_speak(const mc_move *m)
          *
          * ⚠ Only when BOTH are missing. A row that already has a name loses
          * nothing by speaking now, and a row with a caption is not racing. */
-        if (!have_cap && !sp.named && m && !g_defer_pending && !g_defer_retrying) {
+        if (!have_cap && !sp.named && m && !g_defer_pending &&
+            !g_defer_retrying && !g_defer_superseded) {
             g_defer_pending = TRUE;
             g_defer_move = *m;
             return;                 /* speak on the next poll instead */
         }
+        /* ⚠ Consumed here, not at entry: it must survive until the deferral
+         * decision above, and must not persist past it. */
+        g_defer_superseded = FALSE;
 
         if (have_cap &&
             !caption_is_stale_repeat(cap, sp.screen_name)) {
