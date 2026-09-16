@@ -480,6 +480,24 @@ void menu_speak_build(const mc_move *m, mc_speech *out);
 /* Build it and speak it. */
 void menu_speak(const mc_move *m);
 
+/* ⭐⭐ Speak a movement held back one poll waiting for its caption to arrive.
+ *
+ * ⛔ Fighter Awards read inconsistently -- 7 of 13 movements named, 6 spoke a
+ * bare number, and in three of those the game set the title in the SAME
+ * MILLISECOND just AFTER we spoke. The caption channel is that screen's only
+ * naming route, so losing the race loses the name. Every title arrived 0-1 ms
+ * after its movement, so this is an ORDERING problem, not a time window: an
+ * unnamed movement with no caption yet waits ONE poll and asks again.
+ *
+ * Call from the poll loop when mc_take_move() yielded nothing. A new movement
+ * supersedes a pending one, and a deferral never repeats -- the retry speaks
+ * whatever it has, so a screen that sets no text is delayed 100 ms, never
+ * silenced. */
+void menu_speak_flush_deferred(void);
+
+/* Test seam: TRUE while a movement is held back waiting for its caption. */
+BOOL menu_speak_test_deferred(void);
+
 /* Speak one already-built line. ⭐ The single point where text reaches the
  * backend, shared by the movement path and the modal announcer. */
 void menu_speak_line(const char *line);

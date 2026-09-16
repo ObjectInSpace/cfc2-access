@@ -3725,9 +3725,50 @@ void menu_speak_check_modal(void)
         menu_speak_line(flat);
 }
 
+/* ⭐⭐ ONE-POLL DEFERRAL FOR A CAPTION THAT HAS NOT ARRIVED YET.
+ *
+ * ⛔⛔ MEASURED, user-reported as Fighter Awards reading inconsistently: of 13
+ * movements, 7 spoke a title and 6 spoke a BARE NUMBER -- and in three of those
+ * the game set the title in the SAME MILLISECOND, just AFTER we spoke:
+ *     spoke "29 of 40" while the screen showed "Let Friendship Prevail!"
+ *     spoke "1 of 40"  while the screen showed "Fighting Game Fans Rejoice!"
+ * The 40-item grid named 0 of 3. The caption channel is that screen's ONLY
+ * naming route, so losing the race means losing the name entirely.
+ *
+ * ⚠ NOT A TIME WINDOW. Every title arrived 0-1 ms after its movement, so a
+ * delay tuned in milliseconds would be guesswork. What differs is ORDERING
+ * within the poll: sometimes setText has run when we ask, sometimes not. So
+ * this waits for the NEXT POLL (100 ms) and asks again -- the same ordering
+ * fact gt_take_caption() already keys on, given one more chance to be true.
+ *
+ * ⛔ DEFERRED AT MOST ONCE, and only when the movement has NO name and NO
+ * caption. A screen that genuinely never sets text must not be silenced: it
+ * speaks its position one poll later, which is the behaviour it had before.
+ *
+ * ⛔ AND A NEWER MOVEMENT WINS. If the user moves again while one is pending,
+ * the pending one is DROPPED -- announcing a row the cursor has already left
+ * is worse than skipping it, and mc_take_move() keeps only the most recent
+ * movement for exactly this reason. */
+static BOOL     g_defer_pending;
+static mc_move  g_defer_move;
+/* ⛔⛔ Set only while the RETRY is running, and it blocks a second deferral.
+ *
+ * Without it the retry can defer again -- menu_speak() clears `pending` on
+ * entry for any movement, so the guard `!g_defer_pending` is true again by the
+ * time the retry reaches it. A screen that genuinely never sets text would then
+ * defer on EVERY poll and never speak at all: silence introduced by a fix for
+ * a missing word, which is strictly worse than the bug. Caught by tracing the
+ * path before shipping, and pinned by a case. */
+static BOOL     g_defer_retrying;
+
 void menu_speak(const mc_move *m)
 {
     mc_speech sp;
+
+    /* A new movement supersedes anything held over. */
+    if (m)
+        g_defer_pending = FALSE;
+
     menu_speak_build(m, &sp);
 
     /* ⭐ The builder already spoke a whole PANEL (the move list). Saying
@@ -3817,7 +3858,21 @@ void menu_speak(const mc_move *m)
      * worst case is silence, never a caption belonging to another row. */
     {
         char cap[GT_CAPTION_MAX];
-        if (gt_take_caption(cap, (int)sizeof(cap)) &&
+        BOOL have_cap = gt_take_caption(cap, (int)sizeof(cap));
+
+        /* ⭐⭐ THE DEFERRAL. An unnamed row with no caption yet is the shape of
+         * the race above: the game is about to set the title and we asked too
+         * early. Hold this movement for one poll and ask again.
+         *
+         * ⚠ Only when BOTH are missing. A row that already has a name loses
+         * nothing by speaking now, and a row with a caption is not racing. */
+        if (!have_cap && !sp.named && m && !g_defer_pending && !g_defer_retrying) {
+            g_defer_pending = TRUE;
+            g_defer_move = *m;
+            return;                 /* speak on the next poll instead */
+        }
+
+        if (have_cap &&
             !caption_is_stale_repeat(cap, sp.screen_name)) {
             prompt_id id = prompt_identify(cap);
             if (id.result == PROMPT_ID_FOUND && !sp.named && id.label &&
@@ -4003,6 +4058,34 @@ void menu_speak(const mc_move *m)
     }
 
     menu_speak_line(line);
+}
+
+/* ⭐⭐ Speak a movement that was held back one poll waiting for its caption.
+ *
+ * Called from the poll loop when NO new movement arrived: a new one supersedes
+ * the pending one (menu_speak() clears the flag), so this only ever fires on an
+ * otherwise idle poll ~100 ms after the movement -- by which time the game has
+ * long since drawn the row's text.
+ *
+ * ⚠ The flag is cleared BEFORE speaking, so a second failure cannot defer
+ * again: the retry speaks whatever it has, name or position. One poll of
+ * patience, never a loop. */
+/* Test seam: is a movement being held back? ⭐ A case needs this to prove the
+ * deferral happens AT MOST ONCE -- the retry must speak, not defer again, or a
+ * screen that never sets text is silenced rather than delayed. */
+BOOL menu_speak_test_deferred(void) { return g_defer_pending; }
+
+void menu_speak_flush_deferred(void)
+{
+    if (!g_defer_pending)
+        return;
+    g_defer_pending = FALSE;
+    {
+        mc_move held = g_defer_move;
+        g_defer_retrying = TRUE;
+        menu_speak(&held);
+        g_defer_retrying = FALSE;
+    }
 }
 
 /* ⭐ The one place a line reaches the speech backend. Extracted from

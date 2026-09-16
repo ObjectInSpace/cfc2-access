@@ -582,7 +582,26 @@ void mc_poll_and_log(void)
     /* ⚠ `if`, not `while`: only the most recent movement is kept, so a loop
      * would suggest a queue that does not exist. */
     mc_move m;
-    if (mc_take_move(&m)) {
+    if (!mc_take_move(&m)) {
+        /* ⭐ Nothing new this poll: speak anything held back waiting for its
+         * caption to arrive. ⚠ Only on an IDLE poll -- a new movement
+         * supersedes a pending one (menu_speak clears it), because announcing
+         * a row the cursor has already left is worse than skipping it. */
+        menu_speak_flush_deferred();
+    } else {
+        /* ⭐ The screen snapshot, on the CONSUMING path.
+         *
+         * ⛔ It used to hang only off mc_peek_rest() in mod.c, which is reached
+         * only when a movement is still pending at poll time. On the Fighter
+         * Awards run that produced exactly ONE snapshot -- the main menu -- and
+         * none for the screen the user had been asked to open. Every movement
+         * passes through here, so this is where a per-screen capture belongs.
+         *
+         * ⚠ Still once per screen pointer, and it declines loudly rather than
+         * silently, so a screen it cannot read says so in the log. */
+        gt_snapshot(m.screen, 320.0f, 835.0f,
+                    m.max_index - m.min_index + 1);
+
         /* ⭐ Speak first, log second: the user is waiting on the readout, and
          * the log is for us. menu_speak() falls back to position-only whenever
          * the screen is unknown or the text cannot be read -- it never guesses

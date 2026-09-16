@@ -1660,6 +1660,60 @@ int main(void)
         }
     }
 
+    /* --- cases 33k-33l: ⭐⭐ THE ONE-POLL CAPTION DEFERRAL.
+     *
+     * ⛔⛔ MEASURED on Fighter Awards: 7 of 13 movements named, 6 spoke a bare
+     * number, and in three of those the game set the title in the SAME
+     * MILLISECOND just AFTER we spoke. The caption channel is that screen's
+     * only naming route, so losing the race loses the name. Every title
+     * arrived 0-1 ms after its movement, so it is an ORDERING problem: wait one
+     * poll and ask again.
+     *
+     * ⛔⛔ AND THE DANGEROUS HALF IS THE RETRY. menu_speak() clears the pending
+     * flag for ANY movement, so without a separate "retrying" guard the retry
+     * re-enters the same branch and defers AGAIN -- a screen that genuinely
+     * sets no text would defer on every poll and NEVER SPEAK. That is silence
+     * introduced by a fix for a missing word, which is strictly worse than the
+     * bug. Traced before shipping; case 33l is what keeps it fixed. */
+    {
+        /* An unknown caller with no live text: nothing can name it, and in this
+         * process there is no caption either -- exactly the shape that must
+         * defer once and then speak. */
+        /* ⚠ Advance the focus sequence FIRST. Earlier cases planted objects
+         * and stamped movements, so the caption mailbox still holds records
+         * matching the current seq -- gt_take_caption() would return one and
+         * the deferral would never fire. A fresh movement with no text set
+         * after it is precisely the condition being modelled. */
+        gt_note_focus_move();
+        mc_move dm = mk(0xC0FFEE01ULL, 2, 0, 5);
+        menu_speak(&dm);
+        check("33k. an unnamed movement with no caption DEFERS one poll",
+              menu_speak_test_deferred(),
+              "deferred=%d", (int)menu_speak_test_deferred());
+
+        /* ⛔ The retry must SPEAK, not defer again. */
+        menu_speak_flush_deferred();
+        check("33l. the retry SPEAKS rather than deferring again -- a "
+              "caption-less screen is delayed, never silenced",
+              !menu_speak_test_deferred(),
+              "still deferred=%d", (int)menu_speak_test_deferred());
+    }
+    {
+        /* ⭐ And a NEW movement supersedes a pending one: announcing a row the
+         * cursor has already left is worse than skipping it. */
+        gt_note_focus_move();
+        mc_move a = mk(0xC0FFEE02ULL, 1, 0, 5);
+        menu_speak(&a);
+        int was = menu_speak_test_deferred();
+        mc_move b = mk(0xC0FFEE02ULL, 2, 0, 5);
+        menu_speak(&b);
+        check("33m. a new movement supersedes the pending one",
+              was && menu_speak_test_deferred(),
+              "first deferred=%d, after a second movement deferred=%d",
+              was, (int)menu_speak_test_deferred());
+        menu_speak_flush_deferred();
+    }
+
     /* --- case 33j: ⛔⛔ THE PAUSE MENU MUST NOT CLAIM NAMES FROM A MAP.
      *
      * USER-REPORTED: "In training mode it is saying quicksave/load rather than

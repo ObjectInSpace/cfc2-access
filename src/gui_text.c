@@ -3233,6 +3233,7 @@ BOOL gt_test_sc_entry_at(int i, const char **label, const char **value,
 #define MC_SNAP_ROWS 24
 
 static const void   *g_snap_last;
+static const void   *g_snap_declined;   /* rate-limits the "nothing captured" line */
 static volatile LONG g_snap_on;
 static volatile LONG g_snap_count;
 
@@ -3302,8 +3303,24 @@ void gt_snapshot(const void *screen, float row_x, float val_x, int total)
             if (c >= 2) { row_x = cols[i]; n = c; break; }
         }
     }
-    if (n <= 0)
-        return;                 /* not a row screen; do not claim one */
+    if (n <= 0) {
+        /* ⛔⛔ SAY SO. This returned silently, and on Fighter Awards it
+         * produced exactly ONE snapshot (the main menu) out of a whole visit --
+         * so the user spent a run and I learned nothing about the screen I had
+         * asked them to open. A capture tool that declines in silence is
+         * indistinguishable from one that never ran, and it costs a run to find
+         * out which.
+         *
+         * ⚠ Rate-limited to one line per screen pointer, so a screen it cannot
+         * read does not fill the log. */
+        if (screen != g_snap_declined) {
+            g_snap_declined = screen;
+            log_line("snap: ⚠ screen %p has %d column(s) but NONE holds 2+ "
+                     "objects -- nothing captured. The rows are somewhere this "
+                     "did not look.", screen, ncol);
+        }
+        return;
+    }
     g_snap_last = screen;
     InterlockedIncrement(&g_snap_count);
 
