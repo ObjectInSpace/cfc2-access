@@ -222,7 +222,10 @@ static DWORD    g_cursor_armed_at;
 static unsigned g_cursor_edges;
 static BOOL     g_cursor_gave_up;
 static char     g_cursor_rom[32];
-static BOOL     g_cursor_waited_note;
+static unsigned g_cursor_waited_note;
+static unsigned g_cursor_reads;
+static unsigned g_cursor_unreadable;
+static unsigned g_cursor_other;
 
 /* How long to wait for ANY arrow edge before concluding the emulated game does
  * not use sKeyboard. 30 s of navigation is far more than enough. */
@@ -330,7 +333,10 @@ static void cursor_probe_tick(void)
         }
         g_cursor_armed = TRUE;
         g_cursor_edges = 0;
-        g_cursor_waited_note = FALSE;
+        g_cursor_waited_note = 0;
+        g_cursor_reads = 0;
+        g_cursor_unreadable = 0;
+        g_cursor_other = 0;
         /* ⭐ The clock starts HERE, with the ROM confirmed loaded -- so the
          * timeout measures time INSIDE the emulated game. The first version
          * started it at arm time on the shell and burned 80% of the window
@@ -343,40 +349,102 @@ static void cursor_probe_tick(void)
         return;
     }
 
-    if (!kbd_poll_edges(&e)) return;      /* could not read: not a negative */
-    if (e.first) return;                  /* seeded, not observed           */
+    /* ⛔⛔ THE TIMEOUT IS EVALUATED FIRST, ON EVERY TICK.
+     *
+     * Run 2 (19:05) armed correctly on 'cvs2u', logged "still waiting" at 10 s
+     * -- and then went SILENT for the remaining 23 s of the session. The 30 s
+     * verdict never fired even though the run outlasted it.
+     *
+     * Cause: `if (!kbd_poll_edges(&e)) return;` and `if (e.first) return;` both
+     * skipped the timeout. Once kbd_poll_edges() started failing every tick,
+     * the probe waited forever and said nothing -- a silent probe again, the
+     * very thing the "still waiting" line was added to prevent. Adding one
+     * status line does not help if the code path that would print the verdict
+     * is unreachable.
+     *
+     * ⭐ And the two silences are DIFFERENT FINDINGS:
+     *     could not read the keyboard state  -> says something about the path
+     *     read it fine, but no arrow edges   -> says the game ignores it
+     * Collapsing them into one line would repeat this project's oldest mistake. */
+    {
+        DWORD waited = GetTickCount() - g_cursor_armed_at;
+        BOOL  got    = kbd_poll_edges(&e);
+
+        if (!got) g_cursor_unreadable++;
+        else      g_cursor_reads++;
+
+        /* ⚠⚠ A HEARTBEAT, not a one-shot. Run 2 printed its 10 s line and
+         * then went silent for 23 s with no verdict, and NOTHING in the log
+         * could say why -- the builder was demonstrably still running
+         * (+1357 calls after arming), so the obvious explanation was wrong and
+         * there was no evidence left to choose between the rest.
+         *
+         * A probe that cannot say what it is doing costs a whole play session
+         * to re-run. This reports every 10 s, unconditionally, until it
+         * concludes. */
+        if (g_cursor_edges == 0 && waited > 10000 &&
+            waited / 10000 > g_cursor_waited_note) {
+            g_cursor_waited_note = (unsigned)(waited / 10000);
+            log_line("cursor: still waiting for a LEFT/RIGHT edge -- %u s "
+                     "inside '%s'. %u tick(s) read the keyboard state OK, "
+                     "%u could NOT read it.",
+                     (unsigned)(waited / 1000), g_cursor_rom,
+                     g_cursor_reads, g_cursor_unreadable);
+        }
+
+        if (g_cursor_edges == 0 && waited > CURSOR_EDGE_TIMEOUT_MS) {
+            if (g_cursor_reads == 0)
+                log_line("cursor: ⛔ COULD NOT READ the sKeyboard state on ANY "
+                         "of %u tick(s) in %u s inside '%s'. ⚠ NOTHING WAS "
+                         "MEASURED -- this is not 'the game ignores the "
+                         "keyboard'. The state block is unreadable while the "
+                         "emulator runs, which is itself a clue about where "
+                         "in-game input lives.",
+                         g_cursor_unreadable, (unsigned)(waited / 1000),
+                         g_cursor_rom);
+            else
+                log_line("cursor: ⛔ NO ARROW EDGES in %u s inside '%s', but "
+                         "the state WAS readable on %u tick(s) (%u not). So "
+                         "sKeyboard is alive and simply does not carry the "
+                         "emulated game's input. ⚠ This is a real negative "
+                         "about the PATH, not about a cursor. Next step is the "
+                         "emulator's own input handling in the disassembly.",
+                         (unsigned)(waited / 1000), g_cursor_rom,
+                         g_cursor_reads, g_cursor_unreadable);
+            g_cursor_gave_up = TRUE;
+            return;
+        }
+
+        if (!got)     return;   /* could not read: not a negative        */
+        if (e.first)  return;   /* seeded, not observed                  */
+    }
 
     left  = kbd_is_set(e.pressed, KBDC_LEFT);
     right = kbd_is_set(e.pressed, KBDC_RIGHT);
 
+    /* ⭐ Log ANY key that arrives, not just arrows.
+     *
+     * Run 2 established that sKeyboard is alive during the emulated game (the
+     * builder ran +1357 times after arming) yet no LEFT/RIGHT edge reached us.
+     * The obvious next question is whether the game takes menu input on some
+     * OTHER code -- a gamepad-mapped key, WASD, Enter -- and that question is
+     * answered for free by printing what we DO see. Without this, "no arrows"
+     * and "no keys at all" are the same log line, and they mean different
+     * things. Bounded so a held key cannot flood the log. */
     if (!left && !right) {
-        /* ⛔ THE DISTINCT NEGATIVE. If no arrow edge EVER arrives, the emulated
-         * game does not receive keyboard through sKeyboard -- which is a
-         * different fact from "no cursor was found", and points at different
-         * work (find the emulator's own input path in the disassembly). */
-        DWORD waited = GetTickCount() - g_cursor_armed_at;
-
-        /* ⚠ Say we are still waiting, and say it in terms of time spent INSIDE
-         * the game. A silent probe and a broken one look identical, and the
-         * 18:54 run's single "NO EDGES" line gave no way to notice that most
-         * of its window had been spent on the shell. */
-        if (g_cursor_edges == 0 && waited > 10000 && !g_cursor_waited_note) {
-            log_line("cursor: still waiting for a LEFT/RIGHT edge -- %u s "
-                     "inside '%s' so far, 0 edges.",
-                     (unsigned)(waited / 1000), g_cursor_rom);
-            g_cursor_waited_note = TRUE;
+        int i, b;
+        for (b = 0; b < KBD_BANK_WORDS && g_cursor_other < 24; b++) {
+            if (!e.pressed[b]) continue;
+            for (i = 0; i < 32 && g_cursor_other < 24; i++) {
+                if (!(e.pressed[b] & (1u << i))) continue;
+                g_cursor_other++;
+                log_line("cursor: saw key code 0x%02x (not LEFT 0x%02x / "
+                         "RIGHT 0x%02x). sKeyboard IS delivering input here.",
+                         b * 32 + i, KBDC_LEFT, KBDC_RIGHT);
+            }
         }
-
-        if (g_cursor_edges == 0 && waited > CURSOR_EDGE_TIMEOUT_MS) {
-            log_line("cursor: ⛔ NO INPUT EDGES SEEN in %u s INSIDE '%s'. The "
-                     "emulated game does not take keyboard through sKeyboard, "
-                     "so this probe cannot be driven by arrow presses. ⚠ This "
-                     "is NOT 'no cursor found' -- nothing was ever measured. "
-                     "Next step is the emulator's own input path.",
-                     (unsigned)(waited / 1000), g_cursor_rom);
-            g_cursor_gave_up = TRUE;
-        }
-        return;
+        return;                 /* the timeout above handles "nothing ever
+                                 * arrives" */
     }
 
     g_cursor_edges++;
