@@ -194,6 +194,7 @@ static ec_status hash_pass(ec_phase phase, ULONGLONG base, SIZE_T size)
     MEMORY_BASIC_INFORMATION mbi;
     unsigned idx = 0;
     DWORD t0 = GetTickCount();
+    unsigned chunks_done = 0;
     SIZE_T hashed = 0;
 
     while (addr < end && idx < g_hash_n) {
@@ -616,11 +617,24 @@ unsigned emu_cursor_scan_report(ec_scan *out, unsigned cap)
 
 /* ⚠ A varied stride is reported as 0, never averaged -- an averaged stride
  * would invent a regularity that is not in the data. */
+static unsigned  g_pt_chunk_limit;  /* test seam: deterministic budget */
+
+void emu_cursor_test_pt_chunk_limit(unsigned chunks)
+{
+    g_pt_chunk_limit = chunks;
+}
+
+static ULONGLONG g_pt_resume;      /* where the last budgeted pass stopped */
+static SIZE_T    g_pt_scanned;     /* accumulated across the whole pass    */
+
 unsigned emu_cursor_find_pagetable(ec_ptrun *out, unsigned cap,
-                                   SIZE_T *scanned_out)
+                                   SIZE_T *scanned_out, DWORD budget_ms,
+                                   BOOL *done)
 {
     ULONGLONG base, lo, hi, addr, region_end = 0;
     SIZE_T size, scanned = 0;
+    DWORD t0 = GetTickCount();
+    unsigned chunks_done = 0;
     MEMORY_BASIC_INFORMATION mbi;
     static BYTE buf[PT_CHUNK];
     unsigned n = 0;
@@ -636,9 +650,21 @@ unsigned emu_cursor_find_pagetable(ec_ptrun *out, unsigned cap,
     lo = base; hi = base + size;
     memset(&cur, 0, sizeof cur);
 
-    addr = 0x10000;                          /* skip the null page */
+    if (done) *done = FALSE;
+    addr = g_pt_resume ? g_pt_resume : 0x10000;   /* skip the null page */
     while (addr < 0x7FFFFFFF0000ULL) {
         SIZE_T want = PT_CHUNK, i;
+
+        /* ⭐⭐ THE BUDGET, checked in the loop that can run long. An earlier
+         * scanner in this project put its deadline in an outer loop, where it
+         * could not fire for minutes, voiding the guarantee it existed for. */
+        if (g_pt_chunk_limit ? (chunks_done >= g_pt_chunk_limit)
+                             : (budget_ms && GetTickCount() - t0 >= budget_ms)) {
+            g_pt_resume = addr;
+            g_pt_scanned += scanned;
+            if (scanned_out) *scanned_out = g_pt_scanned;
+            return n;                       /* more to do; *done stays FALSE */
+        }
 
         if (addr >= region_end) {
             if (VirtualQuery((LPCVOID)(ULONG_PTR)addr, &mbi, sizeof mbi)
@@ -655,6 +681,7 @@ unsigned emu_cursor_find_pagetable(ec_ptrun *out, unsigned cap,
         }
         if (addr + want > region_end) want = (SIZE_T)(region_end - addr);
         if (want < 8) { addr = region_end; continue; }
+        chunks_done++;
         if (!mem_copy(buf, (const void *)(ULONG_PTR)addr, want)) {
             addr += want; cur.count = 0; continue;
         }
@@ -694,7 +721,11 @@ unsigned emu_cursor_find_pagetable(ec_ptrun *out, unsigned cap,
     }
     if (cur.count >= PT_MIN_RUN && n < cap) out[n++] = cur;
 
-    if (scanned_out) *scanned_out = scanned;
+    g_pt_scanned += scanned;
+    if (scanned_out) *scanned_out = g_pt_scanned;
+    g_pt_resume = 0;                        /* wrapped: next call restarts */
+    g_pt_scanned = 0;
+    if (done) *done = TRUE;
     return n;
 }
 

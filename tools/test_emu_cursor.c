@@ -720,7 +720,7 @@ int main(void)
                 tbl[i] = (ULONGLONG)(ULONG_PTR)arena + (ULONGLONG)i * 0x800;
             tbl[32] = 0;                       /* terminate the run */
 
-            nr = emu_cursor_find_pagetable(runs, 8, &sc);
+            nr = emu_cursor_find_pagetable(runs, 8, &sc, 0, NULL);
             check("14a the sweep EXAMINED memory (a positive count)",
                   sc > 0, "scanned %llu bytes", (unsigned long long)sc);
 
@@ -735,12 +735,39 @@ int main(void)
              * none -- it would read plausible garbage at confident addresses. */
             for (i = 0; i < 32; i++)
                 tbl[i] = (ULONGLONG)(ULONG_PTR)arena + (ULONGLONG)(i * i) * 0x40;
-            nr = emu_cursor_find_pagetable(runs, 8, &sc);
+            nr = emu_cursor_find_pagetable(runs, 8, &sc, 0, NULL);
             found = 0;
             for (i = 0; i < nr; i++)
                 if (runs[i].count >= 32 && runs[i].stride != 0) found = 1;
             check("14c an UNEVEN run reports stride 0, never an average",
                   !found, "an uneven run was given a stride");
+
+            /* ⛔⛔ THE BUDGET MUST RESUME, NOT TRUNCATE. A budgeted sweep
+             * that silently gave up would report "0 runs" over a fraction of
+             * memory and look exactly like a real negative -- the failure this
+             * project has paid for repeatedly. Drive it with a 0 ms budget so
+             * it stops almost immediately, and require that (a) it says it is
+             * NOT done, and (b) continuing eventually finds the table. */
+            for (i = 0; i < 32; i++)
+                tbl[i] = (ULONGLONG)(ULONG_PTR)arena + (ULONGLONG)i * 0x800;
+            {
+                BOOL done = TRUE;
+                unsigned guard = 0;
+                found = 0;
+                emu_cursor_test_pt_chunk_limit(1);   /* deterministic */
+                nr = emu_cursor_find_pagetable(runs, 8, &sc, 0, &done);
+                check("14d a bitten budget reports NOT done",
+                      !done, "a truncated sweep claimed to be complete");
+                while (!done && guard++ < 100000) {
+                    nr = emu_cursor_find_pagetable(runs, 8, &sc, 0, &done);
+                    for (i = 0; i < nr; i++)
+                        if (runs[i].count >= 32 && runs[i].stride == 0x800)
+                            found = 1;
+                }
+                check("14e resuming across calls still FINDS the table",
+                      found, "%u call(s), never found it", guard);
+                emu_cursor_test_pt_chunk_limit(0);
+            }
 
             emu_cursor_test_window(0, 0);
             VirtualFree(arena, 0, MEM_RELEASE);

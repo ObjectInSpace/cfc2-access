@@ -453,8 +453,35 @@ typedef struct {
  *
  * ⚠ Returns 0 and logs if the arena cannot be resolved -- "could not look"
  * must never read as "there is no table". */
+/* ⚠⚠ TIME-BUDGETED AND RESUMABLE, unlike the snapshot passes.
+ *
+ * MEASURED: 1937 ms for 529 MB (273 MB/s -- slower than a plain hash because
+ * every 8 bytes is compared). The live process has ~1.5 GB writable, so one
+ * full sweep is ~5 SECONDS of blocking. Six retries would be a 30-second
+ * freeze, and this project has already shipped a 114 s stall and a 37 s one.
+ *
+ * ⭐ Resuming is SAFE here, and that is a real distinction rather than a
+ * convenience: a page table is a STATIC structure, so reading it across
+ * several ticks cannot blend two moments. A memory SNAPSHOT cannot be resumed
+ * for exactly that reason -- see hash_pass(). Same mechanism, opposite verdict,
+ * because the thing being read is different.
+ *
+ * Each call does at most `budget_ms` of work and returns EC_UNREADABLE-ish
+ * semantics via *done: FALSE means "more to sweep", TRUE means the pass
+ * finished. Runs found so far accumulate across calls. */
 unsigned emu_cursor_find_pagetable(ec_ptrun *out, unsigned cap,
-                                   SIZE_T *scanned_out);
+                                   SIZE_T *scanned_out, DWORD budget_ms,
+                                   BOOL *done);
+
+/* Force the sweep to stop after N chunks instead of on the wall clock.
+ *
+ * ⚠⚠ THE OFFLINE SUITE MUST NOT DEPEND ON WALL-CLOCK TIMING. GetTickCount has
+ * ~15 ms resolution, so a 1 ms budget never fires and a fixture sized to
+ * "happen not to finish in 25 ms" is only true on some machines -- a flaky
+ * test, which is worse than none because it reports a mechanism as protected
+ * when it is not. emu_ram.h carries the identical warning for the same reason.
+ * 0 restores the timed behaviour. */
+void emu_cursor_test_pt_chunk_limit(unsigned chunks);
 
 /* --- Offline test seam ---------------------------------------------------
  * Point the probe at a planted fixture instead of the live arena. Passing

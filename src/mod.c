@@ -234,6 +234,8 @@ static DWORD    g_last_input_ms;
 static DWORD    g_scan_report_ms;
 static unsigned g_spr_pairs;
 static BOOL     g_pt_done;
+static DWORD    g_pt_last;
+static unsigned g_pt_tries;
 static BOOL     g_spr_pending;
 static DWORD    g_spr_at;
 
@@ -355,29 +357,72 @@ static void cursor_probe_tick(void)
         /* ⭐⭐ THE PAGE-TABLE FINDER, once, a few seconds after the ROM
          * loads so the emulator has built its tables. One pass; nothing is
          * spoken; the player does nothing. */
-        if (!g_pt_done && GetTickCount() - g_cursor_armed_at > 4000) {
-            ec_ptrun runs[12];
+        /* ⚠ RETRY UNTIL IT FINDS ONE, then stop. A ONE-SHOT sweep on a
+         * timer is the exact shape that has failed repeatedly this session:
+         * if it happens to run before the emulator has built its tables, it
+         * finds nothing and never looks again -- and a premature negative is
+         * indistinguishable from a real one.
+         *
+         * ⭐ It also removes any dependence on how long the player takes to
+         * reach a particular screen. The table is built when the EMULATOR
+         * starts, not when character select appears, but nothing here has to
+         * assume that: it simply keeps looking until it succeeds.
+         *
+         * Every attempt is LOGGED with its number, so "swept 3 times, found
+         * nothing" can never be read as "never tried". */
+        /* ⭐⭐ THE PAGE-TABLE SWEEP -- budgeted, resumable, and retried.
+         *
+         * ⚠ 25 ms per tick, not one blocking pass. MEASURED: 1937 ms for
+         * 529 MB, and the live process has ~1.5 GB writable, so a full sweep
+         * is ~5 SECONDS. Six retries unbudgeted would be a 30-second freeze,
+         * and this project has already shipped a 114 s stall and a 37 s one.
+         *
+         * ⭐ Resuming is SAFE here and that is a real distinction, not a
+         * convenience: a page table is a STATIC structure, so reading it
+         * across ticks cannot blend two moments. A memory SNAPSHOT cannot be
+         * resumed for exactly that reason. Same mechanism, opposite verdict,
+         * because the thing being read is different.
+         *
+         * ⚠ RETRIED until it finds something, so it cannot matter how long
+         * the player takes to reach any particular screen, and an early
+         * premature sweep cannot become a permanent false negative. */
+        if (!g_pt_done) {
+            static ec_ptrun runs[12];
             SIZE_T sc = 0;
-            unsigned nr = emu_cursor_find_pagetable(runs, 12, &sc), k;
-            g_pt_done = TRUE;
-            log_line("pagetable: swept %llu MB of writable memory; %u run(s) "
-                     "of >=8 consecutive in-arena pointers.",
-                     (unsigned long long)(sc / (1024 * 1024)), nr);
-            for (k = 0; k < nr; k++)
-                log_line("pagetable:   at 0x%llx  %u entries  stride 0x%llx  "
-                         "targets arena+0x%llx .. +0x%llx%s",
-                         (unsigned long long)runs[k].addr, runs[k].count,
-                         (unsigned long long)runs[k].stride,
-                         (unsigned long long)runs[k].first_tgt,
-                         (unsigned long long)runs[k].last_tgt,
-                         runs[k].stride ? "  <== CONSTANT STRIDE: a mapping "
-                                          "table" : "");
-            if (!nr)
-                log_line("pagetable: ⛔ no run found. Either the emulator does "
-                         "not use a flat pointer table, or it stores offsets "
-                         "rather than pointers. ⚠ %llu MB WAS examined, so "
-                         "this is a real negative for pointer tables.",
-                         (unsigned long long)(sc / (1024 * 1024)));
+            BOOL pass_done = FALSE;
+            unsigned nr = emu_cursor_find_pagetable(runs, 12, &sc, 25,
+                                                    &pass_done);
+            if (pass_done) {
+                unsigned k;
+                g_pt_tries++;
+                /* Stop on SUCCESS, or once enough full passes have run that a
+                 * negative means something rather than being premature. */
+                if (nr || g_pt_tries >= 4) g_pt_done = TRUE;
+
+                log_line("pagetable: pass %u complete -- swept %llu MB of "
+                         "writable memory; %u run(s) of >=8 consecutive "
+                         "in-arena pointers.",
+                         g_pt_tries, (unsigned long long)(sc / (1024 * 1024)),
+                         nr);
+                for (k = 0; k < nr; k++)
+                    log_line("pagetable:   at 0x%llx  %u entries  "
+                             "stride 0x%llx  targets arena+0x%llx .. +0x%llx%s",
+                             (unsigned long long)runs[k].addr, runs[k].count,
+                             (unsigned long long)runs[k].stride,
+                             (unsigned long long)runs[k].first_tgt,
+                             (unsigned long long)runs[k].last_tgt,
+                             runs[k].stride ? "  <== CONSTANT STRIDE: a "
+                                              "mapping table" : "");
+                if (!nr && g_pt_done)
+                    log_line("pagetable: ⛔ no run found in %u full pass(es). "
+                             "Either the emulator uses no flat pointer table, "
+                             "or it stores OFFSETS rather than pointers. ⚠ The "
+                             "memory WAS examined each pass, so this is a real "
+                             "negative -- not 'never tried'.", g_pt_tries);
+                else if (!nr)
+                    log_line("pagetable: nothing yet -- sweeping again (the "
+                             "emulator may still have been setting up).");
+            }
         }
 
         if (g_spr_pending && GetTickCount() - g_spr_at >= 100) {
