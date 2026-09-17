@@ -470,6 +470,31 @@ SIZE_T emu_cursor_capture_ram(ULONGLONG offset, SIZE_T len, const char *tag);
  * arena or that offset is not readable. */
 BOOL emu_cursor_peek(ULONGLONG offset, BYTE *out, SIZE_T len);
 
+/* --- THE WHOLE-PROCESS SAMPLER ------------------------------------------
+ *
+ * ⭐⭐ THE ONE UNTESTED ASSUMPTION: that guest RAM is inside the arena.
+ *
+ * Run 17 sampled the 256 MB arena on a 4 MB grid and found NO SH-4 code --
+ * every slice had lds_pr = 0, where real SH-4 has balanced prologue/epilogue
+ * pairs ([[cfc2-arena-map]]). But the arena is only what ONE constructor
+ * allocates, and this process has ~1726 MB of writable memory. Nothing has
+ * ever proven the emulator keeps guest RAM there.
+ *
+ * So sample EVERYTHING committed and writable, not just the arena. The game's
+ * executable is copied into guest RAM at boot, so wherever that RAM lives its
+ * low bytes are SH-4 code -- a signature with a known right answer and both
+ * controls verified.
+ *
+ * ⚠ Bounded by construction: ~375 slices of 4 KB is 1.5 MB of disk, and the
+ * detector runs offline where it can be checked. One run, one answer, either
+ * way.
+ *
+ * ⛔ Regions inside the arena are SKIPPED -- run 17 already covered them, and
+ * re-reporting them would pad the result with a known negative.
+ *
+ * Writes `cfc2_mem_<hex-address>.bin`. Returns how many slices were written. */
+unsigned emu_cursor_sample_process(SIZE_T stride, SIZE_T slice);
+
 /* --- THE PAGE-TABLE FINDER ----------------------------------------------
  *
  * ⭐⭐⭐ A POSITIVE IDENTIFICATION, not another shape match.

@@ -435,6 +435,17 @@ static void cursor_probe_tick(void)
                      "4 KB written, arena CONFIRMED populated (%u%% non-zero "
                      "at +16MB). Analyse OFFLINE with the SH-4 detector.",
                      wrote, nz * 100u / (unsigned)sizeof probe);
+
+            /* ⭐⭐ AND THE WHOLE PROCESS, not just the arena.
+             *
+             * Run 17's negative covers the arena only, and the arena is one
+             * constructor's 256 MB out of ~1726 MB committed. Nothing has ever
+             * proven the emulator keeps guest RAM there -- that assumption has
+             * been carried, untested, since the anchor was found.
+             *
+             * ⚠ Gated behind the SAME content check, so it cannot fire before
+             * the emulator has populated anything. */
+            emu_cursor_sample_process(0x400000, 0x1000);
         ram_done_check: ;
         }
 

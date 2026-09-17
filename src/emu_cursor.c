@@ -839,6 +839,71 @@ BOOL emu_cursor_peek(ULONGLONG offset, BYTE *out, SIZE_T len)
     return mem_copy(out, (const void *)(ULONG_PTR)(base + offset), len);
 }
 
+unsigned emu_cursor_sample_process(SIZE_T stride, SIZE_T slice)
+{
+    ULONGLONG addr = 0x10000, arena = 0, next = 0;
+    SIZE_T asize = 0;
+    MEMORY_BASIC_INFORMATION mbi;
+    unsigned wrote = 0, skipped_arena = 0;
+    BYTE *buf;
+
+    if (!stride || !slice) return 0;
+    (void)window(&arena, &asize);        /* may fail; then nothing is skipped */
+
+    buf = (BYTE *)malloc(slice);
+    if (!buf) return 0;
+
+    while (addr < 0x7FFFFFFF0000ULL) {
+        ULONGLONG region_end;
+
+        if (VirtualQuery((LPCVOID)(ULONG_PTR)addr, &mbi, sizeof mbi)
+                != sizeof mbi)
+            break;
+        region_end = (ULONGLONG)(ULONG_PTR)mbi.BaseAddress + mbi.RegionSize;
+
+        /* ⚠ PAGE_GUARD is 0x100 -- never mask Protect to a byte. */
+        if (mbi.State != MEM_COMMIT ||
+            (mbi.Protect & PAGE_GUARD) || (mbi.Protect & PAGE_NOACCESS) ||
+            !(mbi.Protect & (PAGE_READWRITE | PAGE_WRITECOPY |
+                             PAGE_EXECUTE_READWRITE))) {
+            addr = region_end;
+            continue;
+        }
+
+        for (; addr + slice <= region_end; addr += stride) {
+            char path[MAX_PATH];
+            FILE *f;
+            size_t n;
+
+            if (addr < next) continue;
+
+            /* Skip the arena: run 17 already sampled it in full. */
+            if (arena && addr >= arena && addr < arena + asize) {
+                skipped_arena++;
+                continue;
+            }
+            if (!mem_copy(buf, (const void *)(ULONG_PTR)addr, slice))
+                continue;
+
+            _snprintf(path, sizeof path, "cfc2_mem_%011llx.bin",
+                      (unsigned long long)addr);
+            f = fopen(path, "wb");
+            if (!f) continue;
+            n = fwrite(buf, 1, slice, f);
+            fclose(f);
+            /* ⚠ Count only what was ACTUALLY written. */
+            if (n == slice) wrote++;
+            next = addr + stride;
+        }
+        addr = region_end;
+    }
+    free(buf);
+    log_line("mem: sampled the whole process -- %u slice(s) written, %u "
+             "arena slice(s) skipped (run 17 covered those).",
+             wrote, skipped_arena);
+    return wrote;
+}
+
 SIZE_T emu_cursor_capture_ram(ULONGLONG offset, SIZE_T len, const char *tag)
 {
     ULONGLONG base;
