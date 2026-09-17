@@ -240,6 +240,22 @@ static DWORD    g_pt_progress_ms;
 static BOOL     g_spr_pending;
 static DWORD    g_spr_at;
 
+/* ⭐⭐ THE DISPLAY-LIST DIFF (run 20). See the long note at the capture site.
+ *
+ * ⚠ 64 KB per slot because run 19 measured the REAL content at 152 words, all
+ * at the very start; everything past it was 0xCDCD fill. 2 MB per slot would
+ * write 32 MB of fill to carry ~600 bytes of signal.
+ *
+ * ⚠ 16 slots at ~1 per tick spans several seconds of play, which is enough for
+ * the user to cross a dozen characters. The SERIES is the measurement -- a
+ * single capture, however large, cannot show a change. */
+#define DL_OFFSET   0x8900000ULL
+#define DL_LEN      0x10000
+#define DL_SLOTS    16
+static BOOL     g_dl_armed;
+static unsigned g_dl_slot;
+static DWORD    g_dl_last;
+
 /* How long to wait for ANY arrow edge before concluding the emulated game does
  * not use sKeyboard. 30 s of navigation is far more than enough. */
 #define CURSOR_EDGE_TIMEOUT_MS  30000
@@ -450,41 +466,110 @@ static void cursor_probe_tick(void)
              * ~1.7 MB of disk and several seconds for a known negative. */
             /* emu_cursor_sample_process(0x400000, 0x1000); */
 
-            /* ⭐⭐⭐ THE FRAMEBUFFER -- the one LIVE source that can answer
-             * "which character is selected", and the only one left.
+            /* ⛔⛔ RETIRED -- AND IT WAS NEVER A FRAMEBUFFER.
              *
-             * Run 10 PROVED arena+0x8900000 is ARGB1555 pixel data: 438
-             * distinct colours, alpha set throughout, 74% of bytes changing per
-             * frame, and a second copy at +0xa400000 matching at shift -0x18.
-             * It IS the live screen.
+             * This block captured 2 MB at arena+0x8900000 and +0xa400000 on the
+             * strength of run 10's conclusion that the first is "ARGB1555 pixel
+             * data: 438 distinct colours, alpha set throughout". Run 19 read the
+             * full 2 MB and refuted it:
              *
-             * And the user described what to look for: "the pulsing RED or BLUE
-             * outline around the character moves to the other character". So
-             * the selection is VISIBLE, at a grid position we measured exactly
-             * (5 cols x 10 rows, 64px cells, 74px pitch).
+             *     +0x8900000   99.99% is 0xCDCD -- MSVC never-written heap fill
+             *     +0xa400000   100% ZEROS, one distinct byte value
              *
-             * ⭐ This is not another search. It reads a KNOWN buffer at a KNOWN
-             * offset in a KNOWN format, looking for a colour the player named.
-             * Every failed route hunted an unknown value at an unknown place.
+             * ⛔⛔ 0xCDCD HAS BIT 15 SET IN 100% OF WORDS, exactly like
+             * ARGB1555. Run 10 sampled 32 KB of a fill region and I read the
+             * fill's shape as a pixel format. The "second copy matching at shift
+             * -0x18" was two fill regions matching, not two frames.
              *
-             * ⚠ We have only ever captured 32 KB of it -- ~5% of a frame --
-             * because the sprite capture hardcoded that length. Run 15's
-             * reacting pages show the cluster spans at least +0x8900000..
-             * +0x890f000. Take 2 MB from each buffer so the offline analysis
-             * can find the real extent, stride and pixel layout.
+             * ⚠ And I had ALREADY DOCUMENTED that trap in run 17 -- then walked
+             * into it, because run 10's conclusion was written down and I
+             * treated the note as evidence. A recorded conclusion is not a
+             * measurement; re-derive it when you sample the same place again.
              *
-             * ⛔ If the buffer turns out tiled or swizzled rather than a linear
-             * image, locating the outline gets much harder -- which is exactly
-             * why this dumps bytes for offline analysis instead of trying to
-             * interpret anything live. */
-            if (emu_cursor_capture_ram(0x8900000ULL, 0x200000, "fb_a"))
-                log_line("fb: captured 2 MB at arena+0x8900000 (buffer A).");
-            if (emu_cursor_capture_ram(0xa400000ULL, 0x200000, "fb_b"))
-                log_line("fb: captured 2 MB at arena+0xa400000 (buffer B). "
-                         "⚠ Analyse OFFLINE: confirm it is a linear ARGB1555 "
-                         "image and find its width before trusting any pixel "
-                         "coordinate.");
+             * There is no image here, so there is no outline to find, and the
+             * whole pixel route is closed. See memory cfc2-not-a-framebuffer. */
+
+            /* ⭐⭐⭐ WHAT IS ACTUALLY THERE: A DISPLAY LIST -- and it is better.
+             *
+             * The 152 words of REAL content at the very start of +0x8900000
+             * decode cleanly as render commands:
+             *
+             *     floats +-64, +-47      quad VERTEX COORDINATES (128x94 sprite)
+             *     floats 1.0, 0.75, 0.269  colour / UV multipliers
+             *     u32 0x0CE80010, 0x0CE80018, 0x0CE80038, 0x0CC00000
+             *
+             * ⭐⭐ Those u32s are NAOMI GUEST ADDRESSES (0x0C...... is the
+             * uncached view of guest system RAM), and 0x0CE80000 is the address
+             * an earlier session pinned for AFS entry[11]'s texture table.
+             *
+             * ⭐ A display list NAMES WHAT IS BEING DRAWN. A framebuffer would
+             * have required finding a coloured outline in pixels and hoping the
+             * buffer was linear rather than twiddled. Here, if the selection
+             * highlight is a quad, its vertex coordinates give the screen
+             * position DIRECTLY -- and the grid geometry is already measured
+             * (5x10, 64px cells, 74px pitch, origin 180,32). If its TEXTURE
+             * pointer changes with the cursor, that names the character outright.
+             *
+             * ⭐⭐ AND THIS IS A DIFF, NOT A SEARCH. Every route that failed
+             * hunted something cursor-shaped in an unknown place. This watches a
+             * KNOWN 64 KB window change while the player moves -- anchor on what
+             * CHANGES, identify last. The diff is against 152 words, not 91 MB.
+             *
+             * ⚠ 64 KB, not 2 MB: the real content was 152 words and everything
+             * past it was fill. A 2 MB capture per slot would write 32 MB for
+             * ~600 bytes of signal.
+             *
+             * ⚠ SERIAL SLOTS, NOT ONE FILE. A single overwritten capture cannot
+             * show a change; and the probe must sample on the GAME'S schedule,
+             * not the user's -- so this takes a slot every tick regardless of
+             * keypresses, and the offline diff finds which words move. Slots are
+             * numbered so "wrote 12 slots" can never read as "wrote nothing". */
+            g_dl_armed = TRUE;
+            log_line("dl: display-list capture ARMED at arena+0x%llx (%u KB per "
+                     "slot, %u slots). ⚠ NOT a framebuffer -- run 19 refuted "
+                     "that. Move the cursor on CHARACTER SELECT while these "
+                     "write, then diff them OFFLINE.",
+                     (unsigned long long)DL_OFFSET, (unsigned)(DL_LEN / 1024),
+                     (unsigned)DL_SLOTS);
         ram_done_check: ;
+        }
+
+        /* ⭐⭐ THE SLOT WRITER -- one capture per 300 ms, unconditionally.
+         *
+         * ⚠ NOT gated on a keypress. A probe must sample on the GAME'S
+         * schedule, not the user's: an event-triggered sampler cannot bracket a
+         * change it did not predict, and that error has cost this project four
+         * play sessions. It writes on a clock and the offline diff decides.
+         *
+         * ⚠ 300 ms, not every tick. The user moves roughly every 600 ms, so
+         * successive slots land on either side of a movement; faster just
+         * doubles the disk for the same evidence.
+         *
+         * ⚠ Stops at DL_SLOTS. A wraparound overwriting slot 0 would make an
+         * old capture look fresh -- the exact confusion that a series exists to
+         * avoid. A bounded recorder must report its own saturation. */
+        if (g_dl_armed && g_dl_slot < DL_SLOTS &&
+            GetTickCount() - g_dl_last > 300) {
+            char tag[32];
+            g_dl_last = GetTickCount();
+            _snprintf(tag, sizeof tag, "dl%02u", g_dl_slot);
+            if (emu_cursor_capture_ram(DL_OFFSET, DL_LEN, tag)) {
+                g_dl_slot++;
+                if (g_dl_slot == DL_SLOTS)
+                    log_line("dl: ⭐ %u slot(s) written, capture COMPLETE "
+                             "(cfc2_ram_dl00.bin .. dl%02u.bin). Diff them "
+                             "OFFLINE: a word that moves with the cursor is the "
+                             "highlight. ⚠ If you were NOT on character select "
+                             "for these, the series says nothing -- rerun.",
+                             (unsigned)DL_SLOTS, (unsigned)(DL_SLOTS - 1));
+            } else {
+                /* ⚠ A failed read is NOT an empty slot. Say so, or "8 slots"
+                 * silently means something different than it appears to. */
+                log_line("dl: ⚠ could not read arena+0x%llx for slot %u -- "
+                         "NOTHING written. This says nothing about its "
+                         "contents.",
+                         (unsigned long long)DL_OFFSET, g_dl_slot);
+            }
         }
 
         /* ⭐⭐ THE PAGE-TABLE SWEEP -- budgeted, resumable, and retried.
