@@ -287,16 +287,17 @@ static void cursor_probe_report(void)
     {
         ULONGLONG pg[64];
         unsigned np = emu_cursor_pages(pg, 64);
-        if (np && np != g_scan_npages_set) {
-            if (emu_cursor_scan_set_pages(pg, np)) {
-                g_scan_npages_set = np;
-                g_scan_len_set = TRUE;
-                log_line("cursor: continuous scan AIMED at %u page(s) "
-                         "(%u KB). It samples every 20 ms and separates IDLE "
-                         "changes from input-driven ones -- animation changes "
-                         "while you do nothing, a cursor does not.",
-                         np, np * 4);
-            }
+        /* ⭐ ADD, never replace. The reacting set wobbles every cycle, and
+         * rebuilding the table on each wobble reset all accumulated history --
+         * which made a whole run report "2 distinct, 1 change" on every field.
+         * The set only grows; 124 KB of pages costs ~0.14 ms per tick. */
+        if (np && emu_cursor_scan_add_pages(pg, np)) {
+            g_scan_len_set = TRUE;
+            log_line("cursor: continuous scan now covers %u page(s). It "
+                     "samples every 20 ms and separates IDLE changes from "
+                     "input-driven ones -- animation changes while you do "
+                     "nothing, a cursor does not. History is KEPT across "
+                     "updates.", emu_cursor_scan_npages());
         }
     }
 

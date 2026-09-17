@@ -403,49 +403,97 @@ static SIZE_T     g_scan_len;
 static BYTE      *g_scan_prev;     /* last sample, for change detection     */
 static ec_scan   *g_scan;          /* one per byte                          */
 static unsigned  *g_scan_seen;     /* value bitmap 0..63 per byte           */
-static BOOL       g_scan_primed;
+static BYTE      *g_scan_pprimed;   /* per-PAGE seed flag */
 
 void emu_cursor_scan_reset(void)
 {
     if (g_scan_prev) { free(g_scan_prev); g_scan_prev = NULL; }
     if (g_scan)      { free(g_scan);      g_scan = NULL; }
     if (g_scan_seen) { free(g_scan_seen); g_scan_seen = NULL; }
-    if (g_scan_pages) { free(g_scan_pages); g_scan_pages = NULL; }
+    if (g_scan_pages)   { free(g_scan_pages);   g_scan_pages = NULL; }
+    if (g_scan_pprimed) { free(g_scan_pprimed); g_scan_pprimed = NULL; }
     g_scan_len = 0;
     g_scan_npages = 0;
-    g_scan_primed = FALSE;
 }
 
-BOOL emu_cursor_scan_set_pages(const ULONGLONG *offsets, unsigned n)
+/* ⭐⭐ ALLOCATE FOR THE MAXIMUM ONCE, THEN ONLY EVER APPEND.
+ *
+ * ⛔⛔ The reason is a bug that cost a whole run. The first version rebuilt the
+ * table whenever the watched set changed -- and the reacting set naturally
+ * wobbles (31/28/30/31/30/29/11 pages within one 26-second run). Every rebuild
+ * called emu_cursor_scan_reset() and DESTROYED all accumulated history, so the
+ * scan restarted every ~3 seconds. Every field read "2 distinct, 1 change":
+ * the signature of a scan that had only just begun.
+ *
+ * ⭐ Same class of error as the differential probe's per-cycle pruning --
+ * throwing away evidence BETWEEN observations. A field's history IS the
+ * measurement.
+ *
+ * Allocating the full 256-page capacity up front (1 MB of records) removes the
+ * problem at the root: adding a page is an append, nothing is reallocated, and
+ * no existing page's history can be disturbed. There was never memory pressure
+ * to justify the rebuild -- 31 pages is 124 KB. */
+static BOOL scan_alloc(void)
 {
-    SIZE_T i, total;
-    unsigned k;
+    SIZE_T total = (SIZE_T)SCAN_MAX_PAGES * EC_PAGE;
 
-    emu_cursor_scan_reset();
-    if (!offsets || n == 0) return TRUE;
-    if (n > SCAN_MAX_PAGES) n = SCAN_MAX_PAGES;
-
-    total = (SIZE_T)n * EC_PAGE;
-    g_scan_pages = (ULONGLONG *)calloc(n, sizeof(ULONGLONG));
-    g_scan_prev  = (BYTE *)calloc(total, 1);
-    g_scan       = (ec_scan *)calloc(total, sizeof(ec_scan));
-    g_scan_seen  = (unsigned *)calloc(total, sizeof(unsigned));
-    if (!g_scan_pages || !g_scan_prev || !g_scan || !g_scan_seen) {
+    if (g_scan) return TRUE;
+    g_scan_pages   = (ULONGLONG *)calloc(SCAN_MAX_PAGES, sizeof(ULONGLONG));
+    g_scan_pprimed = (BYTE *)calloc(SCAN_MAX_PAGES, 1);
+    g_scan_prev    = (BYTE *)calloc(total, 1);
+    g_scan         = (ec_scan *)calloc(total, sizeof(ec_scan));
+    g_scan_seen    = (unsigned *)calloc(total, sizeof(unsigned));
+    if (!g_scan_pages || !g_scan_pprimed || !g_scan_prev ||
+        !g_scan || !g_scan_seen) {
         emu_cursor_scan_reset();
         return FALSE;
     }
-    for (k = 0; k < n; k++) {
-        g_scan_pages[k] = offsets[k];
-        for (i = 0; i < EC_PAGE; i++) {
-            SIZE_T x = (SIZE_T)k * EC_PAGE + i;
-            g_scan[x].offset = offsets[k] + i;
-            g_scan[x].vmin   = 0xFFFFFFFFu;
-        }
-    }
-    g_scan_npages = n;
-    g_scan_len = total;
     return TRUE;
 }
+
+/* Add pages to the watched set. Existing pages keep every sample they have.
+ * Returns TRUE if anything new was added. */
+BOOL emu_cursor_scan_add_pages(const ULONGLONG *offsets, unsigned n)
+{
+    unsigned i, k;
+    BOOL added = FALSE;
+
+    if (!offsets || n == 0) return FALSE;
+    if (!scan_alloc()) return FALSE;
+
+    for (i = 0; i < n; i++) {
+        BOOL seen = FALSE;
+        SIZE_T base, x;
+
+        for (k = 0; k < g_scan_npages; k++)
+            if (g_scan_pages[k] == offsets[i]) { seen = TRUE; break; }
+        if (seen) continue;
+        if (g_scan_npages >= SCAN_MAX_PAGES) break;   /* full: keep what we have */
+
+        k = g_scan_npages++;
+        g_scan_pages[k] = offsets[i];
+        g_scan_pprimed[k] = 0;            /* ⚠ seed on its first read */
+        base = (SIZE_T)k * EC_PAGE;
+        for (x = 0; x < EC_PAGE; x++) {
+            g_scan[base + x].offset = offsets[i] + x;
+            g_scan[base + x].vmin   = 0xFFFFFFFFu;
+        }
+        added = TRUE;
+    }
+    if (added) g_scan_len = (SIZE_T)g_scan_npages * EC_PAGE;
+    return added;
+}
+
+/* Replace the watched set outright, discarding history. ⚠ Only for tests and
+ * an explicit restart -- the live path uses emu_cursor_scan_add_pages(). */
+BOOL emu_cursor_scan_set_pages(const ULONGLONG *offsets, unsigned n)
+{
+    emu_cursor_scan_reset();
+    if (!offsets || n == 0) return TRUE;
+    return emu_cursor_scan_add_pages(offsets, n);
+}
+
+unsigned emu_cursor_scan_npages(void) { return g_scan_npages; }
 
 BOOL emu_cursor_scan_tick(BOOL input_recent)
 {
@@ -468,7 +516,8 @@ BOOL emu_cursor_scan_tick(BOOL input_recent)
         /* ⚠ The FIRST sample of a page is a seed, not an observation. Counting
          * it would give every byte a phantom change and make the idle
          * discriminator meaningless on short sessions. */
-        if (!g_scan_primed) {
+        if (!g_scan_pprimed[k]) {
+            g_scan_pprimed[k] = 1;
             memcpy(g_scan_prev + off, buf, EC_PAGE);
             for (i = 0; i < EC_PAGE; i++) {
                 BYTE v = buf[i];
@@ -504,7 +553,6 @@ BOOL emu_cursor_scan_tick(BOOL input_recent)
             g_scan_prev[x] = v;
         }
     }
-    g_scan_primed = TRUE;
     return TRUE;
 }
 

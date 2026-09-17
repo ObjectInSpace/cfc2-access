@@ -633,6 +633,70 @@ int main(void)
         }
     }
 
+    printf("\n--- 13. HISTORY SURVIVES adding pages ---------------------\n");
+    {
+        /* ⛔⛔ THE BUG THIS PINS, which cost an entire run.
+         * The reacting page set wobbles every cycle. The first version rebuilt
+         * the scan table on each change, which RESET all accumulated history --
+         * so every field reported "2 distinct, 1 change" forever and the scan
+         * could never establish a range. */
+        BYTE *w = (BYTE *)VirtualAlloc(NULL, 0x3000, MEM_COMMIT | MEM_RESERVE,
+                                       PAGE_READWRITE);
+        ULONGLONG p1[1] = { 0x0000 };
+        ULONGLONG p2[2] = { 0x0000, 0x2000 };
+        ec_scan sc[8];
+        unsigned ns, i, before;
+
+        check("13-setup", w != NULL, "");
+        if (w) {
+            memset(w, 0, 0x3000);
+            emu_cursor_test_window((ULONGLONG)(ULONG_PTR)w, 0x3000);
+            emu_cursor_scan_set_pages(p1, 1);
+
+            /* Build up history on page 0. */
+            w[0x10] = 0;
+            emu_cursor_scan_tick(FALSE);
+            for (i = 1; i <= 10; i++) {
+                w[0x10] = (BYTE)i;
+                emu_cursor_scan_tick(TRUE);
+            }
+            ns = emu_cursor_scan_report(sc, 8);
+            check("13a history accumulated before the change",
+                  ns >= 1 && sc[0].distinct >= 10,
+                  "distinct=%u", ns ? sc[0].distinct : 0);
+            before = ns ? sc[0].distinct : 0;
+
+            /* Now ADD a second page -- the wobble that used to wipe everything. */
+            check("13b adding a page reports a change",
+                  emu_cursor_scan_add_pages(p2, 2), "");
+            check("13c the set GREW to 2 pages",
+                  emu_cursor_scan_npages() == 2,
+                  "npages=%u", emu_cursor_scan_npages());
+
+            ns = emu_cursor_scan_report(sc, 8);
+            check("13d page 0's HISTORY SURVIVED the add",
+                  ns >= 1 && sc[0].distinct >= before,
+                  "distinct was %u, now %u", before, ns ? sc[0].distinct : 0);
+
+            /* And the newly added page must SEED, not count 4096 phantom
+             * changes on its first read. */
+            w[0x2000 + 0x20] = 99;
+            emu_cursor_scan_tick(FALSE);
+            ns = emu_cursor_scan_report(sc, 8);
+            for (i = 0; i < ns; i++)
+                if (sc[i].offset == 0x2000 + 0x20) break;
+            check("13e a NEWLY ADDED page seeds rather than reporting "
+                  "phantom changes",
+                  i == ns || sc[i].changes == 0,
+                  "the new page reported %u change(s) on its first read",
+                  i < ns ? sc[i].changes : 0);
+
+            emu_cursor_scan_set_pages(NULL, 0);
+            emu_cursor_test_window(0, 0);
+            VirtualFree(w, 0, MEM_RELEASE);
+        }
+    }
+
     emu_cursor_test_window(0, 0);
     emu_cursor_reset();
     VirtualFree(g_fx, 0, MEM_RELEASE);

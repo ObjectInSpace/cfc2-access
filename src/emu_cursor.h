@@ -328,6 +328,30 @@ typedef struct {
  * Passing n = 0 stops the scan. */
 BOOL emu_cursor_scan_set_pages(const ULONGLONG *offsets, unsigned n);
 
+/* ADD pages to the watched set, KEEPING every existing page's history.
+ *
+ * ⛔⛔ THIS EXISTS BECAUSE REBUILDING THE SET DESTROYED THE MEASUREMENT.
+ * The reacting set wobbles constantly -- 31/28/30/31/30/29/11 pages within one
+ * 26-second run -- and the first version rebuilt the table on every change,
+ * resetting all accumulated history. The scan restarted every ~3 seconds, so
+ * every field reported "2 distinct, 1 change": the signature of a scan that had
+ * only just begun. A whole run produced nothing for that reason alone.
+ *
+ * ⭐ Same class of error as the differential probe's per-cycle pruning:
+ * throwing away evidence BETWEEN observations. A field's history IS the
+ * measurement, and a set that shrinks must not take it away.
+ *
+ * The watched set therefore only ever GROWS. Storage is allocated once for the
+ * 256-page maximum so adding a page is an append that cannot disturb anything
+ * already recorded, and there was never memory pressure to justify otherwise:
+ * 31 pages is 124 KB.
+ *
+ * Returns TRUE if anything new was added. */
+BOOL emu_cursor_scan_add_pages(const ULONGLONG *offsets, unsigned n);
+
+/* How many pages are currently watched. */
+unsigned emu_cursor_scan_npages(void);
+
 /* Sample the whole region once. `input_recent` tells it whether a key went
  * down within the last few hundred ms, which is what separates idle changes
  * from input-driven ones.
