@@ -609,6 +609,96 @@ unsigned emu_cursor_scan_report(ec_scan *out, unsigned cap)
     return n;
 }
 
+/* --- The page-table finder ----------------------------------------------- */
+
+#define PT_CHUNK    0x40000u     /* 256 KB per guarded read, like emu_ram */
+#define PT_MIN_RUN  8u           /* shorter runs are coincidence          */
+
+/* ⚠ A varied stride is reported as 0, never averaged -- an averaged stride
+ * would invent a regularity that is not in the data. */
+unsigned emu_cursor_find_pagetable(ec_ptrun *out, unsigned cap,
+                                   SIZE_T *scanned_out)
+{
+    ULONGLONG base, lo, hi, addr, region_end = 0;
+    SIZE_T size, scanned = 0;
+    MEMORY_BASIC_INFORMATION mbi;
+    static BYTE buf[PT_CHUNK];
+    unsigned n = 0;
+    ec_ptrun cur;
+
+    if (scanned_out) *scanned_out = 0;
+    if (!out || !cap) return 0;
+    if (window(&base, &size) != EC_OK) {
+        log_line("pagetable: could not resolve the arena -- NOTHING was "
+                 "examined. This says nothing about whether a table exists.");
+        return 0;
+    }
+    lo = base; hi = base + size;
+    memset(&cur, 0, sizeof cur);
+
+    addr = 0x10000;                          /* skip the null page */
+    while (addr < 0x7FFFFFFF0000ULL) {
+        SIZE_T want = PT_CHUNK, i;
+
+        if (addr >= region_end) {
+            if (VirtualQuery((LPCVOID)(ULONG_PTR)addr, &mbi, sizeof mbi)
+                    != sizeof mbi)
+                break;
+            region_end = (ULONGLONG)(ULONG_PTR)mbi.BaseAddress + mbi.RegionSize;
+            /* ⚠ PAGE_GUARD is 0x100 -- never mask Protect to a byte. */
+            if (mbi.State != MEM_COMMIT ||
+                (mbi.Protect & PAGE_GUARD) || (mbi.Protect & PAGE_NOACCESS) ||
+                !(mbi.Protect & (PAGE_READWRITE | PAGE_WRITECOPY |
+                                 PAGE_EXECUTE_READWRITE))) {
+                addr = region_end; cur.count = 0; continue;
+            }
+        }
+        if (addr + want > region_end) want = (SIZE_T)(region_end - addr);
+        if (want < 8) { addr = region_end; continue; }
+        if (!mem_copy(buf, (const void *)(ULONG_PTR)addr, want)) {
+            addr += want; cur.count = 0; continue;
+        }
+        scanned += want;
+
+        for (i = 0; i + 8 <= want; i += 8) {
+            ULONGLONG v;
+            memcpy(&v, buf + i, 8);
+
+            if (v >= lo && v < hi) {
+                ULONGLONG tgt = v - base;
+                if (cur.count == 0) {
+                    cur.addr = addr + i; cur.first_tgt = tgt;
+                    cur.stride = 0; cur.entry_bytes = 8;
+                } else {
+                    ULONGLONG st = tgt - cur.last_tgt;
+                    if (cur.count == 1) cur.stride = st;
+                    else if (cur.stride != st) cur.stride = 0;
+                }
+                cur.last_tgt = tgt;
+                cur.count++;
+                continue;
+            }
+
+            if (cur.count >= PT_MIN_RUN) {
+                if (n < cap) out[n++] = cur;
+                else {
+                    unsigned k, worst = 0;
+                    for (k = 1; k < cap; k++)
+                        if (out[k].count < out[worst].count) worst = k;
+                    if (cur.count > out[worst].count) out[worst] = cur;
+                }
+            }
+            cur.count = 0;
+        }
+        addr += want;
+    }
+    if (cur.count >= PT_MIN_RUN && n < cap) out[n++] = cur;
+
+    if (scanned_out) *scanned_out = scanned;
+    return n;
+}
+
+
 /* --- Sprite-list capture ------------------------------------------------- */
 
 #define SPR_A_OFF   0x8900000ULL     /* the two mirrored 32 KB clusters */

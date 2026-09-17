@@ -411,6 +411,51 @@ void emu_cursor_scan_reset(void);
  * Returns the number of bytes written, 0 on failure. */
 SIZE_T emu_cursor_capture_sprites(const char *tag);
 
+/* --- THE PAGE-TABLE FINDER ----------------------------------------------
+ *
+ * ⭐⭐⭐ A POSITIVE IDENTIFICATION, not another shape match.
+ *
+ * Ten runs of searching for something cursor-SHAPED have closed three routes.
+ * This asks a different question, and it is the one this project is 4-for-4
+ * with: read the answer out of the emulator's own data.
+ *
+ * An emulator translates guest addresses to host ones on every memory access.
+ * It does that through a TABLE: an array of host pointers indexed by guest
+ * page. That table must exist, and it must contain pointers INTO THE ARENA.
+ *
+ * ⭐ And we already know one host address that IS guest memory: the
+ * framebuffer at arena+0x8900000, proven to be ARGB1555 pixels
+ * ([[cfc2-clusters-are-framebuffer]]). So the table contains an entry pointing
+ * at or near it, and THE INDEX OF THAT ENTRY GIVES THE MAPPING DIRECTLY --
+ * entry i covers guest address i * stride.
+ *
+ * ⚠⚠ WHY THIS IS NOT THE FAILED METHOD AGAIN. The earlier scans asked "does
+ * this value look like a cursor?", which countless values do. This asks "is
+ * there a long ascending run of pointers into the arena at a constant stride?"
+ * -- and nothing except a page table looks like that. The signature is
+ * structural, not statistical, and a single run of 100+ entries settles it.
+ *
+ * ⚠ It is also cheap and needs nothing from the player: one pass over
+ * writable memory, 8-byte aligned, one VirtualQuery per REGION (never per
+ * item -- that has hung this game three times). */
+
+typedef struct {
+    ULONGLONG addr;        /* where the run starts                          */
+    unsigned  count;       /* how many consecutive in-arena pointers        */
+    ULONGLONG stride;      /* bytes between successive TARGETS, 0 if varied */
+    ULONGLONG first_tgt;   /* arena offset the first entry points at        */
+    ULONGLONG last_tgt;
+    unsigned  entry_bytes; /* 8 for a plain pointer array                   */
+} ec_ptrun;
+
+/* Sweep writable memory for runs of pointers into [arena, arena+256MB).
+ * Reports the longest runs first. Returns how many were written.
+ *
+ * ⚠ Returns 0 and logs if the arena cannot be resolved -- "could not look"
+ * must never read as "there is no table". */
+unsigned emu_cursor_find_pagetable(ec_ptrun *out, unsigned cap,
+                                   SIZE_T *scanned_out);
+
 /* --- Offline test seam ---------------------------------------------------
  * Point the probe at a planted fixture instead of the live arena. Passing
  * (0, 0) restores live derivation.

@@ -697,6 +697,57 @@ int main(void)
         }
     }
 
+    printf("\n--- 14. THE PAGE-TABLE FINDER ----------------------------\n");
+    {
+        /* Plant a fake arena and a fake page table pointing into it, then
+         * require the finder to report the run WITH ITS STRIDE -- because the
+         * stride is what turns a run of pointers into a mapping. */
+        SIZE_T asz = 0x10000;
+        BYTE *arena = (BYTE *)VirtualAlloc(NULL, asz, MEM_COMMIT | MEM_RESERVE,
+                                           PAGE_READWRITE);
+        ULONGLONG *tbl = (ULONGLONG *)VirtualAlloc(NULL, 0x1000,
+                              MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        ec_ptrun runs[8];
+        SIZE_T sc = 0;
+        unsigned nr, i, found = 0;
+
+        check("14-setup", arena && tbl, "");
+        if (arena && tbl) {
+            emu_cursor_test_window((ULONGLONG)(ULONG_PTR)arena, asz);
+
+            /* 32 entries, each mapping a 0x800-byte guest page. */
+            for (i = 0; i < 32; i++)
+                tbl[i] = (ULONGLONG)(ULONG_PTR)arena + (ULONGLONG)i * 0x800;
+            tbl[32] = 0;                       /* terminate the run */
+
+            nr = emu_cursor_find_pagetable(runs, 8, &sc);
+            check("14a the sweep EXAMINED memory (a positive count)",
+                  sc > 0, "scanned %llu bytes", (unsigned long long)sc);
+
+            for (i = 0; i < nr; i++)
+                if (runs[i].count >= 32 && runs[i].stride == 0x800) found = 1;
+            check("14b the planted table is found WITH its stride",
+                  found, "%u run(s) reported, none with 32 entries @0x800", nr);
+
+            /* ⛔ The discriminating case: a run whose targets are NOT evenly
+             * spaced must report stride 0, not an invented average. A wrong
+             * stride would give a wrong guest mapping, which is worse than
+             * none -- it would read plausible garbage at confident addresses. */
+            for (i = 0; i < 32; i++)
+                tbl[i] = (ULONGLONG)(ULONG_PTR)arena + (ULONGLONG)(i * i) * 0x40;
+            nr = emu_cursor_find_pagetable(runs, 8, &sc);
+            found = 0;
+            for (i = 0; i < nr; i++)
+                if (runs[i].count >= 32 && runs[i].stride != 0) found = 1;
+            check("14c an UNEVEN run reports stride 0, never an average",
+                  !found, "an uneven run was given a stride");
+
+            emu_cursor_test_window(0, 0);
+            VirtualFree(arena, 0, MEM_RELEASE);
+            VirtualFree(tbl, 0, MEM_RELEASE);
+        }
+    }
+
     emu_cursor_test_window(0, 0);
     emu_cursor_reset();
     VirtualFree(g_fx, 0, MEM_RELEASE);
