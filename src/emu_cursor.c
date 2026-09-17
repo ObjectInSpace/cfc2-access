@@ -624,6 +624,21 @@ void emu_cursor_test_pt_chunk_limit(unsigned chunks)
     g_pt_chunk_limit = chunks;
 }
 
+/* ⛔⛔ RUNS MUST ACCUMULATE ACROSS RESUMED CALLS.
+ *
+ * `n` was a per-call local, so every 25 ms slice started from zero and only
+ * runs found in the FINAL slice survived. Run 12's log shows it exactly:
+ *
+ *   sweeping... 1709 MB examined, 12 run(s) held
+ *   pass 1 complete -- swept 1728 MB; 0 run(s)
+ *
+ * Twelve runs found, then discarded by the call that finished the pass. The
+ * same class of error as the scan's rebuild-on-rearm and the differential
+ * probe's per-cycle pruning: throwing away evidence between observations.
+ * Third instance on this branch. */
+static ec_ptrun  g_pt_runs[16];
+static unsigned  g_pt_nruns;
+
 static ULONGLONG g_pt_resume;      /* where the last budgeted pass stopped */
 
 ULONGLONG emu_cursor_pt_resume(void) { return g_pt_resume; }
@@ -665,6 +680,8 @@ unsigned emu_cursor_find_pagetable(ec_ptrun *out, unsigned cap,
             g_pt_resume = addr;
             g_pt_scanned += scanned;
             if (scanned_out) *scanned_out = g_pt_scanned;
+            n = g_pt_nruns < cap ? g_pt_nruns : cap;
+            memcpy(out, g_pt_runs, n * sizeof(ec_ptrun));
             return n;                       /* more to do; *done stays FALSE */
         }
 
@@ -709,24 +726,35 @@ unsigned emu_cursor_find_pagetable(ec_ptrun *out, unsigned cap,
             }
 
             if (cur.count >= PT_MIN_RUN) {
-                if (n < cap) out[n++] = cur;
+                unsigned lim = (unsigned)(sizeof g_pt_runs /
+                                          sizeof g_pt_runs[0]);
+                if (g_pt_nruns < lim) g_pt_runs[g_pt_nruns++] = cur;
                 else {
                     unsigned k, worst = 0;
-                    for (k = 1; k < cap; k++)
-                        if (out[k].count < out[worst].count) worst = k;
-                    if (cur.count > out[worst].count) out[worst] = cur;
+                    for (k = 1; k < lim; k++)
+                        if (g_pt_runs[k].count < g_pt_runs[worst].count)
+                            worst = k;
+                    if (cur.count > g_pt_runs[worst].count)
+                        g_pt_runs[worst] = cur;
                 }
             }
             cur.count = 0;
         }
         addr += want;
     }
-    if (cur.count >= PT_MIN_RUN && n < cap) out[n++] = cur;
+    if (cur.count >= PT_MIN_RUN) {
+        unsigned lim = (unsigned)(sizeof g_pt_runs / sizeof g_pt_runs[0]);
+        if (g_pt_nruns < lim) g_pt_runs[g_pt_nruns++] = cur;
+    }
 
     g_pt_scanned += scanned;
     if (scanned_out) *scanned_out = g_pt_scanned;
+    n = g_pt_nruns < cap ? g_pt_nruns : cap;
+    memcpy(out, g_pt_runs, n * sizeof(ec_ptrun));
+
     g_pt_resume = 0;                        /* wrapped: next call restarts */
     g_pt_scanned = 0;
+    g_pt_nruns = 0;                         /* only NOW is the pass over */
     if (done) *done = TRUE;
     return n;
 }

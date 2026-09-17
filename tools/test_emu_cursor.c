@@ -766,6 +766,33 @@ int main(void)
                 }
                 check("14e resuming across calls still FINDS the table",
                       found, "%u call(s), never found it", guard);
+
+                /* ⛔⛔ THE CASE 14e MISSED, and run 12 paid for it.
+                 * 14e accepts a hit on ANY call, so it passed while runs were
+                 * being discarded on every call and only the last slice's
+                 * survived. The live log showed it exactly:
+                 *     "1709 MB examined, 12 run(s) held"
+                 *     "pass 1 complete -- swept 1728 MB; 0 run(s)"
+                 * Twelve found, then thrown away by the call that finished.
+                 * A run found EARLY must still be present in the FINAL,
+                 * completing call's result. */
+                {
+                    BOOL d2 = FALSE;
+                    unsigned last_nr = 0, g2 = 0;
+                    emu_cursor_test_pt_chunk_limit(1);
+                    while (!d2 && g2++ < 100000)
+                        last_nr = emu_cursor_find_pagetable(runs, 8, &sc, 0,
+                                                            &d2);
+                    found = 0;
+                    for (i = 0; i < last_nr; i++)
+                        if (runs[i].count >= 32 && runs[i].stride == 0x800)
+                            found = 1;
+                    check("14f the COMPLETING call still reports runs found "
+                          "EARLY in the pass",
+                          found,
+                          "the final call reported %u run(s) -- earlier finds "
+                          "were discarded", last_nr);
+                }
                 emu_cursor_test_pt_chunk_limit(0);
             }
 
