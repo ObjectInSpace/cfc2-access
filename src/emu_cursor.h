@@ -380,6 +380,37 @@ void emu_cursor_scan_population(unsigned *moved, unsigned *quiet,
 
 void emu_cursor_scan_reset(void);
 
+/* --- THE SPRITE-LIST CAPTURE --------------------------------------------
+ *
+ * ⭐⭐ THIS IS THE ROUTE AT THE USER'S ACTUAL GOAL, and it skips the index.
+ *
+ * The selection is DRAWN. Run 8 showed the fields that change only on input are
+ * a double-buffered sprite list: two 32 KB clusters exactly 0x1B00000 apart
+ * ([[cfc2-double-buffered-sprite-lists]]). If the highlighted portrait's record
+ * carries a TILE ID, that id names the character directly -- no cursor
+ * variable, no index -> name mapping, no 48-cell table to learn.
+ *
+ * ⛔ But a record LAYOUT cannot be inferred from five scattered byte offsets,
+ * which is all the probes ever produced. It is visible in the BYTES: repeating
+ * structure, aligned fields, ids in a plausible range. Nobody has looked at a
+ * single byte of these clusters.
+ *
+ * So: capture them to disk and analyse OFFLINE, for as long as it takes, with
+ * no further play sessions. 32 KB x 2 is nothing to write.
+ *
+ * ⭐ TWO captures, before and after a cursor move, so the DIFF names the record
+ * that changed. A sprite list holds hundreds of records; the highlight should
+ * be one of them.
+ *
+ * ⚠ Deliberately NO in-game analysis and NO protocol for the player. Every
+ * previous attempt failed by doing clever things live -- phases to align,
+ * verdicts to compute, state the user had to hold in mind. This writes bytes
+ * and stops. The thinking happens offline where it can be checked. */
+
+/* Capture both mirrored clusters to `cfc2_sprite_<seq>.bin` next to the exe.
+ * Returns the number of bytes written, 0 on failure. */
+SIZE_T emu_cursor_capture_sprites(const char *tag);
+
 /* --- Offline test seam ---------------------------------------------------
  * Point the probe at a planted fixture instead of the live arena. Passing
  * (0, 0) restores live derivation.

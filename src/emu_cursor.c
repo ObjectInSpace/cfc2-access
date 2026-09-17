@@ -7,6 +7,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 /* Read in 256 KB chunks under one fault guard, matching emu_ram.c. Large
  * enough that the per-chunk overhead is noise, small enough that one bad page
@@ -606,6 +607,76 @@ unsigned emu_cursor_scan_report(ec_scan *out, unsigned cap)
     memcpy(out, tmp, n * sizeof(ec_scan));
     free(tmp);
     return n;
+}
+
+/* --- Sprite-list capture ------------------------------------------------- */
+
+#define SPR_A_OFF   0x8900000ULL     /* the two mirrored 32 KB clusters */
+#define SPR_B_OFF   0xa400000ULL
+#define SPR_LEN     0x8000u
+
+SIZE_T emu_cursor_capture_sprites(const char *tag)
+{
+    static unsigned seq;
+    ULONGLONG base;
+    SIZE_T size;
+    BYTE *buf;
+    char path[MAX_PATH];
+    FILE *f;
+    size_t wrote;
+    SIZE_T total = (SIZE_T)SPR_LEN * 2;
+
+    if (window(&base, &size) != EC_OK) return 0;
+    if (SPR_B_OFF + SPR_LEN > (ULONGLONG)size) return 0;
+
+    buf = (BYTE *)malloc(total);
+    if (!buf) return 0;
+
+    /* ⚠ Both halves must come from the SAME moment, so read them back to back
+     * with nothing in between. They are 27 MB apart, so this is two reads, not
+     * one -- but no logging, no allocation and no analysis separates them. */
+    if (!mem_copy(buf, (const void *)(ULONG_PTR)(base + SPR_A_OFF), SPR_LEN) ||
+        !mem_copy(buf + SPR_LEN,
+                  (const void *)(ULONG_PTR)(base + SPR_B_OFF), SPR_LEN)) {
+        free(buf);
+        log_line("sprite: could not read the clusters -- nothing written. "
+                 "This says nothing about their contents.");
+        return 0;
+    }
+
+    seq++;
+    {
+        const char *dir = "cfc2_sprite";
+        (void)dir;
+        _snprintf(path, sizeof path, "cfc2_sprite_%02u_%s.bin", seq,
+                  tag ? tag : "x");
+    }
+
+    f = fopen(path, "wb");
+    if (!f) {
+        free(buf);
+        log_line("sprite: could not open %s for writing.", path);
+        return 0;
+    }
+    wrote = fwrite(buf, 1, total, f);
+    fclose(f);
+    free(buf);
+
+    /* ⚠ Report what was ACTUALLY written, never what was requested. A short
+     * write under a confident log line is the kind of quiet mismatch that has
+     * cost this project several rounds. */
+    if (wrote != total) {
+        log_line("sprite: ⚠ SHORT WRITE -- %llu of %llu bytes to %s. Do not "
+                 "analyse this file.",
+                 (unsigned long long)wrote, (unsigned long long)total, path);
+        return 0;
+    }
+    log_line("sprite: wrote %s -- cluster A (+0x%llx) then B (+0x%llx), "
+             "0x%x bytes each, from arena 0x%llx.",
+             path, (unsigned long long)SPR_A_OFF,
+             (unsigned long long)SPR_B_OFF, SPR_LEN,
+             (unsigned long long)base);
+    return wrote;
 }
 
 BOOL emu_cursor_rom_running(char *name_out, unsigned cap)

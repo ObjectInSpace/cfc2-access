@@ -232,6 +232,9 @@ static BOOL     g_scan_len_set;
 static unsigned g_scan_npages_set;
 static DWORD    g_last_input_ms;
 static DWORD    g_scan_report_ms;
+static unsigned g_spr_pairs;
+static BOOL     g_spr_pending;
+static DWORD    g_spr_at;
 
 /* How long to wait for ANY arrow edge before concluding the emulated game does
  * not use sKeyboard. 30 s of navigation is far more than enough. */
@@ -344,6 +347,15 @@ static void cursor_probe_tick(void)
      * that independence is the whole point. Gating it behind any of them would
      * reproduce the bug that made run 2 silent. */
     if (emu_cursor_rom_running(NULL, 0)) {
+        /* ⚠ The "after" capture lives HERE, above every early return.
+         * Placed next to its "before" trigger it sat behind six returns
+         * including the give-up gate, so the pair could silently never
+         * complete -- the same shape of bug that made run 2 report nothing. */
+        if (g_spr_pending && GetTickCount() - g_spr_at >= 100) {
+            if (emu_cursor_capture_sprites("after")) g_spr_pairs++;
+            g_spr_pending = FALSE;
+        }
+
     /* ⭐⭐ THE DIRECT WATCH RUNS FIRST, AND IT NEEDS NO PRESSES AT ALL.
      *
      * Run 5 named an address (arena + 0x8030134, 3 -> 2 on a cursor move). The
@@ -596,6 +608,27 @@ static void cursor_probe_tick(void)
             if (e.pressed[b]) { g_last_input_ms = GetTickCount(); break; }
     }
 
+    /* ⭐⭐ SPRITE CAPTURE: a BEFORE/AFTER pair around one cursor move.
+     *
+     * Fires automatically on the first few direction presses -- no hotkey, no
+     * phases, no protocol for the player to hold in mind. Every earlier attempt
+     * failed by doing something clever live; this writes bytes and stops.
+     *
+     * "before" is captured on the press itself (the game has not acted yet at
+     * 20 ms resolution), "after" on the next tick that sees the move landed.
+     * If the bracketing is slightly off it does not matter: the diff of two
+     * captures a moment apart still isolates what moved, and the analysis is
+     * offline where it can be checked. */
+    if (g_spr_pairs < 3 &&
+        (kbd_is_set(e.pressed, KBDC_LEFT)  || kbd_is_set(e.pressed, KBDC_RIGHT) ||
+         kbd_is_set(e.pressed, KBDC_UP)    || kbd_is_set(e.pressed, KBDC_DOWN))) {
+        if (!g_spr_pending) {
+            if (emu_cursor_capture_sprites("before")) {
+                g_spr_pending = TRUE;
+                g_spr_at = GetTickCount();
+            }
+        }
+    }
     left  = kbd_is_set(e.pressed, KBDC_LEFT)  || kbd_is_set(e.pressed, KBDC_UP);
     right = kbd_is_set(e.pressed, KBDC_RIGHT) || kbd_is_set(e.pressed, KBDC_DOWN);
 
