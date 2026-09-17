@@ -378,8 +378,22 @@ static void cursor_probe_tick(void)
                 unsigned quiet = 0;
                 g_scan_report_ms = now;
                 for (k = 0; k < ns; k++) if (!sc[k].idle_changes) quiet++;
-                log_line("scan: %u field(s) moved at all; %u of those changed "
-                         "ONLY after input.", ns, quiet);
+                {
+                    /* ⛔ Report the POPULATION, not the report cap. Printing
+                     * `ns` said "8 field(s)" for three runs because the caller
+                     * asked for 8 -- a cap masquerading as a measurement. */
+                    unsigned pm = 0, pq = 0, pbd = 0;
+                    emu_cursor_scan_population(&pm, &pq, &pbd);
+                    log_line("scan: %u page(s) watched; %u byte(s) moved at "
+                             "all; %u of those changed ONLY after input; best "
+                             "input-only field has %u distinct value(s). "
+                             "(showing top %u)",
+                             emu_cursor_scan_npages(), pm, pq, pbd, ns);
+                    if (pq && pbd < 5)
+                        log_line("scan: ⚠ input-only fields exist but none "
+                                 "takes many values -- consistent with flags "
+                                 "or sprite attributes, not a 0..47 index.");
+                }
                 for (k = 0; k < ns && k < 6; k++)
                     log_line("scan:   +0x%llx  val %u  range %u..%u  "
                              "%u distinct  %u change(s) [%u idle, %u input]%s",

@@ -365,6 +365,19 @@ BOOL emu_cursor_scan_tick(BOOL input_recent);
  * with none -- animation must be visible, not silently dropped. */
 unsigned emu_cursor_scan_report(ec_scan *out, unsigned cap);
 
+/* Population counts, INDEPENDENT of any report cap.
+ *
+ * ⛔⛔ The report returns min(matches, cap), and a caller that printed THAT as
+ * "N field(s) moved at all" reported its own cap for three runs: the log said
+ * "8 field(s)" every time because the caller asked for 8. A cap is not a
+ * measurement -- this project has paid for that exact confusion before
+ * ("0 failed" read as "0 checked").
+ *
+ * `moved` counts every byte that ever changed; `quiet` counts those that
+ * changed ONLY after input. */
+void emu_cursor_scan_population(unsigned *moved, unsigned *quiet,
+                                unsigned *best_distinct);
+
 void emu_cursor_scan_reset(void);
 
 /* --- Offline test seam ---------------------------------------------------

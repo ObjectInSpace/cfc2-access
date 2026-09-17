@@ -493,6 +493,25 @@ BOOL emu_cursor_scan_set_pages(const ULONGLONG *offsets, unsigned n)
     return emu_cursor_scan_add_pages(offsets, n);
 }
 
+void emu_cursor_scan_population(unsigned *moved, unsigned *quiet,
+                                unsigned *best_distinct)
+{
+    SIZE_T i;
+    unsigned m = 0, q = 0, bd = 0;
+
+    for (i = 0; i < g_scan_len; i++) {
+        if (!g_scan[i].changes) continue;
+        m++;
+        if (g_scan[i].idle_changes == 0) {
+            q++;
+            if (g_scan[i].distinct > bd) bd = g_scan[i].distinct;
+        }
+    }
+    if (moved)         *moved = m;
+    if (quiet)         *quiet = q;
+    if (best_distinct) *best_distinct = bd;
+}
+
 unsigned emu_cursor_scan_npages(void) { return g_scan_npages; }
 
 BOOL emu_cursor_scan_tick(BOOL input_recent)
