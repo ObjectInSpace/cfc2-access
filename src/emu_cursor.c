@@ -830,6 +830,15 @@ SIZE_T emu_cursor_capture_sprites(const char *tag)
     return wrote;
 }
 
+BOOL emu_cursor_peek(ULONGLONG offset, BYTE *out, SIZE_T len)
+{
+    ULONGLONG base; SIZE_T size;
+    if (!out || !len) return FALSE;
+    if (window(&base, &size) != EC_OK) return FALSE;
+    if (offset + len > (ULONGLONG)size) return FALSE;
+    return mem_copy(out, (const void *)(ULONG_PTR)(base + offset), len);
+}
+
 SIZE_T emu_cursor_capture_ram(ULONGLONG offset, SIZE_T len, const char *tag)
 {
     ULONGLONG base;

@@ -464,6 +464,12 @@ SIZE_T emu_cursor_capture_sprites(const char *tag);
  * live, nothing for the player to do. */
 SIZE_T emu_cursor_capture_ram(ULONGLONG offset, SIZE_T len, const char *tag);
 
+/* Read a slice of the arena into a caller buffer, for a READINESS check.
+ * ⚠ Exists because a timer is not a readiness test: run 16 captured 17 s
+ * before the ROM loaded and got 63 slices of pure zeros. Returns FALSE if the
+ * arena or that offset is not readable. */
+BOOL emu_cursor_peek(ULONGLONG offset, BYTE *out, SIZE_T len);
+
 /* --- THE PAGE-TABLE FINDER ----------------------------------------------
  *
  * ⭐⭐⭐ A POSITIVE IDENTIFICATION, not another shape match.

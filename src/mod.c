@@ -235,6 +235,7 @@ static DWORD    g_scan_report_ms;
 static unsigned g_spr_pairs;
 static BOOL     g_pt_done;
 static BOOL     g_ram_done;
+static DWORD    g_ram_last;
 static DWORD    g_pt_last;
 static unsigned g_pt_tries;
 static DWORD    g_pt_progress_ms;
@@ -385,9 +386,44 @@ static void cursor_probe_tick(void)
          *
          * ⚠ Fires once, a few seconds after the ROM loads, and writes ONE file
          * so the run stays cheap. Nothing is spoken; the player does nothing. */
-        if (!g_ram_done && GetTickCount() - g_cursor_armed_at > 6000) {
+        /* ⛔⛔ A TIMER IS NOT A READINESS TEST -- this fired 17 SECONDS EARLY.
+         *
+         * Run 16 captured at 23:33:26 while CVS2 did not load until 23:33:43.
+         * 63 of 64 slices were 100% ZEROS and the 64th held unit-circle
+         * constants (0.7071, 0.9239, 0.866) -- the SHELL's own 3D maths. The
+         * arena POINTER resolved, so every guard passed, but the emulator had
+         * not populated it.
+         *
+         * ⚠ 'armed' means a ROM NAME is readable, which happens well before
+         * the ROM is actually resident. That is the same class of error as
+         * arming on the shell in run 1: a proxy for readiness, not readiness.
+         *
+         * ⭐ THE FIX IS A CONTENT TEST, not a longer wait. An empty arena is
+         * all zeros; a populated one is not. Require a sampled slice to be
+         * substantially non-zero before capturing anything, and RETRY until it
+         * is -- so how long loading takes cannot matter. */
+        if (!g_ram_done && GetTickCount() - g_ram_last > 3000) {
             ULONGLONG off;
             unsigned wrote = 0;
+            BYTE probe[4096];
+            unsigned nz = 0, i;
+
+            g_ram_last = GetTickCount();
+
+            /* Sample where the ROM image is known to live (the blob loads at
+             * the arena base) and require real content. */
+            if (!emu_cursor_peek(0x1000000ULL, probe, sizeof probe)) {
+                log_line("ram: arena not readable yet -- retrying.");
+                goto ram_done_check;
+            }
+            for (i = 0; i < sizeof probe; i++) if (probe[i]) nz++;
+            if (nz * 100u / sizeof probe < 10u) {
+                log_line("ram: arena is %u%% non-zero at +16MB -- the emulator "
+                         "has not populated it yet. Retrying in 3 s. (A TIMER "
+                         "fired 17 s early once; this waits for CONTENT.)",
+                         nz * 100u / (unsigned)sizeof probe);
+                goto ram_done_check;
+            }
             g_ram_done = TRUE;
             for (off = 0; off + 0x1000 <= 0x10000000ULL; off += 0x400000ULL) {
                 char tag[32];
@@ -396,9 +432,10 @@ static void cursor_probe_tick(void)
                 if (emu_cursor_capture_ram(off, 0x1000, tag)) wrote++;
             }
             log_line("ram: sampled the arena on a 4 MB grid -- %u slice(s) of "
-                     "4 KB written. Analyse OFFLINE with the SH-4 detector; "
-                     "guest RAM's low bytes are the game's copied executable.",
-                     wrote);
+                     "4 KB written, arena CONFIRMED populated (%u%% non-zero "
+                     "at +16MB). Analyse OFFLINE with the SH-4 detector.",
+                     wrote, nz * 100u / (unsigned)sizeof probe);
+        ram_done_check: ;
         }
 
         /* ⭐⭐ THE PAGE-TABLE SWEEP -- budgeted, resumable, and retried.
