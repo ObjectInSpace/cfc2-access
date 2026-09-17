@@ -304,7 +304,7 @@ static ec_status hash_pass(ec_phase phase, ULONGLONG base, SIZE_T size)
 
 static const ULONGLONG g_watch_off[] = {
     EC_WATCH_CURSOR, EC_WATCH_FLAG0, EC_WATCH_FLAG1,
-    EC_WATCH_FLAG2,  EC_WATCH_FLAG3
+    EC_WATCH_FLAG2,  EC_WATCH_FLAG3,  EC_WATCH_GROOVE
 };
 #define WATCH_N ((unsigned)(sizeof g_watch_off / sizeof g_watch_off[0]))
 

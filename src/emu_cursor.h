@@ -31,7 +31,14 @@
  *     (a) S0 == S1        quiet in the control   -> kills per-frame churn
  *     (b) S1 != S2        reacted to the press
  *     (c) S3 == S1        RETURNED on the reverse -> kills counters
- *     (d) |S2-S1| == 1    stepped by exactly one  -> kills pointers/floats
+ *     (d) 0 < |S2-S1| <= 16  a SMALL step        -> kills pointers/floats
+ *
+ * ⛔⛔ (d) USED TO REQUIRE EXACTLY 1, AND THAT EXCLUDED THE REAL CURSOR.
+ * The user reports CVS2 character select moves ANALOG -- one press can jump
+ * several cells, several presses can move none -- so nine runs of probing could
+ * not have found it. Straight-list menus (groove, ratio) DO step by one, so the
+ * constraint was true of the easy screens and false of the hard one, which is
+ * worse than no constraint. See memory cfc2-cvs2-select-is-analog.
  *     (e) value < 64      bounded by the grid     -> kills large ints
  *
  * ⭐⭐ (c) IS THE LOAD-BEARING TEST. A previous candidate in this project
@@ -233,12 +240,28 @@ void emu_cursor_reset(void);
  * offset is right; a field that never moves is evidence the offset did not
  * survive the relaunch, which is a different finding from "not the cursor". */
 
-/* The offsets run 5 produced. Watched together so a session answers both. */
-#define EC_WATCH_CURSOR   0x8030134ULL   /* went 3 -> 2 on a cursor move   */
-#define EC_WATCH_FLAG0    0x810563cULL   /* 0 -> 1, one of four            */
-#define EC_WATCH_FLAG1    0x8105690ULL
-#define EC_WATCH_FLAG2    0x81056acULL
-#define EC_WATCH_FLAG3    0x81056d4ULL
+/* ⭐⭐ THE OFFSETS RUN 14 PRODUCED, watched together so one session settles
+ * them all. These replace run 5's +0x8030134, which the direct watch REFUTED
+ * in 60 seconds as a blink phase ([[cfc2-cursor-candidate-found]]).
+ *
+ * Five cluster in 0x1354 bytes at +0x8105xxx -- one structure, not five finds
+ * -- and the SAME region was hit by a different method on a different launch
+ * (run 8's input-only fields at +0x810563c..+0x81056d4). Independent
+ * convergence across launches is why they are worth watching.
+ *
+ * ⚠ They may still be graphics: +0x8100000..+0x8106000 is contiguous with the
+ * +0x8900000 clusters that are PROVEN ARGB1555 framebuffer. The watch settles
+ * that -- pixels churn while idle, a cursor does not. */
+#define EC_WATCH_CURSOR   0x8105679ULL   /* delta +12 over 2 cycles        */
+#define EC_WATCH_FLAG0    0x81056ccULL   /* delta  +8                      */
+#define EC_WATCH_FLAG1    0x81056a0ULL   /* delta  +5                      */
+#define EC_WATCH_FLAG2    0x8105630ULL   /* delta  +3                      */
+#define EC_WATCH_FLAG3    0x8105624ULL   /* delta  +4                      */
+
+/* ⭐ The GROOVE candidate from the continuous scan: spans 1..3, 3 distinct
+ * values, ZERO idle changes. If it walks 0..5 it is the groove index, and
+ * groove needs no name mapping at all (the order IS C,A,P,S,N,K). */
+#define EC_WATCH_GROOVE   0xe01ffd4ULL
 
 #define EC_WATCH_MAX      8
 

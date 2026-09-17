@@ -473,7 +473,12 @@ int main(void)
     {
         /* A window big enough to contain the real offsets, so the watch
          * resolves them rather than bounds-rejecting. */
-        SIZE_T big = 0x8200000;
+        /* ⚠ Must exceed the LARGEST watched offset, not just the first.
+         * At 0x8200000 the groove offset (0xe01ffd4, 224 MB) fell outside the
+         * window, so the watch correctly reported it unreadable and the case
+         * passed WITHOUT ever exercising it -- a test that looks green while
+         * covering less than it claims. Sized from the header instead. */
+        SIZE_T big = (SIZE_T)((EC_WATCH_GROOVE & ~0xFFFULL) + 0x2000);
         BYTE *w = (BYTE *)VirtualAlloc(NULL, big, MEM_RESERVE, PAGE_NOACCESS);
         ec_watch t[EC_WATCH_MAX];
         unsigned n;
@@ -482,13 +487,22 @@ int main(void)
         if (w) {
             /* Commit just the pages the watch will touch. */
             VirtualAlloc(w, 0x1000, MEM_COMMIT, PAGE_READWRITE);
-            VirtualAlloc(w + 0x8030000, 0x1000, MEM_COMMIT, PAGE_READWRITE);
-            VirtualAlloc(w + 0x8105000, 0x1000, MEM_COMMIT, PAGE_READWRITE);
+            /* ⚠ COMMIT THE PAGES THE WATCH ACTUALLY LOOKS AT, derived from
+             * the header rather than hardcoded. An earlier version pinned
+             * 0x8030134 by hand; when the watched offsets were re-aimed at the
+             * run-14 candidates the test planted its value somewhere the watch
+             * no longer read, and case 10c failed for a reason that had
+             * nothing to do with the mechanism. A fixture must follow the
+             * thing it tests. */
+            VirtualAlloc(w + (EC_WATCH_CURSOR & ~0xFFFULL), 0x1000,
+                         MEM_COMMIT, PAGE_READWRITE);
+            VirtualAlloc(w + (EC_WATCH_GROOVE & ~0xFFFULL), 0x1000,
+                         MEM_COMMIT, PAGE_READWRITE);
 
             emu_cursor_watch_reset();
             emu_cursor_test_window((ULONGLONG)(ULONG_PTR)w, big);
 
-            w[0x8030134] = 7;
+            w[EC_WATCH_CURSOR] = 7;
             check("10a the watch samples a committed offset",
                   emu_cursor_watch_tick(), "tick returned FALSE");
             n = emu_cursor_watch_report(t, EC_WATCH_MAX);
@@ -498,7 +512,7 @@ int main(void)
                   "readable=%d value=%u", t[0].readable, t[0].value);
 
             /* A change must be counted, and distinct values tracked. */
-            w[0x8030134] = 8;
+            w[EC_WATCH_CURSOR] = 8;
             emu_cursor_watch_tick();
             emu_cursor_watch_report(t, EC_WATCH_MAX);
             check("10d a change is counted", t[0].changes == 1,
