@@ -229,14 +229,12 @@ static unsigned g_cursor_other;
 static int      g_cursor_axis;
 static unsigned g_cursor_watch_logged;
 static BOOL     g_scan_len_set;
-static unsigned g_scan_npages_set;
 static DWORD    g_last_input_ms;
 static DWORD    g_scan_report_ms;
 static unsigned g_spr_pairs;
 static BOOL     g_pt_done;
 static BOOL     g_ram_done;
 static DWORD    g_ram_last;
-static DWORD    g_pt_last;
 static unsigned g_pt_tries;
 static DWORD    g_pt_progress_ms;
 static BOOL     g_spr_pending;
@@ -445,7 +443,47 @@ static void cursor_probe_tick(void)
              *
              * ⚠ Gated behind the SAME content check, so it cannot fire before
              * the emulator has populated anything. */
-            emu_cursor_sample_process(0x400000, 0x1000);
+            /* ⛔ RETIRED. Run 18 ran this over all 1726 MB of committed
+             * memory: 441 slices, every one 'not code', with a positive
+             * control passing through the same harness. The question "is
+             * guest RAM outside the arena?" is ANSWERED. Re-running it costs
+             * ~1.7 MB of disk and several seconds for a known negative. */
+            /* emu_cursor_sample_process(0x400000, 0x1000); */
+
+            /* ⭐⭐⭐ THE FRAMEBUFFER -- the one LIVE source that can answer
+             * "which character is selected", and the only one left.
+             *
+             * Run 10 PROVED arena+0x8900000 is ARGB1555 pixel data: 438
+             * distinct colours, alpha set throughout, 74% of bytes changing per
+             * frame, and a second copy at +0xa400000 matching at shift -0x18.
+             * It IS the live screen.
+             *
+             * And the user described what to look for: "the pulsing RED or BLUE
+             * outline around the character moves to the other character". So
+             * the selection is VISIBLE, at a grid position we measured exactly
+             * (5 cols x 10 rows, 64px cells, 74px pitch).
+             *
+             * ⭐ This is not another search. It reads a KNOWN buffer at a KNOWN
+             * offset in a KNOWN format, looking for a colour the player named.
+             * Every failed route hunted an unknown value at an unknown place.
+             *
+             * ⚠ We have only ever captured 32 KB of it -- ~5% of a frame --
+             * because the sprite capture hardcoded that length. Run 15's
+             * reacting pages show the cluster spans at least +0x8900000..
+             * +0x890f000. Take 2 MB from each buffer so the offline analysis
+             * can find the real extent, stride and pixel layout.
+             *
+             * ⛔ If the buffer turns out tiled or swizzled rather than a linear
+             * image, locating the outline gets much harder -- which is exactly
+             * why this dumps bytes for offline analysis instead of trying to
+             * interpret anything live. */
+            if (emu_cursor_capture_ram(0x8900000ULL, 0x200000, "fb_a"))
+                log_line("fb: captured 2 MB at arena+0x8900000 (buffer A).");
+            if (emu_cursor_capture_ram(0xa400000ULL, 0x200000, "fb_b"))
+                log_line("fb: captured 2 MB at arena+0xa400000 (buffer B). "
+                         "⚠ Analyse OFFLINE: confirm it is a linear ARGB1555 "
+                         "image and find its width before trusting any pixel "
+                         "coordinate.");
         ram_done_check: ;
         }
 
@@ -465,7 +503,8 @@ static void cursor_probe_tick(void)
          * ⚠ RETRIED until it finds something, so it cannot matter how long
          * the player takes to reach any particular screen, and an early
          * premature sweep cannot become a permanent false negative. */
-        if (!g_pt_done) {
+        if (0 && !g_pt_done) {   /* ⛔ RETIRED: run 13 answered it -- no flat
+                                 * pointer table exists (every stride 0). */
             static ec_ptrun runs[12];
             SIZE_T sc = 0;
             BOOL pass_done = FALSE;
@@ -551,9 +590,9 @@ static void cursor_probe_tick(void)
             if (now - g_scan_report_ms > 5000) {
                 ec_scan sc[8];
                 unsigned ns = emu_cursor_scan_report(sc, 8), k;
-                unsigned quiet = 0;
+
                 g_scan_report_ms = now;
-                for (k = 0; k < ns; k++) if (!sc[k].idle_changes) quiet++;
+
                 {
                     /* ⛔ Report the POPULATION, not the report cap. Printing
                      * `ns` said "8 field(s)" for three runs because the caller
