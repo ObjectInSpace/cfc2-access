@@ -483,6 +483,11 @@ unsigned emu_cursor_find_pagetable(ec_ptrun *out, unsigned cap,
  * 0 restores the timed behaviour. */
 void emu_cursor_test_pt_chunk_limit(unsigned chunks);
 
+/* Where the in-flight pass will resume, so a caller can LOG PROGRESS.
+ * ⚠ Run 11 logged nothing at all because no pass ever completed, and there was
+ * no way to distinguish a stalled sweep from one that never started. */
+ULONGLONG emu_cursor_pt_resume(void);
+
 /* --- Offline test seam ---------------------------------------------------
  * Point the probe at a planted fixture instead of the live arena. Passing
  * (0, 0) restores live derivation.

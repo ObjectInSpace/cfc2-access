@@ -4062,7 +4062,7 @@ void menu_speak_check_modal(void)
     if (prompt_is_new)
         menu_speak_flatten_prompt(text, flat, (int)sizeof(flat));
     else
-        flat[0] = ' ';
+        flat[0] = '\0';
 
     /* ⭐⭐ AND THE OPTIONS. The question alone leaves the user to guess what the
      * buttons are; the dialog sets them as live text right after the prompt, so

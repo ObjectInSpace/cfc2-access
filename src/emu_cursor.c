@@ -625,6 +625,8 @@ void emu_cursor_test_pt_chunk_limit(unsigned chunks)
 }
 
 static ULONGLONG g_pt_resume;      /* where the last budgeted pass stopped */
+
+ULONGLONG emu_cursor_pt_resume(void) { return g_pt_resume; }
 static SIZE_T    g_pt_scanned;     /* accumulated across the whole pass    */
 
 unsigned emu_cursor_find_pagetable(ec_ptrun *out, unsigned cap,

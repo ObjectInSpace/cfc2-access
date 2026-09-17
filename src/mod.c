@@ -236,6 +236,7 @@ static unsigned g_spr_pairs;
 static BOOL     g_pt_done;
 static DWORD    g_pt_last;
 static unsigned g_pt_tries;
+static DWORD    g_pt_progress_ms;
 static BOOL     g_spr_pending;
 static DWORD    g_spr_at;
 
@@ -272,7 +273,7 @@ static void cursor_probe_report(void)
             for (k = 0; k < np && used < 440; k++)
                 used += _snprintf(line + used, sizeof line - used,
                                   "+0x%llx ", (unsigned long long)pg[k]);
-            line[used > 0 ? used : 0] = ' ';
+            line[used > 0 ? used : 0] = '\0';
             log_line("cursor: reacting page offsets (%u of %u): %s",
                      np, r.pages_kept, line);
         }
@@ -392,6 +393,17 @@ static void cursor_probe_tick(void)
             BOOL pass_done = FALSE;
             unsigned nr = emu_cursor_find_pagetable(runs, 12, &sc, 25,
                                                     &pass_done);
+            /* ⚠⚠ PROGRESS, unconditionally. Run 11 produced NOT ONE
+             * `pagetable:` line -- no pass ever completed -- and the log gave
+             * no way to tell a stalled sweep from one that never started. A
+             * probe that cannot say where it is costs a whole session. */
+            if (!pass_done && GetTickCount() - g_pt_progress_ms > 2000) {
+                g_pt_progress_ms = GetTickCount();
+                log_line("pagetable: sweeping... %llu MB examined this pass, "
+                         "%u run(s) held, resume at 0x%llx.",
+                         (unsigned long long)(sc / (1024 * 1024)), nr,
+                         (unsigned long long)emu_cursor_pt_resume());
+            }
             if (pass_done) {
                 unsigned k;
                 g_pt_tries++;
