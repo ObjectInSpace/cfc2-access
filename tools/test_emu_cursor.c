@@ -301,8 +301,25 @@ int main(void)
           "a field that changes on its own was reported");
     check("3c the FROZEN field is rejected",
           find_cand(cands, n, p1 + OFF_FROZEN, EC_U32) == NULL, "");
-    check("3d a field that steps by SEVEN is rejected",
-          find_cand(cands, n, p1 + OFF_BIGJUMP, EC_U32) == NULL, "");
+    /* ⛔⛔ THIS CASE USED TO ASSERT "steps by SEVEN is rejected", and the
+     * assumption behind it was WRONG FOR THIS GAME.
+     *
+     * The user reports CVS2's character select moves ANALOG: "I sometimes have
+     * to press the arrow keys multiple times, or I press once and it moves
+     * multiple characters." So the real cursor does NOT advance by exactly one
+     * per press, and a |delta| == 1 filter excluded it BY CONSTRUCTION -- which
+     * is what every probe on this branch enforced.
+     *
+     * ⚠ Straight-list menus (groove, ratio) DO step by one, per the same
+     * report. A filter that is correct for the easy screens and wrong for the
+     * hard one is worse than no filter at all.
+     *
+     * So a step of 7 is now ACCEPTED as a candidate, and the discrimination
+     * moves to ranking (distinct values, and never moving while idle). What
+     * must still be rejected is a step far too large to be a menu move. */
+    check("3d a SMALL multi-step move is now ACCEPTED (analog selection)",
+          find_cand(cands, n, p1 + OFF_BIGJUMP, EC_U32) != NULL,
+          "a 7-step move was rejected -- that filter hid the real cursor");
     /* ⭐ This case survives, but note WHAT rejects it: the BOUNDS guard, not a
      * float-specific test. A float in any UI range has bits ~1.1 billion. An
      * explicit float band was written, found unreachable by sabotage (deleting

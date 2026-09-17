@@ -487,10 +487,30 @@ static void cursor_probe_tick(void)
                              "input-only field has %u distinct value(s). "
                              "(showing top %u)",
                              emu_cursor_scan_npages(), pm, pq, pbd, ns);
-                    if (pq && pbd < 5)
+                    /* ⭐⭐ THE USER'S OBSERVATION, ENCODED. They report that
+                     * GROOVE select is "one press = one item, a straight
+                     * list", while CHARACTER select moves analog (one press
+                     * can jump several cells, several presses can move none).
+                     *
+                     * So a groove index is a small dense 0..5 field that moves
+                     * only on input -- a much sharper target than the 0..47
+                     * character cursor, and it needs NO index->name mapping
+                     * because the order IS C,A,P,S,N,K. Call it out by name. */
+                    for (k = 0; k < ns; k++) {
+                        if (sc[k].idle_changes) continue;
+                        if (sc[k].vmin <= 1 && sc[k].vmax >= 3 &&
+                            sc[k].vmax <= 8 && sc[k].distinct >= 3)
+                            log_line("scan: ⭐⭐ +0x%llx spans %u..%u with %u "
+                                     "distinct values and NEVER moves on its "
+                                     "own -- GROOVE-SHAPED (6 items: C A P S "
+                                     "N K).",
+                                     (unsigned long long)sc[k].offset,
+                                     sc[k].vmin, sc[k].vmax, sc[k].distinct);
+                    }
+                    if (pq && pbd < 3)
                         log_line("scan: ⚠ input-only fields exist but none "
-                                 "takes many values -- consistent with flags "
-                                 "or sprite attributes, not a 0..47 index.");
+                                 "takes 3+ values -- consistent with flags or "
+                                 "sprite attributes, not a list index.");
                 }
                 for (k = 0; k < ns && k < 6; k++)
                     log_line("scan:   +0x%llx  val %u  range %u..%u  "
@@ -502,7 +522,10 @@ static void cursor_probe_tick(void)
                              (sc[k].idle_changes == 0 && sc[k].distinct >= 5)
                                ? "  <== CURSOR-SHAPED: many values, never moves"
                                  " on its own"
-                               : (sc[k].idle_changes ? "  (animation)" : ""));
+                               : (sc[k].idle_changes ? "  (animation)"
+                                  : (sc[k].distinct >= 2
+                                     ? "  <== input-only, few values"
+                                     : "")));
             }
         }
 

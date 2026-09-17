@@ -1108,7 +1108,26 @@ static void judge_fields(void)
                 g_rep.fields_returned++;
 
                 d = (int)v2 - (int)v1;
-                if (d != 1 && d != -1) continue; /* (d) stepped by one       */
+                /* ⛔⛔ THE "STEPPED BY ONE" TEST WAS WRONG FOR THIS GAME,
+                 * and it excluded the real cursor BY CONSTRUCTION.
+                 *
+                 * The user reports that CVS2's character select moves ANALOG:
+                 * "I sometimes have to press the arrow keys multiple times, or
+                 * I press once and it moves multiple characters." So the
+                 * selection does NOT advance by exactly one per press, and
+                 * every probe on this branch filtered on |delta| == 1.
+                 *
+                 * ⚠ Straight-list menus (groove, ratio) DO step by one, per
+                 * the same report -- so the constraint is true of some screens
+                 * and false of the one we care most about. A filter that is
+                 * right for the easy case and wrong for the hard one is worse
+                 * than no filter.
+                 *
+                 * Now: any small bounded change qualifies, and RANKING (by
+                 * distinct values and by never moving while idle) does the
+                 * discrimination instead. */
+                if (d == 0) continue;
+                if (d > 16 || d < -16) continue; /* (d) a SMALL step, not +-1 */
 
                 /* (e) bounded. ⭐ This also subsumes the float rejection an
                  * earlier draft had: an animating IEEE float's BITS are ~1.1
