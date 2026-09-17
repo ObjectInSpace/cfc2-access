@@ -434,6 +434,36 @@ void emu_cursor_scan_reset(void);
  * Returns the number of bytes written, 0 on failure. */
 SIZE_T emu_cursor_capture_sprites(const char *tag);
 
+/* --- THE GUEST-RAM LOCATOR ----------------------------------------------
+ *
+ * ⭐⭐ A DIFFERENT QUESTION, with a bounded answer.
+ *
+ * Eleven runs of differential probing have produced candidates that all turned
+ * out to be RENDERING -- a blink phase, draw slots, a 0x130-stride sprite
+ * array -- because rendering is what visibly reacts when a highlight moves.
+ * The selection itself has never appeared.
+ *
+ * So stop hunting the cursor and locate GUEST RAM, which makes every published
+ * CVS2 address readable by arithmetic ([[cfc2-cvs2-field-schema]]) and needs no
+ * scanning at all.
+ *
+ * ⭐ THE TEST IS FALSIFIABLE AND USES A KNOWN ANSWER. NAOMI system RAM starts
+ * at guest 0x0C000000, and the game's executable is COPIED there at boot. So
+ * wherever system RAM lives in the arena, its low bytes are SH-4 CODE -- and
+ * SH-4 is trivially recognisable: fixed 16-bit instructions, with `rts`
+ * (0x000B), `mov.l @(disp,PC),Rn` (0xDxxx) and balanced `sts.l pr,@-Rn` /
+ * `lds.l @Rn+,pr` prologue-epilogue pairs.
+ *
+ * ⚠ A hit is only meaningful with BOTH controls. Real SH-4 scores hundreds of
+ * each; random data scores a handful and, critically, has UNBALANCED
+ * prologue/epilogue counts. A previous session read "exactly 3 prologues, zero
+ * rts" across 11 entries as a finding; it was a threshold artifact.
+ *
+ * This writes the arena in slices to `cfc2_ram_<MB>.bin` so the detector runs
+ * OFFLINE, where it can be checked -- no in-game analysis, no verdict computed
+ * live, nothing for the player to do. */
+SIZE_T emu_cursor_capture_ram(ULONGLONG offset, SIZE_T len, const char *tag);
+
 /* --- THE PAGE-TABLE FINDER ----------------------------------------------
  *
  * ⭐⭐⭐ A POSITIVE IDENTIFICATION, not another shape match.

@@ -234,6 +234,7 @@ static DWORD    g_last_input_ms;
 static DWORD    g_scan_report_ms;
 static unsigned g_spr_pairs;
 static BOOL     g_pt_done;
+static BOOL     g_ram_done;
 static DWORD    g_pt_last;
 static unsigned g_pt_tries;
 static DWORD    g_pt_progress_ms;
@@ -371,6 +372,35 @@ static void cursor_probe_tick(void)
          *
          * Every attempt is LOGGED with its number, so "swept 3 times, found
          * nothing" can never be read as "never tried". */
+        /* ⭐⭐ THE GUEST-RAM LOCATOR: sample the WHOLE arena, once.
+         *
+         * Eleven runs of differential probing produced only rendering data, so
+         * stop hunting the cursor and locate guest RAM instead -- that makes
+         * every published CVS2 address readable by arithmetic.
+         *
+         * ⭐ Sampling on a GRID rather than at my guesses. I have twice picked
+         * a "promising" offset and been wrong; a 4 KB slice every 4 MB covers
+         * all 256 MB for 256 KB of disk, and the detector decides offline.
+         * That removes my judgement from the search entirely.
+         *
+         * ⚠ Fires once, a few seconds after the ROM loads, and writes ONE file
+         * so the run stays cheap. Nothing is spoken; the player does nothing. */
+        if (!g_ram_done && GetTickCount() - g_cursor_armed_at > 6000) {
+            ULONGLONG off;
+            unsigned wrote = 0;
+            g_ram_done = TRUE;
+            for (off = 0; off + 0x1000 <= 0x10000000ULL; off += 0x400000ULL) {
+                char tag[32];
+                _snprintf(tag, sizeof tag, "%03u",
+                          (unsigned)(off / (1024 * 1024)));
+                if (emu_cursor_capture_ram(off, 0x1000, tag)) wrote++;
+            }
+            log_line("ram: sampled the arena on a 4 MB grid -- %u slice(s) of "
+                     "4 KB written. Analyse OFFLINE with the SH-4 detector; "
+                     "guest RAM's low bytes are the game's copied executable.",
+                     wrote);
+        }
+
         /* ⭐⭐ THE PAGE-TABLE SWEEP -- budgeted, resumable, and retried.
          *
          * ⚠ 25 ms per tick, not one blocking pass. MEASURED: 1937 ms for

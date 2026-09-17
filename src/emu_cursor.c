@@ -830,6 +830,49 @@ SIZE_T emu_cursor_capture_sprites(const char *tag)
     return wrote;
 }
 
+SIZE_T emu_cursor_capture_ram(ULONGLONG offset, SIZE_T len, const char *tag)
+{
+    ULONGLONG base;
+    SIZE_T size;
+    BYTE *buf;
+    char path[MAX_PATH];
+    FILE *f;
+    size_t wrote;
+
+    if (window(&base, &size) != EC_OK) return 0;
+    if (offset + len > (ULONGLONG)size) return 0;
+
+    buf = (BYTE *)malloc(len);
+    if (!buf) return 0;
+
+    if (!mem_copy(buf, (const void *)(ULONG_PTR)(base + offset), len)) {
+        free(buf);
+        log_line("ram: could not read arena+0x%llx -- nothing written. This "
+                 "says nothing about its contents.",
+                 (unsigned long long)offset);
+        return 0;
+    }
+
+    _snprintf(path, sizeof path, "cfc2_ram_%s.bin", tag ? tag : "x");
+    f = fopen(path, "wb");
+    if (!f) { free(buf); return 0; }
+    wrote = fwrite(buf, 1, len, f);
+    fclose(f);
+    free(buf);
+
+    /* ⚠ Report what was ACTUALLY written, never what was asked for. */
+    if (wrote != len) {
+        log_line("ram: ⚠ SHORT WRITE -- %llu of %llu bytes to %s. Do not "
+                 "analyse this file.",
+                 (unsigned long long)wrote, (unsigned long long)len, path);
+        return 0;
+    }
+    log_line("ram: wrote %s -- arena+0x%llx, %llu KB, from arena 0x%llx.",
+             path, (unsigned long long)offset,
+             (unsigned long long)(len / 1024), (unsigned long long)base);
+    return wrote;
+}
+
 BOOL emu_cursor_rom_running(char *name_out, unsigned cap)
 {
     char name[64];
