@@ -1375,6 +1375,149 @@ no between-match misbehaviour was ever reported, over-guarding is the only way
 this change can make things worse. If the health or meter tone has gone quiet
 mid-round, this commit is the cause.
 
+**⭐ SECOND WIN-QUOTE CAPTURE: the state is confirmed, and a WINNER field
+(2026-09-19)**
+
+`winquote-ken-02.bin`, PID 8072, different session and arena from the first,
+taken while a win quote was on screen. User: **Ken won**.
+
+⭐ PHASE BYTES ARE IDENTICAL to the first capture: `02 01 02 03 02 00 00 00`.
+Two independent sessions agreeing makes byte 3 = `03` a trustworthy
+discriminator for the post-match quote screen, not a one-off reading.
+
+⛔⛔ `B+1` IS NOT THE WINNER. It is each side's ACTIVE fighter, and it reads
+Ken on **P2** here. The first capture's `B+1` (P1 Sagat) happened to be the
+winner, which would have made "read B+1 for the winner" look correct on one
+sample. Two captures were needed to see it.
+
+⛔ `B+0x574` WAS REFUTED, and this is the useful part. It reads P1=1 / P2=2 in
+both captures and looked exactly like a best-of-three round count -- so it
+PREDICTED P2 won both. The user confirmed **Sagat (P1)** won the first match.
+⭐ The prediction is what killed it: a field that merely "looks like a round
+counter" survives inspection forever, but one that names a winner can be wrong
+out loud. Ask what the field PREDICTS, then check it against something the user
+knows.
+
+⭐ THE SURVIVING CANDIDATE IS **`B+0x5D3`**: 1 on the winning side, 0 on the
+loser, in both captures, matching the user's report each time. It is `0/0` in
+EVERY in-match capture (`timer-99`, `hp-full`, `hp-low`, `meter-full`,
+`state-b`), so it is set at match end rather than carried through the fight.
+
+Rejected alongside it: `B+0x5CC`/`0x5CD` (the already-traced RATIO bytes --
+they differ here because the two matches had different team setups, not because
+they mark a winner; they also take the value 2 in-match) and `B+0x60D` (reads
+1/0 during `timer-99`, so it is not quote-specific).
+
+⚠ TWO captures only, and `0x5D3` sits inside the per-player config block beside
+`0x5D0` (groove) and `0x5D1` (team size). It has made two correct predictions;
+it has not been shown to be a winner flag rather than something correlated with
+one. ▶ The next quote screen settles it: capture, and say who won BEFORE
+looking. A third correct prediction on a P1 win makes it shippable.
+
+⭐⭐ SIMPLER THAN SIDE-ATTRIBUTION (user, 2026-09-19): "There can only be one
+winning character quote at a time, which is determined by the winning character
+for either side." So the reader does not need to work out WHICH SIDE won and
+then index that side's `B+1` -- it needs one question answered, "whose quote is
+this", and the answer is a single character ID.
+
+⭐ THE WINNING CHARACTER ID IS IN R DIRECTLY. Searching both captures for a byte
+equal to the known winner (9 Sagat, 1 Ken) leaves four global slots, all of
+which carry it in both captures:
+
+    R+0x02C64   R+0x05931   R+0x0A98C   R+0x0F6B1
+
+They are not one array (deltas 0x2CCD / 0x505B / 0x4D25) -- four separate
+records, consistent with the quote screen being assembled from several
+structures (text, portrait, audio).
+
+⭐ `R+0x05931` is the cleanest: it reads **0 in every non-quote capture**
+(`timer-99`, `hp-full`, `hp-low`, `meter-full`, `state-b`, `ryu-01`) and holds
+the winner's ID only on the quote screen. `R+0x02C64` is NOT usable -- it holds
+unrelated values (5, 8, 1) during matches.
+
+⚠ Still two captures. A byte matching a known value twice is weak evidence on
+its own; what makes this stronger than the `B+0x574` guess is that the value is
+the ID ITSELF rather than a flag needing interpretation, and that it is zero
+outside the quote state. One more quote screen confirms it.
+
+⚠ `B+0x5D3` (winner side) remains correct on both captures and is worth keeping
+in this record, but it is NOT needed if the character ID is read directly. Do
+not build the side-attribution path when the simpler field exists.
+
+**The 1-in-8 quote index: a lead, and the check that must NOT be asked for
+(2026-09-19)**
+
+⛔⛔ A METHOD ERROR WORTH RECORDING. I proposed confirming the index by having
+the user tell me the first few words of the quote on screen. The user: "I can't
+see it." That is the entire premise of this project -- they are blind, and the
+quote screen is unreadable to them, which is WHY it needs reading aloud.
+The one input I asked for is the thing the mod exists to provide.
+
+⭐ THE RULE: before asking the user to confirm something, check whether the
+answer is available to them at all. Anything drawn as sprites by the emulated
+game is NOT -- that is the definition of world 2. Speech, audio cues and the
+log are observable to them; on-screen text is not.
+
+⚠ This also invalidates the "capture several and name the quote" plan recorded
+above for the four-way constraint. Ground truth for in-game TEXT cannot come
+from the user. It must come from the data or from the emulated code.
+
+THE LEAD, derived without any user input:
+
+The four global slots holding the winner ID (above) are records, and the bytes
+following the ID differ between the two captures:
+
+    winquote-01  (Sagat, ID 9)   R+0x05931: 09 01 06 01 ...
+                                 R+0x0F6B1: 09 01 06 00 ...
+    winquote-ken-02 (Ken, ID 1)  R+0x05931: 01 00 03 02 ...
+                                 R+0x0F6B1: 01 00 03 02 ...
+
+⭐ TWO INDEPENDENT RECORDS AGREE on bytes 0..2 within each capture (`09 01 06`
+and `01 00 03`). That agreement is the game's own redundancy, not a byte picked
+by eye, and it is the best evidence available here.
+
+Byte **+2** is a valid quote number in both (6 for Sagat, 3 for Ken) and decodes
+to real, coherent quotes:
+    Sagat[6] "Practice all you want! You will never be good enough to defeat me!"
+    Ken[3]   "Maybe next time you should think about watching my hands!!"
+
+⚠⚠ BUT THIS IS NOT CONFIRMED, and plausibility is not evidence: ANY index 0..7
+decodes to some plausible quote, which is exactly what a wrong answer looks
+like. Speaking the wrong quote is indistinguishable from the right one to this
+user -- the failure class this project has paid for repeatedly.
+
+⛔ Byte +1 is NOT the team slot: Sagat's +1=1 matches his slot 1, but Ken's +1=0
+while Ken is slot 1 in both teams. Unknown; do not guess it.
+
+⛔⛔ ROUTE 1 (find the writer in host code) IS CLOSED. Searched and negative:
+
+- The records are NOT addressed by a literal displacement: `0x5931`, `0x5933`,
+  `0x5930`, `0xF6B1`, `0xF6B3` occur ZERO times as u32 immediates in the CVS2
+  range. They are reached through a pointer.
+- ⭐⭐ THE DECISIVE ONE: the shift/XOR RNG `0x1400BD7D0` has **79 host callers
+  and NOT ONE is inside `0x1406A0000..0x140740000`**. Its wrapper `0x14003AE70`
+  has 9 callers, of which the single CVS2-range hit (`0x1406A986E`) is the
+  arena initializer already traced -- session setup, not a per-match pick.
+  A random quote choice made by host code would have to call one of these.
+  It does not. **The pick happens in emulated SH-4**, like the text itself.
+- ⚠ Capstone's linear sweep decoded 1,507 instructions and stopped after
+  **0.9%** of the range, exactly as CLAUDE.md warns. Any "0 occurrences" from a
+  linear sweep here is an artifact; the counts above come from byte-encoding
+  searches (`find_callers.py`), which is the method that works.
+
+▶ WHAT REMAINS, and it needs nothing read aloud:
+Capture several quote screens for the SAME character. If `+2` VARIES while the
+character is constant, it is the per-display random pick and the mapping can be
+trusted; if it is CONSTANT for a character, it is a property of that character
+and NOT the index. ⭐ This requires only that the same fighter wins more than
+once, which happens naturally, and the user need only say WHO won -- something
+the mod already speaks.
+
+⚠ If `+2` turns out constant per character, stop: the index is then not in
+these records, and with the host-code route closed the remaining option is
+observing guest memory around the quote region during display, which is a
+larger piece of work than the payoff justifies.
+
 ▶ NEXT, in value order:
 1. ENDINGS: text and ID mapping are done offline and `B+1` is readable. ⚠ The
    user notes reaching one requires playing through a whole arcade run, so an
@@ -1384,3 +1527,231 @@ mid-round, this commit is the cause.
 2. A second win-quote capture with the user naming the quote, to start the
    four-way constraint on the 1-in-8 index. Cheap by comparison -- quotes occur
    after every match.
+
+## 2026-09-19: positional projectile audio — deferred, and why
+
+The user asked whether a projectile's sound (Ryu's hadouken was the example)
+could follow the fireball across the screen instead of staying at the point of
+origin. It can, but not by moving anything that exists today, and the work sits
+behind the current build order. Recorded so the constraint is not re-derived.
+
+**⛔ THERE IS NO HOST-SIDE AUDIO SOURCE TO MOVE.** The SFX is a sample the
+EMULATED sound hardware mixes -- QSound on CPS-2, AICA on NAOMI. The host plays
+the DSP's output; it never sees a per-object voice with a position. What the
+user hears as "at Ryu's position" is the arcade board's own panning, which on
+these boards is by player side, not by object X. So "reposition the existing
+sound" is not a small change -- it is not a change that can be expressed at all.
+
+The only route is: **read the projectile's X from guest RAM and emit our own
+beacon.** That fits the settled audio design (memory `cfc2-audio-design-decision`)
+as a third beacon alongside the two player beacons -- pan = X, with a timbre
+distinct from both, the same separation test case 7b already enforces for health
+vs super. The arcade's original sound keeps playing at its static pan; whether
+that is acceptable alongside a moving beacon is a listening question, not a
+design one, and should not be decided in advance.
+
+**⛔⛔ DEAD RECKONING WAS CONSIDERED AND REJECTED -- by the user, on the
+strongest available ground.** The cheap approximation was to detect the launch
+and extrapolate from a constant velocity, never finding the object in RAM. It
+fails because **projectiles do not share a speed**: the constant would have to
+be measured per character, per move, per game. And the table would be silently
+wrong exactly where it matters -- EX and level-scaled versions travel at
+different speeds than the base move, Blanka balls and Yamazaki snakes are not
+constant-velocity at all, and anything reflected or absorbed diverges
+immediately. ⭐ A hand-measured table that is wrong on the interesting cases is
+worse than an absent feature: to this user a mispositioned beacon is
+indistinguishable from a correct one, which is this project's recurring failure
+class. Do not revive this as a "first cut".
+
+**▶ WHAT THE REAL WORK IS: the active-object table.** The blocker is one
+specific unknown -- where the list of live entities lives in guest RAM, its
+stride, and the fields for active / type / owner / X. Everything else is small
+once that lands.
+
+⚠ It must be found PER GAME. CVS2's layout implies nothing about CVS1's or
+CFJ's; CVS2 is SH-4, the CPS-2 titles are 68k.
+
+⭐ The method is the one that is 4-for-4 on this project and 0-for-4 against:
+find the code that WRITES the table and read the offsets out of the
+instructions. Do not scan guest RAM for something projectile-shaped -- a moving
+X with a plausible range is the most abundant shape in a fighting game's memory,
+and the first guest-RAM scan here was already a false positive for exactly that
+reason (see the `0x0222` run above).
+
+⚠ Scale honestly: this is comparable to the character-highlight trace, not to
+adding a field to an existing reader. It is worth doing -- positional projectile
+audio is close to the point of the whole mod -- but it is not a small task, and
+nothing above it in the build order has been finished.
+
+## 2026-09-19: player X position — a two-field candidate, derived offline
+
+⛔⛔ **REFUTED THE SAME DAY. DO NOT BUILD ON THIS SECTION.** `B+0x0D8` is a
+64-bit POINTER, not a fine-grained X, and the "20:1 law" below is arithmetic on
+the low 16 bits of it. See "THE X CANDIDATE IS REFUTED" at the end of this
+document. The section is kept because the METHOD error is worth carrying, not
+because the offsets mean what it says.
+
+Position is the next piece of the audio design: both player beacons currently
+pan by OWNER at a fixed +/-0.85 (`src/audio.c`, "Pan is fixed by OWNER, matching
+the HUD"), which is a placeholder. Pan should follow screen X.
+
+⭐ DERIVED WITH ZERO GAME LAUNCHES, from captures already in
+`build/cvs2-state/`. No new run was spent to get this far.
+
+**Method.** Diffed the player struct `B = R+0x1EBA8 + player*0x678` across the
+seven captures whose phase byte 4 is 4 (in-round). The doc's comparability rule
+was respected: `hp-full` (substate 3, intro) and `hp-zero` (substate 5, KO) were
+EXCLUDED, not merged. 113 of 828 u16 slots vary for P1, 141 for P2.
+
+**THE CANDIDATE: `B+0x0D2` (u16) is screen X, corroborated by `B+0x0D8`.**
+
+Values run 98..377 for P1/P2 across captures -- a plausible screen range with
+sensible fighter separation. ⚠ On its own that is shape, and shape is exactly
+what nearly shipped `B+0x246` as health. The evidence is the SECOND field:
+
+    B+0x0D8  ==  20 * B+0x0D2  +  c
+
+⭐⭐ EXACT, zero residual, on all 14 player-captures. `c` is CONSTANT within a
+match and changes between matches:
+- session `root=0x15ba1000`: P1 c=2480, P2 c=4336; the third capture in that
+  session (`hp-ken`) is a different match and has its own pair, P1 c=11680,
+  P2 c=19384.
+- session `root=0x15541000`: P1 c=2480, P2 c=-2196.
+
+Two independent fields agreeing to the bit is the game's own redundancy -- the
+same standard the win-quote bytes were held to -- not a value picked by eye. The
+natural reading is that `0x0D2` is a coarse X and `0x0D8` a finer-grained or
+camera-relative X sharing one origin per match, `c` being that origin. A single
+arbitrary field would not sit in exact 20:1 lockstep with another.
+
+⛔⛔ WHAT THIS DOES NOT ESTABLISH, and must not be skipped:
+- **Which field is the SCREEN coordinate and which is world/stage.** The pan
+  needs screen-relative X; if `0x0D2` is a world coordinate, a scrolling stage
+  makes the beacon wrong exactly when the fighters move, which is when it
+  matters. The captures cannot separate these because `c` is constant within
+  each match -- i.e. NO CAMERA MOVEMENT IS SAMPLED.
+- **The range and the edges.** 98..377 is observed, not bounded. Mapping X to
+  pan needs the real screen extent, and guessing it mispans everything.
+- **Y.** `0x0D4`/`0x0D6` are zero in every capture -- all sampled fighters are
+  grounded. That is an absent signal, not a negative result.
+- **Sign/wrap at the left edge.** No capture sits near x=0.
+- ⚠ `0x0D0` is a small 1..6 counter in the same neighbourhood; it is NOT part
+  of the coordinate and must not be folded into a dword read.
+
+▶ WHAT WOULD SETTLE IT, and it is cheap -- the discriminator is CAMERA MOVEMENT:
+capture two in-round snapshots in ONE match with the fighters at opposite ends
+of a scrolling stage, having WALKED there rather than teleported.
+- If `c` shifts between those two captures while the fighters' on-screen
+  placement is comparable, the origin is the camera and `0x0D2` is a WORLD
+  coordinate -- screen X is then the derived quantity, not the field.
+- If `c` holds and `0x0D2` spans a much wider range, `0x0D2` is screen-relative
+  and can drive pan directly.
+Either way the same two captures also bound the range, which is the other
+missing piece. ⭐ The user need only walk to each corner; nothing is spoken.
+
+⚠ Do NOT wire pan to `0x0D2` before that, however good the 20:1 agreement is.
+The agreement proves the two fields describe one quantity; it says nothing about
+which SPACE that quantity is in, and a beacon that pans correctly in training
+and wrongly on a scrolling stage is the failure class this project has paid for
+repeatedly -- a wrong position is indistinguishable from a right one.
+
+⭐ Once settled, the reader is SMALL: the frame hook `0x1406AA7A0`
+(`src/cvs2_frame.c`) already runs per frame and publishes u16s from this exact
+struct lock-free. Position is two more reads in an existing detour, then pan
+replaces the constant in `src/audio.c`. No new pointer chain, no new hook.
+
+**The capture command for that experiment** (`--position`, added 2026-09-19):
+
+    python tools/cvs2_state_snapshot.py PID --out build/cvs2-state/pos-left-01
+    python tools/cvs2_state_snapshot.py PID --out build/cvs2-state/pos-right-02
+
+Walk to one corner, capture; walk to the other corner IN THE SAME MATCH,
+capture. It prints both players' `x`, `x_fine` and `c`, then states the reading:
+`c` shifted -> world space; `c` held -> screen-relative.
+
+⭐ It adds NO new memory reads -- the fields were already inside every capture
+this tool has ever written; that is how the candidate was derived offline. What
+it adds is a capture-time gate and a capture-time readout.
+
+⛔ It REFUSES a capture whose phase byte 4 is not 4 (writing nothing, so the
+label stays free for the retry): an intro or KO capture cannot be compared with
+an in-round one, and the refusal names which it got. Verified against the
+existing fixtures -- `hp-full` (byte 4 = 3) and `hp-zero` (byte 4 = 5) are
+refused, the in-round ones accepted -- and `position_fields()` reproduces the
+c values recorded above (2480/4336, 11680/19384, 2480/-2196) from the captures
+already in tree.
+
+⚠ Both captures must come from ONE match. `c` changes between matches by
+design, so a cross-match pair shows a shifted `c` for a reason that has nothing
+to do with the camera -- it would read as "world space" no matter the truth.
+
+## 2026-09-19: ⛔⛔ THE X CANDIDATE IS REFUTED — `B+0x0D8` IS A POINTER
+
+**The `B+0x0D2` / `B+0x0D8` finding recorded earlier today is WRONG and must
+not be built on.** Refuted offline, same day, before any pan code was written.
+
+**What the instructions say.** `0x1406B79D7` writes `0x0D2`, and the VERY NEXT
+instruction writes `0x0D8`:
+
+    0x1406B79D3  movzx eax, word ptr [rdx + 4]
+    0x1406B79D7  mov   word  ptr [rbx + 0xd2], ax
+    0x1406B79DE  mov   qword ptr [rbx + 0xd8], rdx     <-- 64-bit POINTER
+
+Every `mov` writing `0x0D8` across the CVS2 range is a **qword store of a
+register** (`rax`/`rcx`/`rdx`/`r9`; 18 of them). `0x0D2` is a u16 COPIED from
+`[rdx+4]` -- a field of the record `rdx` points at. The pair is
+"cached field + the record it came from", not "coarse X + fine X".
+
+Read as the qword it is, `B+0x0D8` holds guest pointers: P1 `0x107F13D8`,
+`0x106913C4`, `0x106F1400`; P2 `0x10971898`, `0x108114E0`. The high half is
+constant per player per match; only the low bits move.
+
+⭐⭐ **THAT IS EXACTLY WHY THE "LAW" LOOKED PERFECT.** `0xD8 == 20*0xD2 + c`
+held with zero residual because I was doing arithmetic on the LOW 16 BITS OF A
+POINTER, and `c` -- the "per-match origin" I was going to use as the camera
+discriminator -- was just the pointer's base, which is constant within a match
+because the allocation is. The proposed experiment (walk to a corner, watch `c`
+shift) could NEVER have worked: `c` has nothing to do with the camera.
+
+⚠⚠ **THE LESSON, AND IT IS NOT A NEW ONE HERE.** Two fields agreeing to the bit
+was treated as the game's own redundancy. It is not redundancy when the
+relationship is an ARTIFACT OF MISREADING THE WIDTH of one of them. A u16 window
+onto a qword will correlate beautifully with anything derived from that qword.
+⭐ The guard that would have caught it instantly: **before believing a
+relationship between two fields, establish each field's WIDTH from the
+instructions that write it.** Neither width was checked; both were assumed from
+the diff tooling's u16 stride.
+
+⚠ The live probe had already contradicted the reading -- values drifting while
+the fighters stood still, and `pos-right-01` (both fighters in the RIGHT corner)
+reading P1 x=132 c=2480, indistinguishable from `meter-full` in a different
+session and a different stage position. That contradiction is what stopped the
+walk-to-the-other-corner capture from being spent. ⭐ Stopping on a measurement
+that does not fit, instead of collecting the second half of a designed
+experiment, is what kept this cheap.
+
+**Status of player X: UNKNOWN again.** `0x0D2` is a u16 copied from a pointed-to
+record and may still be position-adjacent, but nothing here establishes it, and
+the 26-offset enumeration cited above ("the rest are position, velocity and
+timers") is a SUMMARY, not a mapping -- it names no offset.
+
+▶ NEXT, and it stays offline: `0x0D2`'s source is `[rdx+4]` in a record whose
+pointer lands in `0x0D8`. Trace what builds that record. The writers are few --
+10 for `0x0D2`, 18 qword `mov`s for `0x0D8` -- and they cluster at
+`0x1406A48E3`, `0x1406B77xx`-`0x1406B7Dxx`, `0x14071A9xx`, `0x14073FFxx`.
+
+**The tool: `tools/find_field_access.py`** (new). Finds every instruction
+touching a displacement in the CVS2 range, by byte-encoding search plus a
+capstone decode CONFIRMING the displacement -- never a linear sweep.
+- ⭐ POSITIVE CONTROL, run before trusting any result: `0x16C --writes-only`
+  independently finds both documented super-meter sites, `0x1406C26AA` (gain,
+  inside the documented `0x1406C26A0` sequence) and `0x1406C4241` (spend, and
+  as a `sub`, matching the doc). A scanner that finds nothing and a broken
+  scanner are otherwise identical.
+- ⚠ It collapses OVERLAPPING decodes: a `66` prefix makes the same bytes decode
+  as `word ptr` at one offset and `dword ptr` one byte later, and both carry the
+  displacement. Reporting both inflated the meter control from 41 to 72 and
+  would make one write look like two independent writers.
+- ⚠ Zero hits is NOT automatically a negative: an access through a
+  register-held offset carries no displacement and cannot be found this way.
+  The tool says so rather than printing a clean-looking zero.
