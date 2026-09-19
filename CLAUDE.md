@@ -1,5 +1,16 @@
 # CFC2 Access
 
+For CVS2 in-game research, read [the 2026-09-18 prior-art audit](docs/cvs2-prior-art-audit.md)
+before relying on the historical conclusions below. It corrects the NAOMI RAM
+size, the claimed coverage of SH-4 searches, and the guest-pointer mapping
+experiment. CVS2's native character-highlight state is now traced and live
+checked; see [the state-access trace](docs/cvs2-state-access-trace.md).
+`src/cvs2_select.c` reads that state on the existing speech worker and calls
+`speech_say`. Groove and ratio handlers are also traced and included in the
+pending combined build; the alternate native stage-selection handler is now
+code-traced but not live-validated. See the trace for
+the distinction between real captures and synthetic regression fixtures.
+
 Screen reader accessibility mod for **Capcom Fighting Collection 2** (Steam
 appid **2400430**). Goal: make the collection playable by a blind player —
 NVDA primary, with braille and SAPI fallback via UniversalSpeech.
@@ -1168,4 +1179,3 @@ that WRITES the state and read its offsets, rather than searching memory.
   table, not the 0x14 form public GMD tools assume — they misparse it. Ours
   is verified against all 4165 label hashes
   (`~crc32(label*2)` / `~crc32(label*3)`).
-

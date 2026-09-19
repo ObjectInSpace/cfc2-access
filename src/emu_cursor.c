@@ -1060,8 +1060,10 @@ static void collect_pages(ULONGLONG base)
          *
          * The page filter's only job is to NARROW the space to pages that
          * reacted to the press. The real discrimination -- quiet in the
-         * control, stepped by one, RETURNED -- is applied PER FIELD in
-         * judge_fields(), which is the granularity the verdict is reported at.
+         * control, changed by 1..16, RETURNED on the reverse -- is applied
+         * PER FIELD in judge_fields(), which is the granularity the verdict
+         * is reported at. (Not "stepped by one": see the delta test in
+         * judge_fields() for why that was wrong for this screen.)
          *
          * `pages_noisy` is still counted, because it is useful to know how much
          * of the window churns on its own -- but it no longer excludes. */

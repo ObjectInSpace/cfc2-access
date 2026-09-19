@@ -35,9 +35,10 @@ New-Item -ItemType Directory -Force -Path "$root\build" | Out-Null
     "$root\src\rom_table.c" "$root\src\gui_text.c" `
     "$root\src\gui_markup.c" "$root\src\prompt_id.c" `
     "$root\src\move_list.c" "$root\src\emu_ram.c" "$root\src\emu_cursor.c" `
+    "$root\src\cvs2_select.c" "$root\src\cvs2_hit.c" "$root\src\audio.c" `
     @minhookSrc `
     -I "$root\libs\minhook\include" `
-    -luser32 -lpsapi -s
+    -luser32 -lpsapi -lwinmm -s
 if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 Write-Host "Built build\dinput8.dll"
 

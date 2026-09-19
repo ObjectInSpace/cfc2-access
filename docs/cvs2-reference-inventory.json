@@ -1,0 +1,67 @@
+{
+  "manifest_path": "C:\\Users\\amock\\Downloads\\flycast_roms.json",
+  "manifest_sha256": "741233626684e601ec51fd9d2519fa25a9fad10c0ee890f2db98cf09e7865c24",
+  "game_directory": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\CAPCOM FIGHTING COLLECTION 2",
+  "entries": {
+    "flycast_cvs2": {
+      "download": "https://fightcade.download/flycast/cvs2.zip",
+      "require": [
+        "flycast_naomi_bios",
+        "save_cvs2",
+        "flycast_cvs2_chd"
+      ]
+    },
+    "flycast_cvs2_chd": {
+      "download": "https://fightcade.download/flycast/chd_files/cvs2_chd.zip",
+      "extract_to": [
+        {
+          "src": "cvs2/gdl-0007a.chd",
+          "dst": "cvs2/gdl-0007a.chd"
+        },
+        {
+          "src": "cvs2/gdl-0008.chd",
+          "dst": "cvs2/gdl-0008.chd"
+        }
+      ]
+    },
+    "flycast_naomi_bios": {
+      "download": "https://fightcade.download/flycast/bios/naomi.zip",
+      "copy_to": "../data/naomi.zip"
+    },
+    "save_cvs2": {
+      "download": "https://github.com/blueminder/flycast-netplay-savestates/raw/main/cvs2.state.net",
+      "copy_to": "../data/cvs2.state.net"
+    }
+  },
+  "files": [
+    {
+      "path": "build/reference/flycast/naomi.zip",
+      "bytes": 9321533,
+      "sha256": "9f3ff37a68bef27cd9ce8f5603ce44779b402cca40e653ae3633fff78d179392"
+    },
+    {
+      "path": "build/reference/flycast/cvs2.zip",
+      "bytes": 8310549,
+      "sha256": "fdd11bb89b7af2477f49d88e70e60ea019260df80058981c222b2ff388c05bca"
+    },
+    {
+      "path": "build/reference/flycast/cvs2_chd.zip",
+      "bytes": 310621762,
+      "sha256": "8d5f8efbb4aca6c40b6f2b8b04c9d70b73f7c933901755e8744ad67d825a971c"
+    },
+    {
+      "path": "build/reference/flycast/cvs2/gdl-0007a.chd",
+      "bytes": 156733374,
+      "sha256": "aad3d2bbdae814c757c237b7329c913df4be5a40a2fef7843c149260783f35d2",
+      "chd_header_sha1": "2c7969edc7ce9af1101d4803b47b321dc05503e8"
+    },
+    {
+      "path": "build/reference/flycast/cvs2/gdl-0008.chd",
+      "bytes": 156736120,
+      "sha256": "fe55ad500acc23b1d9143e908955ebd25e609d3b8bd64a16ad317e4862c23839",
+      "chd_header_sha1": "a45c7df4ca6692ff0d1a34f8269e17760fbd3a04"
+    }
+  ],
+  "verification": "ZIP CRC checks passed. CHD header identities match MAME; full CHD verification and reference execution not yet performed. Netplay save state not downloaded.",
+  "cvs2_pic_sha1": "0882d0e12ca4fb81dda2268cd12724a10278c220"
+}

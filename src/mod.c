@@ -17,6 +17,9 @@
 #include "mod.h"
 #include "log.h"
 #include "speech.h"
+#include "cvs2_select.h"
+#include "cvs2_hit.h"
+#include "audio.h"
 #include "image.h"
 #include "gmd_find.h"
 #include "pad_watch.h"
@@ -332,10 +335,34 @@ static void cursor_probe_report(void)
     }
 
     if (n == 0) {
-        log_line("cursor: ⛔ NO candidate survived %u cycle(s). That is a real "
-                 "negative for this window: %u field(s) were examined at three "
-                 "widths and none was quiet in the control, stepped by one AND "
-                 "returned.", r.cycles_done, r.fields_examined);
+        /* ⛔⛔ "NO candidate survived" IS NOT A NEGATIVE WHEN NOTHING MOVED.
+         *
+         * A whole run reported ten of these as "a real negative for this
+         * window" while the log ALSO showed that not one LEFT/RIGHT edge had
+         * ever arrived: the cycles compared two captures of a STATIONARY
+         * screen, so they tested nothing. An un-navigated screen and a
+         * navigated screen with no cursor in it produced the SAME line, which
+         * is the one thing this report must never do.
+         *
+         * A cycle needs at least one forward AND one reverse press to mean
+         * anything, i.e. 2 edges. Below that, say "measured nothing" and say
+         * why -- an inconclusive is a RETURN VALUE, not a negative. */
+        if (g_cursor_edges < 2) {
+            log_line("cursor: ⚠ MEASURED NOTHING -- only %u directional "
+                     "edge(s) seen since arming. The 4-phase test needs a "
+                     "forward press AND the reverse on the same axis; with "
+                     "fewer, the captures compared are of an UNMOVED screen. "
+                     "This is NOT evidence the cursor is absent. Navigate "
+                     "character select with LEFT and RIGHT (or UP/DOWN).",
+                     g_cursor_edges);
+            return;
+        }
+        log_line("cursor: ⛔ NO candidate survived %u cycle(s), with %u "
+                 "directional edge(s) seen. That is a real negative for this "
+                 "window: %u field(s) were examined at three widths and none "
+                 "was quiet in the control, changed by 1..16 AND returned on "
+                 "the reverse.",
+                 r.cycles_done, g_cursor_edges, r.fields_examined);
         return;
     }
 
@@ -1601,6 +1628,25 @@ static DWORD WINAPI worker(LPVOID param)
                      "you are done naming a screen.");
     }
 
+    if (unpacked) cvs2_hit_install();
+
+    /* Gauge cues. Opt-in while the design is being tuned by ear; the mixer
+     * no-ops if the device will not open, and speech is unaffected either
+     * way (there is deliberately NO ducking). */
+    if (unpacked && opt_in_file_present("cfc2_audio.on")) {
+        wchar_t dir[MAX_PATH];
+        DWORD dn = GetModuleFileNameW(NULL, dir, MAX_PATH);
+        if (dn > 0 && dn < MAX_PATH) {
+            wchar_t *slash = wcsrchr(dir, (wchar_t)0x5C);
+            if (slash) *slash = 0;
+            audio_init(dir);
+        }
+        log_line("audio: %s", audio_ready() ? "cues ON" : "device unavailable");
+    } else if (unpacked) {
+        log_line("audio: OFF -- create cfc2_audio.on next to the exe for "
+                 "gauge cues.");
+    }
+
     BOOL gt_on = opt_in_file_present("cfc2_guitext.on");
     BOOL gt_ok = FALSE;
     if (unpacked && hook_enabled && gt_on) {
@@ -1788,6 +1834,11 @@ static DWORD WINAPI worker(LPVOID param)
             if (InterlockedCompareExchange(&g_quit, 0, 0))
                 break;
             Sleep(20);
+
+            /* Read actual CVS2 selection on the speech worker, never a hook. */
+            cvs2_select_tick();
+            cvs2_gauges_log_stats();
+            cvs2_hit_poll_and_log();
 
             /* ⭐⭐⭐ THE MODAL CHECK RUNS AT 100 ms, NOT ON THE 2 s BEAT.
              *
