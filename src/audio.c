@@ -9,7 +9,23 @@
 #include <string.h>
 #include <stdio.h>
 
-#define AUD_NBUF 4                     /* ~23 ms each: 92 ms worst case */
+/* ⛔⛔ 23 ms OF QUEUE WAS NOT ENOUGH, and that was the crackle.
+ *
+ * 4 x 5.8 ms means the device runs dry if this thread is not rescheduled
+ * within 23 ms. It shares a machine with the game's render thread and our own
+ * worker, so that happens. ⚠ The earlier crackle fix removed per-frame lock
+ * traffic from the FEED side -- a real bug, and it helped -- but it left the
+ * queue at 23 ms, so the underrun remained. Two causes, one symptom; fixing
+ * the first made the second look fixed.
+ *
+ * 12 x 5.8 ms = 70 ms tolerates an ordinary scheduling hiccup. The BLOCK size
+ * is deliberately unchanged: HOLD_BLOCKS and the tick decay constants are
+ * calibrated in blocks, so changing AUDIO_BLOCK would silently retime both.
+ *
+ * ⚠ Latency cost is real but irrelevant here: these are continuous gauge tones
+ * and a round-clock blip, not input feedback. 70 ms of added worst-case delay
+ * on a health tone is inaudible; a dropout is not. */
+#define AUD_NBUF 12                    /* 12 x 5.8 ms = 70 ms of queue */
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -48,10 +64,36 @@ static voice g_voice[VOICE_COUNT];
 /* Per-gauge tone character. Timbre identifies the gauge, so these must stay
  * audibly distinct; the base frequencies are deliberately spread apart. */
 typedef struct { float f_lo, f_hi; int timbre; } gauge_tone;
+/* ⛔⛔ THE FIRST PAIRING WAS NOT DISTINCT ENOUGH (user-reported, 2026-09-19).
+ * It was super sine 330-990 and health triangle 180-540, and it failed on BOTH
+ * axes at once:
+ *
+ *  1. THE RANGES OVERLAPPED. 330-540 Hz was shared, so a FULL health tone and
+ *     an EMPTY super tone were literally the same pitch. Pitch is supposed to
+ *     encode fill; when two gauges share a band it encodes nothing.
+ *  2. AT EQUAL FILL THE RATIO WAS ALWAYS 1.83 -- close to a perfect fifth, so
+ *     the two tones sat in a consonant interval and FUSED into one sound
+ *     rather than separating. Two simultaneous gauges is the normal case.
+ *  3. Sine vs triangle is a weak timbre contrast: a triangle is a sine with
+ *     quiet odd harmonics, which is subtle over a noisy fight.
+ *
+ * ⭐ NOW SEPARATED ON BOTH AXES, with non-overlapping registers:
+ *     health  150-420 Hz  triangle       -- low and warm
+ *     super   600-1500 Hz softened square -- high and reedy
+ * Health tops out at 420 while super starts at 600, so no fill combination can
+ * put them on the same pitch; at equal fill they are ~3.6x apart, which is not
+ * a consonant interval and does not fuse.
+ *
+ * ⭐ WHICH IS WHICH IS NOT ARBITRARY: health is the one being watched while
+ * under pressure, so it gets the LOW warm register that stays legible under
+ * game audio; the super meter gets the brighter register because it is the
+ * less critical of the two and a bright tone is easier to ignore.
+ *
+ * ⚠ The test pins these as audibly distinct. If either is retuned, re-measure
+ * -- do not assume a new pair separates just because the numbers differ. */
 static const gauge_tone g_tone[AUDIO_GAUGE_COUNT] = {
-    /* SUPER  */ { 330.0f, 990.0f,  0 },  /* sine: clean, mid       */
-    /* HEALTH */ { 180.0f, 540.0f,  1 },  /* triangle: softer, low  */
-    /* STUN   */ { 520.0f, 1560.0f, 2 },  /* square-ish: edgy, high */
+    /* SUPER  */ { 600.0f, 1500.0f, 2 },  /* softened square: reedy, high */
+    /* HEALTH */ { 150.0f,  420.0f, 1 },  /* triangle: warm, low          */
 };
 
 /* ---- gauge tracking -----------------------------------------------------
@@ -62,7 +104,11 @@ static const gauge_tone g_tone[AUDIO_GAUGE_COUNT] = {
  * The timer counts BLOCKS, not samples: audio_gauge_set() is called from the
  * worker (20 ms) while the mixer runs per block (23 ms), and tying the lifetime
  * to the render side keeps it independent of how often the caller polls. */
-#define HOLD_BLOCKS 6                  /* ~140 ms of tone after a change */
+/* ⚠ Recalibrated when AUDIO_BLOCK went 1024 -> 256. This counts BLOCKS, so
+ * shrinking the block silently shortened the hold from ~140 ms to ~35 ms and
+ * the tone would have become a click. 24 x 5.8 ms restores ~140 ms.
+ * A constant expressed in someone else's units breaks when those units move. */
+#define HOLD_BLOCKS 24                 /* ~140 ms of tone after a change */
 typedef struct {
     int   last;
     BOOL  seeded;
@@ -200,6 +246,29 @@ static void update_voices(void)
     }
 }
 
+/* ---- one-shot ticks -----------------------------------------------------
+ * A small ring of independent decaying blips. A ring rather than one slot so
+ * that ticks one second apart never cut each other off, and so a tick can
+ * overlap a gauge tone without either being stolen.
+ *
+ * ⚠ audio_tick() is called from the game's frame thread. It takes NO lock:
+ * it claims a slot with InterlockedIncrement and writes only that slot, and
+ * the render thread reads slots it does not write. Taking the mixer lock here
+ * is what made the health tone crackle. */
+#define TICK_SLOTS 4
+typedef struct { volatile LONG armed; float phase, env; } tick_voice;
+static tick_voice g_tick[TICK_SLOTS];
+static volatile LONG g_tick_next;
+
+void audio_tick(void)
+{
+    LONG i = InterlockedIncrement(&g_tick_next) - 1;
+    tick_voice *t = &g_tick[((unsigned)i) % TICK_SLOTS];
+    t->phase = 0.0f;
+    t->env   = 1.0f;
+    InterlockedExchange(&t->armed, 1);
+}
+
 static void render(int16_t *out)
 {
     memset(out, 0, sizeof(int16_t) * AUDIO_BLOCK * 2);
@@ -222,7 +291,18 @@ static void render(int16_t *out)
             /* Smooth gain and frequency: an abrupt gain change is an audible
              * click, and a jumping pitch reads as a different event rather
              * than the same gauge moving. */
-            v->sm_gain += 0.004f * (gt - v->sm_gain);
+            /* ⭐ FAST ATTACK, slow release. The user needs the onset keyed to
+             * the frame the damage lands, so a rising gain must reach full in
+             * ~1 ms (0.05 -> 50% in 14 samples); a falling one keeps the old
+             * gentle ramp so the tail does not click. Symmetric smoothing put
+             * ~4 ms of ramp in front of every hit, which is audible slop on a
+             * game this fast. */
+            v->sm_gain += (gt > v->sm_gain ? 0.05f : 0.004f) * (gt - v->sm_gain);
+            /* ⚠ 0.010 restored. I changed this to 0.0006 believing it caused the
+             * health crackle; measuring the smoother directly showed the
+             * coefficient makes NO difference (7.2 Hz per feed at every value
+             * from 0.010 to 0.0003). The cause was lock contention in the
+             * frame hook. Do not re-tune this without measuring first. */
             if (v->sm_freq <= 0.0f) v->sm_freq = v->freq;
             v->sm_freq += 0.010f * (v->freq - v->sm_freq);
 
@@ -244,6 +324,26 @@ static void render(int16_t *out)
                 v->active = FALSE;
                 v->sm_gain = 0.0f;
             }
+        }
+
+        /* Clock ticks: short decaying blips, centre panned so they sit apart
+         * from the owner-panned gauges. A wooden click rather than a tone --
+         * fast decay on a mid frequency. */
+        for (int ti = 0; ti < TICK_SLOTS; ti++) {
+            tick_voice *t = &g_tick[ti];
+            if (!t->armed) continue;
+            t->phase += 1200.0f / (float)AUDIO_SR;
+            if (t->phase >= 1.0f) t->phase -= 1.0f;
+            /* ⚠ 0.9965, not 0.9994. I wrote 0.9994 with the comment "~40 ms"
+             * without checking: it actually decays over 235 ms, which is a
+             * sustained blip rather than a clock tick, and the offline suite
+             * caught it. 0.9965 really is ~40 ms. Compute the constant, do
+             * not assert it. */
+            t->env *= 0.9965f;                 /* ~40 ms to inaudible */
+            float ts = sinf(t->phase * 2.0f * (float)M_PI) * t->env * 0.5f
+                     * (on ? 1.0f : 0.0f) * g_master;
+            l += ts; r += ts;
+            if (t->env < 0.002f) { t->env = 0.0f; InterlockedExchange(&t->armed, 0); }
         }
 
         if (l >  1.0f) l =  1.0f;
@@ -326,6 +426,21 @@ void audio_init(const wchar_t *game_dir)
     g_ready = TRUE;
     InterlockedExchange(&g_run, 1);
     g_thread = CreateThread(NULL, 0, audio_thread, NULL, 0, NULL);
+    /* ⭐ The OTHER half of the crackle. This thread refills the device queue;
+     * at NORMAL priority it competes with the game's render thread and loses
+     * often enough to underrun. TIME_CRITICAL is the standard priority for an
+     * audio callback thread and is safe here because the thread does bounded
+     * work per wake (render one block, write it) and then blocks on an event
+     * -- it cannot spin and starve anything.
+     *
+     * ⚠ Not fatal if it fails: a refused priority leaves a working but
+     * underrun-prone thread, which is the behaviour we already had. Logged
+     * rather than assumed, so a future crackle report can rule it in or out. */
+    if (g_thread) {
+        if (!SetThreadPriority(g_thread, THREAD_PRIORITY_TIME_CRITICAL))
+            log_line("audio: ⚠ could not raise device-thread priority (%lu) -- "
+                     "cues may crackle under load", GetLastError());
+    }
     log_line("audio: waveOut open, %d x %d frames at %d Hz, volume %d%%",
              AUD_NBUF, AUDIO_BLOCK, AUDIO_SR, (int)(g_master * 100.0f));
 }

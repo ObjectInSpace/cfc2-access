@@ -639,7 +639,19 @@ fall when the other player is hit.
 Corrected fields, same validated state block:
 
     health      B+0x16C   (B = R + 0x1EBA8 + player*0x678)
-    max health  B+0x170   per-character: 11520 Ryu, 11200 for P2's fighter
+    shadow bar  B+0x16E   the delayed/drain bar -- LAGS behind +0x16C
+    max health  B+0x170   per-fighter AND per-RATIO; read live, never hardcode
+
+⚠ `B+0x16E` sits BETWEEN health and max, and it usually equals current health,
+so reading `+0x16C`/`+0x170` as an ADJACENT u16 PAIR silently gives you
+(health, shadow) and a fill fraction pinned at 1.00. I did exactly that while
+chasing a pitch-direction report and briefly "disproved" max health with it.
+They are 4 bytes apart; `state-b` is the capture that separates them
+(hp 2406, shadow 3108, max 11520).
+
+⚠ MAX DEPENDS ON CHARACTER AND RATIO (user, 2026-09-19), confirmed in captures:
+11520 at ratio 1 in Arcade, 14400 at ratio 2 in Training, same fighter (Ryu).
+So it is not a per-character constant either -- it must be read live.
 
 ⭐⭐ WHY THE EARLIER "CONFIRMATION" WAS WORTHLESS, because this is the reusable
 part. Two independent lines of evidence were cited and NEITHER discriminated:
@@ -721,3 +733,654 @@ Deployed after the user closed CFC2. Installed/built SHA256 match:
 Backup: `build/dinput8-before-handicap-20260919-123416.dll`.
 End-to-end speech in the relaunched game remains for the user to confirm;
 actual selection state and the offline speech path were validated above.
+
+**Super-meter search: first attempt did NOT find it (2026-09-19)**
+
+Training-mode pair, same PID and root `0x15541000`, both phase byte 4 = `04`:
+`meter-full` (user: both players full health AND full meter) and `meter-spent`
+(user: spent down to level 0).
+
+⭐ The baseline independently re-validated health: P1 and P2 both read
+14400/14400 at `B+0x16C`/`B+0x170`, exactly as the user described. Note the max
+is 14400 in training, not the 11520/11200 seen in Arcade -- max health is
+per-character AND per-mode, so do not hardcode it.
+
+⭐ The isolation was clean: health held at 14400 on BOTH sides across the pair,
+so nothing in the diff is damage.
+
+Searches run, all negative:
+
+- Player-struct u16s that decreased with P2 unchanged: 3 hits, all animation
+  (`B+0x03B`/`0x03C` are one field read at two alignments; `B+0x0D9` moved by 1).
+- EVERY P1 struct change listed with P2 context: 47 fields, all animation or
+  shared. `B+0x246` again moved IDENTICALLY on both players, re-confirming it
+  is a shared counter and not per-player state.
+- Whole-block byte scan for a small count landing on exactly 2 (when the user
+  first said "level two"): 38 hits, almost all at regular 0x168 strides =
+  display list.
+- Same, with a partner holding the pre-spend value: 0 hits.
+- Whole-block u16 -> 0 with an unchanged partner at 14 plausible strides:
+  259 hits, all in `0x00D00..0x01E00` with repeating 32768/16256/5460 at
+  0x100/0x800 strides = display list.
+- R-globals `0x1F000..0x216B0`: 49 changed bytes, all small values counting UP
+  from zero (effect/animation), nothing draining from full.
+
+⛔ WHY THIS PAIR CANNOT SETTLE IT: **10,594 of 136,880 bytes changed (7.7%)**,
+and 3,177 u16s anywhere in the block dropped from >=1000 to <=8. A super
+animation churns far too much state for a two-capture diff to isolate one
+field. The pair is not bad data -- the method is under-powered for this event.
+
+▶ WHAT TO DO INSTEAD. Do not run another spend-diff; it will return thousands
+of candidates again. The meter's distinguishing property is that it **refills
+gradually while nothing else happens**. Two captures taken during quiet
+meter-building, with no attack animation in flight, should differ in very few
+bytes -- and the meter must be among them. That inverts the signal-to-noise:
+the spend event is the loudest possible moment, the refill is the quietest.
+
+⚠ Also still unchecked: whether the meter lives in the state block at all. The
+stock display may be driven from somewhere the 0x216B0 window does not cover,
+as health's max does vary by mode. Confirm the field exists here before
+spending more captures on locating it.
+
+**Super meter: three-way full/full/empty test, still NOT located (2026-09-19)**
+
+⭐ CORRECTION to the entry above: the user clarified that `meter-full` AND
+`meter-spent` were BOTH taken at FULL meter. So that pair contained no meter
+change at all, and its 10,594 changed bytes were pure animation noise. The
+"spend diff" described above tested nothing. A third capture `meter-empty`
+(user: "empty or near empty", same PID, same root `0x15541000`, phase byte
+4 = `04`) supplies the real contrast.
+
+⭐⭐ THE THREE-WAY CONSTRAINT is much stronger than any pair: the meter field
+must AGREE across the two full captures and DIFFER in the empty one. Animation
+noise differs between the two fulls and is therefore excluded automatically.
+It cut 3,177 pair-candidates to 84 u16s / 140 bytes.
+
+Still negative. What the survivors are:
+
+- Repeated display constants (5460, 5461, 32768, 16256, 16384) at 0x8 and
+  0x100 strides across the whole block -- vertex/display-list data.
+- An 84/21 byte pattern at 0x8 stride recurring block-wide, which also passes
+  a naive "partner kept its value" filter. It is not a gauge.
+- Values clustered at 21500-21900 with tiny deltas, appearing everywhere:
+  pointers or coordinates, not a meter.
+
+⛔⛔ THE DECISIVE NEGATIVE: in the 0x678-byte PLAYER STRUCT, exactly **TWO**
+bytes are equal in both full captures and different when empty -- `B+0x030`
+and `B+0x031`, both `0 -> 255`. That is a flag, not a gauge. **The super meter
+is not a field of the player struct.** Health is (`B+0x16C`), so the two are
+not stored together, and walking outward from health will not find it.
+
+⭐ Health re-validated again in all three captures: 14400/14400 both players,
+matching the user's description exactly. Note max health is 14400 in TRAINING
+vs 11520/11200 in Arcade -- per-character AND per-mode. Do not hardcode it.
+
+▶ NEXT, and do not repeat the above: 1,284 bytes block-wide satisfy the
+three-way constraint, which is too many because a full-to-empty transition
+still spans a lot of game time. The remaining high-value experiment is the
+QUIET one: two captures during gradual meter BUILDING with no attack animation
+in flight. Very few bytes should differ, and the meter must be among them.
+If that also returns nothing plausible, conclude the meter is outside this
+0x216B0 window and stop diffing -- max health already varies by mode, so the
+block demonstrably does not hold every gauge uniformly.
+
+**⭐⭐ SUPER METER FOUND: B+0x226 (2026-09-19)**
+
+The user corrected the labelling twice; the final set is THREE full-meter
+captures (`meter-full`, `meter-spent`, `meter-empty` -- all taken while the
+meter was actually full) and ONE genuinely empty (`meter-empty2`). Same PID,
+same root `0x15541000`, all phase byte 4 = `04`.
+
+⭐⭐ THE FOUR-WAY CONSTRAINT is what found it, and it is the technique to
+reuse: the field must be IDENTICAL across all three full captures and DIFFER
+in the empty one. Three captures taken at different times cancel animation
+noise that no pair can. 125,002 of 136,880 bytes agree across all three fulls;
+1,059 of those differ when empty; and in the 0x678-byte PLAYER STRUCT exactly
+**ONE** byte survives:
+
+    super meter   B+0x226   (u16)
+
+    meter-full   P1=168  P2=168
+    meter-spent  P1=168  P2=168
+    meter-empty  P1=168  P2=168
+    meter-empty2 P1=  4  P2=168      <- user spent; P2 never did
+
+P2 holding at 168 across all four while P1 collapses to 4 is the per-player
+independence that health's identification originally lacked.
+
+CODE CONFIRMATION, independent of the captures. 57 instructions touch +0x226.
+At `0x1406C40EA`: `add word ptr [rbx+0x226], di` followed by `jns` and a store
+of 0 -- a variable add that FLOORS AT ZERO (spending). Just above, at
+`0x1406C40B0`: `add eax,edi` / `mov [rbx+0x226],ax` / `cmp ax,0x48` / clamp to
+`0x48` -- a variable add that CEILINGS (gaining). Accumulate-up-to-a-cap and
+drain-to-zero is the meter, and nothing else in the struct has that shape.
+
+⚠ THE CAP IS NOT A SINGLE CONSTANT. The observed full value is 168, but the
+only immediates compared against +0x226 are 72 (0x48, x3), 100 (0x64, x2) and
+112 (0x70, x1) -- all BELOW 168. So `0x48` is a per-path or per-groove
+threshold, not the maximum. That is expected for CVS2, where grooves differ in
+meter behaviour. **Do not hardcode 72, 168, or any of these as the max.** The
+real maximum must be located (likely a per-groove table) before the gauge can
+be scaled to a 0..1 fill fraction for the audio.
+
+⚠ Unlike health, no max-value FIELD has been found beside it. Health has
+`B+0x170` adjacent; the meter's ceiling appears to come from code/tables, not
+a neighbouring slot. Until that is resolved, a fill fraction is not derivable.
+
+Health re-validated in all four captures: 14400/14400 both players throughout,
+matching the user's description each time.
+
+**⭐⭐ THE METER CAP IS PER-GROOVE — table resolved (2026-09-19)**
+
+The observed full value (168) exceeded every immediate compared against
+`B+0x226` (72, 100, 112), which meant no single constant could be the max.
+Tracing the enclosing function `0x1406C3DE0` resolved it:
+
+    0x1406C3E53  movsx rax, byte ptr [rbx+0x22D]   ; groove index
+    0x1406C3E5B  cmp eax, 5
+    0x1406C3E70  jump table at 0x1406C4138          ; six cases
+
+Each case loads its own ceiling:
+
+    0 C = 0xA8 (168)   1 A = 0x90 (144)   2 P = 0xC0 (192)
+    3 S = 0x64 (100)   4 N = 0xD8 (216)   5 K = 0x48 (72)
+
+⚠ `0x48` is K-Groove's cap ONLY. It is the immediate that appears most often
+near this field, and hardcoding it -- or the measured 168 -- would misreport
+every other groove. `B+0x22D` is the index, and it agrees with `B+0x5D0` (the
+groove field the selection reader already validates) in all four captures.
+
+⭐ THE CHECK THAT MADE IT SHIPPABLE, and the standard to reuse: the table
+predicts 100% for all three full-meter captures and 2% for the empty one,
+reproducing the user's own description. A cap that could not reproduce the
+measured 168 would have been rejected. This is the falsifiable-prediction test
+that the earlier health/meter mix-up lacked.
+
+Shipping: `cvs2_gauges_observe()` feeds AUDIO_GAUGE_SUPER from `B+0x226`
+scaled by `meter_cap[B+0x22D]`, and stays SILENT for a groove index outside
+0..5 rather than guessing a ceiling. Regression in `tools/test_cvs2_select.c`
+replays all four captures and forces each of the six groove indices; hardcoding
+a single cap fails it immediately (verified by sabotage).
+
+⚠ Test note: the older health assertions counted `ga_sets==2` for "both
+players fed". That count is now 4, because each player feeds two gauges, and
+the assertion failed for a reason unrelated to health. The suite now records
+per-gauge/per-player values instead. A raw call count is a proxy; assert on
+the value that matters.
+
+**Round timer: strong candidate R+0x184, needs one live confirmation (2026-09-19)**
+
+Found by diffing same-session capture pairs for a u16 in 0..99 that decreases.
+`R+0x184` is the only offset appearing in ALL THREE pairs, and its values are
+exactly what a CVS2 round clock looks like:
+
+    hp-full 99   hp-hurt 71   hp-low 55   hp-zero 55
+    hp-ken  81   state-a 81   state-b 75
+    all four TRAINING captures: 99   (training does not run the clock)
+
+99 is CVS2's default round time; the training captures sitting frozen at 99
+while the Arcade ones count down is the discriminator. `hp-ken` resetting to 81
+is consistent with a new round starting after the previous one ended.
+
+⚠ NOT yet confirmed against code. The 13 instructions touching `+0x184` are all
+BYTE accesses on other structures' `+0x184`, not this u16 at the block base --
+the timer is reached through a base pointer I have not identified. So this rests
+on behaviour alone, which is exactly the evidence that mislabelled health as the
+super meter.
+
+⚠ The wall-clock rate check is INCONCLUSIVE and must not be cited as support:
+0.07-0.12 per second across the three pairs, where a real clock is 1/s. The
+gaps include long pauses while the session was idle, so elapsed wall time
+massively overstates in-match time. Consistency across pairs is mildly
+encouraging; the absolute rate proves nothing either way.
+
+▶ THE CONFIRMATION THAT SETTLES IT, and it costs one capture: read the
+on-screen timer aloud and capture at that moment. If `R+0x184` equals the
+displayed number, it is the timer. This is the falsifiable-prediction standard
+that the per-groove meter cap met and the original health/meter claim did not.
+
+Until then do NOT wire timer cues. A wrong timer would fire the 30/15/5-second
+warnings at the wrong moments, which is worse than no warning at all.
+
+**Win quotes: located live, but the DRAW path is not found (2026-09-19)**
+
+Confirmed the quote text exists and is readable at runtime. With the game
+running, all five signature phrases resolve inside the arena:
+
+    arena = 0x7B71000  (this session)
+    "Stand up and face me again"  arena+0x1FD9F4
+    "Shinryuken"                  arena+0x1FDD23
+    "Sumo is the greatest"        arena+0x1FE5B0
+    "Psycho power"                arena+0x1FEC60
+    "Kyokugen style"              arena+0x1FFAFC
+
+So the memory's file offset 0x001FD800 for entry[7] maps directly to
+`arena+0x1FD800`. 664 ASCII runs of >=8 chars in the 25,676-byte region.
+
+⭐ STRUCTURE, read off a live dump of the region head:
+
+    +0x0000  u32 0x62CC   -- a table offset
+    +0x0004  u32 0x638C   -- a second table offset
+    +0x0008  a character REMAP table (font glyph indices, not text)
+    +0x0074  a long run of 01/02 bytes -- per-line width/advance data
+    +0x01F4  text begins; Ryu's first line. Ken's starts at +0x039C.
+
+⚠ QUOTES ARE MULTI-LINE, each line its own NUL-terminated string:
+  +0x01F4 "Stand up and face me again. I have"
+  +0x0218 "yet to see your best..."
+So "a quote" is several strings, not one, and any reader must join them.
+
+⛔ NEITHER HEADER TABLE IS THE QUOTE INDEX. `+0x62CC` holds u32s (0x5238,
+0x5290, 0x52F0, ...) that point PAST the text into another region; `+0x638C`
+indexes the 01/02 width data at +0x0074. Do not mistake either for a
+per-character quote table -- I did briefly, and the strings they resolve to
+are binary garbage.
+
+⛔ THE DRAW ROUTINE IS NOT FOUND, and the static route is closed: a sweep of
+0x1406A0000..0x140740000 for the immediates 0x1FD800 / 0x1FD000 / 0x1FE000
+returns ZERO instructions. The region is reached through the archive's own
+entry table (IBIS/AFS), not by a literal offset, so there is nothing to grep.
+
+▶ WHAT WOULD WORK, in preference order:
+1. A WRITE/ACCESS BREAKPOINT on a known quote address while a win screen is on
+   screen -- the only method that names the reader directly. Needs a debugger
+   or a hardware breakpoint, neither of which this mod currently does.
+2. Hook the archive entry resolver (0x1406B0060 / 0x1406ADF10 already known to
+   translate guest addresses for resource records) and watch for a request
+   that lands in 0x1FD800..0x203CC.
+3. Read the quote by index once the per-character table is understood -- but
+   only 7 of 48 offsets are confirmed and spacing is explicitly variable, so
+   arithmetic would risk speaking the WRONG character's line.
+
+⚠ Do not ship route 3 on its own. Speaking another fighter's victory quote is
+indistinguishable from correct behaviour to a blind user, which is the exact
+failure class this project has paid for repeatedly.
+
+**⭐⭐ ROUND TIMER CONFIRMED: R+0x184 (2026-09-19)**
+
+The falsifiable check passed. The user reported **99** on the arcade timer;
+`timer-99.bin`, captured at that moment, reads **99** at `R+0x184`. Combined
+with the earlier evidence -- the only offset decreasing across all three
+same-session pairs, frozen at 99 in all four Training captures, resetting to 81
+for a new round -- this is settled.
+
+`R+0x186` holds 36..59 across captures: a 0..59 sub-second frame counter. Not
+needed for second-boundary cues, which read `+0x184` alone.
+
+⚠ The earlier wall-clock rate check (0.07-0.12/s against an expected 1/s) was
+INCONCLUSIVE and is superseded, not confirmed, by this. It failed because the
+gaps included long idle pauses, not because the field was wrong.
+
+SHIPPED: `cvs2_frame.c` reads the clock in the per-frame detour, so a tick
+lands on the frame the second changes. Warnings at 30 and 15, then every
+second for the last five.
+
+⚠ Fires only on a DECREASE. A round reset jumps the value upward past 30 and
+15, which would otherwise fire the whole warning set during the reset.
+
+The cue is a one-shot decaying blip (1200 Hz sine, ~40 ms), centre-panned so
+it sits apart from the owner-panned gauges, in a 4-slot ring so ticks overlap
+rather than steal -- the user said overlap is fine as long as onsets are right.
+
+⚠ audio_tick() takes NO lock. It claims a slot with InterlockedIncrement and
+writes only that slot. Taking the mixer's critical section from the frame
+thread is what made the health tone crackle.
+
+⛔ TWO TEST DEFECTS WORTH REMEMBERING, both found here:
+1. I wrote the decay constant 0.9994 with the comment "~40 ms". It is actually
+   **235 ms**. Compute a constant; do not assert it in a comment.
+2. The decay assertion used `peak_over(24)`, which returns the MAXIMUM across
+   those blocks -- so it measured the tick's ATTACK and failed against
+   correct code. Let the sound ring out first, THEN assert silence.
+   Measured decay is silent at block 7, 40.6 ms, exactly as intended.
+
+**⛔ Win quotes: the "read it by char_id" shortcut is DEAD (2026-09-19)**
+
+The user: CVS2 displays a RANDOM win quote, and there is no way to determine
+in advance which will appear.
+
+That closes the cheap route. Knowing the winner narrows it to that character's
+BLOCK, but each block holds several alternatives -- Ryu's alone contains at
+least six ("Stand up and face me again...", "A true warrior follows their own
+destiny!", "You were your own worst enemy...", "That's it?", "Has your fighting
+spirit burned out?!", "Never give into your fear..."). I catalogued those
+earlier in this same session and still wrote about "the winner's quote" as if
+it were singular.
+
+⚠ So reading by char_id would speak ONE OF SIX at random, and a wrong quote is
+indistinguishable from a right one to a blind user -- the exact failure class
+this project has paid for repeatedly. Do not ship it, and do not revive
+"establish all 48 per-character offsets" as a path to win quotes: the offsets
+are not the missing piece, the RUNTIME SELECTION is.
+
+▶ ONLY ONE ROUTE REMAINS: observe the pointer the game hands its text
+renderer. Not inference -- observation. The static search is already closed
+(zero instructions reference the region offset; it is reached through the
+archive entry table), and today's attempt at the archive resolvers found that
+0x1406B0060 is allocator/list arithmetic, not a text reader.
+
+That needs machinery this mod does not have: a hardware breakpoint or a
+PAGE_GUARD on a known quote address, armed while a win screen is up.
+
+⚠ Worth weighing before spending a session on it: the payoff is flavour text
+on a screen that lasts a few seconds, versus position/beacons which change how
+the game is PLAYED. Recommend parking this below position.
+
+What is already established and need not be redone:
+- the quote region is live at `arena+0x1FD800`, 25,676 bytes, 664 ASCII runs;
+- the header is two table offsets (0x62CC, 0x638C -- NEITHER is a quote index),
+  a font remap table at +0x0008, per-line width data at +0x0074, text at +0x01F4;
+- quotes are MULTI-LINE, each line its own NUL-terminated string.
+
+**⛔⛔ CORRECTION: +0x62CC *IS* THE QUOTE INDEX (2026-09-19)**
+
+The line above ("NEITHER is a quote index") is WRONG, and the reason is worth
+more than the correction. `+0x62CC` was read as a table of pointers TO TEXT,
+its entries were dereferenced once, they landed on binary, and it was ruled out.
+
+⭐⭐ IT IS A TWO-LEVEL TABLE. The u32s point at PER-CHARACTER SUB-TABLES, which
+point at the lines. One dereference lands on the sub-table's own pointer bytes
+-- exactly the "binary garbage" that was reported as disproof. The index was
+there; the indirection was one level deeper than the read.
+
+⚠ THE REUSABLE RULE: "the pointer resolves to garbage" can mean the pointer is
+wrong, OR that it points at more pointers. Before ruling out an index, check
+whether the "garbage" is itself a plausible offset array. Here every u32 was a
+small ascending in-region value -- the signature of an index, not of text.
+
+⭐ AND THE WHOLE THING IS OFFLINE. The text ships uncompressed in
+`bin/cvs2` inside `arc/pc/game_10.arc` (ARC v7, one zlib entry, 96 MB IBIS).
+Region file offset `0x1FD840` = live `arena+0x1FD800 + 0x40` (the IBIS header).
+All five live-confirmed phrases are present. No launch is needed to work on
+this text ever again.
+
+FORMAT: `+0x62CC` = 48 u32, one per character ID -> that character's sub-table
+of 8 u32, one per quote -> an array of u16 LINE offsets, terminated by the next
+quote's pointer (for quote 7, by the sub-table itself). `+0x638C` = 48 u32 into
+the width data at `+0x0074` -- so BOTH header tables are now explained.
+
+**48 characters x exactly 8 quotes = 384**, decoding cleanly.
+`tools/cvs2_quotes.py`, controls in the same invocation; sabotaging the
+multi-line join is caught by two independent controls and it refuses to report.
+
+⚠ THIS DOES NOT MAKE QUOTES SHIPPABLE. 8 per character, chosen at random at
+display time, so the ID gives a 1-in-8 guess. The remaining unknown is the
+RUNTIME SELECTION -- a single small integer -- not the text or its layout.
+
+⚠ Why no x86 search will find the reader: a sweep of the dump for `0x62CC`,
+`0x638C` and `0x1FD800` returns ZERO occurrences. This region is GUEST data read
+by emulated SH-4 code; the host executable never touches these offsets. That is
+the structural reason the static route is closed.
+
+**⭐⭐ ENDINGS ARE SOLVED AND SHIPPABLE: one per character (2026-09-19)**
+
+The user confirmed CVS2 endings are NOT random -- one per character. So the
+character ID fully determines the text, and the selection reader already
+validates that ID. There is no runtime-selection unknown, which is exactly what
+separates endings from win quotes.
+
+REGION: file offset `0x204040` in `bin/cvs2`, immediately after the quotes,
+same two-level shape:
+
+    +0x0000  u32 0x3EAC -- entry index
+    +0x0008  per-line width bytes (01/02/03)
+    +0x04B8  text, NUL-terminated lines
+    +0x3EAC  256 u32 -- entry -> array of u32 LINE offsets
+
+An entry's array runs until the next entry's begins, so entries are variable
+length (1-3 lines). 250 of 256 carry text.
+
+⚠ THE TABLE IS THE WHOLE STORY SCRIPT, not only endings:
+
+    0..47    boss/pre-fight dialogue and the Osaka news interlude
+    48..191  THE 48 ENDINGS, exactly 3 entries each
+    192..239 pre-final-match lines, one per character
+    240..249 the closing ceremony
+
+Only 48..191 is keyed by character ID. Do not speak the rest by ID.
+
+⭐ THE MAPPING IS DERIVED, NOT ASSUMED: endings start at 48, 3 entries per
+character, in the SAME roster order `src/cvs2_select.c` already uses. Ryu 48-50,
+Ken 51-53, Chun-Li 54-56 ... Rolento 189-191. Sagat lands at 75-77 = ID 9, the
+ID the user identified live.
+
+⚠ 12 of 48 endings do not contain the character's roster name, and that is
+CORRECT: Claw's says "Vega", Dictator's "Bison", Kyo's is Shingo addressing
+"Mr. Kusanagi", Mai's is about Andy, Haohmaru's "the samurai", Cammy's is the
+Shadaloo doll monologue. So a name-match RATE alone cannot validate alignment.
+
+⭐⭐ THE CONTROL THAT ACTUALLY DISCRIMINATES: exact phrase ANCHORS on IDs whose
+identity is independently live-verified (Ryu 0, Sagat 9, Yun 44) plus the table
+endpoint (47). A uniform shift keeps the name-match rate plausible while
+breaking every anchor. Verified by sabotage: `ENDINGS_FIRST` 48 -> 51 gives
+anchors 0/4, name-match 37 -> 1/48, exit 2, and the tool refuses to report --
+where a rate-only control would have shipped Ken's ending as Ryu's.
+
+`tools/cvs2_story.py` (`--char N`, `--raw` for all 256 entries).
+
+⚠ Entries 243-245 hold 0x81-prefixed placeholders where the game substitutes
+the winning team's names at runtime. They decode as replacement characters;
+that is not corruption.
+
+▶ NOT YET WIRED TO SPEECH. What remains is the runtime trigger: detecting that
+an ending is being displayed, and for which character. The text and the ID
+mapping are settled; the trigger is not, and it must not be inferred from a
+match ending -- a loss and a win both end a match.
+
+**Ending trigger: what the user reports, and what the code settles (2026-09-19)**
+
+User report: endings are shown at the END, after the boss is defeated, DURING
+THE CREDIT ROLL. They believe it requires beating Shin Akuma or Ultimate/God
+Rugal, but explicitly flagged that as uncertain. Treat the boss condition as
+UNVERIFIED -- do not encode it as a guard until a capture shows it.
+
+⛔ THE STATIC ROUTE IS CLOSED FOR ENDINGS TOO, and now for a proven reason.
+Searched the dump for the story region's own offsets: `0x3EAC` occurs ONCE, at
+`0x140533BE0`, which is OUTSIDE the CVS2 range `0x1406A0000..0x140740000` --
+i.e. coincidental. `0x204000` and `0x204040` occur ZERO times. Same result as
+the quote region. This is guest data read by emulated SH-4 code; the host x86
+executable never touches these offsets, so no amount of x86 disassembly will
+find the reader. Do not repeat this sweep.
+
+WHAT IS ESTABLISHED ABOUT THE PHASE MACHINE:
+
+- The top-level table `0x141282A20` has EXACTLY 7 entries (index 7 is null;
+  8..11 are the ASCII "CAPCOM VS SNK 2"). Earlier notes listed "the first seven"
+  without saying seven is all there are. It is all there are.
+- Phase 1 `0x1406B9BA0` (match) subtable `0x14128CCD8`: 10 entries, followed by
+  a byte index map `0706050403020100`. Match setup `0x1406B9F40` is index 6.
+- Phase 2 `0x1406BA870` (selection) subtable `0x14128CD68`: 10 entries, same
+  shape.
+- Phase 6 `0x1406B20D0` is a TRANSITION handler: it sets P[0]=1 and zeroes
+  P[1]/P[2], i.e. it re-enters the match phase from the top.
+
+⛔⛔ NO CAPTURE OF AN ENDING OR CREDIT ROLL EXISTS. All 28 captures are either
+character select (`02 01 01 01 ...`) or in-match (`02 01 02 02 ...`). So which
+phase drives the credit roll is UNKNOWN -- not narrowed, unknown. Do not guess
+it from the handler list above; three leads in this project have already failed
+by pattern-matching code that "looks like" the target.
+
+▶ THE CAPTURE THAT WOULD SETTLE IT, and it is one run: reach an ending and
+capture DURING the credit roll with `tools/grab.ps1`. What it answers:
+
+- the phase bytes for the ending/credits state -- which names the handler;
+- whether the winning character's ID is still readable at a known offset
+  (B+1 and the team bytes B+0x5C0.. are the candidates the selection reader
+  already validates), which is what picks WHICH ending to speak;
+- whether the boss condition matters at all, by comparing a normal-ending run
+  with a true-boss run.
+
+⚠ Until that capture exists, do NOT wire ending speech. Speaking the wrong
+character's ending, or speaking one during a plain match end, is
+indistinguishable from correct behaviour to a blind user -- the failure class
+this project has paid for repeatedly.
+
+⚠ Worth saying plainly: an ending is a one-off narrative payoff at the end of
+an arcade run, and the credit roll is long. This is lower value than in-match
+position/beacons. It is now CHEAP (the text and mapping are done offline), but
+it is not urgent.
+
+**Win-quote timing: the in-match state machine, and a correction (2026-09-19)**
+
+User: win quotes are displayed AFTER A MATCH COMPLETES, before the next match
+starts.
+
+⛔ MY FIRST READING WAS WRONG and the user corrected it: I took `hp-zero`
+(phase byte 4 = `05`) to be the state preceding the quote. That is ROUND end,
+not MATCH end. A match is best-of-three, so the quote comes after a state no
+capture has reached. Recorded because the two are easy to conflate and the
+captures only cover the round-level ones.
+
+THE STATE MACHINE, traced (this part is solid):
+
+- Phase-1 subtable `0x14128CCD8` index 2 -> `0x1406B9CB0`, a tail-jump to
+  `0x1406EF570`.
+- `0x1406EF570` dispatches on `P[2]` through the 12-entry table at
+  **`0x141293760`** (states 0..11 -> `0x1406F0F60` .. `0x1406F1870`).
+- The states ALTERNATE: even = setup, odd = a timed wait that decrements
+  `[rdx+8]` and advances `P[2]` when it goes negative.
+- Each setup calls `0x1406EF5E0` with an ascending selector: state 6 -> 4,
+  state 8 -> 6, state 10 -> 8.
+- `0x1406EF5E0` bounds the selector at 0xB and dispatches through the
+  rva table at **`0x1406F0ECC`** (base `0x140000000`), 12 entries,
+  `0x1406EF608` .. `0x1406F0CC2`.
+
+Captured states: `hp-full` byte4=`03` (intro), `hp-hurt`/`hp-low`/`meter-*`
+byte4=`04` (in-round), `hp-zero` byte4=`05` (round end). States 6..11 are
+POST-ROUND/POST-MATCH and NO capture reaches them.
+
+⛔ I did NOT identify which selector draws the win quote. Selector 6
+(`0x1406F0230`) is a screen-layout setup writing float coordinates, which is
+"consistent with" positioning a text panel -- and that is exactly the
+pattern-matching that produced this project's last three dead leads (the hit
+handler, the bar-ratio division search, the B+0x5F0 pointer). A layout setup
+looks identical whether it positions a quote, a WIN banner, or a continue timer.
+Do not adopt one of these selectors without a capture.
+
+▶ THE CAPTURE THAT SETTLES IT, one run, with `tools/grab.ps1` DURING the win
+quote (after a match ends, before the next begins):
+
+- `P[2]` names the state, and the selector its setup passed names the screen;
+- read `B+1` and the team bytes `B+0x5C0..` for the WINNER's character ID --
+  that is the block of 8 quotes;
+- the remaining unknown is WHICH of the 8, which is a small integer that must
+  be somewhere in `R`. With a capture in hand, the four-way-constraint method
+  that found the super meter applies directly: several quote captures, the
+  field must agree when the same quote shows and differ when it changes.
+
+⚠ Note the asymmetry between the two text bodies. ENDINGS need only the
+character ID, which is already readable -- so an ending capture is a trigger
+hunt alone. QUOTES additionally need the 1-in-8 selection index, which is a
+second unknown. Endings are the nearer win despite being the rarer screen.
+
+**⭐⭐ WIN-QUOTE STATE CAPTURED: phase byte 3 = 0x03 (2026-09-19)**
+
+`build/cvs2-state/winquote-01.bin`, PID 8728, ROM 3, R `0x145F1000`, taken by
+the user while a win quote was on screen.
+
+    phase bytes   02 01 02 03 02 00 00 00
+                            ^^ byte 3
+
+⭐ THE DISCRIMINATOR IS BYTE 3, and it is new. Every prior in-match capture has
+byte 3 = `02` with byte 4 carrying the sub-state (`03` intro, `04` in-round,
+`05` round end -- e.g. `timer-99` is `02 01 02 02 03 04 03 00`). This capture is
+the first with byte 3 = `03`. So the post-match quote screen is a sibling of
+the in-match state, not a sub-state of it.
+
+⚠ ONE capture. Byte 3 = `03` is the value observed WHILE a quote was displayed;
+it has not been shown to be absent at other times, and a second capture at a
+different moment is what would establish that. Do not treat it as a proven
+sufficient guard yet.
+
+WHAT DECODES CLEANLY IN THIS STATE (the same validated offsets, no new chain):
+
+    P1  B+1 = 9  Sagat   team = Ken/Sagat/Ryu    size 3  groove 0 (C)
+    P2  B+1 = 40 Todoh   team = Hibiki/Kim/Iori  size 3  groove 2 (P)
+
+So `B+1` -- the field the selection reader already validates -- still holds each
+side's ACTIVE fighter here. That is the character ID a quote or ending would be
+keyed by, and it survives into the post-match state. This is the half of the
+problem that is now answered.
+
+⚠ `B+0x16C`/`B+0x170` read **0/0** for BOTH players in this state. Health is
+torn down here, so the gauges must not be fed from it -- and a health-based
+"is a match running" test would read this state as a live match at zero HP.
+That is a real hazard for the existing audio path, worth checking.
+
+⛔ THE 1-IN-8 QUOTE INDEX IS STILL NOT LOCATED, and one capture cannot find it:
+1,622 bytes in each player struct and 372 in the `R` globals `0x1FF00..0x20100`
+hold a value in 0..7. A small integer is the least distinctive thing in this
+block. This needs the FOUR-WAY CONSTRAINT that found the super meter -- several
+quote captures where the user reports the SAME quote (the field must agree) and
+one where it differs (the field must differ). Do not pick a candidate on shape.
+
+**⭐ BETWEEN-MATCH PHASES ARE A SAFE TEARDOWN WINDOW -- guard added (2026-09-19)**
+
+⚠ CORRECTION TO THIS ENTRY'S FIRST WRITE-UP. It was headed "THE AUDIO ENGINE WAS
+RUNNING OUTSIDE MATCHES -- FIXED" and read as a user-reported defect. It was not.
+The user clarified: "There wasn't an issue with these playing during the between
+match phases, I'm just telling you it's safe to tear that down and rebuild it
+between matches." That is PERMISSION for a teardown/rebuild boundary, not a
+symptom report. No wrong cue was ever heard.
+
+⛔ I inferred a live bug from a plausible code path and wrote it up as though the
+user had reported one. The timer hazard below is REAL AS CODE -- the guard was
+genuinely absent and `R+0x184` genuinely reads 74 in the capture -- but whether
+it ever actually fired was never established, and the write-up asserted the
+user's experience rather than my own reading. ⭐ Keep the distinction: "this code
+path can misfire" and "this misfired for the user" are different claims, and only
+one of them was mine to make.
+
+The guard is still worth having on its own merits (below), and the user has now
+made the between-match window an explicit teardown point, which is stronger than
+a defensive check: state can be rebuilt there rather than merely suppressed.
+
+⚠⚠ THE HEALTH FEED WAS SAFE ONLY BY ACCIDENT. In `winquote-01` both
+`B+0x16C` and `B+0x170` read **0/0**, so the existing `mx > 0` gate rejected it.
+That gate tests a SIDE EFFECT of the state, not the state, and it holds only as
+long as the side effect happens to. Had the post-match state left max health
+populated, the health tone would have played over every win quote.
+
+⛔ THE TIMER HAD NO SUCH LUCK. `R+0x184` reads a live-looking **74** in that
+capture, and the detour fires `audio_tick()` on any DECREASE landing on
+30/15/1..5. Round-clock warnings over a win quote is precisely the "cue at the
+wrong moment" failure the timer work warned about -- and no health-based check
+could have caught it.
+
+FIX: guard on the phase bytes (`02 01 02 02`) at the top of the detour, reset
+the edge trackers on the way out so re-entry cannot fire a stale decrease, and
+call `audio_gauge_reset_all()` ONCE per departure so the gauges fall silent
+instead of holding their last in-match value.
+
+⚠ `audio_gauge_reset_all()` takes the mixer lock. It runs once per match exit,
+not per frame -- the per-frame lock traffic from this thread is what made the
+health tone crackle before.
+
+⭐ Case 7e in `tools/test_cvs2_select.c` replays `winquote-01` and asserts no
+gauge feed and no speech, plus that `B+1` still reads Sagat(9)/Todoh(40) so a
+later change cannot quietly break the field an ending reader needs. Verified by
+sabotage: removing the phase guard fails the suite.
+
+Installed after confirming CFC2 was closed. Source/installed SHA-256 match:
+`C59EFCD99C416FBD1D126EACE44FB295DCB4BED2114443D2125FA3CCD9374C14`.
+Backup: `build/dinput8-before-phaseguard-20260919-152136.dll`.
+(An earlier install of this change was `C16E45BE...B2D9287E`; the comment
+corrections above changed the binary, so it was reinstalled to keep source and
+installed in sync.)
+
+⚠ NOT YET HEARD IN-GAME, and the thing to listen for is the IN-MATCH half. The
+offline suite proves the guard rejects the captured win-quote state. It does not
+prove the gauges still sound correctly DURING a round on this build -- and since
+no between-match misbehaviour was ever reported, over-guarding is the only way
+this change can make things worse. If the health or meter tone has gone quiet
+mid-round, this commit is the cause.
+
+▶ NEXT, in value order:
+1. ENDINGS: text and ID mapping are done offline and `B+1` is readable. ⚠ The
+   user notes reaching one requires playing through a whole arcade run, so an
+   ending capture is EXPENSIVE -- do not plan around getting one casually. The
+   trigger is the only missing piece; byte 3 is the thing to test against if a
+   run ever happens.
+2. A second win-quote capture with the user naming the quote, to start the
+   four-way constraint on the 1-in-8 index. Cheap by comparison -- quotes occur
+   after every match.

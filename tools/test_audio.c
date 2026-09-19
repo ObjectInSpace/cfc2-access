@@ -117,6 +117,29 @@ int main(void)
     printf("   (low fill %.0f Hz, high fill %.0f Hz)\n", f_low, f_high);
     CHECK(f_high > f_low * 1.3, "6. pitch RISES as the gauge fills");
 
+    /* --- 6b. HEALTH pitch FALLS as it depletes ---------------------------
+     * ⭐ Case 6 only ever exercised SUPER, so nothing pinned the direction of
+     * the gauge the user actually tracks under pressure. A user report that
+     * "P1 health sounds like it rises as it depletes" could not be answered by
+     * the suite -- it had to be re-derived by hand. Pin it.
+     *
+     * ⚠ Uses a REAL max (11520, Ryu at ratio 1) and walks health DOWN the way
+     * damage does. Max health depends on character AND ratio, so this asserts
+     * the DIRECTION, never an absolute frequency.
+     *
+     * Sabotage: invert the mapping to (f_hi - range*level) -> this fails while
+     * case 6 still passes, because the two gauges move opposite ways. */
+    audio_gauge_reset_all();
+    for (int i = 0; i < 30; i++) { int l, r; peaks(&l, &r); }
+    audio_gauge_set(AUDIO_GAUGE_HEALTH, 0, 11520, 11520);
+    for (int i = 0; i < 12; i++) { audio_gauge_set(AUDIO_GAUGE_HEALTH, 0, 11520 - i, 11520); left_freq(); }
+    double h_full = left_freq();
+
+    for (int i = 0; i < 12; i++) { audio_gauge_set(AUDIO_GAUGE_HEALTH, 0, 600 - i, 11520); left_freq(); }
+    double h_low = left_freq();
+    printf("   (health full %.0f Hz, nearly dead %.0f Hz)\n", h_full, h_low);
+    CHECK(h_full > h_low * 1.3, "6b. health pitch FALLS as health depletes");
+
     /* --- 7. Two gauges mix simultaneously -------------------------------
      * The reference implementation could not do this; it is the reason for a
      * voice table.
@@ -148,10 +171,22 @@ int main(void)
 
     /* --- 7b. Gauge TYPES are audibly distinct ---------------------------
      * Timbre identifies the gauge, so HEALTH must not sound like SUPER at the
-     * same fill. They are separate voices with separate frequency ranges
-     * (health 180-540 Hz triangle, super 330-990 Hz sine), so at equal fill
-     * their pitches must differ clearly.
-     * Sabotage: give both the same f_lo/f_hi -> this fails. */
+     * same fill. health 150-420 Hz triangle, super 600-1500 Hz soft square.
+     *
+     * ⛔⛔ THE OLD THRESHOLD WAS 1.4x AND IT PASSED A PAIRING THE USER COULD
+     * NOT TELL APART. The previous tones (health 180-540, super 330-990) sit
+     * at a CONSTANT 1.83x at equal fill -- over the 1.4 bar, green test, and
+     * confusable in practice, because 1.83 is near a perfect fifth so the two
+     * fuse into one sound, and because the RANGES OVERLAPPED (330-540 shared):
+     * full health and empty super were the same pitch.
+     *
+     * ⭐ So assert the property that actually matters -- the registers must not
+     * overlap AT ALL -- not just a ratio at one convenient fill. This is the
+     * "a test that passes the broken thing is not a test" lesson again: the
+     * old case measured equal-fill ratio, which is the one configuration where
+     * an overlapping pair still looks fine.
+     *
+     * Sabotage: give both the same f_lo/f_hi -> both assertions fail. */
     audio_gauge_reset_all();
     for (int i = 0; i < 30; i++) { int l, r; peaks(&l, &r); }
     audio_gauge_set(AUDIO_GAUGE_HEALTH, 0, 5000, 10000);
@@ -164,7 +199,103 @@ int main(void)
     for (int i = 0; i < 12; i++) { audio_gauge_set(AUDIO_GAUGE_SUPER, 0, 5000 + i, 10000); left_freq(); }
     double f_super = left_freq();
     printf("   (health %.0f Hz, super %.0f Hz at equal fill)\n", f_health, f_super);
-    CHECK(f_super > f_health * 1.4, "7b. health and super are audibly distinct");
+    CHECK(f_super > f_health * 2.5, "7b. health and super differ clearly at equal fill");
+
+    /* ⭐ THE STRONGER CHECK: the worst case is not equal fill, it is health
+     * FULL against super EMPTY -- the closest the two ranges ever come. If the
+     * registers overlap, those two are the same pitch and pitch stops meaning
+     * fill. Measure that corner directly. */
+    audio_gauge_reset_all();
+    for (int i = 0; i < 30; i++) { int l, r; peaks(&l, &r); }
+    audio_gauge_set(AUDIO_GAUGE_HEALTH, 0, 9999, 10000);
+    for (int i = 0; i < 12; i++) { audio_gauge_set(AUDIO_GAUGE_HEALTH, 0, 9988 + i, 10000); left_freq(); }
+    double f_health_full = left_freq();
+
+    audio_gauge_reset_all();
+    for (int i = 0; i < 30; i++) { int l, r; peaks(&l, &r); }
+    audio_gauge_set(AUDIO_GAUGE_SUPER, 0, 1, 10000);
+    for (int i = 0; i < 12; i++) { audio_gauge_set(AUDIO_GAUGE_SUPER, 0, 1 + i, 10000); left_freq(); }
+    double f_super_empty = left_freq();
+    printf("   (worst case: health FULL %.0f Hz vs super EMPTY %.0f Hz)\n",
+           f_health_full, f_super_empty);
+    CHECK(f_super_empty > f_health_full * 1.15,
+          "7b2. the gauge registers never overlap, even at their closest");
+
+    /* --- 7c. A frame-rate feed stays SMOOTH ------------------------------
+     * ⛔⛔ THE FIRST VERSION OF THIS CASE MEASURED ITS OWN QUANTISATION.
+     * It asserted on left_freq(), which counts zero crossings over a 256-frame
+     * block: resolution SR/(2*BLOCK) = 86.1 Hz. It reported "86.1 Hz jumps"
+     * and I read that as real pitch stepping. It was ONE crossing -- the
+     * smallest value the metric can express. A measurement cannot detect an
+     * effect finer than its own resolution, and reporting it as a finding is
+     * how I spent a round "fixing" a smoother that was never involved.
+     *
+     * What is worth asserting is that a value fed at frame rate produces a
+     * CONTINUOUS waveform: no sample-to-sample discontinuities, which is what
+     * a listener hears as crackle. Measure the largest single-sample jump in
+     * the output and require it to stay below what the oscillator itself can
+     * produce at the top of the health range.
+     * Sabotage: reset v->phase on each feed -> this fails. */
+    audio_gauge_reset_all();
+    for (int i = 0; i < 40; i++) { int l, r; peaks(&l, &r); }
+    audio_gauge_set(AUDIO_GAUGE_HEALTH, 0, 14400, 14400);
+    {
+        int worst = 0, hp = 14400, prev = 0, first = 1;
+        for (int f = 0; f < 30; f++) {
+            hp -= 300;
+            audio_gauge_set(AUDIO_GAUGE_HEALTH, 0, hp, 14400);
+            for (int k = 0; k < 3; k++) {
+                audio_render_block_for_test(blk);
+                for (int i = 0; i < AUDIO_BLOCK; i++) {
+                    int v = blk[i * 2];
+                    if (!first) {
+                        int d = v - prev; if (d < 0) d = -d;
+                        if (d > worst) worst = d;
+                    }
+                    prev = v; first = 0;
+                }
+            }
+        }
+        /* A 540 Hz triangle at full scale steps about 2*32000*540/44100 = 784
+         * per sample. Allow headroom; a phase discontinuity jumps far more. */
+        printf("   (worst single-sample jump: %d)\n", worst);
+        CHECK(worst < 3000, "7c. frame-rate feed stays continuous (no clicks)");
+    }
+
+    /* --- 7d. Clock ticks are one-shot and can OVERLAP --------------------
+     * The user asked for onsets at the right moment and said overlap is fine.
+     * A tick must therefore sound on its own, and a second tick must not be
+     * stolen by the first.
+     * Sabotage: make audio_tick() reuse one slot -> the overlap check fails. */
+    audio_gauge_reset_all();
+    for (int i = 0; i < 40; i++) { int l, r; peaks(&l, &r); }
+    CHECK(peak_over(4) == 0, "7d-a. silent before any tick");
+
+    audio_tick();
+    CHECK(peak_over(2) > 0, "7d-b. a tick makes sound");
+
+    /* It must DECAY, not sustain.
+     * ⚠ peak_over(n) returns the MAXIMUM across n blocks, so asserting it is
+     * zero right after a tick measures the ATTACK, not the decay -- the first
+     * version of this case did exactly that and failed against correct code.
+     * Let the tick ring out, THEN assert silence. */
+    for (int i = 0; i < 12; i++) { int l, r; peaks(&l, &r); }   /* ~70 ms */
+    CHECK(peak_over(8) == 0, "7d-c. a tick decays to silence");
+
+    /* Two ticks close together: the second must still be audible after the
+     * first has been running, i.e. they do not share one slot. */
+    {
+        audio_tick();
+        for (int i = 0; i < 2; i++) { int l, r; peaks(&l, &r); }
+        audio_tick();                       /* while the first still rings */
+        int both = peak_over(2);
+        for (int i = 0; i < 30; i++) { int l, r; peaks(&l, &r); }  /* drain */
+        audio_tick();
+        int single = peak_over(2);
+        printf("   (one tick %d, overlapping two %d)\n", single, both);
+        CHECK(both > single, "7d-d. overlapping ticks sum rather than steal");
+    }
+    for (int i = 0; i < 40; i++) { int l, r; peaks(&l, &r); }
 
     /* --- 8. Master toggle silences everything ---------------------------
      * Sabotage: ignore g_enabled in render() -> this fails. */
@@ -192,6 +323,6 @@ int main(void)
     CHECK(1, "10. out-of-range input did not crash");
 
     printf(fails ? "\nFAILURES: %d\n" : "\nall %d checks passed\n",
-           fails ? fails : 12);
+           fails ? fails : 17);
     return fails ? 1 : 0;
 }

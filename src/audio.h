@@ -50,10 +50,22 @@ BOOL audio_toggle_enabled(void);
  *
  * ⚠ Call audio_gauge_set() every tick with the CURRENT value, changed or not.
  * The mixer needs to see a value settle in order to go silent. */
+/* ⛔ NO STUN GAUGE. I added one as a "reserved" slot without checking whether
+ * CVS2 shows stun to the player. It does NOT: dizzy is a STATE (you see stars
+ * and the game plays its own sound), but no bar displays accumulated stun.
+ * The published CVS2 field schema lists health, char_id, groove, ratio, team
+ * and stage -- no stun field at all. An on-screen stun bar is a Street
+ * Fighter III/IV convention, not a CVS2 one.
+ *
+ * ⭐⭐ This is not merely a missing feature, it would be a WRONG one: a stun
+ * cue would hand the listener information a SIGHTED player does not have.
+ * That inverts the parity principle the whole design rests on -- judge a cue
+ * against what the sighted player actually perceives. Do not add it back for
+ * CVS2. Other games in the collection have their own meters (Groove, Plasma
+ * Power, Guts); those are per-game and need their own evidence. */
 typedef enum {
-    AUDIO_GAUGE_SUPER = 0,   /* super/power meter                            */
-    AUDIO_GAUGE_HEALTH,      /* reserved -- address not yet found            */
-    AUDIO_GAUGE_STUN,        /* reserved -- address not yet found            */
+    AUDIO_GAUGE_SUPER = 0,   /* super/power meter -- B+0x226, per-groove cap */
+    AUDIO_GAUGE_HEALTH,      /* B+0x16C, max B+0x170                         */
     AUDIO_GAUGE_COUNT
 } audio_gauge;
 
@@ -66,11 +78,27 @@ void audio_gauge_set(audio_gauge g, unsigned player, int value, int maxv);
 void audio_gauge_reset(audio_gauge g, unsigned player);
 void audio_gauge_reset_all(void);
 
+/* ---- One-shot cues ------------------------------------------------------
+ * A short percussive tick, centre-panned, for discrete events (the round
+ * clock). Unlike a gauge this is fire-and-forget: it plays once and ends.
+ * Overlap is deliberate -- a new request while one is sounding starts another
+ * rather than stealing it, because the user asked for onsets to land at the
+ * right moment, not for sounds to be exclusive. */
+void audio_tick(void);
+
 /* ---- Test seam ----------------------------------------------------------
  * ⭐ Renders one block into `out` (AUDIO_BLOCK frames, interleaved stereo)
  * WITHOUT any device. The offline suite drives the whole mixer through this,
  * so the DSP is testable on a machine with no sound card. */
-#define AUDIO_BLOCK 1024
+/* ⭐ 256 frames (5.8 ms), NOT 1024. The user reported the health tone lagging
+ * behind the damage, and the measured chain was ~117 ms: worker poll 20 ms +
+ * waveOut QUEUE 4x23.2 = 92.9 ms + gain ramp ~4 ms. The queue dominated --
+ * a value written now is only heard after every ALREADY-QUEUED buffer plays
+ * out, so queue depth IS latency. 4 x 256 = 23.2 ms of queue instead of 92.9.
+ *
+ * ⚠ Keep FOUR buffers. Cutting the COUNT would trade underrun safety for the
+ * same latency that shrinking each buffer buys more cheaply. */
+#define AUDIO_BLOCK 256
 #define AUDIO_SR    44100
 void audio_render_block_for_test(int16_t *out);
 
