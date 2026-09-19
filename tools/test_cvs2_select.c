@@ -14,8 +14,14 @@ void log_line(const char *fmt, ...) { (void)fmt; }
  * health value reaches the mixer with the right value, owner and max -- and that the
  * KO sentinel is rejected rather than swept to full. */
 static int ga_sets, ga_resets, ga_last_player, ga_last_value, ga_last_max;
+/* Per-gauge, per-player record so the suite can assert on the METER
+ * independently of health. 0 = SUPER, 1 = HEALTH (audio.h order).
+ * ⚠ CVS2 has no stun gauge -- see the note in audio.h. */
+static int ga_val[2][2], ga_max[2][2], ga_seen[2][2];
 void audio_gauge_set(int g, unsigned player, int value, int maxv)
-{ (void)g; ga_sets++; ga_last_player=(int)player; ga_last_value=value; ga_last_max=maxv; }
+{ ga_sets++; ga_last_player=(int)player; ga_last_value=value; ga_last_max=maxv;
+  if (g>=0 && g<2 && player<2) { ga_val[g][player]=value; ga_max[g][player]=maxv;
+                                 ga_seen[g][player]=1; } }
 void audio_gauge_reset(int g, unsigned player) { (void)g; (void)player; ga_resets++; }
 void audio_gauge_reset_all(void) { ga_resets++; }
 BOOL mem_guard_install(void) { return FALSE; }
@@ -281,18 +287,21 @@ int main(void)
         g[b1+0x16c]=(BYTE)(8216&0xff);  g[b1+0x16d]=(BYTE)(8216>>8);
         g[b1+0x170]=(BYTE)(11200&0xff); g[b1+0x171]=(BYTE)(11200>>8);
 
-        ga_sets=0;
+        /* ⛔ HEALTH IS NO LONGER FED FROM THE POLL. cvs2_frame.c feeds it on
+         * the game's own frame; feeding it here too would overwrite that with
+         * a stale value and re-introduce the lag the hook removes. The poll
+         * still READS health for its counters and the KO-sentinel guard, so
+         * assert that it does not reach the mixer. */
+        memset(ga_seen,0,sizeof ga_seen);
         cvs2_gauges_observe(g,sizeof g,0x15ba1000ULL);
-        assert(ga_sets==2);                      /* both players fed */
-        assert(ga_last_player==1);
-        assert(ga_last_value==8216 && ga_last_max==11200);
+        assert(!ga_seen[1][0] && !ga_seen[1][1]);    /* health not fed here */
+        assert(ga_seen[0][0] && ga_seen[0][1]);      /* meter still is      */
 
         /* 0xFFFF is the KO/round-end sentinel: reject, never announce. */
         g[b0+0x16c]=0xff; g[b0+0x16d]=0xff;
-        ga_sets=0; ga_resets=0;
+        memset(ga_seen,0,sizeof ga_seen); ga_resets=0;
         cvs2_gauges_observe(g,sizeof g,0x15ba1000ULL);
-        assert(ga_sets==1);                      /* only P2 fed */
-        assert(ga_resets==1);                    /* P1 reset instead */
+        assert(ga_resets>0);       /* the sentinel still forces a reset */
 
         /* A relocated state block must reset, not read as a huge change. */
         before=ga_resets;
@@ -310,17 +319,184 @@ int main(void)
          * in-game. Synthetic fixtures all passed because they wrote the cap to
          * whatever offset the code read. Feeding an untouched capture is the
          * only version of this test that could fail. */
+        /* ---- super meter: B+0x226 scaled by the PER-GROOVE cap --------
+         * ⭐ These four captures are the ones that found the field: three
+         * were taken at FULL meter and one genuinely empty, and the cap table
+         * must reproduce that description. A wrong cap (e.g. hardcoding 0x48,
+         * which is K-Groove's) fails these outright. */
+        {
+            static BYTE mf[CVS2_STATE_SIZE], me[CVS2_STATE_SIZE];
+            load("meter-full",   mf);    /* both players FULL  */
+            load("meter-empty2", me);    /* P1 empty, P2 full  */
+
+            memset(ga_seen,0,sizeof ga_seen);
+            cvs2_gauges_observe(mf,sizeof mf,0x15541000ULL);
+            assert(ga_seen[0][0] && ga_seen[0][1]);
+            assert(ga_val[0][0]==168 && ga_max[0][0]==168);   /* P1 full  */
+            assert(ga_val[0][1]==168 && ga_max[0][1]==168);   /* P2 full  */
+
+            memset(ga_seen,0,sizeof ga_seen);
+            cvs2_gauges_observe(me,sizeof me,0x15541000ULL);
+            assert(ga_val[0][0]==4   && ga_max[0][0]==168);   /* P1 spent */
+            assert(ga_val[0][1]==168 && ga_max[0][1]==168);   /* P2 held  */
+
+            /* Each groove has its OWN ceiling; a single constant is wrong.
+             * Verify the table is actually consulted by forcing the index. */
+            {
+                static BYTE g2[CVS2_STATE_SIZE];
+                static const unsigned caps[6]={168,144,192,100,216,72};
+                unsigned gi;
+                memcpy(g2,mf,sizeof g2);
+                for (gi=0; gi<6; gi++) {
+                    g2[0x1eba8+0x22d]=(BYTE)gi;
+                    g2[0x1eba8+0x226]=1; g2[0x1eba8+0x227]=0;
+                    memset(ga_seen,0,sizeof ga_seen);
+                    cvs2_gauges_observe(g2,sizeof g2,0x15541000ULL);
+                    assert(ga_max[0][0]==(int)caps[gi]);
+                }
+                /* An unknown groove has no known ceiling: stay silent. */
+                g2[0x1eba8+0x22d]=9;
+                memset(ga_seen,0,sizeof ga_seen);
+                cvs2_gauges_observe(g2,sizeof g2,0x15541000ULL);
+                assert(!ga_seen[0][0]);
+            }
+        }
+
         {
             static BYTE match[CVS2_STATE_SIZE];
             load("hp-hurt", match);      /* a real IN-MATCH capture */
-            ga_sets=0; ga_resets=0;
+            memset(ga_seen,0,sizeof ga_seen); ga_resets=0;
             cvs2_gauges_observe(match,sizeof match,0x15ba1000ULL);
-            assert(ga_sets==2);          /* both players accepted as-is */
-            assert(ga_last_max == 11200);    /* P2 max health, measured live */
-            assert(ga_last_value == 8216);   /* P2 health, measured live */
+            /* An unmodified real capture must still be ACCEPTED -- the guard
+             * that caught the B+0x5BC cap bug. Health goes to the mixer via
+             * the frame hook now, so assert the meter path here. */
+            assert(ga_seen[0][0] && ga_seen[0][1]);
+        }
+
+        /* ---- 7e. the WIN-QUOTE state must feed nothing --------------------
+         * ⭐ REAL CAPTURE, taken by the user while a win quote was on screen:
+         * phase 02 01 02 **03**, a sibling of the in-match 02 01 02 02.
+         *
+         * ⚠ No defect was ever heard here -- the user said so explicitly. This
+         * case pins a boundary they designated safe for teardown/rebuild, not
+         * a reproduction of a reported bug.
+         *
+         * The requirement: quotes are shown BETWEEN
+         * matches, so the audio engine must be idle there.
+         *
+         * ⚠ WHY THIS CASE EXISTS RATHER THAN TRUSTING THE VALUES. In this
+         * capture B+0x16C/B+0x170 are 0/0, so the health feed was rejected by
+         * the `mx > 0` gate -- by ACCIDENT, not by design. The round timer had
+         * no such luck: R+0x184 reads a live-looking 74, and the frame hook
+         * fires a tick on any decrease landing on 30/15/1..5. The fix guards
+         * on the phase bytes; this pins it.
+         *
+         * Sabotage check: delete the phase guard in frame_detour() and the
+         * timer can tick over a win quote -- which no value assertion catches. */
+        {
+            static BYTE wq[CVS2_STATE_SIZE];
+            load("winquote-01", wq);
+
+            /* The capture really is the post-match state, not an in-match one. */
+            assert(memcmp(wq + 0x78, "\x02\x01\x02\x03", 4) == 0);
+            /* ...and it is NOT the phase the gauges/announcements accept. */
+            assert(memcmp(wq + 0x78, "\x02\x01\x02\x02", 4) != 0);
+
+            memset(ga_seen,0,sizeof ga_seen); ga_resets=0;
+            cvs2_gauges_observe(wq,sizeof wq,0x145f1000ULL);
+            assert(!ga_seen[0][0] && !ga_seen[0][1]);
+            assert(!ga_seen[1][0] && !ga_seen[1][1]);
+
+            /* No match/round speech over a quote either. */
+            {
+                int b = calls;
+                cvs2_announce_observe(wq,sizeof wq,0x145f1000ULL);
+                assert(calls == b);
+            }
+
+            /* ⭐ The character ID DOES survive here (P1 Sagat=9, P2 Todoh=40),
+             * which is what an ending/quote reader would key on. Pinned so a
+             * later change cannot quietly break the field this depends on. */
+            assert(wq[0x1eba8 + 1] == 9);
+            assert(wq[0x1eba8 + 0x678 + 1] == 40);
         }
     }
 
-    puts("PASS: Arcade and alternate character/groove, team/P2, ratio/stage, transitions, speech without prefixes, gauge feed + KO sentinel");
+    /* ---- in-match announcements: team/groove, then per-round fighter ----
+     * ⭐ Replays REAL in-match captures. hp-full and hp-ken are the same match
+     * with P1 having switched Ryu -> Ken, which is exactly the round-change
+     * case, and their teams/ratios were read off the live captures. */
+    {
+        static BYTE m1[CVS2_STATE_SIZE], m2[CVS2_STATE_SIZE];
+        int before;
+        load("hp-full", m1);          /* P1 Ryu, team 0/1/9, C groove */
+        load("hp-ken",  m2);          /* same match, P1 now Ken       */
+
+        cvs2_announce_observe(NULL,0,0);
+        before=calls;
+        cvs2_announce_observe(m1,sizeof m1,0x15ba1000ULL);
+        assert(calls==before+1);                       /* match announced */
+        assert(wcsstr(last,L"You")!=NULL);
+        assert(wcsstr(last,L"C Groove")!=NULL);
+        assert(wcsstr(last,L"Ryu")!=NULL);
+        assert(wcsstr(last,L"Ken")!=NULL);             /* team ORDER */
+        assert(wcsstr(last,L"Sagat")!=NULL);
+        assert(wcsstr(last,L"Opponent")!=NULL);
+        assert(wcsstr(last,L"K Groove")!=NULL);        /* P2 groove */
+
+        /* Repeating the same state must not repeat the announcement. */
+        cvs2_announce_observe(m1,sizeof m1,0x15ba1000ULL);
+        assert(calls==before+1);
+
+        /* A new round with a different fighter speaks just that fighter. */
+        before=calls;
+        cvs2_announce_observe(m2,sizeof m2,0x15ba1000ULL);
+        assert(calls==before+1);
+        assert(wcsstr(last,L"Ken")!=NULL);
+        assert(wcsstr(last,L"Groove")==NULL);          /* not the whole team */
+        cvs2_announce_observe(m2,sizeof m2,0x15ba1000ULL);
+        assert(calls==before+1);                       /* no repeat */
+
+        /* A relocated block is a new session: announce the match again. */
+        before=calls;
+        cvs2_announce_observe(m2,sizeof m2,0x16000000ULL);
+        assert(calls==before+1);
+        assert(wcsstr(last,L"Groove")!=NULL);
+
+        /* ⭐⭐ RATIOS ARE GATED ON THE 4-POINT BUDGET, NOT TEAM SIZE.
+         * The user corrected this twice: plain 3-on-3 team battle has NO
+         * ratios, but Ratio Match with a 3-member team DOES (hp-full stores
+         * 1/1/2). Size alone cannot tell them apart; the budget can. */
+        {
+            static BYTE t3[CVS2_STATE_SIZE];
+            unsigned b0=0x1eba8;
+            int before2;
+
+            /* Real Ratio Match 3-member team: 1+1+2 = 4 -> ratios spoken. */
+            memcpy(t3,m1,sizeof t3);
+            cvs2_announce_observe(NULL,0,0);
+            cvs2_announce_observe(t3,sizeof t3,0x21000000ULL);
+            assert(wcsstr(last,L"ratio")!=NULL);
+
+            /* Plain 3-on-3: every fighter equal, so the field is not a real
+             * allocation (1+1+1 = 3, not 4) -> say NOTHING about ratios. */
+            t3[b0+0x5cc]=0; t3[b0+0x5cd]=0; t3[b0+0x5ce]=0;
+            t3[0x1f220+0x5cc]=0; t3[0x1f220+0x5cd]=0; t3[0x1f220+0x5ce]=0;
+            cvs2_announce_observe(NULL,0,0);
+            before2=calls;
+            cvs2_announce_observe(t3,sizeof t3,0x22000000ULL);
+            assert(calls==before2+1);
+            assert(wcsstr(last,L"ratio")==NULL);       /* no ratio claimed */
+            assert(wcsstr(last,L"Ryu")!=NULL);         /* team still named */
+            assert(wcsstr(last,L"C Groove")!=NULL);    /* groove still named */
+        }
+
+        /* Selection-screen phases must NOT trigger match speech. */
+        before=calls;
+        cvs2_announce_observe(ryu,sizeof ryu,0x17000000ULL);
+        assert(calls==before);
+    }
+
+    puts("PASS: Arcade and alternate character/groove, team/P2, ratio/stage, transitions, speech without prefixes, gauge feed + KO sentinel, super meter per-groove caps, match/round speech");
     return 0;
 }

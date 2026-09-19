@@ -263,10 +263,12 @@ void cvs2_select_tick(void)
         goto inactive;
     cvs2_select_observe(state,sizeof state,root);
     cvs2_gauges_observe(state,sizeof state,root);
+    cvs2_announce_observe(state,sizeof state,root);
     return;
 inactive:
     cvs2_select_observe(NULL,0,0);
     cvs2_gauges_observe(NULL,0,0);
+    cvs2_announce_observe(NULL,0,0);
 }
 
 /* ---- In-match gauges ---------------------------------------------------- */
@@ -320,6 +322,36 @@ inactive:
  * time, and the same shortcut produced BOTH bugs in this file. */
 #define GA_MAXHP     0x170u
 
+/* ---- Super meter -------------------------------------------------------
+ * B+0x226 (u16), found by a FOUR-WAY capture constraint: identical across
+ * three full-meter captures and different in a genuinely empty one. In the
+ * whole 0x678 player struct exactly ONE byte survived that filter, with P2
+ * holding at 168 while P1 collapsed to 4.
+ *
+ * Code confirms it independently: 0x1406C40EA `add word [rbx+0x226],di` with
+ * a jns and a store of 0 (drain, floors at zero), and 0x1406C40B0
+ * add/cmp/clamp (gain, ceilings). Accumulate-to-cap and drain-to-zero.
+ *
+ * ⭐⭐ THE CAP IS PER-GROOVE, and this is why a single constant was wrong:
+ * 0x1406C3E53 does `movsx rax,byte [rbx+0x22D]` / `cmp eax,5` / jump table at
+ * 0x1406C4138, six cases, each loading its own ceiling:
+ *
+ *   0 C=0xA8(168)  1 A=0x90(144)  2 P=0xC0(192)
+ *   3 S=0x64(100)  4 N=0xD8(216)  5 K=0x48(72)
+ *
+ * ⚠ 0x48 appears as an immediate in several places and is K-Groove's cap
+ * ONLY. Hardcoding it -- or the observed 168 -- would misreport every other
+ * groove. The table is indexed by B+0x22D, which agrees with B+0x5D0 (the
+ * groove field the selection reader already validates) in every capture.
+ *
+ * ⭐ The check that makes this shippable: the table predicts 100% for all
+ * three full captures and 2% for the empty one, matching the user's own
+ * description. A cap that could not reproduce the measured 168 would have
+ * been rejected. */
+#define GA_METER     0x226u
+#define GA_GROOVE    0x22du
+static const unsigned meter_cap[6] = { 168, 144, 192, 100, 216, 72 };
+
 static ULONGLONG g_ga_root;
 /* ⭐ Liveness: without these the log cannot tell "never ran" from "ran and
  * everything was rejected", which is exactly the ambiguity that hid the bug
@@ -362,6 +394,164 @@ void cvs2_gauges_observe(const BYTE *state, SIZE_T size, ULONGLONG root)
             continue;
         }
         g_ga_fed++;
-        audio_gauge_set(AUDIO_GAUGE_HEALTH, p, (int)hp, (int)maxhp);
+        /* ⛔ HEALTH IS NOT FED HERE. The frame hook (cvs2_frame.c) feeds it on
+         * the frame it changes; this poll runs asynchronously and would
+         * overwrite that with a value up to a frame stale, re-introducing the
+         * exact lag the hook exists to remove. The read above still runs so
+         * the fed/rejected counters and the KO-sentinel guard stay honest. */
+
+        /* Super meter, scaled by this player's groove cap. */
+        {
+            unsigned meter, groove;
+            memcpy(&meter, state + b + GA_METER, 2); meter &= 0xffff;
+            groove = state[b + GA_GROOVE];
+            /* An unknown groove has no known ceiling, so scaling would be a
+             * guess. Stay silent rather than report a wrong fill. */
+            if (groove < 6 && meter != 0xffffu && meter <= meter_cap[groove])
+                audio_gauge_set(AUDIO_GAUGE_SUPER, p, (int)meter,
+                                (int)meter_cap[groove]);
+            else
+                audio_gauge_reset(AUDIO_GAUGE_SUPER, p);
+        }
     }
+}
+
+/* ---- In-match announcements --------------------------------------------
+ * Speech OUTSIDE the fight only: team/groove when a match starts, and the
+ * fighter + its ratio when a round starts. The audio design forbids narrating
+ * DURING play (a screen reader is too slow and masks the game's own sound);
+ * these fire at natural pauses, which is the case that rule was not about.
+ * Gauges stay cues. */
+
+static ULONGLONG g_an_root;
+static int g_an_match_done;          /* team/groove announced this match  */
+static int g_an_char[2] = {-1,-1};   /* last fighter announced, per player */
+static unsigned g_an_team[2][3];     /* team that was announced           */
+static int g_an_size[2] = {-1,-1};
+
+/* Ratio for team slot `i`, as DISPLAYED. The game stores ratio-1, and the
+ * layout table already holds displayed values, so B+0x5CC..E needs +1. */
+/* ⭐⭐ DOES THIS TEAM ACTUALLY HAVE RATIOS?
+ *
+ * ⛔ NOT a question of team size. The user corrected me twice here: a plain
+ * 3-on-3 team battle has NO ratios (every fighter is equal), but Ratio Match
+ * with a 3-member team DOES -- the live hp-full capture stores 1/1/2. Gating
+ * on "size < 2", or on "size < 3", would have been wrong in one direction or
+ * the other.
+ *
+ * The real invariant is CVS2's ratio BUDGET: a genuine allocation always
+ * spends exactly 4 points across the team (3 members 1+1+2, 2 members 2+2 /
+ * 3+1 / 1+3, 1 member 4). That matches the traced layout table at
+ * 0x1412A0210. A mode without ratios leaves the field holding something that
+ * does not sum to 4 -- the 1v1 training capture stores 1/1/1, which sums to 2
+ * over one member and would have been announced as "ratio 2".
+ *
+ * So: announce ratios only when the numbers form a real allocation. This is
+ * the same principle as refusing to speak a gauge whose ceiling is unknown --
+ * say nothing rather than a number the player does not actually have. */
+static int an_has_ratios(const BYTE *s, unsigned b)
+{
+    unsigned n = s[b + 0x5d1], i, sum = 0;
+    if (n < 1 || n > 3) return 0;
+    for (i = 0; i < n; i++) {
+        unsigned r = s[b + 0x5cc + i];
+        if (r == 255 || r > 3) return 0;
+        sum += r + 1;
+    }
+    return sum == 4;
+}
+
+static unsigned an_ratio(const BYTE *s, unsigned b, unsigned i)
+{
+    unsigned r;
+    if (!an_has_ratios(s, b)) return 0;
+    r = s[b + 0x5cc + i];
+    return r == 255 ? 0 : r + 1;
+}
+
+void cvs2_announce_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
+{
+    wchar_t line[600] = L"", part[200];
+    unsigned p, i;
+    int said = 0;
+
+    if (!s || size != CVS2_STATE_SIZE) { g_an_root = 0; return; }
+
+    /* A new state block is a new session: re-announce everything. */
+    if (root != g_an_root) {
+        g_an_root = root;
+        g_an_match_done = 0;
+        g_an_char[0] = g_an_char[1] = -1;
+        g_an_size[0] = g_an_size[1] = -1;
+    }
+
+    /* Only in an actual match. Phase bytes 02 01 02 02 with byte 4 in the
+     * in-round range; the selection screens use a different phase. */
+    if (memcmp(s + 0x78, "\x02\x01\x02\x02", 4)) return;
+
+    /* ---- match start: team order + groove, once per team composition ---- */
+    if (!g_an_match_done) {
+        int ok = 1;
+        for (p = 0; p < 2 && ok; p++) {
+            unsigned b = 0x1eba8 + p * 0x678;
+            if (s[b + 0x5d1] < 1 || s[b + 0x5d1] > 3) ok = 0;
+            if (s[b + 0x5d0] >= 6) ok = 0;
+        }
+        if (ok) {
+            for (p = 0; p < 2; p++) {
+                unsigned b = 0x1eba8 + p * 0x678, n = s[b + 0x5d1];
+                swprintf(part, 200, L"%ls: %ls, ",
+                         p == 0 ? L"You" : L"Opponent",
+                         names[48 + s[b + 0x5d0]]);
+                wcscat(line, part);
+                for (i = 0; i < n; i++) {
+                    unsigned id = s[b + 0x5c0 + i], ratio = an_ratio(s, b, i);
+                    if (id >= 48) continue;
+                    g_an_team[p][i] = id;
+                    if (ratio)
+                        swprintf(part, 200, L"%ls ratio %u%ls", names[id], ratio,
+                                 i + 1 < n ? L", " : L"");
+                    else
+                        swprintf(part, 200, L"%ls%ls", names[id],
+                                 i + 1 < n ? L", " : L"");
+                    wcscat(line, part);
+                }
+                g_an_size[p] = (int)n;
+                if (p == 0) wcscat(line, L". ");
+            }
+            if (speech_say(line, TRUE)) {
+                g_an_match_done = 1;
+                /* The fighters now on screen are announced, so do not repeat
+                 * them as a round change immediately afterwards. */
+                for (p = 0; p < 2; p++)
+                    g_an_char[p] = s[0x1eba8 + p * 0x678 + 1];
+            }
+            return;
+        }
+    }
+
+    /* ---- round start: whichever fighter changed, with its ratio -------- */
+    line[0] = 0;
+    for (p = 0; p < 2; p++) {
+        unsigned b = 0x1eba8 + p * 0x678;
+        int id = s[b + 1];
+        unsigned n = s[b + 0x5d1], slot;
+        if (id < 0 || id >= 48) continue;
+        if (g_an_char[p] == id) continue;
+        /* Which team slot is this fighter, so the ratio matches. */
+        for (slot = 0; slot < n && slot < 3; slot++)
+            if ((int)s[b + 0x5c0 + slot] == id) break;
+        {
+            unsigned ratio = (slot < 3) ? an_ratio(s, b, slot) : 0;
+            if (ratio)
+                swprintf(part, 200, L"%ls%ls, ratio %u",
+                         said ? L". " : L"", names[id], ratio);
+            else
+                swprintf(part, 200, L"%ls%ls", said ? L". " : L"", names[id]);
+        }
+        wcscat(line, part);
+        g_an_char[p] = id;
+        said = 1;
+    }
+    if (said) speech_say(line, TRUE);
 }

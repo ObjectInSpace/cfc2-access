@@ -20,7 +20,13 @@ void cvs2_select_tick(void);
  * (see docs/cvs2-state-access-trace.md).
  *
  *   health      B+0x16C   (B = state + 0x1EBA8 + player*0x678)
- *   max health  B+0x170   per-character: 11520 Ryu, 11200 for P2's fighter
+ *   shadow bar  B+0x16E   the delayed/drain bar -- lags behind +0x16C
+ *   max health  B+0x170   per-fighter AND per-RATIO -- read live, never hardcode
+ *
+ * ⚠ +0x16E sits BETWEEN them and usually EQUALS current health, so reading
+ * +0x16C/+0x170 as an adjacent u16 pair gives (health, shadow) and a fill
+ * fraction stuck at 1.00. They are 4 bytes apart. `state-b` separates them:
+ * hp 2406, shadow 3108, max 11520.
  *
  * ⭐⭐ IDENTIFIED BY THE USER IN TRAINING MODE, which is the only evidence
  * here that could tell health from the super meter:
@@ -44,3 +50,8 @@ void cvs2_gauges_observe(const BYTE *state, SIZE_T size, ULONGLONG root);
 /* Log fed/rejected counts when they change. A silent mod with no counters
  * cannot distinguish "never ran" from "ran and rejected everything". */
 void cvs2_gauges_log_stats(void);
+
+/* Speech OUTSIDE the fight: team order + groove when a match starts, and the
+ * fighter + ratio when a round starts. Gauges remain audio cues -- the design
+ * forbids narrating DURING play, which these do not do. */
+void cvs2_announce_observe(const BYTE *state, SIZE_T size, ULONGLONG root);

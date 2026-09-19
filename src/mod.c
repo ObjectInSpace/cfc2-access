@@ -20,6 +20,7 @@
 #include "cvs2_select.h"
 #include "cvs2_hit.h"
 #include "audio.h"
+#include "cvs2_frame.h"
 #include "image.h"
 #include "gmd_find.h"
 #include "pad_watch.h"
@@ -1642,6 +1643,8 @@ static DWORD WINAPI worker(LPVOID param)
             audio_init(dir);
         }
         log_line("audio: %s", audio_ready() ? "cues ON" : "device unavailable");
+        /* Health must be read ON the game's frame, not on our poll. */
+        if (audio_ready() && hook_enabled) cvs2_frame_install();
     } else if (unpacked) {
         log_line("audio: OFF -- create cfc2_audio.on next to the exe for "
                  "gauge cues.");
@@ -1810,7 +1813,7 @@ static DWORD WINAPI worker(LPVOID param)
     while (!InterlockedCompareExchange(&g_quit, 0, 0)) {
         /* Poll the hotkey at 100 ms so a press is never missed, but only do
          * the (expensive) work on an edge. The 2 s beat below is unchanged. */
-        /* ⭐⭐ 100 x 20 ms, not 20 x 100 ms -- the 2 s beat is unchanged.
+        /* ⭐⭐ 200 x 10 ms, not 20 x 100 ms -- the 2 s beat is unchanged.
          *
          * ⛔ USER: "it is impractical for me to wait... there are hundreds of
          * options in there. You will have to make it so that it reads each one
@@ -1830,14 +1833,24 @@ static DWORD WINAPI worker(LPVOID param)
          * and speech_say() calls into NVDA -- a stall there is a frozen game,
          * which this project has already paid for twice. The poll is the right
          * place; it just had to be faster. */
-        for (int t = 0; t < 100; t++) {
+        /* ⚠ 200 ticks, not 100: the tick is now 10 ms, so the count had to
+         * double to keep the outer beat at 2 s. Halving Sleep() alone would
+         * have silently made every "2 s" report fire at 1 s -- including the
+         * heartbeat, whose whole job is measuring how long things take. */
+        for (int t = 0; t < 200; t++) {
             if (InterlockedCompareExchange(&g_quit, 0, 0))
                 break;
-            Sleep(20);
+            /* ⭐ 10 ms, halved from 20: it is the first term in the gauge
+             * latency chain (poll + waveOut queue + gain ramp). The user heard
+             * the health tone lag the damage; the queue was the main cost and
+             * is fixed in audio.h, but the poll is the part that decides how
+             * stale the VALUE is before it is ever handed to the mixer. */
+            Sleep(10);
 
             /* Read actual CVS2 selection on the speech worker, never a hook. */
             cvs2_select_tick();
             cvs2_gauges_log_stats();
+            cvs2_frame_log_stats();
             cvs2_hit_poll_and_log();
 
             /* ⭐⭐⭐ THE MODAL CHECK RUNS AT 100 ms, NOT ON THE 2 s BEAT.
