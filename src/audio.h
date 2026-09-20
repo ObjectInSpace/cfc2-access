@@ -43,6 +43,54 @@ BOOL audio_ready(void);
 /* Master on/off for all mod-generated cues. Speech is never affected. */
 BOOL audio_toggle_enabled(void);
 
+/* ---- Per-cue volume -----------------------------------------------------
+ * ⭐ ONE LEVEL PER CUE FAMILY, not per voice. The families are what the
+ * listener can name ("the beacons are too loud"); P1 and P2 share a level
+ * because they are the same cue heard from two sides, and turning one player
+ * down would make the pan readout lie about which side is which.
+ *
+ * Levels are PERCENT 0..100 and multiply the cue's designed gain, so 100 is
+ * exactly the balance tuned by ear and 0 is silence. They stack under the
+ * master volume from cfc2_audio.ini; master stays a file setting.
+ *
+ * ⚠ The step is 25 and the cycle WRAPS: 100 -> 0 -> 25 -> 50 -> 75 -> 100.
+ * So from the default one press up mutes the cue. That is the user's design
+ * (2026-09-19): muting a cue must cost one keypress, not four, because the
+ * reason to mute is usually that the cue is in the way right now. */
+/* ⚠ THE ORDER IS THE KEY ORDER. F5 F6 F7 F8 map to these four in sequence,
+ * so the enum is not free to be reordered -- mod.c indexes it by (vk - VK_F5).
+ * The pairing is deliberate: the two gauges first (they share a mental
+ * category), then the beacons, then the tick. */
+typedef enum {
+    AUDIO_CUE_HEALTH = 0,   /* F5 -- the health gauge, both players  */
+    AUDIO_CUE_SUPER,        /* F6 -- the super meter, both players   */
+    AUDIO_CUE_BEACON,       /* F7 -- the two position beacons        */
+    AUDIO_CUE_TICK,         /* F8 -- the round-clock tick            */
+    AUDIO_CUE_COUNT
+} audio_cue;
+
+#define AUDIO_VOL_STEP 25
+
+/* Current level, percent. Out-of-range cue returns 0. */
+int  audio_cue_volume(audio_cue c);
+
+/* Set a level directly, clamped to 0..100 and rounded to nothing -- the
+ * caller owns the step policy. Returns the level actually stored. */
+int  audio_cue_set_volume(audio_cue c, int percent);
+
+/* One step up (`up`) or down, wrapping at both ends. Returns the new level.
+ * ⭐ Wrapping in BOTH directions, so shift from 0 lands on 100 -- a blind
+ * user cannot see that a key has stopped doing anything, and a key that
+ * silently no-ops at an end reads as a broken hotkey. */
+int  audio_cue_step_volume(audio_cue c, BOOL up);
+
+/* The cue's spoken name, for the announcement the hotkey makes. */
+const wchar_t *audio_cue_name(audio_cue c);
+
+/* Persist all four levels to <game_dir>\cfc2_audio.ini. Called after a
+ * change so the balance survives a restart; failure is logged, not fatal. */
+void audio_save_volumes(void);
+
 /* ---- Gauges -------------------------------------------------------------
  * A gauge is identified by TYPE (which picks the timbre) and OWNER (which
  * picks the pan). Callers report the current value and its range; the mixer
@@ -77,6 +125,46 @@ void audio_gauge_set(audio_gauge g, unsigned player, int value, int maxv);
  * not sound like a drain. Silences the voice without a fade artifact. */
 void audio_gauge_reset(audio_gauge g, unsigned player);
 void audio_gauge_reset_all(void);
+
+/* ---- Beacons ------------------------------------------------------------
+ * ⭐⭐ THE CORE OF THE DESIGN (memory cfc2-audio-design-decision): each
+ * player has a PERSISTENT looping cue that sounds continuously during a
+ * match. Pan = the fighter's screen X, pitch = stance. The two beacons have
+ * different base pitches so "which one is me" is carried by tone, not
+ * position -- pan alone is ambiguous when both fighters are near centre.
+ *
+ * ⛔ DO NOT confuse this with gauge pan. Gauge pan is FIXED by owner (P1
+ * left, P2 right) to mirror the HUD bars; beacon pan MOVES with the fighter.
+ * Both fighters can be on the right of the stage while P1's gauge tone still
+ * comes from the left, exactly as the screen looks.
+ *
+ * `pan` is -1 hard left .. +1 hard right; `stance` multiplies the base pitch
+ * (knocked down 0.70, crouching 0.85, standing 1.00, airborne 1.15+). Both
+ * are clamped, not rejected. Calling this marks the beacon live.
+ *
+ * ⚠ Lock-free: called from the game's frame thread, where taking the mixer
+ * lock is what made the health tone crackle. */
+void audio_beacon_set(unsigned player, float pan, float stance);
+
+/* Leaving a match. The "never silent" rule governs play; outside a match
+ * there is no fighter to locate and a droning tone over the menus is noise. */
+void audio_beacons_off(void);
+
+/* The stance ladder, as pitch multipliers -- ordered low to high, so one
+ * axis carries the fighter's vertical state continuously.
+ *
+ * Driven from CVS2's own stance byte (B+0x59A: 0 grounded, 1 airborne,
+ * 2 crouching), with AIR..AIR_TOP interpolated by actual height so a jump
+ * reads as a rising-then-falling arc rather than a single "airborne" step.
+ *
+ * ⛔ DOWN is defined but NOT yet driven: no capture was taken while knocked
+ * down, so that state's encoding is unverified. Anything unrecognised is
+ * treated as STAND rather than guessed. */
+#define AUDIO_STANCE_DOWN    0.70f
+#define AUDIO_STANCE_CROUCH  0.85f
+#define AUDIO_STANCE_STAND   1.00f
+#define AUDIO_STANCE_AIR     1.15f
+#define AUDIO_STANCE_AIR_TOP 1.45f
 
 /* ---- One-shot cues ------------------------------------------------------
  * A short percussive tick, centre-panned, for discrete events (the round

@@ -183,6 +183,140 @@ cue, speech only on character select**; two per-player beacons with pan = X
 position and pitch = a stance ladder. See memory `cfc2-audio-design-decision`
 before touching that work.
 
+### ⛔⛔ SPEECH LAGGED KEYPRESSES AGAIN (2026-09-19, fixed)
+
+User-reported: "we're back to the state where keypresses cause the speech
+announcement to become delayed." Diagnosed by COUNTING, not profiling, per the
+rule below — and the count was damning.
+
+**Cause 1 — `cvs2_select_tick()` ran the whole validation at 100 Hz.**
+Ten `read_at()` calls, each a `mem_readable()` → **1000 `VirtualQuery` per
+second**, plus a **134 KB** guarded copy every tick = 13 MB/s, on the same
+worker thread that speaks. ⚠ **FIFTH time this project has hit the
+VirtualQuery wall** (`gmd_find`, the heapdiff capture, the span scan, the
+arena sweep, now this).
+
+Fixed three ways, none of which weakens a guard:
+- the `.text` signature check is **hoisted to once** — `.text` is immutable
+  (ASLR off, no relocations), so its answer cannot differ between ticks;
+- **one 8-byte read** of the session slot decides whether to go further, and
+  it stays on every tick so leaving a match still silences the gauges
+  promptly — throttling the INACTIVE path would hold a tone over the next
+  screen;
+- everything past it, including the 134 KB copy, runs at **33 ms**.
+  ⭐ That is FASTER than the game's own 60 fps frame, so no selection can
+  appear and vanish between samples; the old 2 s-poll defect needed a gap
+  sixty times larger. Health is unaffected either way — `cvs2_frame.c` feeds
+  it on the frame hook precisely so this poll's rate cannot make it stale.
+
+Measured: **1000 → 370 VirtualQuery/s, 13.1 → 3.9 MB/s.**
+
+⛔ What was NOT done: dropping `mem_readable()` before the copies. Case C of
+`run_span_test.ps1` still passes today — a guarded `memcpy` across a bad page
+is NOT caught. The fault guard is a net for the race, never a replacement.
+
+**Cause 2 — ⭐⭐ THE SAME BUG IN THREE PLACES: a change-guard on a counter
+that always changes.**
+
+    if (fed == last_fed && rejected == last_rej) return;   // never suppresses
+
+`fed`/`rejected` increment twice per tick during a match, so the guard was
+true on every call: **2741 `gauge:` lines in one 5-minute session, one every
+~25 ms**, each a file write from the speech worker. This is verbatim the bug
+already found and fixed in `cvs2_frame_log_stats()` — whose own comment
+explains it — and it was left standing in `cvs2_gauges_log_stats()`.
+⚠ **Knowing a trap is not the same as encoding it.**
+
+The third instance: `gt_poll_and_log()`'s "log only DISTINCT strings" filter.
+It holds for labels and **fails completely in a match**, because the emulated
+game redraws NUMBERS — "188", "191", "198" are all distinct, so every redraw
+passed. 612 of 942 `gt:` lines, ~50 ms apart.
+
+⭐⭐ **The rule: a guard asking "is this different from last time?" is no
+guard at all against a value that is different every time.** Rate-limit by
+TIME and report a RATE a human can act on.
+
+### ⭐⭐ THE gt SWITCH IS SPLIT: SPEECH AND DIAGNOSTICS ARE NOW SEPARATE
+
+`gt_ok` gated **18 call sites**, and they had opposite audiences. Three are
+shipping speech a blind player depends on:
+
+- `menu_speak_check_modal()` — the quit / consent dialogs
+- `menu_speak_check_hint()` — the hints view
+- `gt_poll_and_log()` — feeds `gt_take_caption()`, i.e. the per-row captions
+
+The other fifteen are development reports. Because ONE file switched both,
+the only way to stop the diagnostics flooding the log was to turn the hook
+off — **which silenced the quit dialogs.** That is a real trade I hit and
+had to back out of within the same session.
+
+Now:
+
+- **`cfc2_guitext.on`** → the hook is live; modal prompts, the hints view and
+  per-row captions all work. This is the PLAY setting.
+- **`cfc2_guitext_diag.on`** → *additionally* print the development reports
+  (focus record, instance dump, layout/movelist probes, stats lines, the
+  live-text transcript). Absent = off.
+
+⭐⭐ **Decoupling is the SAFER default here, not merely the quieter one.**
+`gt_focus_report()` **clears the caption window** (see the ordering note at
+its call site). While it ran unconditionally it was competing with
+`menu_speak` for the same captions; with diagnostics off it cannot discard a
+caption that has not been spoken yet.
+
+⚠ `gt_poll_and_log()` still runs unconditionally — only the log line *inside*
+it is switched. The caption channel needs the poll; it does not need the
+transcript.
+
+**Cause 3 — development switches were left on during play.** The game dir had
+`cfc2_cursor.on`, `cfc2_emu.on` and `cfc2_snap.on` live: 4716 log lines in
+~5 minutes (~16 file writes/second) plus a continuous arena scan. CLAUDE.md
+already says of the cursor probe that each arrow press costs a full hash pass
+over the arena and it is "not something to impose on ordinary play."
+Renamed to `.disabled` (not deleted) — one rename away from returning.
+
+⭐ **Before any loop over memory, COUNT THE SYSCALLS it will make.** And
+before shipping a diagnostic, ask whether it needs to run at all.
+
+### ⭐ PER-CUE VOLUME KEYS (2026-09-19)
+
+    F5 health · F6 super meter · F7 beacons · F8 clock tick
+
+The key steps **UP**, shift+key steps **DOWN**, both **wrapping** on
+0/25/50/75/100. Default is 100, so **one press mutes** — the user's design:
+the reason to mute is usually that the cue is in the way *right now*.
+
+- ⭐ One level per **cue FAMILY**, not per voice. P1 and P2 share a level —
+  they are the same cue heard from two sides, and turning one player down
+  would make the pan readout lie about which side is which.
+- ⭐ Levels multiply the cue's **designed gain**, so 100 is exactly the
+  balance tuned by ear and an ini with no `vol_*` keys sounds as before.
+- ⭐ Applied as a GAIN, never a skip: a muted cue still runs its voice and
+  smoother, so muting **fades** (~7 blocks, measured) instead of clicking.
+  Case 19 pins that fade in both directions.
+- Persisted to `cfc2_audio.ini` (`vol_health`/`vol_super`/`vol_beacon`/
+  `vol_tick`) on each press. Speech is the ONLY feedback — there is no
+  on-screen indicator, so an unspoken change is an invisible one.
+- ⚠ NOT gated on `cfc2_audio.on`: a key that silently does nothing because of
+  an unrelated file is exactly what a blind user cannot diagnose.
+
+⚠⚠ **THE KEYS WERE CHECKED, not assumed** (the user asked directly, and the
+first two proposals were both wrong):
+- **F12 is Steam's default screenshot key** — it would snap a screenshot on
+  every press. Do not give it to anything used during play.
+- CFC2 itself **binds no function keys**; its 16 keyboard-settings rows
+  (`g_kbd_settings_rows`) are gameplay actions on letters and arrows.
+- The `KB_F10` in `gui_markup.c` and `markup.py` is an **example in a comment**
+  about the mechanical `KB_A -> "A"` rule, NOT a binding. ⭐ A grep hit inside
+  a comment looks exactly like a real one.
+
+⛔ **THE F7 PAD-DUMP HOTKEY WAS REMOVED** (user: "we don't need that, I don't
+think we ever even used it"). It was a manual override for a route CLOSED with
+evidence — every sPad record has `Kind = 0`, so the update never runs.
+`pad_auto_capture()` still runs under `cfc2_pad.on`, so the diagnostic is
+intact; only the unused trigger is gone. That is what freed F5-F8 as one
+physical four-pack the user can reach by feel mid-match.
+
 ## Build
 
 - Toolchain: WinLibs MinGW-w64 GCC 16.1 (winget, user scope). Path in `build.ps1`.

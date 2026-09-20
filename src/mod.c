@@ -1347,13 +1347,28 @@ static volatile LONG g_quit;
  * An earlier pass excluded all 70 keys in the game's KB_* table and landed on
  * Scroll Lock, a toggle key that never registered in-game, costing two runs. */
 
-/* ONE hotkey: F7 takes a capture. There is nothing else to drive, because
- * the mod makes no decisions -- see the header of pad_watch.h. */
-#define PAD_DUMP_HOTKEY      VK_F7
-#define PAD_DUMP_HOTKEY_NAME "F7"
+/* ⛔ THE MANUAL PAD-DUMP HOTKEY IS GONE (2026-09-19, user's call: "we don't
+ * need that, I don't think we ever even used it").
+ *
+ * It was F7, and it was a manual override for a route that is CLOSED with
+ * evidence: every sPad record has `Kind = 0`, so the dispatcher at
+ * 0x1401880a0 returns immediately and the pad update never runs. The shell
+ * does not read the keyboard through sPad, so there is nothing a forced
+ * capture can reveal that pad_auto_capture() has not already shown.
+ *
+ * ⭐ Removing it is what freed F5-F8 as one physical four-pack for the cue
+ * volume keys. `pad_auto_capture()` still runs under cfc2_pad.on, so the
+ * diagnostic itself is intact -- only the unused manual trigger is gone.
+ *
+ * ⚠ Keep any new hotkey clear of F12: that is Steam's default screenshot key,
+ * and a key used during ordinary play must not also snap a screenshot. */
 
 /* Was `vk` pressed since the last check? Edge-triggered, so holding the key
- * captures one pass rather than a flood. */
+ * acts once rather than flooding.
+ *
+ * ⚠ Shift is read SEPARATELY by the caller, not folded in here: the edge must
+ * belong to the cue key itself, so that shifting mid-hold cannot manufacture a
+ * second press. */
 static BOOL key_pressed(int vk)
 {
     /* GetAsyncKeyState's low bit reports "pressed since last call", but it is
@@ -1364,6 +1379,61 @@ static BOOL key_pressed(int vk)
     BOOL edge = down && !was_down[vk & 0xFF];
     was_down[vk & 0xFF] = down;
     return edge;
+}
+
+/* --- Per-cue volume hotkeys ----------------------------------------------
+ * F5 health · F6 super meter · F7 beacons · F8 clock tick.
+ * Plain key steps UP, Shift+key steps DOWN, both wrapping on
+ * 0/25/50/75/100. From the 100 default one press mutes -- the user's design.
+ *
+ * ⚠ THE KEY CHOICE WAS CHECKED, not assumed (user asked directly):
+ *  - the mod's only other hotkey was the pad dump on F7, now removed;
+ *  - CFC2 binds no function keys -- its 16 keyboard-settings rows
+ *    (g_kbd_settings_rows in menu_speak.c) are gameplay actions on letters
+ *    and arrows;
+ *  - the `KB_F10` seen in gui_markup.c and markup.py is an EXAMPLE in a
+ *    comment about the mechanical KB_ naming rule, not a binding;
+ *  - F12 is deliberately avoided: it is Steam's default screenshot key.
+ *
+ * ⚠ These are NOT gated on cfc2_audio.on. A user whose cues are off presses
+ * nothing here, and a key that silently does nothing because of an unrelated
+ * file is exactly the failure a blind user cannot diagnose. The handler
+ * announces the level either way.
+ *
+ * ⭐ SPEECH IS THE ONLY FEEDBACK. There is no on-screen indicator, so an
+ * unspoken change is an invisible one; the announcement interrupts, because
+ * holding a key through three steps should say where it LANDED, not queue
+ * four sentences. */
+static void volume_hotkeys_tick(void)
+{
+    for (int c = 0; c < AUDIO_CUE_COUNT; c++) {
+        if (!key_pressed(VK_F5 + c))
+            continue;
+        /* Read shift at the moment of the edge. */
+        BOOL down = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+        int pct = audio_cue_step_volume((audio_cue)c, !down);
+
+        wchar_t say[96];
+        /* "beacons 50 percent" / "health muted" -- the word MUTED rather than
+         * "0 percent", because 0 is the state the user most needs to
+         * recognise instantly and a number is easy to mishear. */
+        if (pct == 0)
+            _snwprintf(say, 96, L"%ls muted", audio_cue_name((audio_cue)c));
+        else
+            _snwprintf(say, 96, L"%ls %d percent",
+                       audio_cue_name((audio_cue)c), pct);
+        say[95] = 0;
+        speech_say(say, TRUE);
+
+        /* Persist so the balance survives a restart. ⚠ A profile write is a
+         * file I/O on the worker thread, but it happens only on a KEYPRESS --
+         * a handful of times a session, never in a loop. That is the test this
+         * project applies before any I/O near the poll: count how often it
+         * runs, not how fast it is. */
+        audio_save_volumes();
+        log_line("audio: %ls volume -> %d%%",
+                 audio_cue_name((audio_cue)c), pct);
+    }
 }
 
 
@@ -1643,6 +1713,14 @@ static DWORD WINAPI worker(LPVOID param)
             audio_init(dir);
         }
         log_line("audio: %s", audio_ready() ? "cues ON" : "device unavailable");
+        log_line("audio: volume keys -- F5 health %d%%, F6 super %d%%, "
+                 "F7 beacons %d%%, F8 clock tick %d%%. The key steps UP and "
+                 "shift+key steps DOWN, wrapping 0/25/50/75/100, so one press "
+                 "from 100%% mutes. Saved to cfc2_audio.ini.",
+                 audio_cue_volume(AUDIO_CUE_HEALTH),
+                 audio_cue_volume(AUDIO_CUE_SUPER),
+                 audio_cue_volume(AUDIO_CUE_BEACON),
+                 audio_cue_volume(AUDIO_CUE_TICK));
         /* Health must be read ON the game's frame, not on our poll. */
         if (audio_ready() && hook_enabled) cvs2_frame_install();
     } else if (unpacked) {
@@ -1666,10 +1744,59 @@ static DWORD WINAPI worker(LPVOID param)
                  "This is the step that names the remaining screens.");
     }
 
+    /* ⭐⭐ TWO THINGS RODE ON ONE FLAG, AND THEY HAVE OPPOSITE AUDIENCES.
+     *
+     * `gt_ok` gated 18 call sites. Three of them are SHIPPING SPEECH that a
+     * blind player depends on:
+     *
+     *     menu_speak_check_modal()   the quit / consent dialogs
+     *     menu_speak_check_hint()    the hints view
+     *     gt_poll_and_log()          feeds gt_take_caption(), i.e. the
+     *                                per-row captions menu speech announces
+     *
+     * The other fifteen are development diagnostics -- focus reports, instance
+     * dumps, layout and movelist probes, stats lines.
+     *
+     * ⛔ Because one file switched both, the only way to stop the diagnostics
+     * flooding the log was to turn the hook off, which SILENCED THE QUIT
+     * DIALOGS. That is the trade I hit turning `cfc2_guitext.on` off, and the
+     * reason I turned it straight back on.
+     *
+     * ⭐ So: `gt_ok` now means "the hook is live, shipping speech works", and
+     * `gt_diag` means "also print the development reports". Diagnostics are
+     * OFF by default, which is the direction this project has settled on every
+     * other time it asked -- a diagnostic that does not run is an inconvenience
+     * to the developer; one that stalls the user's speech is a broken mod.
+     *
+     * ⭐⭐ AND DECOUPLING IS THE SAFER DEFAULT HERE, not merely the quieter
+     * one. gt_focus_report() CLEARS the caption window (see the ordering note
+     * at its call site). While it ran unconditionally it was competing with
+     * menu_speak for the same captions; with diagnostics off it cannot discard
+     * a caption that has not been spoken yet. */
+    BOOL gt_diag = gt_ok && opt_in_file_present("cfc2_guitext_diag.on");
+    if (gt_ok)
+        log_line("gt: hook live -- modal prompts, the hints view and per-row "
+                 "captions are ACTIVE. Development reports are %s%s",
+                 gt_diag ? "ON (cfc2_guitext_diag.on)" : "off",
+                 gt_diag ? ". ⚠ They print per-beat reports and clear the "
+                           "caption window; remove that file for ordinary play."
+                         : " -- create cfc2_guitext_diag.on to enable them.");
+
+    /* ⭐ The live-text TRANSCRIPT is one of the development reports, so it
+     * rides on the same flag rather than carrying a second file of its own.
+     * Measured: 612 of one session's 942 `gt:` lines were that one line, ~50 ms
+     * apart, because the emulated game redraws NUMBERS and its "log only
+     * distinct strings" filter passes every one.
+     *
+     * ⚠ gt_poll_and_log() itself still runs unconditionally -- it is what
+     * feeds gt_take_caption(), and captions are shipping speech. Only the log
+     * line inside it is switched. */
+    gt_text_log_enable(gt_diag);
+
     /* ⭐ The focus differ rides on the gt hook -- without the instance set
      * there is nothing to diff -- so it is gated on gt_ok as well as its own
      * file. See gui_text.h for what it measures and why it is not route 3. */
-    if (gt_ok) {
+    if (gt_diag) {
         BOOL fd_on = opt_in_file_present("cfc2_focusdiff.on");
         gt_focus_diff_enable(fd_on);
         if (fd_on)
@@ -1684,7 +1811,7 @@ static DWORD WINAPI worker(LPVOID param)
      * opt_in_file_present(), which resolves the EXE's directory. The two
      * probes that check a bare relative path in gui_text.c work only because
      * the CWD happens to be the game dir; that is not a pattern to copy. */
-    if (gt_ok) {
+    if (gt_diag) {
         BOOL ml_on = opt_in_file_present("cfc2_movelist.on");
         gt_movelist_enable(ml_on);
         if (ml_on)
@@ -1796,18 +1923,11 @@ static DWORD WINAPI worker(LPVOID param)
     if (unpacked && pad_enabled) {
         /* Starts itself and re-seeds until a press makes the record visible.
          * Nothing is asked of the player except to navigate. */
-        log_line("pad: dumping the sPad INSTANCE at image+0x%x on F7. "
-                 "The mod does NO analysis -- it writes cfc2_pad_NN.bin plus a "
-                 "line in cfc2_pad_index.txt recording which arrow keys were "
-                 "down. Comparison happens offline.",
+        log_line("pad: dumping the sPad INSTANCE at image+0x%x on every arrow "
+                 "EDGE. The mod does NO analysis -- it writes cfc2_pad_NN.bin "
+                 "plus a line in cfc2_pad_index.txt recording which arrow keys "
+                 "were down. Comparison happens offline. Just navigate.",
                  PAD_INSTANCE_RVA);
-        /* ⭐ The protocol is stated in the log because it is what makes the
-         * result interpretable: captures 1 and 2 are the SAME state, so their
-         * difference is the noise floor. Without that control a diff measures
-         * elapsed time, which is exactly how the previous attempt failed. */
-        log_line("pad: press F7 five times -- (1) nothing held, (2) nothing "
-                 "held again, (3) holding DOWN, (4) nothing held, "
-                 "(5) holding LEFT. Captures 1 and 2 are the control.");
     }
 
     while (!InterlockedCompareExchange(&g_quit, 0, 0)) {
@@ -1846,6 +1966,11 @@ static DWORD WINAPI worker(LPVOID param)
              * is fixed in audio.h, but the poll is the part that decides how
              * stale the VALUE is before it is ever handed to the mixer. */
             Sleep(10);
+
+            /* ⭐ Cue volume keys, on the 10 ms tick so a press is never
+             * missed. Cost when nothing is pressed is four GetAsyncKeyState
+             * calls -- the same order as the arrow polling already here. */
+            volume_hotkeys_tick();
 
             /* Read actual CVS2 selection on the speech worker, never a hook. */
             cvs2_select_tick();
@@ -1997,7 +2122,7 @@ static DWORD WINAPI worker(LPVOID param)
              * not depend on menu_cursor (linking the two into the gui_text
              * suite pulls in menu_speak and the GMD reader). mod.c already owns
              * both, so it reads the cursor and hands the answer over. */
-            if (gt_ok && mc_ok) {
+            if (gt_diag && mc_ok) {
                 mc_move mlm;
                 if (mc_peek_rest(&mlm)) {
                     int mltot = mlm.max_index - mlm.min_index + 1;
@@ -2072,16 +2197,9 @@ static DWORD WINAPI worker(LPVOID param)
                 pad_auto_capture(dirs);
             }
 
-            /* F7 still forces a capture, for the two control captures and as
-             * a manual override if the automatic edges misbehave. */
-            if (unpacked && pad_enabled && key_pressed(PAD_DUMP_HOTKEY)) {
-                unsigned dirs = 0;
-                if (GetAsyncKeyState(VK_UP)    & 0x8000) dirs |= PAD_UP;
-                if (GetAsyncKeyState(VK_DOWN)  & 0x8000) dirs |= PAD_DOWN;
-                if (GetAsyncKeyState(VK_LEFT)  & 0x8000) dirs |= PAD_LEFT;
-                if (GetAsyncKeyState(VK_RIGHT) & 0x8000) dirs |= PAD_RIGHT;
-                pad_dump_now(dirs);
-            }
+            /* ⛔ The manual F7 force-capture was removed -- see the note at
+             * key_pressed(). pad_auto_capture() above still captures on the
+             * arrow-key EDGE, which is the path that ever produced anything. */
         }
         beat++;
 
@@ -2137,17 +2255,17 @@ static DWORD WINAPI worker(LPVOID param)
          * kept only as a liveness floor for when nothing changes at all. */
         static LONG gt_last_calls = -1;
         gt_stats gs_probe;
-        if (gt_ok)
+        if (gt_diag)
             gt_get_stats(&gs_probe);
         /* ⚠ Track the CTOR count too. A run where objects are built but slot 13
          * never fires is the single most informative outcome available, and
          * watching only `calls` would leave it unreported. */
         static LONG gt_last_ctors = -1;
         static LONG gt_last_text = -1;
-        BOOL gt_changed = gt_ok && (gs_probe.calls != gt_last_calls ||
+        BOOL gt_changed = gt_diag && (gs_probe.calls != gt_last_calls ||
                                     gs_probe.ctors != gt_last_ctors ||
                                     gs_probe.with_text != gt_last_text);
-        if (gt_ok && (gt_changed || beat == 3 || beat == 10 || beat == 30 ||
+        if (gt_diag && (gt_changed || beat == 3 || beat == 10 || beat == 30 ||
                       beat % 60 == 0)) {
             gt_stats gs;
             gt_get_stats(&gs);
@@ -2239,7 +2357,7 @@ static DWORD WINAPI worker(LPVOID param)
          * modal does when its selection changes. Same clock the layout probe
          * now uses, and the same lesson: gate on the signal the target screen
          * actually produces, not the one the other screens happen to share. */
-        if (gt_ok) {
+        if (gt_diag) {
             static LONG fd_last_sets;
             gt_stats fs;
             gt_get_stats(&fs);
@@ -2250,7 +2368,7 @@ static DWORD WINAPI worker(LPVOID param)
             }
         }
 
-        if (gt_ok && (beat == 10 || beat % 5 == 0))
+        if (gt_diag && (beat == 10 || beat % 5 == 0))
             gt_focus_report();
 
         /* ⭐⭐ FOLLOW A LANGUAGE CHANGED IN OPTIONS > SYSTEM.
@@ -2273,7 +2391,7 @@ static DWORD WINAPI worker(LPVOID param)
          * only, never spoken; see gt_instance_report(). Same cadence as the
          * focus record so one run carries both, and on the slow beats only
          * because it prints one line per live object. */
-        if (gt_ok && (beat == 10 || beat % 5 == 0))
+        if (gt_diag && (beat == 10 || beat % 5 == 0))
             gt_instance_report();
 
         /* ⭐⭐⭐ MODAL PROMPTS -- the quit dialogs. NOT gated on a switch: this
@@ -2291,7 +2409,7 @@ static DWORD WINAPI worker(LPVOID param)
         /* ⭐⭐ The MODAL SELECTION HUNT (cfc2_modal.on, absent = off). Same
          * redraw clock as the other probes -- a dialog is open for ~2 s and a
          * beat cadence misses it entirely, which already cost one run. */
-        if (gt_ok)
+        if (gt_diag)
             gt_modal_probe();
 
         /* ⭐⭐ The LAYOUT PROBE (cfc2_layout.on, absent = off). Looks for the
@@ -2312,7 +2430,7 @@ static DWORD WINAPI worker(LPVOID param)
          *
          * ⚠ Still rate-limited: at most once per beat, so a busy screen (the
          * music player redraws its timer constantly) cannot flood the log. */
-        if (gt_ok) {
+        if (gt_diag) {
             static LONG last_sets;
             gt_stats ls;
             gt_get_stats(&ls);
@@ -2331,7 +2449,7 @@ static DWORD WINAPI worker(LPVOID param)
          *
          * ⚠ Every 5 beats plus an early one -- the cadence mod.c earned after
          * beats 10/30/60 missed an entire run. */
-        if (gt_ok && (beat == 10 || beat % 5 == 0))
+        if (gt_diag && (beat == 10 || beat % 5 == 0))
             gt_movelist_report();
 
         /* ⛔ The census report is not called either: with the sampler withdrawn

@@ -16,3 +16,7 @@ cfc2_dump/
 # Not committed: it is large, derived, and goes stale when the game rewrites
 # the dump -- the tool refuses to load a stale one rather than answer wrongly.
 riprefs.pkl
+# Claude Code's permission allowlist. Machine-specific: every entry embeds an
+# absolute path to this checkout and to the Steam install, so a committed copy
+# would grant nothing on another machine while looking as though it did.
+.claude/

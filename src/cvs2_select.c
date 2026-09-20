@@ -232,20 +232,114 @@ void cvs2_select_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
 static BOOL read_at(void *out, ULONGLONG address, SIZE_T size)
 { return mem_copy(out,(const void *)(ULONG_PTR)address,size); }
 
+/* ⛔⛔ THIS TICK RAN AT 100 Hz AND DELAYED THE USER'S SPEECH.
+ *
+ * The user reported keypress announcements lagging again. Counted rather than
+ * profiled, which is this project's rule (CLAUDE.md: "before any loop over
+ * memory, COUNT THE SYSCALLS it will make"):
+ *
+ *     10 read_at() per tick      -> >= 1000 VirtualQuery per SECOND
+ *     137067 bytes per tick      -> ~13 MB/s of guarded memcpy
+ *
+ * That is the FIFTH time this project has hit the VirtualQuery wall, and the
+ * first four all presented the same way: the worker is alive but too busy to
+ * notice a cursor movement promptly, so speech trails the keypress.
+ *
+ * ⭐ THE THREE FIXES, none of which weakens a guard:
+ *
+ * 1. THE SIGNATURE CHECK IS HOISTED. It reads 11 bytes of `.text` at a fixed
+ *    address to confirm the audited build. `.text` is immutable here (ASLR
+ *    off, no relocations, Enigma decrypts once before we ever run), so its
+ *    answer cannot change between ticks. Checking it 100 times a second is
+ *    100 times more often than it can possibly differ. Now checked ONCE and
+ *    latched; a failure latches too, so a wrong build still never decodes.
+ *
+ * 2. THE 134 KB COPY IS GATED BEHIND THE CHEAP CHECKS. It already sat behind
+ *    them textually, but C's `||` chain put it in the SAME expression as the
+ *    pointer comparisons, so it ran whenever those passed -- which is every
+ *    tick of an active match, i.e. exactly when speech matters most. Split
+ *    out so the arithmetic decides before 134 KB moves.
+ *
+ * 3. THE STATE COPY IS RATE-LIMITED TO 30 Hz. ⚠ This is the one that needs
+ *    justifying, because a slower poll is what caused a past defect here
+ *    (six arrow presses between two 2 s polls, the index returned to its
+ *    start, nothing was said).
+ *
+ *    ⭐ 33 ms is not that. It is FASTER than the game's own 60 fps frame, so
+ *    no selection state can appear and vanish between two samples: the menu
+ *    holds a highlight for as long as the player stands on it, which is
+ *    hundreds of milliseconds at minimum. The failure mode above needed a
+ *    2000 ms gap, sixty times larger.
+ *
+ *    ⚠ And health does NOT come through here -- cvs2_frame.c feeds it on the
+ *    game's own frame hook precisely so this poll's rate cannot make it
+ *    stale. The super meter is the only gauge on this path, and a meter moves
+ *    over seconds.
+ *
+ * ⛔ What was NOT done: dropping mem_readable() before the memcpy. That was
+ * tried in this project and the test written to prove it safe CRASHED -- a
+ * guarded memcpy across a page boundary is NOT caught (case C in
+ * run_span_test.ps1). The fault guard is a net for the race between the check
+ * and the copy, never a replacement for the check. Every bulk read here still
+ * calls mem_copy(). */
+#define SELECT_POLL_MS 33u
+
 void cvs2_select_tick(void)
 {
     static BYTE state[CVS2_STATE_SIZE];
     static int guard_ready;
-    BYTE sig[11], header[0x60];
-    const BYTE expected[11] = {0x48,0x8b,0x48,0x10,0x48,0x89,0x0d,0x90,0x48,0xc3,0x01};
+    /* 0 = not yet checked, 1 = this is the audited build, -1 = it is not. */
+    static int sig_ok;
+    static DWORD last_poll;
+    BYTE header[0x60];
     ULONGLONG session, arena, context, pointers[4], root, phase, again;
     unsigned game, rom;
+    DWORD now;
+
     if (!guard_ready) {
         if (!mem_guard_install()) return;
         guard_ready = 1;
     }
-    if (!read_at(sig,0x1406aa335ULL,sizeof sig) || memcmp(sig,expected,sizeof sig) ||
-        !read_at(&session,0x141c14f98ULL,8) || !read_at(header,session,sizeof header))
+
+    /* ⭐ ONCE. See note 1 above: `.text` cannot change between ticks, so this
+     * answer is a property of the build, not of the moment. */
+    if (sig_ok == 0) {
+        BYTE sig[11];
+        const BYTE expected[11] =
+            {0x48,0x8b,0x48,0x10,0x48,0x89,0x0d,0x90,0x48,0xc3,0x01};
+        if (!read_at(sig,0x1406aa335ULL,sizeof sig))
+            return;              /* could not look: not a negative, retry */
+        sig_ok = memcmp(sig,expected,sizeof sig) == 0 ? 1 : -1;
+        if (sig_ok < 0)
+            log_line("cvs2-select: ⛔ the bytes at 0x1406aa335 differ from the "
+                     "audited build -- refusing to decode this build's state. "
+                     "Nothing will be spoken from the emulated game.");
+    }
+    if (sig_ok < 0) return;
+
+    /* ⭐ ONE 8-byte read decides whether anything at all is worth doing.
+     *
+     * ⚠ This read stays on EVERY tick on purpose, and it is the only one that
+     * does. Leaving a game nulls the session slot, and the gauges must be
+     * silenced promptly when that happens -- a tone holding over the screen
+     * that follows is exactly the "cue at the wrong moment" failure this
+     * project keeps guarding against. Throttling the INACTIVE path would
+     * reintroduce it. Throttling the ACTIVE path costs nothing, because an
+     * active match is precisely when there is nothing new to decide. */
+    if (!read_at(&session,0x141c14f98ULL,8) || !session)
+        goto inactive;
+
+    /* Active. Everything below -- eight more guarded reads and a 134 KB copy
+     * -- happens at SELECT_POLL_MS, not at the 10 ms tick.
+     *
+     * ⚠ Returning here is NOT "inactive": nothing is reset and nothing is
+     * said, because the state we already published is still current. */
+    now = GetTickCount();
+    if (last_poll && now - last_poll < SELECT_POLL_MS)
+        return;
+    last_poll = now;
+
+    if (!read_at(header,session,sizeof header))
         goto inactive;
     memcpy(&arena,header,8); memcpy(&game,header+8,4); memcpy(&rom,header+0x44,4);
     if (game != 1 || (rom != 2 && rom != 3) ||
@@ -256,8 +350,10 @@ void cvs2_select_tick(void)
     if (arena > 0x00007fff00000000ULL || context != arena+0x8000000 ||
         pointers[0] != arena || pointers[1] != arena+0x8400000 ||
         pointers[2] != root || phase != root+0x78 ||
-        root < arena+0xc000000 || root > arena+0x10000000-CVS2_STATE_SIZE ||
-        !read_at(state,root,sizeof state) ||
+        root < arena+0xc000000 || root > arena+0x10000000-CVS2_STATE_SIZE)
+        goto inactive;
+
+    if (!read_at(state,root,sizeof state) ||
         !read_at(&again,0x1422debd0ULL,8) || again != root ||
         !read_at(&again,0x141c14f98ULL,8) || again != session)
         goto inactive;
@@ -266,6 +362,7 @@ void cvs2_select_tick(void)
     cvs2_announce_observe(state,sizeof state,root);
     return;
 inactive:
+    last_poll = 0;
     cvs2_select_observe(NULL,0,0);
     cvs2_gauges_observe(NULL,0,0);
     cvs2_announce_observe(NULL,0,0);
@@ -358,12 +455,41 @@ static ULONGLONG g_ga_root;
  * above. Reported by cvs2_gauges_log_stats(). */
 static unsigned g_ga_fed, g_ga_rejected;
 
+/* ⛔⛔ THIS WROTE A LOG LINE EVERY TICK -- 2741 of them in one 5-minute
+ * session, one every ~25 ms, a THIRD of the whole log. Each is a file write
+ * from the worker thread, and the user heard it as speech lagging keypresses.
+ *
+ * ⭐ THE BUG IS THE GUARD ITSELF, and it is the SAME one already fixed in
+ * cvs2_frame_log_stats(): `fed` and `rejected` are incremented twice per tick
+ * while a match is running, so "have the counters changed?" is TRUE on every
+ * single call. A counter that changes continuously cannot also be the thing
+ * that gates "has anything changed?".
+ *
+ * ⚠ Knowing a trap is not the same as encoding it -- that fix was written,
+ * commented at length, and the identical guard was left standing here.
+ *
+ * Rate-limit by TIME, like the frame version, and report the RATE rather than
+ * a running total: "fed 120/s" is a number a human can act on, where an
+ * ever-climbing total is not. */
 void cvs2_gauges_log_stats(void)
 {
-    static unsigned last_fed = (unsigned)-1, last_rej = (unsigned)-1;
-    if (g_ga_fed == last_fed && g_ga_rejected == last_rej) return;
-    last_fed = g_ga_fed; last_rej = g_ga_rejected;
-    log_line("gauge: fed=%u rejected=%u", g_ga_fed, g_ga_rejected);
+    static ULONGLONG last_tick;
+    static unsigned last_fed, last_rej;
+    ULONGLONG now = GetTickCount64();
+    unsigned fed = g_ga_fed, rej = g_ga_rejected;
+
+    if (last_tick == 0) { last_tick = now; last_fed = fed; last_rej = rej; return; }
+    if (now - last_tick < 10000) return;          /* at most once per 10 s */
+
+    /* Say nothing at all while nothing is happening: outside CVS2 both
+     * counters are frozen, and a heartbeat every 10 s saying "0 and 0" is the
+     * log noise this function is being fixed for. */
+    if (fed != last_fed || rej != last_rej)
+        log_line("gauge: fed=%u (%.0f/s) rejected=%u (%.0f/s)",
+                 fed, (double)(fed - last_fed) * 1000.0 / (double)(now - last_tick),
+                 rej, (double)(rej - last_rej) * 1000.0 / (double)(now - last_tick));
+
+    last_tick = now; last_fed = fed; last_rej = rej;
 }
 
 void cvs2_gauges_observe(const BYTE *state, SIZE_T size, ULONGLONG root)

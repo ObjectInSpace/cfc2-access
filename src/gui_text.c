@@ -81,6 +81,12 @@ static void          *g_text_self;
 static volatile LONG  g_text_ready;   /* mailbox full */
 static volatile LONG  g_text_busy;    /* claim flag over g_text_buf */
 static char           g_text_last[GT_TEXT_MAX];  /* dedupe: last logged */
+/* The live-text TRANSCRIPT, opt-in via cfc2_guitext_diag.on. Off by default:
+ * the emulated game redraws numbers every frame, so the dedupe filter above
+ * cannot suppress it and it becomes ~12 file writes per second on the worker
+ * thread that speech shares. The HOOK stays on regardless -- it feeds the
+ * modal announcements and the caption channel, which are shipping speech. */
+static BOOL           g_text_log_on;
 
 /* ⭐⭐ THE FOCUS RECORDER -- item 4's measurement, and the caption channel.
  *
@@ -1994,8 +2000,26 @@ BOOL gt_poll_and_log(void)
         /* ⭐ Log only DISTINCT strings. The same label is set hundreds of
          * times a second; printing every sighting would bury the log and tell
          * us nothing a single line does not. The count in the stats line is
-         * what carries the volume. */
-        if (strcmp(copy, g_text_last) != 0) {
+         * what carries the volume.
+         *
+         * ⛔⛔ THE DISTINCTNESS GUARD DOES NOT HOLD IN A MATCH, and it cost
+         * the user's speech. Measured: 612 of one session's 942 `gt:` lines
+         * were this one line, ~50 ms apart, because the emulated game redraws
+         * NUMBERS -- score, timer, combo. "188", "191", "198" are all
+         * distinct, so the filter passes every one, and each is a file write
+         * on the worker thread that speech shares.
+         *
+         * ⭐ Same shape as the gauge and frame counters: a guard that tests
+         * "is this different from last time?" is no guard at all against a
+         * value that is different every time. That is now THREE places in
+         * this project where the same reasoning failed.
+         *
+         * ⚠ Gated rather than deleted, and gated SEPARATELY from the hook
+         * itself. The hook also feeds menu_speak_check_modal() and the caption
+         * channel, which are SHIPPING SPEECH -- turning the whole thing off to
+         * quiet a log line would silence the quit dialogs. The transcript is a
+         * development aid; it is the only part that needs a switch. */
+        if (g_text_log_on && strcmp(copy, g_text_last) != 0) {
             strncpy(g_text_last, copy, sizeof(g_text_last) - 1);
             g_text_last[sizeof(g_text_last) - 1] = 0;
             log_line("gt: * TEXT SET on %p: \"%s\"", who, copy);
@@ -3304,6 +3328,10 @@ static volatile LONG g_snap_on;
 static volatile LONG g_snap_count;
 
 void gt_snapshot_enable(BOOL on) { InterlockedExchange(&g_snap_on, on ? 1 : 0); }
+
+/* See g_text_log_on: this switches the live-text TRANSCRIPT only, never the
+ * hook that shipping speech depends on. */
+void gt_text_log_enable(BOOL on) { g_text_log_on = on; }
 long gt_snapshot_count(void)     { return (long)g_snap_count; }
 void gt_test_snapshot_reset(void)
 {

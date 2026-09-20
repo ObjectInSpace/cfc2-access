@@ -942,6 +942,25 @@ that the per-groove meter cap met and the original health/meter claim did not.
 Until then do NOT wire timer cues. A wrong timer would fire the 30/15/5-second
 warnings at the wrong moments, which is worse than no warning at all.
 
+⛔ **THE OFFLINE ROUTE IS CLOSED — tried 2026-09-19, recorded so it is not
+re-attempted.** Two further attempts, both negative:
+
+- `find_field_access.py 0x184` (reads AND writes): 14 hits, every one a BYTE
+  access on another structure's `+0x184`, confirming the note above. There is
+  no direct `R+0x184` access anywhere in the CVS2 range.
+- Since `R` is published at the fixed global `0x1422DEBD0`, I searched for
+  RIP-relative references to that global and decoded 40 instructions after
+  each, looking for a `+0x184` access on the loaded register. **None.**
+  ⚠ That is a WEAK negative, not a result: the global is referenced from
+  **3105 sites**, and the root is typically loaded once and passed in a
+  register across calls, so the access can be in a different function
+  entirely. Do not cite this as evidence the field is not the timer.
+
+So the candidate cannot be promoted or refuted offline, and the one live
+capture described above remains the only thing that settles it. It is cheap —
+the user reads the on-screen number aloud at capture time — and the
+prediction is exact, which is the standard the meter cap met.
+
 **Win quotes: located live, but the DRAW path is not found (2026-09-19)**
 
 Confirmed the quote text exists and is readable at runtime. With the game
@@ -1755,3 +1774,595 @@ capstone decode CONFIRMING the displacement -- never a linear sweep.
 - ⚠ Zero hits is NOT automatically a negative: an access through a
   register-held offset carries no displacement and cannot be found this way.
   The tool says so rather than printing a clean-looking zero.
+
+## 2026-09-19: ⭐⭐ FIGHTER POSITION FOUND — `B+0x54` (X) and `B+0x58` (Y)
+
+Derived OFFLINE from the existing dump and the captures already in
+`build/cvs2-state/`. **Zero game launches.** This replaces the refuted
+`B+0x0D2`/`B+0x0D8` candidate above.
+
+    X        B+0x54  (s32, 16.16 fixed point)  velocity B+0xA8  accel B+0xB0
+    Y        B+0x58  (s32, 16.16 fixed point)  velocity B+0xAC  accel B+0xB4
+
+⭐⭐ **THE METHOD, and it is the one this project is 4-for-4 with: ask what
+position IS, not what it looks like.** Every failed candidate here
+(`B+0x246` health, `B+0x0D2` X) came from diffing captures for plausible
+VALUES. A coordinate has a structural definition instead — it INTEGRATES a
+velocity that itself integrates an acceleration. That is a query over
+instructions, and it has one answer.
+
+`tools/find_integration.py`: every `add/sub [reg+disp], reg` inside the 0x678
+player struct whose addend was just loaded from the SAME base register.
+`+0x54` has **16 sites, every one fed by `+0xA8`**; `+0x58` has 5, every one
+fed by `+0xAC`. Two adjacent coordinates, each with exactly one velocity.
+Disassembling the site resolved the whole routine at **`0x140708F50`**:
+
+    0x140708F50  mov edx, [rcx+0xA8]     ; X velocity
+    0x140708F56  add [rcx+0x54], edx     ; position += velocity
+    0x140708F59  add edx, [rcx+0xB0]     ; velocity += acceleration
+    0x140708F5F  mov [rcx+0xA8], edx
+    0x140708F65  mov edx, [rcx+0xAC]     ; then the identical block for Y
+    0x140708F6B  add [rcx+0x58], edx
+    0x140708F6E  add edx, [rcx+0xB4]
+    0x140708F74  mov [rcx+0xAC], edx
+    0x140708F7A  ret
+
+A field that accumulates a velocity which accumulates an acceleration is a
+coordinate. Nothing else in the struct has that three-level shape. A second
+copy of the same block exists at `0x140709012` on a different base register.
+
+**Live corroboration, from captures taken for other work:**
+
+- ⭐ **The match-start mirror.** In all three start captures (`hp-full`,
+  `meter-full`, `timer-99`) P1 reads exactly `-6553600` and P2 exactly
+  `+6553600` — i.e. **-100.00 and +100.00**, summing to zero. Fighters begin
+  equidistant from centre, facing each other. An arbitrary field has no reason
+  to be mirrored to the bit across three separate sessions.
+- Separation across 12 in-round captures runs 39.55 .. 320.06 units — close
+  quarters to full screen width, never zero, never absurd.
+- `B+0x58` (Y) is **0 in every in-round capture**: all sampled fighters are
+  grounded, exactly as expected. ⚠ That is an absent signal, not a proof; no
+  capture samples a jump.
+- Velocities at `+0xA8` are clean speeds: ±2.50, ±3.00, ±3.06, ±3.50 per
+  frame. A walk is a few units per frame.
+
+⭐ **THE FORMAT IS 16.16**, and getting there took one wrong turn worth
+recording.
+
+I first tested "are the values exact multiples of the unit", which said 24.8
+(24/24 exact) over 16.16 (9/24). ⛔ **That test is monotone in the wrong
+direction and can only ever favour the COARSEST candidate**: everything
+divisible by 65536 is also divisible by 256, so a coarser unit passes
+whenever a finer one does. It cannot distinguish "the real scale" from "any
+factor of the real scale".
+
+The test that DISCRIMINATES is the physics, since velocity is integrated once
+per frame at 60fps:
+
+    scale    start pos    stage span    walk speed (units/s)
+    24.8      25600.00      180352      38400 .. 53760
+    20.12      1600.00       11272       2400 ..  3360
+    16.16       100.00         704        150 ..   210
+
+Only 16.16 describes a fighting game: fighters start 100 units apart on a
+~700-unit stage and walk at 150-210 units/second. ⭐ **Prefer the test whose
+answer changes when the hypothesis changes.** "Divides evenly" was true of
+several scalings; "implies a believable fighter" is true of exactly one.
+
+⛔⛔ **WHAT THIS DOES NOT ESTABLISH — do not wire pan yet.**
+
+- **World vs. screen space is still OPEN**, and it is the same gap that made
+  the last candidate useless. These are WORLD coordinates as far as the
+  evidence goes: the integration routine knows nothing about a camera. Screen
+  X requires subtracting a camera origin that has NOT been located. On a
+  scrolling stage a world-X beacon is wrong exactly when the fighters move,
+  which is when it matters.
+- **The range is observed, not bounded.** -320..+320 is what 12 captures show.
+  Mapping X to pan needs the real stage extent.
+- ⚠ Do not read `+0x54` as a u16 or fold `+0x50` into it. It is a signed
+  32-bit value and it goes NEGATIVE for the whole left half of the stage — a
+  u16 window would wrap to ~65000 there, which is the width-misreading that
+  produced the `0x0D8` pointer artifact.
+- ⚠ `find_field_access.py 0x54` returns 136 hits, mostly `adc` — those are
+  mid-instruction decodes of SSE data, not writers. `0x54` is an ordinary
+  displacement in many unrelated structs. The anchored routine is the
+  evidence; that raw count is not.
+
+### ⭐⭐ The camera: NOT NEEDED — pan is derivable from the two fighters
+
+The X beacon needs `screen_x`, not world X. The obvious route was to find a
+camera origin. **Searching for one failed, and then turned out to be
+unnecessary.**
+
+What was tried, and why each is a weak negative (recorded so it is not
+re-run):
+- Subtractions applied to a value loaded from `+0x54`: only 3 sites, all
+  object-relative placement (`[rdi+0x54] - [rbx+0x444] -> [rbx+0x54]`, i.e.
+  spawning an effect relative to its owner at `0x14071E1F3`). Not a camera.
+- Correlating every 4-byte field in `R` against the fighters' midpoint across
+  12 captures: **zero fields** with |r| > 0.97.
+- ⚠ Both negatives are weak for the same reason the win-quote pick was: CVS2
+  is emulated, so the camera may well be computed in guest SH-4 code, where
+  no host instruction performs it at all.
+
+⭐⭐ **THE INSIGHT THAT REMOVES THE BLOCKER: in a 2D fighter the camera is a
+FUNCTION of the two fighters.** It tracks their midpoint and clamps at the
+stage edges — that is what keeps both fighters on screen. So screen position
+is computable from the two world X values alone:
+
+    STAGE = 352        stage half-width, in world units
+    SCREEN_HALF = 192  half of CVS2's 384-pixel width
+    camera   = clamp(midpoint, -(STAGE - SCREEN_HALF), +(STAGE - SCREEN_HALF))
+    screen_x = world_x - camera
+    pan      = screen_x / SCREEN_HALF          -> -1.0 .. +1.0
+
+**STAGE = 352 is MEASURED, not assumed.** Across 24 in-round readings the
+extremes are -352.00 and +352.50, and **three independent readings from
+different sessions and both players sit at exactly ±352.00** — a hard corner
+wall. (`hp-ken` P1 and `state-a` P1 at -352.00; `pos-right-01` P2 at +352.00.)
+
+⭐ **THE CHECK THAT MAKES IT SHIPPABLE, and it is a real falsifiable
+prediction.** 352 and 192 were derived independently of each other and of the
+model. Applied to all 12 in-round captures:
+
+- **0 of 12 captures put a fighter off screen** (|pan| > 1). Nothing forced
+  that; the arithmetic could easily have produced out-of-range values.
+- Every corner capture lands at **exactly pan = ±1.00** — a fighter in the
+  corner is at the screen edge, which is what "corner" means.
+- Match start gives a symmetric ±0.52 for fighters 100 units apart.
+- Max observed separation is 320.1 against a 384-wide screen, so both
+  fighters always fit — exactly the invariant the camera exists to maintain.
+
+⚠ WHAT IS STILL ASSUMED, and how it would show up:
+- **SCREEN_HALF = 192** is CVS2's native 384-pixel width, not a measurement
+  from this game's rendering. If the emulator's visible window differs, pan
+  is scaled slightly — a uniformly too-wide or too-narrow field, not a
+  wrong direction.
+- **STAGE = 352 may be PER-STAGE.** All captures come from a small number of
+  stages. A wider stage would make fighters seem to reach the edge early.
+  ⭐ The model degrades gracefully: clamping pan to ±1.0 keeps a fighter at
+  the edge rather than panning past it.
+- **The camera may lead or lag** rather than sitting exactly on the midpoint
+  (many fighters bias toward the active player). That shifts both beacons
+  together by a small amount; relative separation stays right.
+
+⛔ None of these can be settled offline, and all are second-order. The
+first-order question — does a fighter in the left corner pan hard left — the
+model answers correctly on every capture in hand.
+
+### ⛔⛔ FIRST ATTEMPT WAS WIRED TO THE WRONG THING (2026-09-19)
+
+User report: **"I didn't hear a new sound."** Correct, and the log confirmed
+the build was current and the frame hook running at 60/s.
+
+I wired fighter position to the **GAUGE pan**. That was wrong twice over:
+
+1. **Gauge pan is FIXED BY OWNER on purpose** — P1 hard left, P2 hard right,
+   mirroring the on-screen HUD bars. The design memory is explicit that these
+   are two layers: *"gauge pan is FIXED to the HUD (owner), beacon pan MOVES
+   with the fighter (position)"*. I collapsed them.
+2. **Gauges sound only while a value CHANGES** (~140 ms hold). So a fighter
+   walking across the stage moved nothing and produced no sound at all.
+
+⭐⭐ **The actual design was never built.** `cfc2-audio-design-decision` has
+always specified *"each player gets their own persistent looping cue"* that
+*"NEVER goes silent"* during a match. There was no beacon in the mixer — only
+gauge tones. I read the position work as the last missing piece when the
+consumer for it did not exist.
+
+⚠ **THE LESSON.** I checked that pan reached the mixer and that the captures
+validated the model, and both were true — but never asked *what will the user
+actually hear?* A change can be correct at every layer I tested and still
+produce nothing, when the thing it feeds is silent by design. Trace a feature
+to the ear, not to the last function you changed.
+
+**Now built:** two persistent beacon voices (`audio_beacon_set`), sine, P1 at
+440 Hz and P2 at 520 Hz — between the gauge registers (health 150-420
+triangle, super 600-1500 square) and a minor third apart so they neither fuse
+with each other nor with a gauge. Fed EVERY FRAME, no change rule, no hold.
+Gauge pan restored to fixed-by-owner. Stance is a pitch multiplier on the
+base, currently pinned to `AUDIO_STANCE_STAND` because Y reads 0 in every
+capture and no state byte separating crouch from stand has been found — a
+constant is honest, a guessed ladder would mislead.
+
+**Shipped (built, not yet heard).** `src/cvs2_frame.c` reads both fighters'
+`B+0x54` as **s32** on the existing frame hook, derives pan with the model
+above, and feeds `audio_set_pan()`; `src/audio.c` uses it per voice instead of
+the fixed ±0.85. `audio_reset_pan()` restores the HUD-matching default when a
+match ends, beside the existing gauge reset.
+
+⚠ `audio_set_pan()` is deliberately **lock-free** — a single clamped float
+store. Every other setter in `audio.c` takes the mixer critical section, and
+taking it from the frame thread is precisely what made the health tone
+crackle. Pan is also fed only when it moves by more than 1/128, so a walking
+fighter costs a handful of calls per second rather than 120.
+
+⭐ Tests: `run_audio_test.ps1` grew to 24 checks, asserting on RENDERED
+SAMPLES, not on the stored float — a setter that records pan while the mixer
+ignores it would pass any check of the variable. Sabotage-verified:
+- restoring the fixed `±0.85` in `update_voices` fails 11b and 12a. ⚠ Note
+  11a, 12b and 14 still PASS under that sabotage, because the fixed value
+  happens to be left-panned; that asymmetry is why both directions are
+  asserted.
+- setting `SCREEN_HALF` to 240 fails case 13, which pins the model against
+  the real measured capture values.
+
+⚠ A test-authoring trap worth keeping: the mixer only sounds for
+`HOLD_BLOCKS` after a value CHANGE and ramps gain in, so measuring one block
+right after a pan change reads a tone still climbing out of silence. The
+first version of these cases failed for that reason and not because of pan.
+`pan_peaks()` renders past the ramp before measuring.
+
+Beacon build installed after confirming CFC2 was closed. Built/installed
+SHA-256 match:
+`BE7724C0D96DF38052B76615FF4E6C3F901F494D5A672A57637C364AF07E9A31`.
+(The earlier gauge-pan build was
+`2187B5179B3101C3B07A0A4D093E019B607D601B1B6BEAE75C580F9526D62324`.)
+
+### ⭐⭐ Beacon revision after the first listen (2026-09-19)
+
+User feedback on the first audible beacons, three separate issues:
+
+**1. "Not sure they pan exactly with the characters... a little behind or
+ahead"; later clarified as POSITION in the stereo field, not timing.** The
+pan law was equal-power sine/cosine, whose channel DIFFERENCE -- the thing
+the ear localises by -- is badly non-linear in `pan`:
+
+    near centre   1.7 dB per 1/8 step
+    near ±0.9     6.1 dB per 1/8 step
+    at ±1.0       ~100 dB (one channel reaches exact silence)
+
+So a step into the corner threw the image ~58x harder than a step across the
+middle, and the extremes collapsed into one ear ("too wide"). ⭐ Replaced
+with a law that is **linear in dB**: `PAN_SPAN` (15) dB of channel difference
+per unit of pan, normalised to constant power. Measured: a uniform **3.75 dB
+per quarter-step across the whole field**, and both channels stay audible at
+full deflection so the image stays in the listener's head.
+⚠ `PAN_SPAN` is now the single knob for "too wide"/"too narrow".
+
+**2. Timing must change instantly.** The output queue was 12 buffers = 70 ms,
+over four frames at 60 fps. The comment defending it said latency was
+"irrelevant -- these are continuous gauge tones, not input feedback", which
+was true for gauges and WRONG for a beacon: a beacon is a spatial readout of
+something the player is actively controlling. Reduced to 8 buffers (46 ms).
+⚠ Queue depth trades dropout tolerance against positional accuracy; only one
+side was being weighed. If crackling returns, raise it back first.
+
+**3. "The tones sound a bit too close to the gauges... something very
+sonically different."** The beacons were sines sitting between the gauge
+registers. ⛔ Separating by pitch and waveform alone is too weak -- sine,
+triangle and softened square are all steady pitched harmonic tones, i.e. ONE
+FAMILY, so they read as related however far apart their registers are.
+
+⭐ Beacons are now **plucks** (osc timbre 3), differing in KIND on three axes
+at once: inharmonic partials (2.76x, 5.40x -- bell ratios, so they cannot
+fuse with a pitched tone), a sharp decaying envelope where the gauges are
+flat, and a rhythmic pulse. The two players are told apart by PULSE RATE
+(P1 9/s, P2 6.2/s -- deliberately not 2:1, which would lock into one rhythm).
+
+**4. "The pitch needs to raise or lower when the player jumps or crouches."**
+The mechanism is built and tested (stance scales the pulse rate, so airborne
+is faster/brighter and knocked down slower/duller) but is **NOT yet driven by
+the game** -- see the stance section below. Everything currently sits at
+`AUDIO_STANCE_STAND`.
+
+⚠ TEST-INSTRUMENT NOTES, both of which produced convincing false failures:
+- Zero-crossing "pitch" is the wrong instrument for a pluck (it measures the
+  partials, not the repeat rate). `pulse_count()` counts envelope onsets.
+- A gauge tone left sounding by an earlier case landed in the pan
+  measurement and reported **15.3x unevenness for a law that is uniform to
+  1.00x**. ⭐⭐ Measuring a SUM of voices says nothing about one of them, and
+  the artifact looked exactly like the bug under test. Isolate first.
+
+Sabotage-verified: restoring cos/sin in `pan_gains()` fails 12f alone.
+
+### ⛔⛔⛔ THAT PLUCK BUILD WAS INAUDIBLE — a pluck needs TWO rates
+
+User: **"I don't hear a sound."** The log confirmed the right DLL, the frame
+hook at 60/s through a real match with health changes, so the beacons were
+being fed. The bug was in the oscillator.
+
+The pluck generated its partials from the **pulse ramp**:
+
+    e   = phase              (advancing at the PULSE rate, 9 Hz)
+    s1  = sin(e * 2pi)       -> 9.0 Hz
+    s2  = sin(e * 2pi*2.76)  -> 24.8 Hz
+    s3  = sin(e * 2pi*5.40)  -> 48.6 Hz
+
+Every component below or barely at the limit of hearing; P2 at 6.2 Hz was
+worse (6.2 / 17.1 / 33.5 Hz). On a normal speaker that is silence.
+
+⭐ **A PLUCK HAS TWO INDEPENDENT RATES** and I collapsed them into one ramp:
+the TONE pitch inside each pluck (hundreds of Hz) and how often it REPEATS
+(a few Hz). The voice now carries `pulse_phase`/`pulse_rate` beside
+`phase`/`freq`; `osc()` renders the tone and the render loop applies
+`exp(-7 * pulse_phase)` as the envelope. Measured after the fix: **P1 743 Hz,
+P2 498 Hz**. P1 is higher AND faster, P2 lower AND slower -- two agreeing
+cues, so the players stay distinct if one axis is masked.
+
+⭐⭐⭐ **WHY 29 PASSING CHECKS DID NOT CATCH SILENCE, and this is the
+reusable part.** The suite asserted amplitude (non-zero samples), pulse rate
+(envelope onsets), pan (channel ratio), persistence, and match gating. All
+were CORRECT. Not one asserted that the output lay in the **audible band**.
+"Samples are non-zero" is not "a human can hear it" -- a 9 Hz tone satisfies
+every amplitude and ratio test ever written and is inaudible.
+
+New case **12g** measures tone frequency and requires 120 Hz .. 5 kHz.
+Sabotage-verified by reproducing the shipped bug exactly (tone driven from
+the pulse rate): it reports **17 Hz / 6 Hz** and 12g is the ONLY case that
+fails. That isolation is the whole point -- it is precisely why the bug
+shipped past everything else.
+
+⚠ This is the SECOND silent-beacon ship in a row, both from testing a
+property adjacent to the one that matters (first: pan on a voice that never
+sounded; second: a voice sounding below hearing). Before shipping audio,
+ask what a LISTENER would notice, then assert that.
+
+Installed: `C672E8BB1D0FD6582FE78891B020B2500043C2E679AD8A297C293A6B267F23A6`.
+
+### ⭐ Pause suppression (user request, 2026-09-19)
+
+The beacons kept sounding over the pause menu. A paused game is not
+simulating, so the position they report is frozen and conveys nothing.
+
+⚠ **The phase bytes do NOT distinguish pause**: a paused in-round capture
+reads `02 01 02 02 04 ...`, identical to an unpaused one. So suppression keys
+on the game's OWN frame counter at `*0x1422DEC30 + 0x18` -- the one the
+hooked function increments at `0x1406AA7BB`. Our detour still runs while
+paused (the caller keeps calling it); that counter stops advancing, which is
+exactly what "not simulating" means.
+
+⛔⛔ **THAT VERSION COULD NEVER HAVE WORKED, and the user reported the
+beacons still playing on pause.** The hooked function is the one that
+INCREMENTS the counter it watched (`0x1406AA7BB`, `inc dword [rax+0x18]`), so
+by the time the detour runs the counter has always just advanced --
+`ctr == g_last_counter` is essentially never true.
+
+⭐⭐ **A SIGNAL GENERATED BY THE VERY FUNCTION YOU HOOK CANNOT TELL YOU THAT
+FUNCTION IS IDLE.** Watch something the SIMULATION advances, not something
+the hook itself advances. The trace even says the function increments that
+counter, two lines from where I read the address -- I took the address and
+skipped the sentence.
+
+**Corrected:** a composite signature of state that only moves while the game
+simulates -- both fighters' X, the round timer, and their animation-frame
+bytes (`B+0x0D2`/`0x0D3`; position alone is insufficient because two idle
+fighters can stand still, while animation keeps ticking). Unchanged for 30
+frames (~0.5 s) = paused.
+
+⚠ 30 frames is deliberately generous. A false positive silences the beacons
+mid-fight, which is far worse than half a second of beacon into a pause.
+
+⭐ The report now prints a PAUSE COUNT. The first attempt failed silently
+because the log could not distinguish "user never paused" from "pause never
+detected" -- a liveness counter is what separates those. Installed:
+`760A71D3646BC1E6BAA16AB6AA387B9AF4B2EE2E63272EC57661CD089A7BC244`.
+
+### ⭐ Super meter: triangle (user, 2026-09-19)
+
+After hearing square-vs-saw the user kept health's square and asked for a
+TRIANGLE on super. Both square and saw are harsh and competed for attention.
+Square and triangle share the odd-harmonic series but differ in how much of
+it -- `1/n` vs `1/n^2`:
+
+    square    h3 0.333  h5 0.200  h7 0.143   buzzy, hollow
+    triangle  h3 0.111  h5 0.040  h7 0.020   soft, near-sine
+
+A much larger brightness gap than square-vs-saw, so the two sit in different
+perceptual layers rather than fighting: health cuts through, the super meter
+stays easy to ignore -- matching which one the player tracks under pressure.
+⚠ The triangle needs no band-limiting; its `1/n^2` rolloff makes aliasing
+negligible. The sawtooth path (timbre 4) is retained but unused.
+
+### ⭐⭐ STANCE SOLVED — `B+0x59A`, and height `B+0x58` confirmed (2026-09-19)
+
+Two user-labelled captures settled it, both taken live in one session:
+
+- `crouch-01` — user reported crouching at capture time.
+- `jump-01` — ⭐ **the user's idea, and a much better one than mine.** I was
+  about to burst-capture 40 snapshots hoping to catch a sub-second jump;
+  instead they **paused in mid-air**, freezing the airborne state so a single
+  unhurried capture got it. P1 reads y = 81.38 with a small downward velocity
+  (just past the peak) while grounded P2 reads 0.
+
+⭐ **This also confirms `B+0x58` IS height.** It had read 0 in all sixteen
+earlier captures, which was consistent with "not the height field" as much as
+"nobody jumped"; a single airborne sample separates those.
+
+    stance   B+0x59A     0 = grounded/standing   1 = airborne   2 = crouching
+
+Method: bytes CONSTANT across ten standing captures that take a THIRD
+distinct value in each of crouch and jump, with grounded P2 unaffected in
+both. Three offsets survive -- 0x59A, 0x5A6, 0x5B2 (0xC apart, one value
+replicated in a small array); they agree in all 26 player-captures.
+
+⭐ **THE FALSIFIABLE CHECK:** value 1 appears in exactly the captures where
+`B+0x58 > 0`, and never otherwise. Two independent fields agreeing across
+every capture, which is the standard the meter cap met and the original
+health/meter claim did not.
+
+⚠ **`B+0x038` was rejected, and it is worth recording why.** It was the most
+enum-looking candidate (standing 4, crouch 3) and would have been an easy
+pick from the crouch capture alone. Checking the OTHER player killed it: P2
+reads 3 standing and 4 in the crouch capture -- the values SWAP between
+players, so it is facing/side, not stance. ⭐ A per-player field must be
+tested on the player who did not act.
+
+### ⭐ Knockdown: a DIFFERENT field, `B+0x007` (2026-09-19)
+
+The user knocked P2 down and paused, giving `knockdown-01`.
+
+⛔ **The clean negative first: P2's `B+0x59A` reads 0 while knocked down** --
+identical to standing. So the stance byte has no fourth value, and that is
+measured, not assumed. Had the ladder been extended by guessing a value
+there, it would simply never have fired.
+
+Diffing P2's struct against ten standing captures, requiring the field to be
+unchanged for P2 in the crouch and jump captures too (P2 was upright in
+both), gives 12 candidates. `B+0x007` is the only small ENUM that changes
+value rather than flipping 0->something:
+
+    B+0x007   0 = not in a match   1 = normal   2 = crouching
+              3 = knocked down     5 = (seen twice, unexplained)
+
+⚠⚠ **ONLY VALUE 3 IS EVIDENCED, AND FROM ONE CAPTURE.** This is an ACTION
+state, not a second stance ladder: value 2 duplicates what 0x59A already
+carries, and 5 appears in two captures where nobody was reported knocked
+down. ⭐ I checked whether 5 meant "being hit" -- it occurs with damage, but
+so does 1, so that reading is NOT supported and was dropped rather than
+shipped. A single sample is exactly the evidence class that mislabelled
+health as the super meter.
+
+Shipped narrowly: `0x007 == 3` maps to `AUDIO_STANCE_DOWN`; every other
+value defers to `0x59A`. That is the narrowest claim the evidence supports.
+
+▶ To go further, labelled captures are needed for: being hit but not downed,
+blockstun, and getting up. Until then do not interpret 5.
+
+Installed with pause suppression and the full stance ladder:
+`8C30308061A336D02D35043C300026A75746053B480BE177C6CB9B614A4BFA9A`.
+Backup: `build/dinput8-before-stance-*.dll`.
+
+### ⭐ Gauge waveforms: square and sawtooth (user, 2026-09-19)
+
+After hearing them in play the user reported the gauge tones still too
+similar and proposed the fix: **square for health, sawtooth for super**.
+
+⛔ The old pairing was triangle vs a "softened square" that was only two
+harmonics (fundamental + 1/3 third) -- effectively a triangle with slightly
+more edge. A difference of DEGREE within one family. The registers were well
+separated (150-420 vs 600-1500) and that still was not enough, which is the
+same lesson the beacons taught: **separating tones by pitch does not work
+when the timbres are close in kind.**
+
+⭐ Square and saw differ in WHICH HARMONICS EXIST. Measured from the shipping
+mixer by DFT at harmonic bins:
+
+    health square @420Hz   h1 1.00  h2 0.00  h3 0.33  h4 0.00  h5 0.20  h6 0.00
+    super  saw    @1500Hz  h1 1.00  h2 0.49  h3 0.32  h4 0.23  h5 0.18  h6 0.14
+
+Odd-only versus all, exactly as theory predicts. They stay distinguishable
+even at the same pitch, which register separation alone never guaranteed.
+
+⚠ Both are BAND-LIMITED via PolyBLEP. A naive square/saw is an infinite
+harmonic series, so everything above Nyquist folds back as inharmonic
+aliasing -- worst at high pitch, and super reaches 1500 Hz. Proper additive
+synthesis would need up to 147 `sinf()` calls PER SAMPLE at the low end, on
+the render thread; PolyBLEP rounds each discontinuity over one sample for a
+few arithmetic ops. (COUNT THE WORK BEFORE PUTTING IT IN A PER-SAMPLE LOOP.)
+
+⛔⛔ **THIS BROKE THE CLICK TEST, and the fix is the reusable part.** Case 7c
+asserted the worst single-sample jump stayed under an ABSOLUTE 3000 -- a
+constant derived for a triangle's gentle slope. A square jumps the full
+peak-to-peak at every edge BY DESIGN: predicted 9633, measured 9723. The test
+was measuring the waveform, and "fixing" it would have meant removing the
+edges that make it a square.
+
+⭐ 7c now compares against the SAME waveform held STATIC. Whatever steps the
+oscillator makes on its own appear in both and cancel, so the case tests what
+it always meant to -- that FEEDING A VALUE adds no discontinuity. Correct
+code measures exactly the control (9723 vs 9723).
+
+⚠ And the headroom is set BY SABOTAGE, not taste: resetting the phase on each
+feed (a real click) gives 12964, i.e. 1.33x. My first bound of 1.5x let that
+sabotage PASS. It is now 1.15x, verified to pass honest code and fail the
+click. **A tolerance chosen by eye is a tolerance that has not been tested.**
+
+Installed: `90D9D3B0281A8462BE3A3B603C329C5DD9200D9DEA46A5475C0561AB033CC3CE`.
+
+⭐⭐ **THE TECHNIQUE THAT MADE THIS SESSION CHEAP, and it was the user's
+idea: PAUSE IN THE STATE YOU WANT TO CAPTURE.** Crouch, mid-air and knocked
+down are all sub-second states, and I was about to burst-capture 40 snapshots
+hoping to catch one. Pausing freezes the state so a single unhurried capture
+gets it, and the phase bytes are unchanged by pause so the capture is fully
+comparable with unpaused ones. Three states, three captures, zero retries.
+Use this for any transient state (hitstun, blockstun, getting up, supers).
+
+Shipped: airborne interpolates `AUDIO_STANCE_AIR`..`AIR_TOP` by actual
+height, so a jump reads as a rising-then-falling arc rather than a single
+step. Test 12h pins the ladder ordering (measured 518 / 633 / 746 / 857 /
+1078 Hz). ⚠ That test measures TONE, not pulse count: the envelope detector
+merges overlapping fast plucks and reported stand > air for a correctly
+ordered ladder. An instrument that saturates is not evidence.
+
+### ▶ (superseded) STANCE: the data is NOT yet located
+
+`B+0x58` ("Y") reads exactly **0 in every in-round capture**, while
+`B+0xAC` ("Y velocity") is non-zero and varies (-2.84, -4.62, -7.75). A
+fighter with downward velocity and a pinned height is GROUNDED with gravity
+applied and clamped -- consistent with no capture having sampled a jump, but
+it also means `0x58` has never been seen to move and cannot be trusted as
+height on this evidence alone.
+
+⚠ Per the design memory, height is insufficient anyway: crouching and
+standing almost certainly SHARE a height, so a state byte is needed to
+separate them.
+
+Offline progress: 44 sites store an immediate into `B+0xAC`, and many are
+clean 16.16 impulses (+5.00, +9.00, +10.00 units/frame) -- jump velocities,
+as expected. Enumerating the byte fields written alongside them did not
+produce a state candidate (the scan's operand-size filter is unreliable for
+byte stores and needs fixing before it means anything).
+
+⭐ THE CHEAP SETTLEMENT, and it needs one capture rather than more
+disassembly: capture while **holding crouch**, and again **at the top of a
+jump**, in the same match. Diffing those against a standing capture names
+both the height field and the state byte directly, because the only thing
+that differs is the stance. Until then a guessed ladder would mislead, so the
+beacon stays at standing pitch.
+
+⚠ The FIRST `build.ps1 -Deploy` reported nothing and did NOT land — the
+installed hash was unchanged afterwards. A second run copied it correctly.
+⭐ Verify a deploy by HASHING BOTH FILES, never by the script's own
+"Deployed to ..." line; that message printed on the run that did not copy.
+
+▶ REMAINING: one listening check — walk to each corner and confirm the beacon
+reaches full left/right, and that it tracks smoothly in between. That also
+tests the two assumptions the captures cannot: `SCREEN_HALF = 192` and
+whether `STAGE_HALF` varies per stage.
+
+⚠ Y is located but has no verified use yet: the audio design maps pan to X
+only, and no capture samples a jump to confirm `+0x58` moves.
+
+### ⭐⭐ The scanner bug the positive control caught — stale registers
+
+`tools/find_integration.py` runs its control automatically and **exits
+non-zero** on failure. It failed twice before this result was trusted, and
+both failures were in the TOOL, not the game.
+
+The control asserts the documented routine appears. It reported the X site at
+`0x140708F56` found and the Y site at `0x140708F6B` **missing** — 21 bytes
+apart, in a routine I had already disassembled and could see was there.
+
+⛔ **My first explanation was wrong.** I assumed a 64-byte window boundary
+split the load from its use, and added overlapping windows. Coverage went from
+162,639 to 269,241 decoded instructions — a real improvement worth keeping —
+**and the control still failed.**
+
+The actual cause: the routine reuses `edx`.
+
+    mov edx, [rcx+0xA8]     ; edx = X velocity
+    add [rcx+0x54], edx
+    add edx, [rcx+0xB0]     ; edx is now the ACCELERATION step
+    mov [rcx+0xA8], edx
+    mov edx, [rcx+0xAC]     ; edx = Y velocity
+    add [rcx+0x58], edx     ; <-- rejected: edx still mapped to +0xA8
+
+The tracker only APPENDED loads and never invalidated a register when
+something else wrote it, so the stale `+0xA8` entry shadowed the fresh
+`+0xAC` one. Fixed by keying on the register (width-normalised, so `edx` and
+`rdx` are one slot) and clearing it on every write capstone reports.
+
+⭐⭐ **THE FIX MADE THE ANSWER CLEANER, WHICH IS THE REAL CONFIRMATION.**
+Before it, `+0x54` appeared to be fed by five different velocities
+(`+0xA8`, `+0xC0`, `+0xCF`, `+0x1FA`, `+0x3D0`) and spurious `+0x32`/`+0x56`
+candidates existed. After it, `+0x54` is fed by `+0xA8` and nothing else. The
+bug was not hiding one site; it was **inventing pairings**.
+
+⚠⚠ **THE LESSON.** Stale register state does not look like an error — it
+looks like a plausible finding with extra candidates. Had the control not
+pinned a known answer, "position is +0x54, velocity is one of five fields"
+would have shipped as the result, and the extra four would have been rationalised.
+⭐ And when the first fix does not clear the control, **do not stack a second
+guess on it** — instrument the rejection and read why. Printing the actual
+operands took one run and named the cause exactly.

@@ -829,6 +829,16 @@ int  gt_test_sc_expect(const char *label);
  *
  * Opt-in: `cfc2_snap.on`. Nothing is spoken. */
 void gt_snapshot_enable(BOOL on);
+
+/* Enable the live-text TRANSCRIPT ("gt: * TEXT SET ..."), a development aid.
+ *
+ * ⚠ This is NOT the hook. The hook always runs when gt_install() succeeded,
+ * because menu_speak_check_modal() and the caption channel are shipping
+ * speech that depends on it. Only the per-string log line is switched, and it
+ * is OFF by default: the emulated game redraws score and timer numbers every
+ * frame, each one "distinct", so the dedupe filter cannot suppress them and
+ * the line becomes a file write ~12 times a second on the speech worker. */
+void gt_text_log_enable(BOOL on);
 void gt_snapshot(const void *screen, float row_x, float val_x, int total);
 long gt_snapshot_count(void);
 void gt_test_snapshot_reset(void);
