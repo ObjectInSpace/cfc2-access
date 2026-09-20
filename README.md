@@ -14,10 +14,40 @@ See [CLAUDE.md](CLAUDE.md) for full technical detail and current status.
    `Steam\steamapps\common\CAPCOM FIGHTING COLLECTION 2\`
 2. Launch the game via Steam as normal.
 
+## In-match audio (CVS2)
+
+Everything during a match is an audio cue; speech is used only on character
+select. Each player has a persistent beacon whose stereo position follows the
+fighter across the screen, and the two beacons are told apart by how fast they
+pluck — so they stay distinct even when both fighters are near the centre.
+Health and super are continuous tones, low and hollow for health, soft and
+high for super. The round clock ticks.
+
+### Volume keys
+
+Each cue family has its own level, so anything in the way can be turned down
+without touching the rest:
+
+- **F5** health
+- **F6** super meter
+- **F7** beacons
+- **F8** clock tick
+
+The key steps the level **up**, shift+key steps it **down**, and both wrap
+around 0 / 25 / 50 / 75 / 100. Everything starts at 100, so **one press
+mutes**. The new level is spoken, and it is saved to `cfc2_audio.ini` next to
+the game, so it survives a restart.
+
+P1 and P2 share one level per cue — they are the same cue heard from two
+sides, and turning one down would make the stereo position lie about which
+side is which.
+
 ## Status
 
 - MTFramework shell (menus, options, move lists): working.
-- In-game arcade emulation (CVS1, CVS2, CFJ, Z3U, PWS1, PWS2, MJUS, STG2):
+- CVS2 in-game: working — character select speech, health and super gauges,
+  position beacons, and the round clock.
+- The other seven arcade games (CVS1, CFJ, Z3U, PWS1, PWS2, MJUS, STG2):
   in progress — see `docs/` for design notes.
 
 ## Source
