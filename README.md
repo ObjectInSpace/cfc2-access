@@ -10,9 +10,20 @@ See [CLAUDE.md](CLAUDE.md) for full technical detail and current status.
 
 ## Install
 
-1. Copy `dinput8.dll` from this release into the game's install directory:
+1. Copy **all four DLLs** from this release into the game's install directory:
    `Steam\steamapps\common\CAPCOM FIGHTING COLLECTION 2\`
 2. Launch the game via Steam as normal.
+
+The four files are `dinput8.dll` (the mod itself), `UniversalSpeech.dll` (the
+speech layer), `nvdaControllerClient.dll` (NVDA), and `ZDSRAPI.dll` (ZDSR).
+Nothing else needs installing.
+
+⚠ **Copy all of them, not just `dinput8.dll`.** UniversalSpeech loads
+`nvdaControllerClient.dll` by that exact name, and without it speech **silently
+falls back to SAPI5** while NVDA is running — you get a voice, so it sounds
+like it worked, but it ignores your configured voice, rate, punctuation level
+and braille display. The mod logs a warning when it detects this; see
+`CFC2Access.log` in the game directory if speech sounds wrong.
 
 ## In-match audio (CVS2)
 
