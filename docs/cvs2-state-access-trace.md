@@ -1459,6 +1459,67 @@ its own; what makes this stronger than the `B+0x574` guess is that the value is
 the ID ITSELF rather than a flag needing interpretation, and that it is zero
 outside the quote state. One more quote screen confirms it.
 
+**⚠ NARROW CORRECTION (2026-09-25): the sentence above is false as written, but
+the FIELD IS FINE.**
+
+"0 in every non-quote capture" was checked against the **6** captures named in
+its own parenthesis. Over all **32**, `R+0x05931` is nonzero in nine:
+
+    16  crouch-01, jump-01, knockdown-01, meter-empty, meter-spent, pos-right-01
+     1  return-ryu-06, up-from-ryu-04, up-from-ryu-idle-05
+
+⚠ Note `1` is Ken's ID. So the byte is **not SELF-GATING** — it cannot be used
+to detect the quote screen. That is all this corrects.
+
+⛔⛔ I FIRST WROTE THIS UP AS A REFUTATION OF THE FIELD and recommended parking
+the feature. That was wrong, and the user corrected it in one line: **win quotes
+cannot happen during a round.** The nine captures all sit in states the phase
+gate excludes, so the failure I described — "it would announce a Ken win quote
+mid-round" — is impossible. I invented a scenario the state machine forbids.
+
+⭐⭐ THE LESSON, and it is the more useful half: **check a proposed failure
+against the system's own structure before reporting it.** A field that misbehaves
+only in states the reader never runs in has not misbehaved. I had the phase
+machine documented in this very file and did not apply it.
+
+⭐ THE GATE IS STRONGER THAN THE ORIGINAL CLAIM. Across all 36 captures,
+`02 01 02 03` occurs in **exactly the two** taken while a quote was on screen;
+every in-match capture is `02 01 02 02`, every selection screen `02 01 01 01`.
+Gate on the phase, then read the ID.
+
+**⚠ The `+2` index lead is weaker than recorded, though.** It rests on two
+records agreeing on bytes 0..2, described as "the game's own redundancy". Across
+the 32 non-quote captures, byte `+2` agrees in 17 and bytes 0..2 agree in full in
+10 — so that agreement is common rather than specific to quote time. ⚠ This is a
+weaker denominator than it looks (those captures are mostly in-match), but it is
+enough to say the agreement is not evidence. `+2` stays a LEAD; the test that
+settles it is unchanged and unrun: same character winning twice, does `+2` vary?
+
+**⭐⭐ SHIPPED (2026-09-25): the win-quote reader**
+
+- `tools/gen_quote_table.py` -> `src/quote_table.h`, all 384 quotes compiled in.
+  It runs `cvs2_quotes.py`'s own controls (5 live-confirmed phrases, the
+  multi-line join, non-printable and distinctness tests) and **refuses to write**
+  if they fail, then re-parses the written file to catch C-escaping damage.
+  ⭐ The mod therefore never dereferences a guest pointer to produce speech: at
+  runtime it reads two bytes and speaks a string it already holds.
+- `cvs2_quote_observe()` in `src/cvs2_select.c`: gate on phase, read the winner
+  from `R+0x05931`, speak once per visit.
+- **DEFAULT: the winner only** ("Sagat wins."). True and never wrong.
+- The unconfirmed 1-in-8 quote is behind `cfc2_cvs2_quote_index.on`, which also
+  logs character+index so a run can be checked for whether `+2` varies.
+  ⭐ Shipping the evidenced half by default and gating the guess is what lets
+  this land without risking a wrong quote.
+
+Cases 7f/7g in `tools/test_cvs2_select.c`, both sabotage-verified:
+- removing the phase gate -> 7g fails (all nine non-quote captures speak);
+- `WQ_WINNER` -> `B+1` (the refuted reading) -> 7f fails **on Ken only**, passing
+  the Sagat capture. ⭐ Exactly why two captures were needed.
+⚠ 7f deliberately does NOT assert the quote text: asserting an unconfirmed pick
+would manufacture confidence the evidence does not support.
+
+▶ NOT YET HEARD IN-GAME. Win a match in CVS2 and listen for "<character> wins."
+
 ⚠ `B+0x5D3` (winner side) remains correct on both captures and is worth keeping
 in this record, but it is NOT needed if the character ID is read directly. Do
 not build the side-attribution path when the simpler field exists.

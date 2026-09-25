@@ -360,12 +360,14 @@ void cvs2_select_tick(void)
     cvs2_select_observe(state,sizeof state,root);
     cvs2_gauges_observe(state,sizeof state,root);
     cvs2_announce_observe(state,sizeof state,root);
+    cvs2_quote_observe(state,sizeof state,root);
     return;
 inactive:
     last_poll = 0;
     cvs2_select_observe(NULL,0,0);
     cvs2_gauges_observe(NULL,0,0);
     cvs2_announce_observe(NULL,0,0);
+    cvs2_quote_observe(NULL,0,0);
 }
 
 /* ---- In-match gauges ---------------------------------------------------- */
@@ -680,4 +682,82 @@ void cvs2_announce_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
         said = 1;
     }
     if (said) speech_say(line, TRUE);
+}
+
+/* ---- Win quotes --------------------------------------------------------- */
+
+#include "quote_table.h"
+
+/* The state gate and the winner field. Evidence in cvs2_select.h. */
+#define WQ_PHASE   "\x02\x01\x02\x03"
+#define WQ_WINNER  0x05931u
+#define WQ_INDEX   0x05933u   /* +2 of the same record -- a LEAD, gated below */
+
+static ULONGLONG g_wq_root;
+static int g_wq_spoken;       /* one quote per visit to the screen */
+
+static BOOL wq_index_enabled(void)
+{
+    /* Cached: this is a developer experiment switch, and re-stat'ing the
+     * directory from the speech worker is the syscall pattern this project
+     * has been bitten by five times. */
+    static int cached = -1;
+    if (cached < 0) {
+        char path[MAX_PATH];
+        DWORD n = GetModuleFileNameA(NULL, path, MAX_PATH);
+        char *slash;
+        cached = 0;
+        if (n && n < MAX_PATH && (slash = strrchr(path, 0x5C)) != NULL) {
+            slash[1] = 0;
+            strncat(path, "cfc2_cvs2_quote_index.on",
+                    MAX_PATH - strlen(path) - 1);
+            cached = GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
+        }
+    }
+    return cached != 0;
+}
+
+void cvs2_quote_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
+{
+    wchar_t line[600];
+    unsigned id, qi;
+
+    if (!s || size != CVS2_STATE_SIZE) { g_wq_root = 0; g_wq_spoken = 0; return; }
+    if (root != g_wq_root) { g_wq_root = root; g_wq_spoken = 0; }
+
+    /* ⭐ THE GATE COMES FIRST, ALWAYS. The winner byte is not self-gating --
+     * it holds 16 or 1 in nine in-match captures -- so reading it outside this
+     * state would announce a quote during a round. Leaving the screen re-arms,
+     * so the next match's quote is spoken. */
+    if (memcmp(s + 0x78, WQ_PHASE, 4)) { g_wq_spoken = 0; return; }
+    if (g_wq_spoken) return;
+
+    id = s[WQ_WINNER];
+    if (id >= CVS2_QUOTE_CHARS) return;   /* not a roster ID: say nothing */
+
+    if (!wq_index_enabled()) {
+        /* DEFAULT: the winner only. True and never wrong. */
+        swprintf(line, 600, L"%ls wins.", names[id]);
+        if (speech_say(line, TRUE)) g_wq_spoken = 1;
+        return;
+    }
+
+    /* EXPERIMENT (cfc2_cvs2_quote_index.on): additionally speak the quote the
+     * +2 lead selects. ⚠ UNCONFIRMED -- see the header. The log line records
+     * the character and index so a run can be checked afterwards for whether
+     * +2 VARIES when the same character wins twice, which is what settles it. */
+    qi = s[WQ_INDEX];
+    if (qi >= CVS2_QUOTES_EACH) {
+        log_line("cvs2-quote: winner %u, but +2 reads %u which is not a quote "
+                 "index 0-7 -- speaking the winner only.", id, qi);
+        swprintf(line, 600, L"%ls wins.", names[id]);
+        if (speech_say(line, TRUE)) g_wq_spoken = 1;
+        return;
+    }
+    log_line("cvs2-quote: winner id %u, +2 index %u (UNCONFIRMED lead). "
+             "Compare across two wins by the SAME character: if this index "
+             "varies it is the random pick, if it is constant the lead is dead.",
+             id, qi);
+    swprintf(line, 600, L"%ls wins. %hs", names[id], cvs2_quotes[id][qi]);
+    if (speech_say(line, TRUE)) g_wq_spoken = 1;
 }

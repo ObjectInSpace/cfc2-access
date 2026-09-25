@@ -420,6 +420,92 @@ int main(void)
             assert(wq[0x1eba8 + 1] == 9);
             assert(wq[0x1eba8 + 0x678 + 1] == 40);
         }
+
+        /* ---- 7f. the WIN-QUOTE READER ------------------------------------
+         * ⭐ Both real quote captures, from two different sessions and arenas.
+         * The user named the winner of each at capture time: Sagat, then Ken.
+         *
+         * ⚠ The index switch is ABSENT in the test process, so this asserts
+         * the DEFAULT behaviour -- the winner alone, which is the part that is
+         * evidenced. The quote text is deliberately NOT asserted here; the
+         * 1-in-8 pick is unconfirmed and a test asserting it would manufacture
+         * confidence the evidence does not support. */
+        {
+            static BYTE wq[CVS2_STATE_SIZE];
+            int b;
+
+            load("winquote-01", wq);          /* user: SAGAT won */
+            cvs2_quote_observe(NULL,0,0);
+            b = calls;
+            cvs2_quote_observe(wq,sizeof wq,0x145f1000ULL);
+            assert(calls == b + 1);
+            assert(wcsstr(last, L"Sagat") != NULL);
+            /* ⛔ The loser must not be named: B+1 reads Todoh on P2 here, and
+             * an earlier reading of this screen took B+1 for the winner. */
+            assert(wcsstr(last, L"Todoh") == NULL);
+
+            /* Speaks ONCE per visit, not on every 33 ms poll while the screen
+             * is up -- the repeat-flood shape this project has hit three
+             * times. */
+            b = calls;
+            cvs2_quote_observe(wq,sizeof wq,0x145f1000ULL);
+            cvs2_quote_observe(wq,sizeof wq,0x145f1000ULL);
+            assert(calls == b);
+
+            /* ⭐⭐ THE DISCRIMINATING CASE: a DIFFERENT session, a different
+             * winner. A reader keyed on anything session-specific, or one that
+             * simply echoed the first capture, passes the Sagat case alone. */
+            load("winquote-ken-02", wq);      /* user: KEN won */
+            cvs2_quote_observe(NULL,0,0);
+            b = calls;
+            cvs2_quote_observe(wq,sizeof wq,0x16571000ULL);
+            assert(calls == b + 1);
+            assert(wcsstr(last, L"Ken") != NULL);
+            assert(wcsstr(last, L"Sagat") == NULL);
+        }
+
+        /* ---- 7g. NO quote outside the quote state -------------------------
+         * ⭐⭐ THE CASE THAT MATTERS MOST, and the reason it exists: the winner
+         * byte R+0x05931 is NOT self-gating. It reads 16 in crouch-01, jump-01,
+         * knockdown-01, meter-empty, meter-spent and pos-right-01, and 1 --
+         * Ken's real character ID -- in return-ryu-06, up-from-ryu-04 and
+         * up-from-ryu-idle-05.
+         *
+         * ⚠ A reader that consulted that byte without the phase gate would
+         * announce "Ken wins" during ordinary play, and a blind user cannot
+         * tell that from a correct announcement. The phase gate is what makes
+         * the field safe; this case pins the gate, not the field.
+         *
+         * Sabotage check: delete the memcmp on state+0x78 in
+         * cvs2_quote_observe() and every one of these nine speaks. */
+        {
+            static BYTE other[CVS2_STATE_SIZE];
+            static const char *const nonquote[] = {
+                "crouch-01", "jump-01", "knockdown-01", "meter-empty",
+                "meter-spent", "pos-right-01",        /* +0x05931 == 16 */
+                "return-ryu-06", "up-from-ryu-04",
+                "up-from-ryu-idle-05",                /* +0x05931 == 1 (Ken) */
+                "hp-full", "hp-low", "timer-99", "state-b", "ryu-01",
+            };
+            unsigned i;
+            for (i = 0; i < sizeof nonquote / sizeof *nonquote; i++) {
+                int b;
+                load(nonquote[i], other);
+                /* Each really is outside the quote state... */
+                assert(memcmp(other + 0x78, "\x02\x01\x02\x03", 4) != 0);
+                cvs2_quote_observe(NULL,0,0);
+                b = calls;
+                cvs2_quote_observe(other,sizeof other,0x15ba1000ULL);
+                assert(calls == b);      /* ...and nothing is spoken. */
+            }
+            /* The premise of the case: these captures really do carry a
+             * roster-valid ID in the winner byte, so the silence above is the
+             * GATE working and not the field happening to be zero. */
+            load("up-from-ryu-04", other);
+            assert(other[0x05931] == 1);
+            load("crouch-01", other);
+            assert(other[0x05931] == 16);
+        }
     }
 
     /* ---- in-match announcements: team/groove, then per-round fighter ----

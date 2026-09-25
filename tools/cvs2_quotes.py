@@ -179,11 +179,16 @@ def self_test(quotes):
     return ok
 
 
+# Module-level so tools/gen_quote_table.py uses the same path rather than
+# keeping a second copy of it that can drift.
+DEFAULT_ARC =(r'C:\Program Files (x86)\Steam\steamapps'
+               r'\common\CAPCOM FIGHTING COLLECTION 2'
+               r'\nativeDX11x64\arc\pc\game_10.arc')
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    ap.add_argument('--arc', default=r'C:\Program Files (x86)\Steam\steamapps'
-                                     r'\common\CAPCOM FIGHTING COLLECTION 2'
-                                     r'\nativeDX11x64\arc\pc\game_10.arc')
+    ap.add_argument('--arc', default=DEFAULT_ARC)
     ap.add_argument('--blob', help='pre-extracted bin/cvs2 instead of --arc')
     ap.add_argument('--char', type=int, help='print one character ID only')
     ap.add_argument('--self-test', action='store_true')
