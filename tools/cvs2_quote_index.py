@@ -338,6 +338,16 @@ def cmd_solve(args):
 
     # (c) must DIFFER across at least two screens -- the pick is random, so a
     # byte constant across every screen is a property of something else.
+    #
+    # ⚠⚠ THIS TEST GETS WEAKER AS SCREENS ARE ADDED, which is the opposite of
+    # what more evidence should do. "not all equal" over 3 screens admits a
+    # byte that "not equal" over 2 rejected, so the survivor count RISES:
+    # measured 22,193 at two screens and 40,945 at three.
+    #
+    # It is not a bug in the data and it fails safe, but do not read a falling
+    # count as progress or a rising one as regression -- (c) is a floor, not a
+    # discriminator. Constraint (d) is the test that tightens with more data,
+    # and nothing here should be trusted until it has been applied.
     stems = sorted(groups)
     if len(stems) >= 2:
         first = groups[stems[0]][0][1]
