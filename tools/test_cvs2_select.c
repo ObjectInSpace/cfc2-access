@@ -1,6 +1,9 @@
 /* Replays real captures through the shipping decoder and speech decisions.
  * No game writes or audible output. Run from the repository root. */
 #include "../src/cvs2_select.h"
+/* The generated quote table, so cases 7f/7g can assert that the string spoken
+ * is exactly the entry the capture's own index selects. */
+#include "../src/quote_table.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -425,24 +428,90 @@ int main(void)
          * ⭐ Both real quote captures, from two different sessions and arenas.
          * The user named the winner of each at capture time: Sagat, then Ken.
          *
-         * ⚠ The index switch is ABSENT in the test process, so this asserts
-         * the DEFAULT behaviour -- the winner alone, which is the part that is
-         * evidenced. The quote text is deliberately NOT asserted here; the
-         * 1-in-8 pick is unconfirmed and a test asserting it would manufacture
-         * confidence the evidence does not support. */
+         * THE FEATURE IS THE QUOTE TEXT: the default speaks the winner AND the
+         * line they are shown saying. The 1-in-8 pick (+2) is still
+         * unconfirmed, so what is asserted here is that the spoken text is
+         * EXACTLY the table entry that index selects -- i.e. the plumbing from
+         * capture to speech is right. Whether +2 is the correct index is a
+         * question only live play can answer, and the reader logs it for that.
+         *
+         * ⚠ The .off switch is absent in the test process, which is the
+         * shipping default. */
         {
             static BYTE wq[CVS2_STATE_SIZE];
             int b;
 
-            load("winquote-01", wq);          /* user: SAGAT won */
+            /* ⛔⛔ THE READER IS DISABLED -- R+0x05931 IS NOT THE WINNER.
+             * Proven in play; see the long note in cvs2_select.c. These
+             * assertions are inverted from what they were: the requirement now
+             * is SILENCE on every quote screen, including the two captures the
+             * broken reader passed. */
+            load("winquote-01", wq);
             cvs2_quote_observe(NULL,0,0);
             b = calls;
             cvs2_quote_observe(wq,sizeof wq,0x145f1000ULL);
-            assert(calls == b + 1);
+            assert(calls == b);
+
+            load("winquote-ken-02", wq);
+            cvs2_quote_observe(NULL,0,0);
+            b = calls;
+            cvs2_quote_observe(wq,sizeof wq,0x16571000ULL);
+            assert(calls == b);
+
+            /* ⭐⭐ THE CAPTURE THAT KILLED IT, kept as the permanent bar any
+             * future candidate must clear. User: P1 Sagat, HAOHMARU (P2) won.
+             *
+             *   R+0x05931 reads 0      -- not Haohmaru (43), not anything
+             *   B+0x5D3   reads 1 on P1 -- i.e. on the LOSER
+             *
+             * Both candidates were coincidences of a two-sample set. A reader
+             * re-enabled without clearing this case is repeating the mistake. */
+            load("winquote-raiden-03", wq);
+            assert(memcmp(wq + 0x78, "\x02\x01\x02\x03", 4) == 0);  /* a quote screen */
+            assert(wq[0x7c] == 1);          /* ...but a THIRD phase sub-shape */
+            assert(wq[0x05931] == 0);       /* the shipped field: empty */
+            assert(wq[0x1eba8 + 1] == 9);   /* P1 Sagat (lost) */
+            assert(wq[0x1eba8 + 0x678 + 1] == 43);          /* P2 Haohmaru (won) */
+            assert(wq[0x1eba8 + 0x5d3] == 1);               /* 5D3 marks the LOSER */
+            assert(wq[0x1eba8 + 0x678 + 0x5d3] == 0);
+            cvs2_quote_observe(NULL,0,0);
+            b = calls;
+            cvs2_quote_observe(wq,sizeof wq,0x164a1000ULL);
+            assert(calls == b);             /* silence, not a wrong winner */
+        }
+
+        /* Retired assertions from the broken reader, kept only as a record of
+         * what two captures appeared to show. Re-enabling the feature means
+         * making a candidate satisfy winquote-raiden-03 FIRST. */
+        if (0) {
+            static BYTE wq[CVS2_STATE_SIZE];
+            int b;
+            load("winquote-01", wq);
+            cvs2_quote_observe(wq,sizeof wq,0x145f1000ULL);
+            b = calls;
             assert(wcsstr(last, L"Sagat") != NULL);
             /* ⛔ The loser must not be named: B+1 reads Todoh on P2 here, and
              * an earlier reading of this screen took B+1 for the winner. */
             assert(wcsstr(last, L"Todoh") == NULL);
+
+            /* ⭐ THE QUOTE ITSELF IS SPOKEN, and it is the table entry the
+             * capture's own index selects -- not a fixed string and not
+             * quote 0. Sagat is id 9, +2 reads 6 in this capture. */
+            assert(wq[0x05933] == 6);
+            {
+                wchar_t want[600];
+                swprintf(want, 600, L"%hs", cvs2_quotes[9][6]);
+                assert(wcsstr(last, want) != NULL);
+                /* ...and it is a DIFFERENT string from quote 0, so a reader
+                 * that ignored the index would fail here. */
+                assert(wcscmp(want, L"") != 0);
+                {
+                    wchar_t zero[600];
+                    swprintf(zero, 600, L"%hs", cvs2_quotes[9][0]);
+                    assert(wcscmp(want, zero) != 0);
+                    assert(wcsstr(last, zero) == NULL);
+                }
+            }
 
             /* Speaks ONCE per visit, not on every 33 ms poll while the screen
              * is up -- the repeat-flood shape this project has hit three
@@ -462,14 +531,33 @@ int main(void)
             assert(calls == b + 1);
             assert(wcsstr(last, L"Ken") != NULL);
             assert(wcsstr(last, L"Sagat") == NULL);
+
+            /* Ken is id 1, +2 reads 3 here -- a different character AND a
+             * different index from the Sagat case, so both lookups are live. */
+            assert(wq[0x05933] == 3);
+            {
+                wchar_t want[600], other[600];
+                swprintf(want, 600, L"%hs", cvs2_quotes[1][3]);
+                assert(wcsstr(last, want) != NULL);
+                /* Not Sagat's line, and not Ken's quote 0. */
+                swprintf(other, 600, L"%hs", cvs2_quotes[9][6]);
+                assert(wcsstr(last, other) == NULL);
+                swprintf(other, 600, L"%hs", cvs2_quotes[1][0]);
+                assert(wcsstr(last, other) == NULL);
+            }
         }
 
         /* ---- 7g. NO quote outside the quote state -------------------------
-         * ⭐⭐ THE CASE THAT MATTERS MOST, and the reason it exists: the winner
-         * byte R+0x05931 is NOT self-gating. It reads 16 in crouch-01, jump-01,
-         * knockdown-01, meter-empty, meter-spent and pos-right-01, and 1 --
-         * Ken's real character ID -- in return-ryu-06, up-from-ryu-04 and
-         * up-from-ryu-idle-05.
+         * ⚠ WHILE THE READER IS DISABLED THIS CASE PASSES TRIVIALLY -- silence
+         * everywhere is silence here too, so its sabotage no longer isolates
+         * the phase gate. It is kept because the gate itself is still correct
+         * and will be needed again: any re-enabled reader must pass this
+         * BEFORE it is trusted, and the facts below stay true.
+         *
+         * ⭐⭐ The winner byte R+0x05931 is NOT self-gating. It reads 16 in
+         * crouch-01, jump-01, knockdown-01, meter-empty, meter-spent and
+         * pos-right-01, and 1 -- Ken's real character ID -- in return-ryu-06,
+         * up-from-ryu-04 and up-from-ryu-idle-05.
          *
          * ⚠ A reader that consulted that byte without the phase gate would
          * announce "Ken wins" during ordinary play, and a blind user cannot

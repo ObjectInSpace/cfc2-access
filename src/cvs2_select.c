@@ -689,75 +689,63 @@ void cvs2_announce_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
 #include "quote_table.h"
 
 /* The state gate and the winner field. Evidence in cvs2_select.h. */
-#define WQ_PHASE   "\x02\x01\x02\x03"
-#define WQ_WINNER  0x05931u
-#define WQ_INDEX   0x05933u   /* +2 of the same record -- a LEAD, gated below */
+/* ⚠ Kept as a RECORD, not as live constants -- nothing reads them now.
+ *   WQ_PHASE  02 01 02 03 at state+0x78 -- the quote screen. This part HELD:
+ *             all three quote captures carry it and no other capture does.
+ *             ⚠ byte 4 varies (2, 2, 1), so there are sub-states within it.
+ *   0x05931   shipped as the winner. REFUTED in play -- see below.
+ *   0x05933   the "+2" quote index lead. Never confirmed, and moot until a
+ *             winner field exists. */
 
 static ULONGLONG g_wq_root;
 static int g_wq_spoken;       /* one quote per visit to the screen */
 
-static BOOL wq_index_enabled(void)
-{
-    /* Cached: this is a developer experiment switch, and re-stat'ing the
-     * directory from the speech worker is the syscall pattern this project
-     * has been bitten by five times. */
-    static int cached = -1;
-    if (cached < 0) {
-        char path[MAX_PATH];
-        DWORD n = GetModuleFileNameA(NULL, path, MAX_PATH);
-        char *slash;
-        cached = 0;
-        if (n && n < MAX_PATH && (slash = strrchr(path, 0x5C)) != NULL) {
-            slash[1] = 0;
-            strncat(path, "cfc2_cvs2_quote_index.on",
-                    MAX_PATH - strlen(path) - 1);
-            cached = GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
-        }
-    }
-    return cached != 0;
-}
+
+/* ⛔⛔⛔ DISABLED 2026-09-25: R+0x05931 IS NOT THE WINNER, PROVEN IN PLAY.
+ *
+ * This shipped on two captures in which the field happened to equal the winner.
+ * Two live matches destroyed it:
+ *
+ *   match 1  user's team Ryu/Ken/Yun, RAIDEN (the opponent) won.
+ *            The field read 0 = Ryu -- the user's own slot-0 character. It
+ *            named the wrong character AND the wrong side, and spoke a quote.
+ *   match 2  user P1 Sagat, HAOHMARU (P2) won, captured live on the quote
+ *            screen (winquote-raiden-03). The field read 0 -- empty.
+ *
+ * ⛔ AND THE APPROACH IS DEAD, not just the offset: across the three quote
+ * captures, the number of offsets in the whole 136 KB window that hold the
+ * winner's ID in ALL THREE is ZERO. There is no such byte to find here.
+ *
+ * ⛔ B+0x5D3 IS ALSO REFUTED. It read 1-on-the-winner in the first two
+ * captures; in match 2 it reads 1 on P1, who LOST. Both candidates were
+ * coincidences of a two-sample set.
+ *
+ * ⚠ A THIRD PHASE SHAPE EXISTS: byte 4 is 2 in the first two captures and 1 in
+ * match 2, all with 02 01 02 03. So the quote screen has sub-states the gate
+ * does not distinguish, and health is 0/0 in all of them.
+ *
+ * ⭐⭐ WHY THIS WAS SHIPPABLE-LOOKING AND WRONG: both original captures had the
+ * winner ALSO being that side's active fighter, and one had the winner as P1
+ * slot 0. A sample where those coincide cannot separate "winner" from "active
+ * fighter", "slot 0", or "P1". The user's first real match separated all three
+ * at once. Two samples that agree are not two pieces of evidence.
+ *
+ * The reader stays compiled but returns immediately. The quote TEXT and its
+ * decoding are solid (src/quote_table.h, 384 verified quotes) -- what is
+ * missing is any trustworthy way to know whose quote is on screen. Re-enabling
+ * requires a field that predicts the winner correctly on winquote-raiden-03
+ * (Haohmaru 43, P2) as well as the two originals, and cases 7f/7g enforce
+ * exactly that. */
+
 
 void cvs2_quote_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
 {
-    wchar_t line[600];
-    unsigned id, qi;
-
+    /* ⛔ Silent by construction. The winner is not known, so nothing is said:
+     * a wrong winner is indistinguishable from a right one to this user, and
+     * that has now happened in play.
+     *
+     * The state tracking stays live so that re-enabling is a matter of filling
+     * in the read, not rebuilding the once-per-screen logic. */
+    (void)root;
     if (!s || size != CVS2_STATE_SIZE) { g_wq_root = 0; g_wq_spoken = 0; return; }
-    if (root != g_wq_root) { g_wq_root = root; g_wq_spoken = 0; }
-
-    /* ⭐ THE GATE COMES FIRST, ALWAYS. The winner byte is not self-gating --
-     * it holds 16 or 1 in nine in-match captures -- so reading it outside this
-     * state would announce a quote during a round. Leaving the screen re-arms,
-     * so the next match's quote is spoken. */
-    if (memcmp(s + 0x78, WQ_PHASE, 4)) { g_wq_spoken = 0; return; }
-    if (g_wq_spoken) return;
-
-    id = s[WQ_WINNER];
-    if (id >= CVS2_QUOTE_CHARS) return;   /* not a roster ID: say nothing */
-
-    if (!wq_index_enabled()) {
-        /* DEFAULT: the winner only. True and never wrong. */
-        swprintf(line, 600, L"%ls wins.", names[id]);
-        if (speech_say(line, TRUE)) g_wq_spoken = 1;
-        return;
-    }
-
-    /* EXPERIMENT (cfc2_cvs2_quote_index.on): additionally speak the quote the
-     * +2 lead selects. ⚠ UNCONFIRMED -- see the header. The log line records
-     * the character and index so a run can be checked afterwards for whether
-     * +2 VARIES when the same character wins twice, which is what settles it. */
-    qi = s[WQ_INDEX];
-    if (qi >= CVS2_QUOTES_EACH) {
-        log_line("cvs2-quote: winner %u, but +2 reads %u which is not a quote "
-                 "index 0-7 -- speaking the winner only.", id, qi);
-        swprintf(line, 600, L"%ls wins.", names[id]);
-        if (speech_say(line, TRUE)) g_wq_spoken = 1;
-        return;
-    }
-    log_line("cvs2-quote: winner id %u, +2 index %u (UNCONFIRMED lead). "
-             "Compare across two wins by the SAME character: if this index "
-             "varies it is the random pick, if it is constant the lead is dead.",
-             id, qi);
-    swprintf(line, 600, L"%ls wins. %hs", names[id], cvs2_quotes[id][qi]);
-    if (speech_say(line, TRUE)) g_wq_spoken = 1;
 }

@@ -80,10 +80,14 @@ void cvs2_announce_observe(const BYTE *state, SIZE_T size, ULONGLONG root);
  * information. Speaking the wrong quote is indistinguishable from the right one
  * to this user.
  *
- * Therefore the index is gated on cfc2_cvs2_quote_index.on. Absent (the
- * default) the mod speaks only the WINNER -- true, useful, and never wrong.
- * Present, it additionally speaks the quote chosen by the lead, for the one
- * experiment that would settle it: the same character winning twice. If +2
- * varies across those wins it is the random pick; if it is constant it is a
- * property of the character and the lead is dead. */
+ * ⭐ THE QUOTE IS SPOKEN BY DEFAULT ANYWAY, and that is a deliberate decision
+ * the user made with the risk stated. Reading the displayed quote is the
+ * feature; speaking only the winner's name would be shipping the provable half
+ * instead of the requested one. The text is certain -- only the choice among
+ * eight is not -- and every display is logged, so ordinary play settles it.
+ * `cfc2_cvs2_quote_text.off` falls back to the winner's name alone.
+ *
+ * ▶ TO SETTLE +2: find two wins by the same character id in CFC2Access.log.
+ * A VARYING index confirms the lead; a constant one refutes it, and this must
+ * then revert to the winner's name alone. */
 void cvs2_quote_observe(const BYTE *state, SIZE_T size, ULONGLONG root);

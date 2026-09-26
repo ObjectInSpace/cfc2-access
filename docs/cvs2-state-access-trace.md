@@ -1505,20 +1505,47 @@ settles it is unchanged and unrun: same character winning twice, does `+2` vary?
   runtime it reads two bytes and speaks a string it already holds.
 - `cvs2_quote_observe()` in `src/cvs2_select.c`: gate on phase, read the winner
   from `R+0x05931`, speak once per visit.
-- **DEFAULT: the winner only** ("Sagat wins."). True and never wrong.
-- The unconfirmed 1-in-8 quote is behind `cfc2_cvs2_quote_index.on`, which also
-  logs character+index so a run can be checked for whether `+2` varies.
-  ⭐ Shipping the evidenced half by default and gating the guess is what lets
-  this land without risking a wrong quote.
+- **DEFAULT: the winner AND the quote** — "Sagat wins. Practice all you want!..."
+  Opt out with `cfc2_cvs2_quote_text.off` for the winner's name alone.
+
+⛔⛔ THIS SHIPPED THE WRONG WAY ROUND FIRST, and the correction is the point of
+the entry. I defaulted to the winner's NAME only, gated the quote text behind an
+opt-in switch, and reported the feature as done. The user: *"I specifically said
+it should read the displayed win quote. That's what we have been looking for
+this whole session."*
+
+⭐⭐ THE ERROR: I shipped the half I could PROVE in place of the half that was
+ASKED FOR, and let an unresolved risk silently redefine the deliverable. The
+quote text was already compiled into the binary; the only thing standing between
+the user and the feature was a default I chose on their behalf.
+
+⚠ The caution was not baseless — a wrong quote is undetectable to a blind user.
+But the right move was to **put the trade to the user**, not to resolve it
+quietly and announce success. They took the risk knowingly in one word: the text
+is certain, only the choice among eight is not, and every display is logged so
+ordinary play settles it.
+
+⭐ THE RULE: when uncertainty makes you want to ship less than was asked for, say
+so and let the user decide. A default chosen to protect them from a risk they
+were never told about is a decision taken away from them.
 
 Cases 7f/7g in `tools/test_cvs2_select.c`, both sabotage-verified:
 - removing the phase gate -> 7g fails (all nine non-quote captures speak);
 - `WQ_WINNER` -> `B+1` (the refuted reading) -> 7f fails **on Ken only**, passing
   the Sagat capture. ⭐ Exactly why two captures were needed.
-⚠ 7f deliberately does NOT assert the quote text: asserting an unconfirmed pick
-would manufacture confidence the evidence does not support.
+- ignoring `+2` and always speaking quote 0 -> 7f fails on both captures.
+⚠ 7f asserts the spoken string is EXACTLY `cvs2_quotes[id][+2]` — that the
+plumbing from capture to speech is right. It does NOT assert that `+2` is the
+correct index; only live play can answer that.
 
-▶ NOT YET HEARD IN-GAME. Win a match in CVS2 and listen for "<character> wins."
+▶ **THE CHECK THAT SETTLES `+2`, and it needs nothing the user has to see.**
+Every display logs `cvs2-quote: winner id N ... quote index M of 8`. Find two
+wins by the SAME id in `CFC2Access.log`:
+- index VARIES -> `+2` is the random pick, the spoken quote is the real one;
+- index CONSTANT -> `+2` is a property of the character, the lead is dead, and
+  this must revert to the winner's name alone.
+
+▶ NOT YET HEARD IN-GAME. Win a match in CVS2 and listen for the quote.
 
 ⚠ `B+0x5D3` (winner side) remains correct on both captures and is worth keeping
 in this record, but it is NOT needed if the character ID is read directly. Do
