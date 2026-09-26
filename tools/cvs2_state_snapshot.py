@@ -18,6 +18,7 @@ again. See the refutation section in docs/cvs2-state-access-trace.md.
 import argparse
 import ctypes as C
 from ctypes import wintypes as W
+import hashlib
 import json
 from pathlib import Path
 import struct
@@ -36,6 +37,13 @@ FIELDS = (('x_cand', 0x0D2, 'H'), ('record_ptr', 0x0D8, 'Q'),
 # Phase byte 4: 3 = intro, 4 = in-round, 5 = KO/round-end. Only 4 is
 # comparable with other in-round captures; the trace doc's rule.
 SUBSTATE_IN_ROUND = 4
+
+# The win-quote text region, confirmed live at arena+0x1FD800 (25,676 bytes)
+# and identical to file offset 0x1FD840 in bin/cvs2 -- see
+# docs/cvs2-state-access-trace.md. tools/cvs2_quotes.py decodes the archive
+# copy; capturing the LIVE copy is what allows the two to be compared.
+QUOTE_REGION_OFF = 0x1FD800
+QUOTE_REGION_SIZE = 25676
 
 
 def player_fields(payload):
@@ -138,9 +146,45 @@ def main():
             meta['note'] = ('Field capture; x_cand is NOT established as '
                             'position and record_ptr is a guest pointer')
 
+        # ---- the QUOTE REGION, captured alongside the R block --------------
+        #
+        # ⭐⭐ WHY THIS EXISTS. Every capture before this one held only the
+        # 136 KB R block, and the win-quote region lives at arena+0x1FD800 --
+        # OUTSIDE it. So no existing capture could contain the displayed quote
+        # or any pointer to it, and the months of filtering those files for a
+        # quote index were searching data that structurally cannot hold it.
+        #
+        # THE QUESTION THIS ANSWERS: the region ships in the archive as static
+        # text, and tools/cvs2_quotes.py decodes it offline. If the game writes
+        # anything into it while a quote is displayed -- a resolved pointer, a
+        # selected index, a render buffer -- then diffing a live capture against
+        # the pristine archive copy names the displayed quote DIRECTLY, with no
+        # 1-in-8 inference. If the region is byte-identical to the archive, that
+        # is a clean negative and the answer is elsewhere.
+        #
+        # ⚠ Captured unconditionally (not behind a flag) because it is 25 KB and
+        # a quote screen is transient: a capture taken without it cannot be
+        # retaken later. The read is guarded like every other here.
+        quote_region = None
+        try:
+            quote_region = read(arena + QUOTE_REGION_OFF, QUOTE_REGION_SIZE)
+        except OSError as exc:
+            # ⚠ NOT a negative -- "could not look" must never read like
+            # "looked and found nothing". Recorded as a status, not silence.
+            meta['quote_region'] = f'UNREADABLE: {exc}'
+        if quote_region is not None:
+            meta['quote_region'] = {
+                'addr': hex(arena + QUOTE_REGION_OFF),
+                'size': len(quote_region),
+                'sha256': hashlib.sha256(quote_region).hexdigest(),
+            }
+
         args.out.parent.mkdir(parents=True, exist_ok=True)
         with args.out.with_suffix('.bin').open('xb') as f:
             f.write(payload)
+        if quote_region is not None:
+            with args.out.with_suffix('.quote.bin').open('xb') as f:
+                f.write(quote_region)
         with args.out.with_suffix('.json').open('x', encoding='utf-8') as f:
             json.dump(meta, f, indent=2)
         print(json.dumps(meta, indent=2))
