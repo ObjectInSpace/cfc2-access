@@ -20,9 +20,24 @@ un-displayed, so that test is unavailable and something must replace it.
 THE CONSTRAINTS THAT REPLACE IT
 -------------------------------
   (a) SAME-SCREEN CONTROL. Two captures seconds apart, one quote on screen:
-      the index must NOT change. Measured on a live quote screen, only 0.0054%
-      of the arena changes in one second, so this filter is extremely strong --
-      it is the S0 == S1 of this probe and it kills animation, timers and RNG.
+      the index must NOT change. This is the S0 == S1 of this probe and it
+      kills animation, timers and RNG.
+
+      ⛔⛔ THE CONTROL IS ONLY AS GOOD AS THE TIME THAT PASSES BETWEEN THE TWO
+      CAPTURES, AND A PAUSED GAME PASSES NONE. Measured on real pairs:
+
+          live, seconds apart      130,260 bytes differ  (0.0243%)
+          PAUSED, same instant       1,483 bytes differ  (0.0003%)
+
+      An 80x difference. A pair taken while the emulator is paused does not
+      test "what holds still across a quote screen" -- it tests "what changes
+      while the machine is frozen", which is almost nothing, so almost
+      everything survives.
+
+      ⚠ This fails SAFE (too many candidates, not too few) but it silently
+      wastes the strongest filter available. Captures now record whether the
+      frame counter advanced between them, and a pair that did not advance is
+      reported as a WEAK control rather than counted as a real one.
 
   (b) VALUE IN 0..7. A 3-bit value. Weak alone, decisive combined.
 
@@ -166,8 +181,16 @@ def cmd_capture(args):
                 comp = zlib.compress(snap[off], 1)
                 f.write(struct.pack('<QQQ', off, len(snap[off]), len(comp)))
                 f.write(comp)
+        # ⭐ LIVENESS. R+0x186 is the 0..59 sub-second frame counter beside the
+        # round timer (docs/cvs2-state-access-trace.md). Recording it lets the
+        # solver tell a real seconds-apart pair from two captures of a PAUSED
+        # machine, which look identical in every other respect and quietly
+        # destroy the control. Nothing else here reveals that the game was
+        # frozen.
+        tick = read(root + 0x186, 2)
         meta = dict(label=args.label, arena=hex(arena),
                     phase=phase[:8].hex(), winner=args.winner,
+                    frame_tick=int.from_bytes(tick, 'little') if tick else None,
                     blocks=len(snap),
                     bytes=sum(len(v) for v in snap.values()))
         with open(path + '.json', 'w', encoding='utf-8') as f:
@@ -288,6 +311,14 @@ def cmd_solve(args):
                 d = x.to_bytes(len(ref), 'big')
                 for i in _nonzero(d):
                     m[i] = 0
+        # ⚠ Report whether the machine actually ADVANCED between the captures.
+        # A pair taken while paused filters almost nothing, and without this
+        # line that is invisible -- the counts look the same either way.
+        ticks = [m.get('frame_tick') for m, _s in g]
+        if all(t is not None for t in ticks) and len(set(ticks)) == 1:
+            print('  %-12s WEAK CONTROL: frame counter did not advance '
+                  '(%s) -- was the game paused? This pair filters almost '
+                  'nothing.' % (stem, ticks[0]))
         print('  %-12s after same-screen control: %d' % (stem, alive()))
 
     if not paired:
