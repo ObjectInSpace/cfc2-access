@@ -89,6 +89,23 @@ import cvs2_quotes
 
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        '..', 'build', 'cvs2-quoteidx')
+
+# ⭐⭐ THE GRAPHICS SPAN, excluded up front so the counts describe STATE rather
+# than pixels. emu_cursor.h documents arena+0x8900000 as proven ARGB1555
+# framebuffer, and measuring between two different quote screens confirms the
+# neighbourhood behaves the same way: 38% of sampled bytes differ at
+# +0x08D00000 and 11% at +0x08900000, where a state region differs by ~1%.
+#
+# Two wins by the same character show different opponents and backgrounds, so
+# these bytes satisfy EVERY constraint this probe applies -- including (d) --
+# for reasons that have nothing to do with the quote. Left in, they were 60% of
+# all survivors and drowned the signal.
+#
+# ⚠ This is an EXCLUSION BY EVIDENCE, not by convenience: it is justified by
+# the churn measurement above, and the tool reports how many candidates it
+# removes so the decision stays visible rather than silently shrinking the set.
+GFX_LO = 0x08000000
+GFX_HI = 0x0A000000
 BLOCK = 4 << 20
 ARENA_SPAN = 256 << 20
 
@@ -288,6 +305,17 @@ def cmd_solve(args):
     def alive():
         return sum(m.count(1) for m in mask.values())
 
+    # Exclude graphics memory first, and say how much that removed.
+    before = alive()
+    for blk in common:
+        m = mask[blk]
+        for i in range(len(m)):
+            a = blk + i
+            if GFX_LO <= a < GFX_HI:
+                m[i] = 0
+    print('excluded the graphics span 0x%X..0x%X: %d bytes removed'
+          % (GFX_LO, GFX_HI, before - alive()))
+
     # (a) SAME-SCREEN CONTROL: within one screen, the byte must NOT change.
     # Measured: only 0.0054% of the arena changes in a second on a live quote
     # screen, so this is the strongest filter available and it runs first.
@@ -379,7 +407,26 @@ def cmd_solve(args):
                 for i in range(len(first)):
                     if m[i] and all(c[i] == first[i] for c in cols[1:]):
                         m[i] = 0
-        print('and varying between two wins by the SAME character: %d' % alive())
+        print('and varying between wins by the SAME character: %d' % alive())
+
+        # ⭐ With THREE OR MORE wins by one character the test sharpens: a real
+        # random 1-in-8 pick should take several distinct values, whereas a
+        # two-state field (a flag, a parity bit, an alternating buffer index)
+        # satisfies "differs" on one pair and then repeats. Requiring >= 3
+        # distinct values over 3+ wins is what separates them, and it is the
+        # first constraint here that genuinely tightens as data arrives.
+        for w, ss in repeats.items():
+            if len(ss) < 3:
+                continue
+            cols_by_blk = [(blk, [groups[s][0][1][blk] for s in ss])
+                           for blk in common]
+            for blk, cols in cols_by_blk:
+                m = mask[blk]
+                for i in range(len(cols[0])):
+                    if m[i] and len({c[i] for c in cols}) < 3:
+                        m[i] = 0
+            print('and taking >=3 distinct values across %d wins by id %d: %d'
+                  % (len(ss), w, alive()))
     else:
         print('\nNo character has won twice yet. Constraint (d) -- the one that '
               'separates a real index from a per-character property -- is NOT '
@@ -392,7 +439,7 @@ def cmd_solve(args):
     # only once it is small enough to be worth reading.
     n_surv = alive()
     print('\nSURVIVORS: %d' % n_surv)
-    REPORT_CAP = 200
+    REPORT_CAP = 600
     if n_surv > REPORT_CAP:
         need = []
         if len([s for s in groups if len(groups[s]) >= 2]) == len(groups) and len(groups) < 2:

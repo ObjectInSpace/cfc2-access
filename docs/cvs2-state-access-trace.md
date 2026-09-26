@@ -2526,3 +2526,47 @@ exactly how `R+0x05931` shipped and named the wrong character in play.
 - ⚠ and an honest limit: if repeat wins keep cutting ~25%, the index is not a
   plain byte that is stable within a screen, and that conclusion should be
   stated rather than worked around.
+
+### 2026-09-26 (cont.): 463 survivors, and the wall this method hits
+
+Five screens (q04 King, q05/q08/q09 Sagat, q07 Sakura). Two changes sharpened
+the filter enormously:
+
+- **excluding the graphics span** `0x08000000..0x0A000000` by evidence (38% of
+  bytes churn there between screens; state regions churn ~1%);
+- **requiring >=3 DISTINCT values across the three Sagat wins.** ⭐ This is the
+  first constraint here that genuinely tightens with data: a real 1-in-8 random
+  pick takes several values, while a flag or alternating buffer index satisfies
+  "differs" on one pair and then repeats. It cut 5,793 -> 463 alone.
+
+Survivors sit at `+0x0CAxxxxx` (378) and `+0x100xxxxx`/`+0x104xxxxx` (85).
+Those regions have the right profile: **0.85% churn across screens and
+0.000% within one screen** — state, not pixels.
+
+**⛔⛔ BUT 463 IS WHERE THIS METHOD STOPS, and the reason is structural.**
+
+⚠ **Constraint (b) is nearly free.** 329 million bytes — **61% of the arena** —
+hold a value in 0..7. Small values are the most common thing in game memory:
+counters, flags, enum tags, zeroed padding. So (b) contributes almost nothing,
+and the work was done by (c) plus the 3-distinct test.
+
+⭐⭐ **Every surviving byte is "a small value that changes between screens and
+takes several values across three wins." So is a frame counter, a random seed
+byte, an animation index, a scroll offset.** The quote index — IF it is a plain
+byte at all — is one of these 463, and *nothing in this method can say which*,
+because the only test that would is agreement with the DISPLAYED QUOTE, which
+cannot be observed: the user is blind and the text is drawn as sprites.
+
+⚠ Three of the five screens were captured PAUSED, so their same-screen controls
+did almost no filtering. Live pairs would help, but they cannot fix the problem
+above — they would shrink 463, not make the survivors distinguishable.
+
+▶ WHAT WOULD ACTUALLY SETTLE IT, honestly stated:
+1. **A write watchpoint** on a candidate, to see what code writes it — the only
+   route that identifies meaning rather than shape. Needs a debugger or
+   PAGE_GUARD machinery the mod does not have.
+2. **OCR of the rendered frame.** The text IS on screen; the framebuffer is at
+   `+0x089xxxxx` in known ARGB1555. Reading pixels sidesteps the index entirely.
+   ⭐ This is the one route that does not need the index at all, and the
+   framebuffer's location is already established.
+3. Accepting that a 1-in-463 guess is not shippable, which it is not.
