@@ -2454,3 +2454,75 @@ would have shipped as the result, and the extra four would have been rationalise
 ⭐ And when the first fix does not clear the control, **do not stack a second
 guess on it** — instrument the rejection and read why. Printing the actual
 operands took one run and named the cause exactly.
+
+## 2026-09-26: the differential probe for the win-quote INDEX
+
+The user's steer: "Astra was able to find the cursor. You can find the quotes
+by the same method." Correct — `src/emu_cursor.c` finds guest state by
+differential capture, and the quote index is guest state. I had stopped one
+step early, having closed only the *text*-side routes.
+
+**What transfers, and what does not.** The cursor probe's load-bearing test is
+REVERSIBILITY (`S3 == S1`: press right, press left, return). A win quote cannot
+be un-displayed, so that test is unavailable. Replacing it:
+
+- **(a) same-screen control** — two captures of ONE quote screen; the index
+  must not change;
+- **(b)** the value is in 0..7;
+- **(c)** it differs across screens (the pick is random);
+- **(d)** it differs between two wins by the SAME character — the constraint
+  that separates an index from a per-character property.
+
+`tools/cvs2_quote_index.py` (`capture` / `solve`). Captures are the whole
+256 MB arena, compressed ~5x; the solver filters with flat bytearray masks.
+
+### ⛔⛔ THREE MEASUREMENT FAULTS, each of which fakes a result
+
+1. **A paused game destroys the control.** The user paused, advanced a few
+   seconds, paused again. Measured: a live pair differs by 130,260 bytes
+   (0.0243%), a paused pair by 1,483 (0.0003%) — **80x**. A paused pair tests
+   "what changes while frozen", i.e. almost nothing, so almost everything
+   survives. ⭐ Captures now record `R+0x186` (the 0..59 sub-second counter) and
+   the solver prints WEAK CONTROL when it did not advance. **A control that
+   cannot be told from no control is worse than none, because it is trusted.**
+
+2. **⭐⭐ CONSTRAINT (c) GETS WEAKER AS SCREENS ARE ADDED.** It tests "not
+   constant across all screens"; "not all equal" over three admits bytes that
+   "not equal" over two rejected. Measured: 22,193 at two screens →
+   **40,945 at three**. More evidence, weaker test. Do not read a rising count
+   as regression. (c) is a floor, not a discriminator.
+
+3. `MemoryError` twice — a set of `(block, byte)` tuples over 512 MB, and
+   materializing the survivor list when the correct output was "far too many".
+
+### ▶ THE RESULT SO FAR: (d) cut 25%, not the expected collapse
+
+Four screens (q04 King, q05 Sagat, q07 Sakura, q08 Sagat). With Sagat winning
+twice, (d) finally applied: **33,085 → 24,717**.
+
+⭐ WHERE the survivors are is the real finding:
+
+    arena+0x08D00000  14,846  (60%)
+    arena+0x08F00000   1,841
+    arena+0x08E00000   1,473
+    arena+0x08900000     317   <- documented ARGB1555 framebuffer
+
+Sampling between two screens: **38% of bytes differ at +0x08D00000**, 11% at
++0x08900000. State does not churn like that; image data does. The
+`+0x08xxxxxx..+0x09xxxxxx` span is GRAPHICS, and two Sagat wins show different
+opponents and backgrounds, so those pixels satisfy (d) for reasons unrelated to
+the quote.
+
+Excluding that span leaves **4,633**, at `+0x0CAxxxxx` and `+0x104xxxxx`.
+
+⚠ Still far too many to adopt one, and picking the most plausible-looking is
+exactly how `R+0x05931` shipped and named the wrong character in play.
+
+▶ WHAT WOULD ACTUALLY FINISH THIS:
+- more repeat wins by ONE character, captured LIVE (not paused), which is the
+  only constraint that tightens with data;
+- excluding the graphics span from the mask up front, so the counts reflect
+  state rather than pixels;
+- ⚠ and an honest limit: if repeat wins keep cutting ~25%, the index is not a
+  plain byte that is stable within a screen, and that conclusion should be
+  stated rather than worked around.
