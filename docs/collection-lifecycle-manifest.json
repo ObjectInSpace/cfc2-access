@@ -1,0 +1,783 @@
+{
+  "schema": 1,
+  "evidence": "offline instruction/data trace; no live validation",
+  "limitations": [
+    "Bounded spans are not complete control-flow graphs.",
+    "Root publication is not readiness or lifetime proof.",
+    "No gameplay field, safe hook ABI, or callback cadence is validated.",
+    "CFJ cleanup callees and arena destruction remain open."
+  ],
+  "sections": [
+    {
+      "name": "sec_00001000_code.bin",
+      "live": "0x140001000",
+      "size": 16625664,
+      "sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b"
+    },
+    {
+      "name": "sec_00fdc000_data.bin",
+      "live": "0x140fdc000",
+      "size": 2072576,
+      "sha256": "e6e7ed51ec50e1a76956112f0f7b3f448450c4e5ecb4312e43522422119e604e"
+    },
+    {
+      "name": "sec_011d6000_data.bin",
+      "live": "0x1411d6000",
+      "size": 28758016,
+      "sha256": "a12f6a815677755c8ef7762f30d93a1c50dac792e48176c3dead68945d0720d5"
+    },
+    {
+      "name": "sec_02d43000_data.bin",
+      "live": "0x142d43000",
+      "size": 745472,
+      "sha256": "6c563af6289ea521d4638b6d7cd8125249bbaff02be604a26c688105e611b520"
+    },
+    {
+      "name": "sec_02df9000_data.bin",
+      "live": "0x142df9000",
+      "size": 4096,
+      "sha256": "fc089ff2133dcb045c1f6dafb3792c7f3f4a8a3968e7b3498aee8ed9b75152ef"
+    },
+    {
+      "name": "sec_02dfa000_data.bin",
+      "live": "0x142dfa000",
+      "size": 270336,
+      "sha256": "1dbe3ea172a960421ded4894bb5873096352e4b1c590a896121b72efea9a7be1"
+    },
+    {
+      "name": "sec_02e3c000_code.bin",
+      "live": "0x142e3c000",
+      "size": 233472,
+      "sha256": "7caa7f74754bb019f8f60d1ecdb5c71b15d3276a15429b8164ec49465fdf8467"
+    },
+    {
+      "name": "sec_02e75000_data.bin",
+      "live": "0x142e75000",
+      "size": 270336,
+      "sha256": "b65eefce10af6f47a0adb2fcba3e63f733b111b2187a70a074baa5db10b1fe68"
+    },
+    {
+      "name": "sec_02eb7000_code.bin",
+      "live": "0x142eb7000",
+      "size": 13451264,
+      "sha256": "b99c2f8570010866ab6eca39e08f1b8162be8f4d170910420f4930fa0d7d3890"
+    }
+  ],
+  "paths": [
+    {
+      "tag": "CVS1",
+      "initializer": "0x1405a5a40",
+      "setup": "0x1405a6440",
+      "context_slot": "0x142c79b40",
+      "root_slot": "0x1422d2b90",
+      "published_size": "0x32ab0",
+      "secondary_size": "0x32ab8",
+      "callbacks": {
+        "0x10": {
+          "target": "0x1405a5c60",
+          "publication": "0x1405a5b04"
+        },
+        "0x18": {
+          "target": "0x1405a5a20",
+          "publication": "0x1405a5b16"
+        },
+        "0x20": {
+          "target": "0x1405a5a30",
+          "publication": "0x1405a5b28"
+        },
+        "0x28": {
+          "target": "0x1405a5ca0",
+          "publication": "0x1405a5b3a"
+        }
+      },
+      "update": "0x1405a65f0",
+      "wrapper_tail": "0x1405a5d90"
+    },
+    {
+      "tag": "CVS2",
+      "initializer": "0x1406a97d0",
+      "setup": "0x1406aa320",
+      "context_slot": "0x142c79b40",
+      "root_slot": "0x1422debd0",
+      "published_size": "0x216b0",
+      "secondary_size": "0x216b8",
+      "callbacks": {
+        "0x10": {
+          "target": "0x1406a9a10",
+          "publication": "0x1406a98b2"
+        },
+        "0x18": {
+          "target": "0x1405a5a20",
+          "publication": "0x1406a98c4"
+        },
+        "0x20": {
+          "target": "0x1405a5a30",
+          "publication": "0x1406a98d6"
+        },
+        "0x28": {
+          "target": "0x1406a9a30",
+          "publication": "0x1406a98e8"
+        }
+      },
+      "update": "0x1406aa7a0",
+      "wrapper_tail": "0x1406a9de0"
+    },
+    {
+      "tag": "CFJ",
+      "initializer": "0x1407caca0",
+      "setup": "0x1407cb660",
+      "context_slot": "0x142cf9d48",
+      "root_slot": "0x1422f3a80",
+      "published_size": "0x26e80",
+      "secondary_size": "0x26e88",
+      "callbacks": {
+        "0x10": {
+          "target": "0x1407caee0",
+          "publication": "0x1407cad86"
+        },
+        "0x18": {
+          "target": "0x14004a600",
+          "publication": "0x1407cad98"
+        },
+        "0x20": {
+          "target": "0x1407cac90",
+          "publication": "0x1407cadaa"
+        },
+        "0x28": {
+          "target": "0x1407caf00",
+          "publication": "0x1407cadbc"
+        }
+      },
+      "update": "0x1407cb8b0",
+      "wrapper_tail": "0x1407cb090"
+    },
+    {
+      "tag": "Z3U",
+      "initializer": "0x14086bc20",
+      "setup": "0x14086cfc0",
+      "context_slot": "0x142c79b40",
+      "root_slot": "0x1422fb960",
+      "published_size": "0x12f98",
+      "secondary_size": "0x12fa0",
+      "callbacks": {
+        "0x10": {
+          "target": "0x14086be70",
+          "publication": "0x14086bd02"
+        },
+        "0x18": {
+          "target": "0x1405a5a20",
+          "publication": "0x14086bd14"
+        },
+        "0x20": {
+          "target": "0x1405a5a30",
+          "publication": "0x14086bd26"
+        },
+        "0x28": {
+          "target": "0x14086c720",
+          "publication": "0x14086bd38"
+        }
+      },
+      "update": "0x14086d160",
+      "wrapper_tail": "0x14086c870"
+    },
+    {
+      "tag": "Z3U-alternate",
+      "initializer": "0x140dcb360",
+      "setup": "0x140dcc280",
+      "context_slot": "0x142c79b40",
+      "root_slot": "0x142c44050",
+      "published_size": "0x1b528",
+      "secondary_size": "0x1b530",
+      "callbacks": {
+        "0x10": {
+          "target": "0x140dcb970",
+          "publication": "0x140dcb44b"
+        },
+        "0x18": {
+          "target": "0x1405a5a20",
+          "publication": "0x140dcb45d"
+        },
+        "0x20": {
+          "target": "0x1405a5a30",
+          "publication": "0x140dcb46f"
+        },
+        "0x28": {
+          "target": "0x140dcb990",
+          "publication": "0x140dcb481"
+        }
+      },
+      "update": "0x140dcc3f0",
+      "wrapper_tail": "0x140dcbaf0"
+    },
+    {
+      "tag": "PWS1",
+      "initializer": "0x140972e50",
+      "setup": "0x140973b10",
+      "context_slot": "0x142c79b40",
+      "root_slot": "0x1423188c0",
+      "published_size": "0x428f0",
+      "secondary_size": "0x42900",
+      "callbacks": {
+        "0x10": {
+          "target": "0x140973090",
+          "publication": "0x140972f32"
+        },
+        "0x18": {
+          "target": "0x1405a5a20",
+          "publication": "0x140972f44"
+        },
+        "0x20": {
+          "target": "0x1405a5a30",
+          "publication": "0x140972f56"
+        },
+        "0x28": {
+          "target": "0x1409730b0",
+          "publication": "0x140972f68"
+        }
+      },
+      "update": "0x140974100",
+      "wrapper_tail": "0x140973670"
+    },
+    {
+      "tag": "PWS2",
+      "initializer": "0x140a46190",
+      "setup": "0x140a46eb0",
+      "context_slot": "0x142c79b40",
+      "root_slot": "0x14262f0b0",
+      "published_size": "0x8cd40",
+      "secondary_size": "0x8cd50",
+      "callbacks": {
+        "0x10": {
+          "target": "0x140a46420",
+          "publication": "0x140a4629e"
+        },
+        "0x18": {
+          "target": "0x1405a5a20",
+          "publication": "0x140a462b0"
+        },
+        "0x20": {
+          "target": "0x140a46180",
+          "publication": "0x140a462c2"
+        },
+        "0x28": {
+          "target": "0x140a46440",
+          "publication": "0x140a462d4"
+        }
+      },
+      "update": "0x140a47290",
+      "wrapper_tail": "0x140a46900"
+    },
+    {
+      "tag": "MJUS",
+      "initializer": "0x140b926f0",
+      "setup": "0x140b930d0",
+      "context_slot": "0x142c79b40",
+      "root_slot": "0x142996830",
+      "published_size": "0x9e8a8",
+      "secondary_size": "0x9e8b0",
+      "callbacks": {
+        "0x10": {
+          "target": "0x140b92930",
+          "publication": "0x140b927cc"
+        },
+        "0x18": {
+          "target": "0x1405a5a20",
+          "publication": "0x140b927de"
+        },
+        "0x20": {
+          "target": "0x1405a5a30",
+          "publication": "0x140b927f0"
+        },
+        "0x28": {
+          "target": "0x140b92950",
+          "publication": "0x140b92802"
+        }
+      },
+      "update": "0x140b93500",
+      "wrapper_tail": "0x140b92a30"
+    },
+    {
+      "tag": "STG2",
+      "initializer": "0x140ccb1c0",
+      "setup": "0x140ccc940",
+      "context_slot": "0x142c79b40",
+      "root_slot": "0x142be6370",
+      "published_size": "0x511b8",
+      "secondary_size": "0x511c0",
+      "callbacks": {
+        "0x10": {
+          "target": "0x140ccb440",
+          "publication": "0x140ccb2d3"
+        },
+        "0x18": {
+          "target": "0x1405a5a20",
+          "publication": "0x140ccb2e5"
+        },
+        "0x20": {
+          "target": "0x1405a5a30",
+          "publication": "0x140ccb2f7"
+        },
+        "0x28": {
+          "target": "0x140ccb460",
+          "publication": "0x140ccb309"
+        }
+      },
+      "update": "0x140cccb60",
+      "wrapper_tail": "0x140ccc310"
+    }
+  ],
+  "roms": [
+    {
+      "index": 0,
+      "record": "0x141208830",
+      "name": "cvs1",
+      "game_index": 0,
+      "region": 0,
+      "name_pointer_slot": "0x1411f5f18",
+      "initializer": "0x1405a5a40",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 1,
+      "record": "0x141208858",
+      "name": "cvs1u",
+      "game_index": 0,
+      "region": 1,
+      "name_pointer_slot": "0x1411f5f20",
+      "initializer": "0x1405a5a40",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 2,
+      "record": "0x141208880",
+      "name": "cvs2",
+      "game_index": 1,
+      "region": 0,
+      "name_pointer_slot": "0x1411f5f58",
+      "initializer": "0x1406a97d0",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 3,
+      "record": "0x1412088a8",
+      "name": "cvs2u",
+      "game_index": 1,
+      "region": 1,
+      "name_pointer_slot": "0x1411f5f60",
+      "initializer": "0x1406a97d0",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 4,
+      "record": "0x1412088d0",
+      "name": "cfj",
+      "game_index": 2,
+      "region": 0,
+      "name_pointer_slot": "0x1411f5f98",
+      "initializer": "0x1407caca0",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 5,
+      "record": "0x1412088f8",
+      "name": "cfe",
+      "game_index": 2,
+      "region": 1,
+      "name_pointer_slot": "0x1411f5fa0",
+      "initializer": "0x1407caca0",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 6,
+      "record": "0x141208920",
+      "name": "z3u",
+      "game_index": 3,
+      "region": 0,
+      "name_pointer_slot": "0x1411f5fd8",
+      "initializer": "0x14086bc20",
+      "alpha_discriminator": "zero"
+    },
+    {
+      "index": 7,
+      "record": "0x141208948",
+      "name": "a3u",
+      "game_index": 3,
+      "region": 1,
+      "name_pointer_slot": "0x1411f5fe0",
+      "initializer": "0x14086bc20",
+      "alpha_discriminator": "zero"
+    },
+    {
+      "index": 8,
+      "record": "0x141208970",
+      "name": "pws1",
+      "game_index": 4,
+      "region": 0,
+      "name_pointer_slot": "0x1411f6018",
+      "initializer": "0x140972e50",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 9,
+      "record": "0x141208998",
+      "name": "pws1u",
+      "game_index": 4,
+      "region": 1,
+      "name_pointer_slot": "0x1411f6020",
+      "initializer": "0x140972e50",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 10,
+      "record": "0x1412089c0",
+      "name": "pws2",
+      "game_index": 5,
+      "region": 0,
+      "name_pointer_slot": "0x1411f6058",
+      "initializer": "0x140a46190",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 11,
+      "record": "0x1412089e8",
+      "name": "pws2u",
+      "game_index": 5,
+      "region": 1,
+      "name_pointer_slot": "0x1411f6060",
+      "initializer": "0x140a46190",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 12,
+      "record": "0x141208a10",
+      "name": "mjus",
+      "game_index": 6,
+      "region": 0,
+      "name_pointer_slot": "0x1411f6098",
+      "initializer": "0x140b926f0",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 13,
+      "record": "0x141208a38",
+      "name": "pjus",
+      "game_index": 6,
+      "region": 1,
+      "name_pointer_slot": "0x1411f60a0",
+      "initializer": "0x140b926f0",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 14,
+      "record": "0x141208a60",
+      "name": "stg2",
+      "game_index": 7,
+      "region": 0,
+      "name_pointer_slot": "0x1411f60d8",
+      "initializer": "0x140ccb1c0",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 15,
+      "record": "0x141208a88",
+      "name": "pswd",
+      "game_index": 7,
+      "region": 1,
+      "name_pointer_slot": "0x1411f60e0",
+      "initializer": "0x140ccb1c0",
+      "alpha_discriminator": "not consulted"
+    },
+    {
+      "index": 16,
+      "record": "0x141208ab0",
+      "name": "z3uu",
+      "game_index": 3,
+      "region": 0,
+      "name_pointer_slot": "0x1411f5fe8",
+      "initializer": "0x140dcb360",
+      "alpha_discriminator": "nonzero"
+    },
+    {
+      "index": 17,
+      "record": "0x141208ad8",
+      "name": "a3uu",
+      "game_index": 3,
+      "region": 1,
+      "name_pointer_slot": "0x1411f5ff0",
+      "initializer": "0x140dcb360",
+      "alpha_discriminator": "nonzero"
+    }
+  ],
+  "spans": [
+    {
+      "label": "arena-allocation",
+      "start": "0x140048270",
+      "end_exclusive": "0x1400482a9",
+      "sha256": "088757b8f10e0124a93c7b8be93e8f72d003aece2ad6b9f1987e7dae3024482f"
+    },
+    {
+      "label": "base-ROM-routing",
+      "start": "0x140052470",
+      "end_exclusive": "0x1400525a7",
+      "sha256": "136e1787ef58ede6b2d1367ce50c3ab7099c974f001c6322262f3cc05e73787f"
+    },
+    {
+      "label": "alternate-ROM-routing",
+      "start": "0x140049da0",
+      "end_exclusive": "0x140049e0f",
+      "sha256": "c7a02151a7bde0b888fdc67fe76d8b16684d1a74efc3ce345ab03d4456dabf36"
+    },
+    {
+      "label": "ROM-name-lookup",
+      "start": "0x1400b6250",
+      "end_exclusive": "0x1400b62b8",
+      "sha256": "89435724bee646aff9770c7ee3df1e93ff40d8e14ac897a1c68425dcf70a9bf8"
+    },
+    {
+      "label": "packed-option-writer",
+      "start": "0x14003feb0",
+      "end_exclusive": "0x14003fec1",
+      "sha256": "b1888789349271174dc1ba9c77e1a9f11c5863ddb8efe6b14610fb8051a415bb"
+    },
+    {
+      "label": "update-consumer",
+      "start": "0x14003a6fc",
+      "end_exclusive": "0x14003a717",
+      "sha256": "9fb0127c28fe7c68688c4427137adc364f75d159fe1d49b3ae57b5f3112c7561"
+    },
+    {
+      "label": "secondary-callback-consumer",
+      "start": "0x14003a767",
+      "end_exclusive": "0x14003a78d",
+      "sha256": "d1404352b22cb805ea4f13866bc5f8284628ad01b0b54e583203c3fb82b85403"
+    },
+    {
+      "label": "cleanup-before-reinitialize",
+      "start": "0x14004ffd0",
+      "end_exclusive": "0x14005007b",
+      "sha256": "8583e37a479e1b151320c298300cc01e2cf7246d080a21248da817535c981de6"
+    },
+    {
+      "label": "cleanup-other-consumer",
+      "start": "0x14004adc4",
+      "end_exclusive": "0x14004ade9",
+      "sha256": "e91cbe95210ee403c573cbab50250d238f7b799085940c70a5d9213990f32613"
+    },
+    {
+      "label": "common-cleanup-thunk",
+      "start": "0x1405a5a30",
+      "end_exclusive": "0x1405a5a35",
+      "sha256": "9937bf46b467e7604f94b25d120198826d38c8c8185f44e8df53c268f48514ce"
+    },
+    {
+      "label": "common-cleanup-thunk-2",
+      "start": "0x1405a5d80",
+      "end_exclusive": "0x1405a5d85",
+      "sha256": "fa967c520df2f212888d18d7438836e218691f79131e0353a9a5c2f4e5706fef"
+    },
+    {
+      "label": "common-cleanup-body",
+      "start": "0x140f2f1f0",
+      "end_exclusive": "0x140f2f269",
+      "sha256": "bbb7a8345ad76ea7894108c5d2ffe7470166ab5398ae5d34c7d82f40ad44e2aa"
+    },
+    {
+      "label": "cleanup-object-array-4096",
+      "start": "0x140048fc0",
+      "end_exclusive": "0x140049008",
+      "sha256": "d5d07dbffd6040c8d63555d7a19697dc75e1fbd584fe46f4facd9d4b48cc5788"
+    },
+    {
+      "label": "cleanup-object-array-256",
+      "start": "0x140048f70",
+      "end_exclusive": "0x140048fb5",
+      "sha256": "c3e50f180598c7075100f36d74489d034286a0776295d885c9c05caab4cfa20e"
+    },
+    {
+      "label": "CFJ-cleanup-thunk",
+      "start": "0x1407cac90",
+      "end_exclusive": "0x1407cac95",
+      "sha256": "80f78569662ad2dbd6e5ab4fe1ac3f3b26b5e2995d7cccfff53e3321f92ef231"
+    },
+    {
+      "label": "CFJ-cleanup-body",
+      "start": "0x1407cb000",
+      "end_exclusive": "0x1407cb089",
+      "sha256": "d7dbe38b9cb5aa6a629b638e945fded99d6c9472e86c01a1f08667462bfaf292"
+    },
+    {
+      "label": "PWS2-cleanup-thunk",
+      "start": "0x140a46180",
+      "end_exclusive": "0x140a46185",
+      "sha256": "9f15a09dac04d5e6a109fd77eaf5ba5f097a9197d0614e738051cf7a7145a1c1"
+    },
+    {
+      "label": "PWS2-cleanup-body",
+      "start": "0x140a468d0",
+      "end_exclusive": "0x140a468f1",
+      "sha256": "2fe0101b4ff4e6150c1c229e91fe13540e8c7b0910c7160ceb72740671096c8f"
+    },
+    {
+      "label": "CVS1-initializer",
+      "start": "0x1405a5a40",
+      "end_exclusive": "0x1405a5c5c",
+      "sha256": "7d26cc15d07265cd0ddab339049cd2b0e53514a1669cee4645f55d793ed58a70"
+    },
+    {
+      "label": "CVS1-root-publication",
+      "start": "0x1405a6440",
+      "end_exclusive": "0x1405a64da",
+      "sha256": "5154586b1e39124b4054c84b459d18a4b59e8cf2cb926890e5d922d081677f53"
+    },
+    {
+      "label": "CVS1-update-wrapper",
+      "start": "0x1405a5c60",
+      "end_exclusive": "0x1405a5c93",
+      "sha256": "f97feebbed8cce5979dbe3f8f2e629e47cb8b220358afef6e393cb32b3cd488c"
+    },
+    {
+      "label": "CVS2-initializer",
+      "start": "0x1406a97d0",
+      "end_exclusive": "0x1406a9a0f",
+      "sha256": "ca6affb79adb124c7fad14a525318778d9aed320d923c157ae5e4aee11249b74"
+    },
+    {
+      "label": "CVS2-root-publication",
+      "start": "0x1406aa320",
+      "end_exclusive": "0x1406aa3c2",
+      "sha256": "fddedb1a76e6f8e047e8cf24b43d44933398d7b453edf3330854e6e57602577f"
+    },
+    {
+      "label": "CVS2-update-wrapper",
+      "start": "0x1406a9a10",
+      "end_exclusive": "0x1406a9a27",
+      "sha256": "261a814449b10747ff74fac3ea69281a847ed78d1e63c6af3068c8de655cd8ee"
+    },
+    {
+      "label": "CFJ-initializer",
+      "start": "0x1407caca0",
+      "end_exclusive": "0x1407caede",
+      "sha256": "249cd234339af7c2468e1c22c8e9aac3220635e3adf507c79a476a605d058f8e"
+    },
+    {
+      "label": "CFJ-root-publication",
+      "start": "0x1407cb660",
+      "end_exclusive": "0x1407cb6ff",
+      "sha256": "9ebe458773aab7ede004fb1cd272722528ea215a9b98c7fa39e322830a0b7762"
+    },
+    {
+      "label": "CFJ-update-wrapper",
+      "start": "0x1407caee0",
+      "end_exclusive": "0x1407caefc",
+      "sha256": "9de03fe630d432fa1ce867ed6b5c35b71bf1b07696b58c54600d5746810f30d8"
+    },
+    {
+      "label": "Z3U-initializer",
+      "start": "0x14086bc20",
+      "end_exclusive": "0x14086be70",
+      "sha256": "140576d7b1e9702600f29ace2c381102c8bb556250506a5f448335dfb2e8208c"
+    },
+    {
+      "label": "Z3U-root-publication",
+      "start": "0x14086cfc0",
+      "end_exclusive": "0x14086d05d",
+      "sha256": "dc6431e5ea5e769bcfb6ee337be3d967870d8d38b640088f8f0b6e430126dc37"
+    },
+    {
+      "label": "Z3U-update-wrapper",
+      "start": "0x14086be70",
+      "end_exclusive": "0x14086be87",
+      "sha256": "bbce5b3622dbcde57d99c619bce73cba81d8980d07f1d1a68af6e9eea275ca1c"
+    },
+    {
+      "label": "Z3U-alternate-initializer",
+      "start": "0x140dcb360",
+      "end_exclusive": "0x140dcb968",
+      "sha256": "34185649e487dea261af98ba40680ce7f24009f8e97e6d09206436eeb33cad5e"
+    },
+    {
+      "label": "Z3U-alternate-root-publication",
+      "start": "0x140dcc280",
+      "end_exclusive": "0x140dcc31d",
+      "sha256": "fdb0f91376c461dfc03f03a263d7bd6d38144568590ce32fe06a6203f63f8b75"
+    },
+    {
+      "label": "Z3U-alternate-update-wrapper",
+      "start": "0x140dcb970",
+      "end_exclusive": "0x140dcb987",
+      "sha256": "1312d1ee118f21f1616be2d00e560d5e6c5acdb44f03f613c3e923e27f56d732"
+    },
+    {
+      "label": "PWS1-initializer",
+      "start": "0x140972e50",
+      "end_exclusive": "0x14097308f",
+      "sha256": "d155b4b17540403b49f52d592dadc1847df0150b6782955dce3f57e38f7356d2"
+    },
+    {
+      "label": "PWS1-root-publication",
+      "start": "0x140973b10",
+      "end_exclusive": "0x140973c34",
+      "sha256": "326d1bc5b199052f7588d51854f480338c8f27222e71e8d687a8645b864caf64"
+    },
+    {
+      "label": "PWS1-update-wrapper",
+      "start": "0x140973090",
+      "end_exclusive": "0x1409730a7",
+      "sha256": "ae51c329697e469e69fa192e3ccb63781c514240536f99ba0c332dd9b3a1cd88"
+    },
+    {
+      "label": "PWS2-initializer",
+      "start": "0x140a46190",
+      "end_exclusive": "0x140a46415",
+      "sha256": "4321b16fe8450d83252fe824bdd901a5a3dde09889510c143c7e9c71b9cfd27b"
+    },
+    {
+      "label": "PWS2-root-publication",
+      "start": "0x140a46eb0",
+      "end_exclusive": "0x140a46fd4",
+      "sha256": "873e3912ac5d4188ea2d679c363582c5845d293e7a74e14a09bb2704769f4cca"
+    },
+    {
+      "label": "PWS2-update-wrapper",
+      "start": "0x140a46420",
+      "end_exclusive": "0x140a46437",
+      "sha256": "93f4bfe88ddc5e32d12ab542a73afecf1a294938ccaacbdc53bda3d79ca4699d"
+    },
+    {
+      "label": "MJUS-initializer",
+      "start": "0x140b926f0",
+      "end_exclusive": "0x140b92929",
+      "sha256": "0227ad959dedfb9d7c6b601ce9806035622fbfb60c6a7fa5d4047385ebc66e80"
+    },
+    {
+      "label": "MJUS-root-publication",
+      "start": "0x140b930d0",
+      "end_exclusive": "0x140b93165",
+      "sha256": "0fe11c40ba006b4ee9594c000acaddd97ee6c79d504af930d90ca86574643803"
+    },
+    {
+      "label": "MJUS-update-wrapper",
+      "start": "0x140b92930",
+      "end_exclusive": "0x140b92947",
+      "sha256": "9203e3ccf06e03b10fb2de652729aab9da502868c1ac89206c026d9fcdf0b1fc"
+    },
+    {
+      "label": "STG2-initializer",
+      "start": "0x140ccb1c0",
+      "end_exclusive": "0x140ccb43c",
+      "sha256": "5ed5f29f21148e83c969d0c5d357e654fbea1bb6668629a7b961272d952aa73a"
+    },
+    {
+      "label": "STG2-root-publication",
+      "start": "0x140ccc940",
+      "end_exclusive": "0x140ccc9f8",
+      "sha256": "5557766287af00e0d1d941a0c758161e77dc2b81adcaa7d71ff0802b915cbb90"
+    },
+    {
+      "label": "STG2-update-wrapper",
+      "start": "0x140ccb440",
+      "end_exclusive": "0x140ccb457",
+      "sha256": "cd62eab4fa11aebb9a35e732a3f9548b0e72169bae12764827bfe9f798229ca7"
+    }
+  ]
+}

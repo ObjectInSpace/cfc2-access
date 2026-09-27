@@ -4,6 +4,11 @@ This is the technical evidence behind the [staged port plan](collection-port-pla
 It audits the current working tree, including the uncommitted CVS2 text work.
 No new game adapter has been implemented or live-validated in this investigation.
 
+Follow-up, 2026-09-27: the [bounded lifecycle trace](collection-lifecycle-trace.md)
+extends all nine paths through root publication and update callbacks, maps all
+18 ROM entries, and records cleanup edges. It corrects CFJ's context slot below.
+Root lifetime and live transition checks remain open; no port is implemented.
+
 ## Reproduction and evidence boundaries
 
 Run `python tools/collection_port_audit.py`. It reads the existing unpacked
@@ -36,8 +41,9 @@ At `0x14004C575`, it indexes eight image-relative branch addresses from
 - CFJ, game 2: branch `0x14004C5B2`, initializer `0x1407CACA0`.
 - Z3U, game 3: branch `0x14004C5CA`; session `+0x2B4 == 0` selects
   `0x14086BC20`, otherwise it calls `0x140DCB360`. The latter also sets a
-  shell object flag. The meaning of the condition and its association with
-  the four ROM entries still need tracing; do not label it from the name alone.
+  shell object flag. The follow-up traces zero to `z3u`/`a3u` and nonzero to
+  `z3uu`/`a3uu`. The visible option label and hardware interpretation remain
+  unresolved; see the lifecycle trace for the actual routing instructions.
 - PWS1, game 4: branch `0x14004C604`, initializer `0x140972E50`.
 - PWS2, game 5: branch `0x14004C61C`, initializer `0x140A46190`.
 - MJUS, game 6: branch `0x14004C634`, initializer `0x140B926F0`.
@@ -50,7 +56,8 @@ about alphabetical order or `rom_index / 2`.
 ## Shared initialization structure, with meaningful exceptions
 
 Let S be the session reached through `0x141C14F98`, and A its first pointer.
-The initializers load A and store a context pointer at `0x142C79B40`.
+The initializers load A and store a context pointer at `0x142C79B40`, except
+CFJ, which uses `0x142CF9D48` (corrected by the 2026-09-27 follow-up).
 
 - CVS1, CVS2, CFJ, ordinary Z3U, PWS1, PWS2, and MJUS place that context
   at A+0x08000000. Their context `+8` is assigned A+0x08400000.
@@ -68,19 +75,22 @@ functions. Candidate callees in analogous positions are:
 
 - CVS1: `0x1405A6440`, then `0x1405A65F0`.
 - CVS2 control: `0x1406AA320`, then known frame routine `0x1406AA7A0`.
-- CFJ: `0x1407CB660`, `0x1407CB8B0`, with further calls including
-  `0x1407CC090` and `0x1407D3200`. Do not collapse these into one assumed pair.
+- CFJ: `0x1407CB660`, `0x1407CB8B0`. Follow-up separates the adjacent
+  `0x1407CC090` and `0x1407D3200` calls: they belong to the cleanup callback
+  at `0x1407CB000`, not the initializer or update wrapper.
 - Ordinary Z3U: `0x14086CFC0`, then `0x14086D160`.
 - PWS1: `0x140973B10`, then `0x140974100`.
 - PWS2: `0x140A46EB0`, then `0x140A47290`.
 - MJUS: `0x140B930D0`, then `0x140B93500`.
 - STG2: `0x140CCC940`, then `0x140CCCB60`.
-- Alternate Z3U: the bounded excerpt reaches repeated calls to
-  `0x140DCB250`; extend the trace through the rest of initialization.
+- Alternate Z3U: the original excerpt reaches repeated calls to `0x140DCB250`.
+  Follow-up reaches setup `0x140DCC280` and update `0x140DCC3F0` through the
+  published update wrapper `0x140DCB970`.
 
-Except for the documented CVS2 pair, these are leads by call placement,
-not established state readers or safe hook sites. Next determine argument
-ABI, root publication, allocation size, teardown, phase dispatch, and owners.
+The original audit established these as leads by call placement. The follow-up
+now proves the setup calls, root publications and update-wrapper calls for all
+nine paths. They are still not implemented state readers or safe hook sites.
+Next resolve lifetime, complete argument ABI, phase dispatch and feature owners.
 
 Two additional setup excerpts were checked with `disasm.py`: ordinary Z3U's
 `0x14086CFC0` copies context `+0x10` into native slot `0x1422FB960`, clears

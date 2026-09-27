@@ -154,6 +154,33 @@ At each session boundary, update task status and evidence, commit cohesive work,
 and leave the next concrete action. Keep task packets in `docs/port-tasks/` as
 they are created. Maintain their statuses in this document or a linked index.
 
-Initial queue: Astra discovery/proof brief is ready to start. Opus runtime
-implementation packets await traced contracts and pilot evidence. No port is
-declared ready solely because this workflow document exists.
+## Handoff update — 2026-09-27
+
+The first stage-1 investigation increment started from clean `5eb3245` and is
+recorded in the [bounded lifecycle trace](collection-lifecycle-trace.md) and
+[reproduction manifest](collection-lifecycle-manifest.json).
+
+- Reproduced the original eight-game/nine-initializer audit.
+- Traced all nine setup calls, primary/secondary root publication sizes,
+  and update-wrapper calls. Extended alternate Alpha 3 beyond its old excerpt.
+- Mapped all 18 ROM names through native descriptors and lookup code. Alpha 3
+  uses S+0x2b4 zero for indices 6/7, nonzero for 16/17. The visible setting
+  label and all entry-path ordering remain open.
+- Corrected CFJ's separate context slot, `0x142CF9D48`, and separated its
+  cleanup callees from initialization. Recorded common and PWS2 cleanup edges.
+- Added `tools/collection_lifecycle_audit.py`: 45 bounded spans with bytes,
+  resolved references, section identity and hashes. Six offline audit-tool
+  tests passed. No runtime source changed; the 28 DLL runners/build were not
+  rerun for this research/tooling increment.
+- No new live checks, capture, deployment or implemented reader. Root lifetime,
+  safe hook ABI and feature acquisition remain unresolved. Shared boundaries,
+  CVS1 pilot and arena/four-player audio proof remain pending.
+
+Next concrete work: trace arena destruction and reset/load invalidation; follow
+CVS1's update into selection/phase and name consumers. Prepare a tested bounded
+metadata capture tool and compact run card before requesting a CVS2 → CVS1 →
+shell transition session and four-variant Alpha 3 cross-check. The trace names
+the exact missing observations. Continue independent offline tracing meanwhile.
+
+Opus runtime implementation packets remain draft/not ready pending essential
+contracts and pilot evidence. The broader campaign is in progress, not complete.

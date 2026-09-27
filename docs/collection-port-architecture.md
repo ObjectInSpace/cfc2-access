@@ -30,7 +30,9 @@ references: [CPS-2](https://github.com/mamedev/mame/blob/master/src/mame/capcom/
 [NAOMI](https://github.com/mamedev/mame/blob/master/src/mame/sega/naomi.cpp),
 [System 246](https://github.com/mamedev/mame/blob/master/src/mame/namco/namcops2.cpp),
 [ZN](https://github.com/mamedev/mame/blob/master/src/mame/sony/zn.cpp).
-The CFC2 Alpha 3 branch/revision association remains unresolved.
+The [lifecycle trace](collection-lifecycle-trace.md) now associates CFC2's
+zero/nonzero discriminator with `z3u`/`a3u` and `z3uu`/`a3uu`, respectively.
+This does not establish their hardware implementation or guest memory layout.
 
 ## Common systems: one implementation
 
