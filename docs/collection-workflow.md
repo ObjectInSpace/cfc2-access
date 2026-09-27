@@ -184,3 +184,54 @@ the exact missing observations. Continue independent offline tracing meanwhile.
 
 Opus runtime implementation packets remain draft/not ready pending essential
 contracts and pilot evidence. The broader campaign is in progress, not complete.
+
+## Handoff continuation — 2026-09-27, from 9f10a12
+
+Started from clean `9f10a12`. This is another stage-1 research/tooling
+increment. See the [new trace](collection-lifecycle-continuation.md) and
+[metadata run card](collection-metadata-run-card.md).
+
+- Reproduced the original audit and six lifecycle tests before editing.
+- Traced the shell destructor's arena release edge and its deleting wrapper.
+  The explicit singleton clear targets `0x141C14F90`, not S's slot
+  `0x141C14F98`. Destructor event coverage and indirect cleanup remain open.
+- Traced a CVS1 primary/secondary copy-and-restore branch, its direct caller,
+  and copy-helper instruction evidence. Contents can be replaced while the
+  root address remains unchanged. The visible reset/load action is not yet
+  associated with this branch.
+- Established CVS1 P = R+0x3e58, the native-update-to-phase dispatch, and two
+  subdispatch leads. Selection phase meanings and name consumers remain open.
+- Expanded the audit/manifest from 45 to 57 bounded instruction spans plus
+  two raw phase-table entries. No new safe hook ABI is certified.
+- Added `collection_metadata_capture.py`: read-only, manifest-signature-gated,
+  bracketed raw metadata, explicit failure records, fresh output paths, and
+  labelled bounded sampling. Full samples request 488 bytes in 32 reads.
+  Roots/contexts are recorded as pointers and never dereferenced by the tool.
+- Prepared the run card for CVS2 → CVS1 → shell and four Alpha 3 identities.
+  No CFC2 attachment, live capture, listening session or deployment occurred.
+
+Validation actually run:
+
+- `python tools/collection_port_audit.py`: exit 0, eight games/nine initializers.
+- `python tools/collection_lifecycle_audit.py --manifest-out docs/collection-lifecycle-manifest.json`:
+  exit 0, nine paths, 18 ROMs, 57 spans.
+- `python tools/test_collection_lifecycle_audit.py`: exit 0, six tests passed.
+- `python tools/test_collection_metadata_capture.py`: exit 0, eleven tests
+  passed. Synthetic failure/transition controls and real dump signatures;
+  Windows read transport tested against this test process only, not CFC2.
+  An initial test incorrectly expected 34 reads; enumerated calls established
+  32 and corrected the assertion before the final passing run.
+- `python tools/collection_metadata_capture.py --help`: exit 0.
+- `git diff --check`: exit 0. Runtime source unchanged; the 28 DLL runners and
+  DLL build were not rerun for this increment.
+
+Next concrete work: use the prepared run card for the missing labelled live
+observations. Independently follow CVS1 tables `0x141217568`, `0x141222398`,
+and `0x141222420` through actual selection/name consumers; trace callers and
+flags around `0x1405C5D50` / `0x1405ADEE0`; resolve destructor vtable consumers
+and allocator +0x60. Metadata equality cannot validate in-place restore or ABA
+reuse, so session epoch design still requires a traced discontinuity source.
+
+F01–F19 acquisition coverage, implemented shared boundaries, CVS1 pilot and
+arena/four-player listening proof remain pending. Runtime Opus packets remain
+draft/not ready; the broader campaign is not complete.

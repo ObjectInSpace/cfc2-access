@@ -34,6 +34,18 @@ PATHS = (
 
 # Explicit, instruction-aligned, exclusive ends; excerpts are not whole CFGs.
 SHARED_SPANS = (
+    ("shell-destructor-body", 0x140048380, 0x1400486B1),
+    ("shell-deleting-destructor", 0x140048700, 0x140048762),
+    ("CVS1-phase-publication", 0x1405A6522, 0x1405A6536),
+    ("CVS1-native-update", 0x1405A65F0, 0x1405A665D),
+    ("CVS1-phase-dispatch", 0x1405AE5F0, 0x1405AE675),
+    ("CVS1-phase-1-subdispatch", 0x1405C4200, 0x1405C427C),
+    ("CVS1-phase-2-subdispatch", 0x1405C5770, 0x1405C57A7),
+    ("CVS1-secondary-copy-restore", 0x1405A6840, 0x1405A69B1),
+    ("CVS1-copy-restore-caller", 0x1405C5D50, 0x1405C5E4B),
+    ("copy-helper-dispatch", 0x140EEC5A0, 0x140EEC5E1),
+    ("copy-helper-rep-movsb", 0x140EEC580, 0x140EEC593),
+    ("copy-helper-vector-prefix", 0x140EEC780, 0x140EEC7C6),
     ("arena-allocation", 0x140048270, 0x1400482A9),
     ("base-ROM-routing", 0x140052470, 0x1400525A7),
     ("alternate-ROM-routing", 0x140049DA0, 0x140049E0F),
@@ -205,12 +217,17 @@ def produce(directory):
         raise ValueError("ROM descriptor routing does not cover exactly 18 names")
     for rom in roms:
         rom.update(routes[rom["name"]])
+    phase_entries = [dict(index=index, slot=hex(0x141217568 + index * 8),
+                          bytes=dump.read(0x141217568 + index * 8, 8).hex(),
+                          target=hex(dump.pointer(0x141217568 + index * 8)))
+                     for index in (1, 2)]
     return dict(schema=1, evidence="offline instruction/data trace; no live validation",
                 limitations=["Bounded spans are not complete control-flow graphs.",
                              "Root publication is not readiness or lifetime proof.",
                              "No gameplay field, safe hook ABI, or callback cadence is validated.",
-                             "CFJ cleanup callees and arena destruction remain open."],
-                sections=baseline["sections"], paths=paths, roms=roms, spans=spans)
+                             "CFJ cleanup callees, destructor entry paths and reset/load coverage remain open."],
+                sections=baseline["sections"], paths=paths, roms=roms, spans=spans,
+                cvs1_phase_table_leads=phase_entries)
 
 
 def main():

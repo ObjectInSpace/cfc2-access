@@ -5,7 +5,7 @@
     "Bounded spans are not complete control-flow graphs.",
     "Root publication is not readiness or lifetime proof.",
     "No gameplay field, safe hook ABI, or callback cadence is validated.",
-    "CFJ cleanup callees and arena destruction remain open."
+    "CFJ cleanup callees, destructor entry paths and reset/load coverage remain open."
   ],
   "sections": [
     {
@@ -510,6 +510,78 @@
   ],
   "spans": [
     {
+      "label": "shell-destructor-body",
+      "start": "0x140048380",
+      "end_exclusive": "0x1400486b1",
+      "sha256": "16d2966bb197ae0b4d571f2b7ec5cc0f974d9f561d46f1475b0e1c97d8b682ff"
+    },
+    {
+      "label": "shell-deleting-destructor",
+      "start": "0x140048700",
+      "end_exclusive": "0x140048762",
+      "sha256": "88b3b105f210afe4c3a7e6235c9950b7c9df7de484717463a4953da75199cf3c"
+    },
+    {
+      "label": "CVS1-phase-publication",
+      "start": "0x1405a6522",
+      "end_exclusive": "0x1405a6536",
+      "sha256": "974f24b4c074ddc5b469ce8aba446193e9f13a23d9d26844d40acd2a8381fd74"
+    },
+    {
+      "label": "CVS1-native-update",
+      "start": "0x1405a65f0",
+      "end_exclusive": "0x1405a665d",
+      "sha256": "0e0c1025c7727b313d5e341ca4aafb057f436ca7126d47d3104b962d57711047"
+    },
+    {
+      "label": "CVS1-phase-dispatch",
+      "start": "0x1405ae5f0",
+      "end_exclusive": "0x1405ae675",
+      "sha256": "5a06b6a87a0dc55dd894c7619a99108166190829ac84e1ea67076df9c0414f11"
+    },
+    {
+      "label": "CVS1-phase-1-subdispatch",
+      "start": "0x1405c4200",
+      "end_exclusive": "0x1405c427c",
+      "sha256": "11fa8f9d33aa19ca397414791830e1afbb63a061635e1aca6a26706805f8a5fc"
+    },
+    {
+      "label": "CVS1-phase-2-subdispatch",
+      "start": "0x1405c5770",
+      "end_exclusive": "0x1405c57a7",
+      "sha256": "921d8ffecf9ab009ba89d28a251713e3dbe2e03dad56b0384df719e4e51a4fae"
+    },
+    {
+      "label": "CVS1-secondary-copy-restore",
+      "start": "0x1405a6840",
+      "end_exclusive": "0x1405a69b1",
+      "sha256": "34ee2e409c6a938ad5a3664bf6fade23882b9f6e38a12fc0c3228e1b7583ac04"
+    },
+    {
+      "label": "CVS1-copy-restore-caller",
+      "start": "0x1405c5d50",
+      "end_exclusive": "0x1405c5e4b",
+      "sha256": "74611a90da53ed04345070631fa43f1b3c6b9b68d5e830cba82ece3859c40abf"
+    },
+    {
+      "label": "copy-helper-dispatch",
+      "start": "0x140eec5a0",
+      "end_exclusive": "0x140eec5e1",
+      "sha256": "317ff46042f3e3398211941fbde7126116b7414c1ae3bf617088f6a83fbcae33"
+    },
+    {
+      "label": "copy-helper-rep-movsb",
+      "start": "0x140eec580",
+      "end_exclusive": "0x140eec593",
+      "sha256": "ca7fe4eba529b2de3fbd5075ec897f1c63c90060a30c6c96144d38df97f358bc"
+    },
+    {
+      "label": "copy-helper-vector-prefix",
+      "start": "0x140eec780",
+      "end_exclusive": "0x140eec7c6",
+      "sha256": "a8acb05364c2a94e165774d33655534422a5d5a039f6bbc58ec7f1ce5c11b30a"
+    },
+    {
       "label": "arena-allocation",
       "start": "0x140048270",
       "end_exclusive": "0x1400482a9",
@@ -778,6 +850,20 @@
       "start": "0x140ccb440",
       "end_exclusive": "0x140ccb457",
       "sha256": "cd62eab4fa11aebb9a35e732a3f9548b0e72169bae12764827bfe9f798229ca7"
+    }
+  ],
+  "cvs1_phase_table_leads": [
+    {
+      "index": 1,
+      "slot": "0x141217570",
+      "bytes": "00425c4001000000",
+      "target": "0x1405c4200"
+    },
+    {
+      "index": 2,
+      "slot": "0x141217578",
+      "bytes": "70575c4001000000",
+      "target": "0x1405c5770"
     }
   ]
 }

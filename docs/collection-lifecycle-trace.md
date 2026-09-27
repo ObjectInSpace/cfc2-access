@@ -16,7 +16,7 @@ python tools/test_collection_lifecycle_audit.py
 ```
 
 The first command reproduced eight dispatcher entries and nine initializers.
-The new audit records 45 instruction-aligned bounded spans, all nine paths,
+The audit now records 57 instruction-aligned bounded spans, all nine paths,
 and all 18 ROM routes in `build/collection-lifecycle-audit.json`. Each instruction
 has its address, bytes, disassembly and resolved RIP references. Each span has
 an exclusive end and SHA-256. The checked-in
@@ -197,6 +197,13 @@ Never equate a retained nonzero pointer with an active game or a new session.
 Arena destruction, root invalidation, reset/load replacement and CFJ's deeper
 cleanup callees remain explicit open edges.
 
+Continuation from `9f10a12`: [destruction and CVS1 phase/copy trace](collection-lifecycle-continuation.md)
+adds a destructor arena-release edge, distinguishes the cleared shell singleton
+from S's slot, and establishes a CVS1 in-place restore path plus phase dispatch.
+These narrow the open edges above; event coverage and hook ABI remain unresolved.
+The [bounded metadata capture tool/run card](collection-metadata-run-card.md)
+is now prepared and tested. No game captures have been obtained with it.
+
 ## Next measurements and independent work
 
 The smallest useful live observation is a labelled CVS2 → CVS1 → shell sequence
@@ -206,8 +213,8 @@ Alpha 3 ROM identities to falsify the static branch map. This observation must
 distinguish stale retained pointers from fresh initialization, including reuse
 of the same arena/root address. No capture has yet been made for this trace.
 
-Before asking for that play session, prepare and offline-test a bounded,
-read-only metadata capture tool and compact run card. The existing
+The bounded, read-only metadata capture tool and compact run card are now
+prepared; use the linked card above for the outstanding play session. The existing
 `cvs2_state_snapshot.py` still contains historical field labels; do not copy
 them into a collection capture. A metadata tool needs no player-field guesses,
 arena scan, injected hook, or speech-worker work. Bracketed reads can detect
