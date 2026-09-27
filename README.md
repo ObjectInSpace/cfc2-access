@@ -61,6 +61,12 @@ side is which.
 - The other seven arcade games (CVS1, CFJ, Z3U, PWS1, PWS2, MJUS, STG2):
   in progress — see `docs/` for design notes.
 
+The [collection port plan](docs/collection-port-plan.md) inventories the CVS2
+features, assesses each game's applicability, and stages the remaining work.
+Its [shared architecture](docs/collection-port-architecture.md) keeps speech,
+text, audio, settings and lifecycle behavior common while isolating traced
+game/ROM differences. The plan is not a claim that the seven ports are implemented.
+
 ## Source
 
 Source, build script (`build.ps1`), and design docs are in this repository.
