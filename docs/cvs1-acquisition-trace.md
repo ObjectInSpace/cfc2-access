@@ -125,7 +125,7 @@ requirements before a hook is implemented.
 Renderer `0x1405C8DB0..0x1405C9071` has two paths:
 
 - Style byte 7: passes position bytes to `0x140F30C20`, then record+3 in RCX
-  to `0x140F31050`. That deeper text path still needs tracing.
+  to `0x140F31050`. The deeper path is now traced below.
 - Other styles: selects a 16-byte descriptor, computes screen vertices from
   the first two bytes, then walks text bytes until zero. Each glyph reaches
   the draw call `0x140F375D0` at `0x1405c8fdd`.
@@ -138,6 +138,86 @@ atlas and special glyph-to-spoken-text mapping remain unverified. Renderer
 entry is a useful candidate for capture of actually consumed records, but
 still does not prove final composited visibility, overlay ownership or live
 execution on every prompt.
+
+### Style-7 stopping rule
+
+`0x140F31050..0x140F311D0` saves the string argument from RCX in RBX
+and reads the common context through `0x142C79B40`. At `0x140f31151`
+it sign-extends the first byte, tests it, and exits on signed less-than-or-equal
+to zero. The loop repeats that signed test at `0x140f311ae..0x140f311c2`.
+Thus zero and every byte 0x80–0xff stop this path; only bytes 0x01–0x7f
+reach its glyph draw `0x140F36A70` at `0x140f31194`. The glyph index is
+multiplied by eight. This leaf does not implement the ordinary path's caret
+escape. A future capture must retain style and raw bytes: neither CP932
+decoding nor one shared caret decoder represents both native renderers.
+
+## Branch-B choice writer and coordinate consumer
+
+This is offline evidence for one branch, not a character-name map or a live
+selection reader. Branch A remains separate. The explicit P+3 table at
+`0x141240D98` has index 0 → `0x140602530` and index 2 → `0x140602B70`.
+The audit records individual entries, not an inferred selector range.
+
+`0x140602B70..0x140602CA3` dispatches actors at R+0x3fb8 and R+0x46b8
+(stride 0x700). Each dispatch is gated by P+0x65 AND actor+0x58c. The
+zero-extended actor+4 indexes `0x141240DC0`; entry 6 is `0x140606290`.
+Actor ownership is read from signed actor+0x688. Its initialization and
+association with a human controller are still unproved.
+
+The choice-update function `0x140606290..0x14060690A` reads:
+
+- Owner from actor+0x688 at `0x1406062ba`.
+- Current slot from P+0xa0+owner at `0x1406062e6`.
+- Selected native byte from P+0x78+4*owner+slot at `0x140606310`.
+
+After input/cooldown handling, `0x1406063e5` forms direction+8*selected.
+Modes P+0x48=4 or 7 add four, then `0x1406063f9` reads a signed byte
+from `0x141240C40` plus that index. This is a navigation lookup, not a
+name table. Mode-dependent substitutions, duplicate checks against up to
+four slots, availability-mask tests and helper calls can reject or replace
+a candidate. Their complete gameplay meanings and the table's legal ID
+domain remain unresolved. Do not implement this as an unconditional lookup.
+
+At `0x14060657c` the owner is reloaded, and `0x14060658f` writes BL to
+P+0x78+4*owner+saved_slot. Actor+5 is set to 6 earlier at `0x140606317`.
+The special 0x23 branch has additional cycling behavior; no character or
+"Random" label is assigned to it here.
+
+Initializer `0x140602530..0x140602AE8`, after its entry gate, loads
+callback `0x140602EC0` into R12 at `0x14060299b`. Its descriptor loop
+conditionally obtains an object from `0x1405ADA90`, checks for null, and
+stores R12 into object+0x18 at `0x140602a12`. It stores the descriptor's
+subtype in object+0x34 and loop index in object+0x37. This establishes
+callback publication; the object scheduler's invocation and final draw
+still require tracing.
+
+The loop covers 215 four-byte descriptors at `0x1412403E0`, using fields
+resource byte, subtype, position index and mode mask. Four individually
+pinned subtype-2 rows are indices 211–214 at `0x14124072C..0x14124073C`:
+`2c020007`, `2e020007`, `2d020007`, `2f020007`. Their mask is 7; creation
+still depends on the initializer's selected mode mask and allocation success.
+Their published object+0x37 indices yield handler owner values 0,1,0,1.
+Resource bytes are not character IDs or verified character names.
+
+That callback indexes `0x141240E10` with unsigned object+0x34. Entry 2
+is `0x140603220..0x140603468`. Its initial owner is
+(object+0x37−1) AND 1, saved at object+0x36. It clears object+0x150,
+requires P+3 <= 2 and the corresponding actor+5=6, then sets object+0x150
+to 1. With actor cooldown word+0x30 zero, it reads signed actor+0x688,
+the current slot, and the same selected byte at `0x140603304`. With
+nonzero cooldown it instead uses actor+1.
+
+The selected byte indexes eight-byte coordinate records at `0x141240B20`;
+`0x140603313..0x140603321` copies the two components into object+0x3c
+and object+0x40. Later mode/ID branches adjust them. This connects the
+choice writer to a selection-coordinate consumer, but does not prove a
+character name, portrait, final visibility, or owner/controller identity.
+
+The next bounded checks are actor+0x688 initialization,
+the scheduler's object+0x18 call, and a name/resource
+consumer for this native ID. A live selection capture also needs phase,
+mode, owner, slot, cooldown and special-ID context; raw P+0x78 alone is
+insufficient. No live reader or new hook is installed by this increment.
 
 ## A concrete blinking-prompt producer
 
@@ -162,9 +242,10 @@ must include empty-frame replacement and capture freshness.
 
 ## Validation and next measurement
 
-Five audit tests passed, exit 0: manifest reproduction; nested selector
+Seven audit tests passed, exit 0: manifest reproduction; nested selector
 preservation; changed nested-pointer rejection; changed literal rejection;
-and jump-table escape rejection. They use the pinned dump and synthetic
+actor/object selector separation; changed object-subtype rejection; and
+jump-table escape rejection. They use the pinned dump and synthetic
 mutations, not gameplay fixtures. No runtime files changed or DLL deployed.
 
 The existing metadata run card still answers identity/lifecycle questions;
@@ -176,5 +257,6 @@ and game → shell. Retain raw 64-byte records and timing alongside the heard or
 visually confirmed text; do not convert queue contents into a screen claim.
 
 Independent next tracing: follow both P+3 tables to the actual choice writers
-and name consumers; resolve style-7 rendering and glyph substitutions; link
+and name consumers, extending the branch-B evidence above; resolve glyph
+substitutions and final visibility; link
 the restore sequence to its concrete entry events before choosing epochs.

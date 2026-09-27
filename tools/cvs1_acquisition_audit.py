@@ -23,6 +23,11 @@ SPANS = (
     ('mode-dispatch', 0x1405C5E50, 0x1405C5E7F),
     ('mode-branch-A-dispatch', 0x1405D8B10, 0x1405D8B27),
     ('mode-branch-B-dispatch', 0x140602440, 0x14060252D),
+    ('mode-branch-B-initializer', 0x140602530, 0x140602AE8),
+    ('mode-branch-B-actor-dispatch', 0x140602B70, 0x140602CA3),
+    ('mode-branch-B-choice-update', 0x140606290, 0x14060690A),
+    ('mode-branch-B-object-dispatch', 0x140602EC0, 0x140602ECF),
+    ('mode-branch-B-choice-coordinates', 0x140603220, 0x140603468),
     ('phase-1-subdispatch', 0x1405C4200, 0x1405C427C),
     ('phase-1-substate-6', 0x1405C5590, 0x1405C55E7),
     ('blinking-prompt-producer', 0x1405C4560, 0x1405C468C),
@@ -31,6 +36,7 @@ SPANS = (
     ('text-queue-reset', 0x1405AF7C0, 0x1405AF7DF),
     ('text-and-callback-drain', 0x1405AF730, 0x1405AF7B1),
     ('text-record-renderer', 0x1405C8DB0, 0x1405C9071),
+    ('style-7-text-renderer', 0x140F31050, 0x140F311D0),
 )
 
 # Explicit individual edges, NOT inferred table lengths. Adjacent dispatch
@@ -43,6 +49,10 @@ TABLE_EDGES = (
     ('phase-2-substate-1', 'P+2 signed byte', 0x141222430, 0, 0x1405C5D50),
     ('phase-2-substate-1', 'P+2 signed byte', 0x141222430, 1, 0x1405C5E50),
     ('phase-1', 'P+1 signed byte', 0x141222398, 6, 0x1405C5590),
+    ('mode-branch-B', 'P+3 signed byte', 0x141240D98, 0, 0x140602530),
+    ('mode-branch-B', 'P+3 signed byte', 0x141240D98, 2, 0x140602B70),
+    ('mode-branch-B-actor', 'actor+4 unsigned byte', 0x141240DC0, 6, 0x140606290),
+    ('mode-branch-B-object', 'object+0x34 unsigned byte', 0x141240E10, 2, 0x140603220),
 )
 
 PROMPTS = (
@@ -51,6 +61,13 @@ PROMPTS = (
     (0x14106E630, 'INSERT MORE COIN(S)'),
     (0x14106E648, '1 CREDITS TO START'),
     (0x14106E660, 'INSERT COIN(S)'),
+)
+
+# Four selected rows from the initializer's 215-row, four-byte descriptor loop.
+# Resource byte, subtype, position index, mode mask; not character names.
+OBJECT_DESCRIPTORS = (
+    (211, '2c020007'), (212, '2e020007'),
+    (213, '2d020007'), (214, '2f020007'),
 )
 
 
@@ -75,6 +92,13 @@ def produce(directory):
     mode_targets = [0x140000000 + offset for offset in struct.unpack('<10I', mode_raw)]
     if any(target not in (0x1405C5E74, 0x1405C5E79, 0x1405C5E7E) for target in mode_targets):
         raise ValueError('Mode jump-table target outside reviewed branches')
+    descriptors = []
+    for index, expected in OBJECT_DESCRIPTORS:
+        address = 0x1412403E0 + index * 4
+        raw = dump.read(address, 4)
+        if raw.hex() != expected:
+            raise ValueError(f'Object descriptor differs: {index}')
+        descriptors.append(dict(index=index, address=hex(address), bytes=raw.hex()))
     return dict(schema=1, evidence='offline instruction/data evidence; no live validation',
                 limitations=['Individual table edges do not prove selector bounds or screen meanings.',
                              'Text enqueue is not visibility; renderer execution needs live checks.',
@@ -82,6 +106,7 @@ def produce(directory):
                 sections=[dict(name=s.name, live=hex(s.live), size=len(s.data),
                                sha256=hashlib.sha256(s.data).hexdigest()) for s in dump.sections],
                 spans=spans, dispatch_edges=edges, prompt_literals=prompts,
+                selected_object_descriptors=descriptors,
                 mode_table=dict(address='0x1405c5e80', selector='P+0x48 signed byte; unsigned <=9 guard',
                                 bytes=mode_raw.hex(), targets=[hex(t) for t in mode_targets]))
 

@@ -280,3 +280,37 @@ session, but cannot prove text rendering or in-place state replacement.
 
 The shared-boundary implementation, CVS1 pilot and arena/four-player listening
 proof are still pending. Runtime Opus packets remain draft/not ready.
+
+## Handoff continuation — 2026-09-27, from c50c11c
+
+Continued offline from clean `c50c11c`. Updated the
+[CVS1 acquisition trace](cvs1-acquisition-trace.md) and its manifest.
+
+- Traced branch B's actor dispatch to a navigation writer. The selected byte
+  is P+0x78+4*owner+slot; owner comes from actor+0x688 and slot from
+  P+0xa0+owner. Controller identity and legal ID bounds remain open.
+- Traced the branch initializer's object+0x18 callback publication and a
+  separate subtype-2 handler that uses the same selected byte for coordinates.
+  Pinned four descriptors that publish subtype 2 and yield owners 0,1,0,1.
+  Scheduler invocation and character-name
+  mapping are still missing. No live selection reader is certified.
+- Resolved the style-7 leaf: signed byte <=0 ends its glyph loop, including
+  high-bit bytes. It has no ordinary-path caret escape. Preserve style/raw
+  bytes in any eventual capture contract.
+- Expanded the separate acquisition audit to 25 bounded spans and 11 explicit
+  table edges plus four selected object descriptors; five literals and ten
+  guarded mode entries remain. Lifecycle
+  capture scope and runtime sources are unchanged.
+
+Validation actually run: acquisition audit/manifest regeneration, exit 0;
+seven acquisition tests, exit 0; `git diff --check`, exit 0. No DLL build,
+deployment, game attachment or live/audible validation. Other test suites
+were not rerun because their code and manifests did not change.
+
+Next offline work: trace actor+0x688 initialization and controller association,
+the object scheduler call, then the native ID's
+name/resource consumer. Branch A still needs its own choice trace. Exact
+text-hook ABI, frame/overlay ownership, lifecycle discontinuities and the
+existing metadata live observations remain outstanding. Shared-boundary
+implementation, CVS1 pilot and arena/four-player proof remain pending;
+runtime Opus packets are still draft/not ready.

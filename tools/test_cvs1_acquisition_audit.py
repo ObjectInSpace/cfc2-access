@@ -37,6 +37,15 @@ class AcquisitionAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Dispatch entry differs'):
                 audit.produce(audit.DEFAULT_DUMP)
 
+    def test_choice_routes_keep_actor_and_object_selectors_separate(self):
+        edges = {e['target']: e for e in self.report['dispatch_edges']}
+        writer = edges['0x140606290']
+        consumer = edges['0x140603220']
+        self.assertEqual((writer['table'], writer['index'], writer['selector']),
+                         ('0x141240dc0', 6, 'actor+4 unsigned byte'))
+        self.assertEqual((consumer['table'], consumer['index'], consumer['selector']),
+                         ('0x141240e10', 2, 'object+0x34 unsigned byte'))
+
     def test_changed_prompt_refused(self):
         original = audit.Dump.read
         def changed(dump, address, size):
@@ -46,6 +55,17 @@ class AcquisitionAuditTests(unittest.TestCase):
             return raw
         with patch.object(audit.Dump, 'read', changed):
             with self.assertRaisesRegex(ValueError, 'Prompt literal differs'):
+                audit.produce(audit.DEFAULT_DUMP)
+
+    def test_changed_object_subtype_refused(self):
+        original = audit.Dump.read
+        def changed(dump, address, size):
+            raw = original(dump, address, size)
+            if address == 0x14124072C:
+                return raw[:1] + b'\x03' + raw[2:]
+            return raw
+        with patch.object(audit.Dump, 'read', changed):
+            with self.assertRaisesRegex(ValueError, 'Object descriptor differs'):
                 audit.produce(audit.DEFAULT_DUMP)
 
     def test_mode_table_cannot_escape_guarded_branches(self):

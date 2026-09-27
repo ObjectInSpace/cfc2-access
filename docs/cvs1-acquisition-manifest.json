@@ -130,6 +130,36 @@
       "sha256": "9a3b1a0649aaba802195fdce9f4d180d7aaa41c98759060f2af2f4ef94f9e6c2"
     },
     {
+      "label": "mode-branch-B-initializer",
+      "start": "0x140602530",
+      "end_exclusive": "0x140602ae8",
+      "sha256": "d64c547f4778a68f0518ed93f68613ec33aed494f3f12b64909c440910de6741"
+    },
+    {
+      "label": "mode-branch-B-actor-dispatch",
+      "start": "0x140602b70",
+      "end_exclusive": "0x140602ca3",
+      "sha256": "00d30f843458d0459d010ac88c0ae503d6cf9531504b47a998494f2b4d380bc7"
+    },
+    {
+      "label": "mode-branch-B-choice-update",
+      "start": "0x140606290",
+      "end_exclusive": "0x14060690a",
+      "sha256": "8f1a74b1952929fed32ef2142b10733f048e104a4c46da0e97325ef8aa71d70e"
+    },
+    {
+      "label": "mode-branch-B-object-dispatch",
+      "start": "0x140602ec0",
+      "end_exclusive": "0x140602ecf",
+      "sha256": "7121097622053091113b2dc8204759dd85ac915ac442df307939625046f9d142"
+    },
+    {
+      "label": "mode-branch-B-choice-coordinates",
+      "start": "0x140603220",
+      "end_exclusive": "0x140603468",
+      "sha256": "cea0295370b92ac70a53b9627e26508e291cc22b96d24fac3f5cf94cf8768460"
+    },
+    {
       "label": "phase-1-subdispatch",
       "start": "0x1405c4200",
       "end_exclusive": "0x1405c427c",
@@ -176,6 +206,12 @@
       "start": "0x1405c8db0",
       "end_exclusive": "0x1405c9071",
       "sha256": "0148fbaac01b7a42b544a99133e1ebaaa1a693cc0613d2282b3458ee6f84805e"
+    },
+    {
+      "label": "style-7-text-renderer",
+      "start": "0x140f31050",
+      "end_exclusive": "0x140f311d0",
+      "sha256": "12909231cfdc6611a3976c04cc867866065b1d991261968082a2aeffde391e32"
     }
   ],
   "dispatch_edges": [
@@ -241,6 +277,42 @@
       "slot": "0x1412223c8",
       "bytes": "90555c4001000000",
       "target": "0x1405c5590"
+    },
+    {
+      "owner": "mode-branch-B",
+      "selector": "P+3 signed byte",
+      "table": "0x141240d98",
+      "index": 0,
+      "slot": "0x141240d98",
+      "bytes": "3025604001000000",
+      "target": "0x140602530"
+    },
+    {
+      "owner": "mode-branch-B",
+      "selector": "P+3 signed byte",
+      "table": "0x141240d98",
+      "index": 2,
+      "slot": "0x141240da8",
+      "bytes": "702b604001000000",
+      "target": "0x140602b70"
+    },
+    {
+      "owner": "mode-branch-B-actor",
+      "selector": "actor+4 unsigned byte",
+      "table": "0x141240dc0",
+      "index": 6,
+      "slot": "0x141240df0",
+      "bytes": "9062604001000000",
+      "target": "0x140606290"
+    },
+    {
+      "owner": "mode-branch-B-object",
+      "selector": "object+0x34 unsigned byte",
+      "table": "0x141240e10",
+      "index": 2,
+      "slot": "0x141240e20",
+      "bytes": "2032604001000000",
+      "target": "0x140603220"
     }
   ],
   "prompt_literals": [
@@ -268,6 +340,28 @@
       "address": "0x14106e660",
       "bytes": "494e5345525420434f494e28532900",
       "text": "INSERT COIN(S)"
+    }
+  ],
+  "selected_object_descriptors": [
+    {
+      "index": 211,
+      "address": "0x14124072c",
+      "bytes": "2c020007"
+    },
+    {
+      "index": 212,
+      "address": "0x141240730",
+      "bytes": "2e020007"
+    },
+    {
+      "index": 213,
+      "address": "0x141240734",
+      "bytes": "2d020007"
+    },
+    {
+      "index": 214,
+      "address": "0x141240738",
+      "bytes": "2f020007"
     }
   ],
   "mode_table": {
