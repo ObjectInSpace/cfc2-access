@@ -15,6 +15,49 @@ Screen reader accessibility mod for **Capcom Fighting Collection 2** (Steam
 appid **2400430**). Goal: make the collection playable by a blind player —
 NVDA primary, with braille and SAPI fallback via UniversalSpeech.
 
+## ⭐⭐ THE TEXT READERS ARE CONSOLIDATED (2026-09-26)
+
+`src/text_channel.h` / `.c` (+ `src/text_capture.c`, the render-thread half) is
+the one speech and read-current-text layer. Full detail in
+[docs/shared-text-channel.md](docs/shared-text-channel.md). Four readers --
+`cvs2_text`, `cvs2_story`, `cvs2_select`'s win quotes, and the shell's
+`menu_speak_line` -- each re-implemented the same five mechanics: narrow->UTF-16
+conversion, a render-thread capture buffer, session invalidation, de-duplication,
+and a drain that advances only on backend acceptance.
+
+⭐ **The fifth is the one worth centralising on its own.** Every reader had to
+learn it separately, and `speech.c`'s comment records the cost: a log full of
+tidy "spoke" lines while the user hears nothing. `tc_say()` is now the single
+place coupling "said it" to "mark it spoken".
+
+⛔⛔ **WHAT WAS DELIBERATELY NOT UNIFIED: the de-dup POLICY.** The three CVS2
+readers key suppression differently and every difference is load-bearing:
+text on the TEXT with a 2 s re-arm (a blinking prompt), story on the ENTRY INDEX
+with 1.5 s and FIFO (every page, in order), quote ONE SHOT per root needing two
+identical reads to settle (the buffer is read mid-animation). A single policy
+would be their union, and the union is wrong for all three. So the caller picks
+a primitive -- `tc_textdedup` / `tc_keydedup` / `tc_settle` -- and the layer
+supplies mechanism only. That is also what makes a port cheap.
+
+⭐ **The ``` ` ``` key (read current text) goes through a REGISTRY, not a branch
+per game.** A source registers
+a name and a read function; the first that speaks wins, and registration order
+IS priority order (games register at install, the shell last). Porting another
+title does not touch `mod.c` or the hotkey. Every outcome has its own sentence
+-- nothing registered / not active here / nothing readable / no fresh frame --
+because collapsing those into silence is what makes a key undiagnosable without
+sight.
+
+⚠ The shell source repeats what was **actually spoken and accepted**, never the
+prose recorder's history. That history is a history, not a screen; the
+text-source audit declined a read-all over it and that still holds.
+
+**Tests:** `.\tools\run_tc_test.ps1` (11 cases) and
+`python tools\sabotage_tc.py` (9 sabotages, all verified to fail the case that
+tests them). ⚠⚠ **SEVEN runners needed `text_channel.c` on their link lines** --
+exactly the "an un-buildable runner looks like a passing one" trap below. Run
+all 28 after touching this layer, not a chosen few.
+
 ## Formatting rule
 
 The user is blind and uses NVDA. **Never use tables** in replies or docs — use

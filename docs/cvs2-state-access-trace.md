@@ -1,3 +1,7 @@
+Current win-quote implementation: [native draw-buffer reader](cvs2-win-quote-reader.md).
+The 2026-09-26 trace supersedes the historical claims below that the native
+reader is inaccessible or that quote selection requires a small-byte scan.
+
 CVS2 state-access trace — 2026-09-18
 
 Status: CVS2 pointer chain verified live; character highlight traced to its

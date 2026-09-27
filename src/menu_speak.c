@@ -11,6 +11,7 @@
 #include "speech.h"
 #include "log.h"
 #include "gui_text.h"     /* the live caption channel */
+#include "text_channel.h" /* shared speech + read-current-text */
 #include "gui_markup.h"   /* markup -> speech */
 
 /* Discovery-sweep string classification -- see the sweep in
@@ -4594,6 +4595,10 @@ void menu_speak(const mc_move *m)
 /* ⭐ The one place a line reaches the speech backend. Extracted from
  * menu_speak() so the modal announcer shares it rather than duplicating the
  * conversion, the interrupt policy and the honest logging. */
+/* The last line the backend actually accepted, for the read-current-text key.
+ * Worker-thread only, like every other menu_speak state. */
+static wchar_t g_last_spoken[1024];
+
 void menu_speak_line(const char *line)
 {
     /* ⛔⛔ THIS WAS wchar_t[256] AND IT SILENCED THE WHOLE MOVE LIST.
@@ -4673,11 +4678,41 @@ void menu_speak_line(const char *line)
     /* ⚠ The log says what ACTUALLY happened. Writing `mcspeak: "..."`
      * unconditionally is what let a completely silent mod look healthy in the
      * log for several runs. */
-    if (speech_say(w, TRUE))
+    if (speech_say(w, TRUE)) {
         log_line("mcspeak: spoke \"%s\"", line);
-    else
+        /* ⭐ Retained so the shared read-current-text key (`) can repeat the
+         * current row in the menus, exactly as it reads the screen in-game.
+         *
+         * ⚠ ONLY what was actually SPOKEN is retained, and only after the
+         * backend accepted it. A line the user never heard must not come back
+         * as "what is on screen now" -- that would make the ` key report the mod's
+         * intentions rather than the user's experience.
+         *
+         * ⚠⚠ And this is deliberately NOT a whole-screen snapshot. The shell's
+         * prose recorder is a HISTORY, not a screen, and the text-source audit
+         * declined to add a read-all over it for that reason. Repeating the
+         * focused row is a claim we can actually support. */
+        lstrcpynW(g_last_spoken, w,
+                  (int)(sizeof g_last_spoken / sizeof g_last_spoken[0]));
+    } else
         log_line("mcspeak: ⛔ NOT SPOKEN (backend refused): \"%s\"", line);
     free(heap);
+}
+
+/* The shell's read-current-text source. Registered from menu_speak_init(). */
+static tc_read_result menu_read_current(void)
+{
+    /* ⚠ INACTIVE, not EMPTY, when nothing has been spoken yet: the registry
+     * then falls through to another game's source instead of announcing that
+     * the menus are empty while CVS2 is on screen. */
+    if (!g_last_spoken[0]) return TC_READ_INACTIVE;
+    return tc_say(g_last_spoken, TRUE, "mcspeak (read current)")
+               ? TC_READ_SPOKE : TC_READ_REFUSED;
+}
+
+BOOL menu_speak_register_reader(void)
+{
+    return tc_register("the menus", menu_read_current);
 }
 
 

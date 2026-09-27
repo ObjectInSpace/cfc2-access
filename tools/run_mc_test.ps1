@@ -27,6 +27,7 @@ $minhookSrc = @(
     "$root\tools\test_menu_cursor.c" "$root\src\menu_cursor.c" `
     "$root\src\log.c" "$root\src\memsafe.c" `
     "$root\src\menu_speak.c" "$root\src\gmd_find.c" "$root\src\speech.c" `
+    "$root\src\text_channel.c" `
     "$root\src\move_list.c" `
     "$root\src\rom_table.c" `
     "$root\src\gui_text.c" "$root\src\gui_markup.c" "$root\src\prompt_id.c" `

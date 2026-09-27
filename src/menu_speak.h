@@ -569,6 +569,19 @@ void menu_speak(const mc_move *m);
  * backend, shared by the movement path and the modal announcer. */
 void menu_speak_line(const char *line);
 
+/* Registers the shell as a read-current-text source (the ` key), so the same
+ * key repeats the focused menu row that reads the screen inside a game.
+ * Returns FALSE if the shared source table is full, which is logged. */
+BOOL menu_speak_register_reader(void);
+
+/* ⚠ WHY THERE IS NO "clear the retained line" CALL. Every one of
+ * menu_speak_line()'s six call sites is driven by a cursor movement, a modal or
+ * the hints view, so arriving anywhere new overwrites the retained line before
+ * the user could ask for it. An explicit clear was written and removed: with no
+ * honest screen-change signal to hang it on, it would have been a guess about
+ * when the retained line goes stale, and a cleared line makes the ` key say "not
+ * active" on a screen that is plainly there. */
+
 /* ⭐⭐ Announce a MODAL PROMPT (the quit dialogs) if one has just appeared.
  *
  * ⛔ Speaks the QUESTION only, never a selection: measured and closed in

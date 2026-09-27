@@ -21,6 +21,9 @@
 #include "cvs2_hit.h"
 #include "audio.h"
 #include "cvs2_frame.h"
+#include "cvs2_story.h"
+#include "cvs2_text.h"
+#include "text_channel.h"
 #include "image.h"
 #include "gmd_find.h"
 #include "pad_watch.h"
@@ -1700,6 +1703,18 @@ static DWORD WINAPI worker(LPVOID param)
     }
 
     if (unpacked) cvs2_hit_install();
+    if (unpacked && hook_enabled) cvs2_story_install();
+    if (unpacked && hook_enabled) cvs2_text_install();
+
+    /* ⭐ The shell registers LAST, so a running game answers the ` key first and the
+     * menus are the fallback. Order here IS the priority order, which is why
+     * the registry keeps it explicit rather than sorting by anything clever.
+     *
+     * ⚠ NOT gated on a hook switch: the shell source repeats what the mod
+     * already said, so it needs no hook, and a key that silently does nothing
+     * because of an unrelated file is exactly what a blind user cannot
+     * diagnose (the same rule as the per-cue volume keys). */
+    menu_speak_register_reader();
 
     /* Gauge cues. Opt-in while the design is being tuned by ear; the mixer
      * no-ops if the device will not open, and speech is unaffected either
@@ -1971,9 +1986,44 @@ static DWORD WINAPI worker(LPVOID param)
              * missed. Cost when nothing is pressed is four GetAsyncKeyState
              * calls -- the same order as the arrow polling already here. */
             volume_hotkeys_tick();
+            /* ⭐ ` (backtick/grave) = read the current text, and it means the
+             * same thing everywhere: the shell repeats the focused row, a
+             * running game reads its own screen. mod.c no longer names any
+             * single reader -- sources register themselves with the shared
+             * channel, so porting another arcade title does not touch this.
+             *
+             * ⚠ VK_OEM_3 is POSITIONAL, not the character: it is the key left
+             * of `1` on a US layout, which is where the user reaches for it by
+             * feel. On some layouts that key produces a different character, so
+             * the log and docs name it by POSITION as well as by the character `, rather than
+             * telling a user to press a character their keyboard may not have
+             * there.
+             *
+             * ⚠⚠ CHECKED, not assumed (CLAUDE.md: the first two hotkey
+             * proposals here were both wrong):
+             *   - Steam's defaults are Shift+Tab (overlay) and F12
+             *     (screenshot). Backtick is neither.
+             *   - CFC2's own 16 keyboard-settings rows are gameplay actions on
+             *     letters and arrows; no OEM/punctuation key among them.
+             *   - the KB_* token vocabulary in gui_markup.c names arrows,
+             *     modifiers and navigation keys only -- no grave. (KB_F10/KB_A
+             *     there are the comment EXAMPLE, not bindings.)
+             *   - MTFramework exposes no dev console here, which is the usual
+             *     claimant for this key. */
+            if (key_pressed(VK_OEM_3)) {
+                DWORD foreground_pid = 0;
+                GetWindowThreadProcessId(GetForegroundWindow(), &foreground_pid);
+                if (foreground_pid == GetCurrentProcessId()) tc_request_read();
+            }
 
             /* Read actual CVS2 selection on the speech worker, never a hook. */
             cvs2_select_tick();
+
+            /* ⚠ AFTER cvs2_select_tick(), not beside the keypress. That tick is
+             * what validates the session and tells each reader whether its game
+             * is live; asking a source to read before it has been told would let
+             * the ` key answer "not active" for a game that is in fact on screen. */
+            if (tc_read_requested()) tc_read_current();
             cvs2_gauges_log_stats();
             cvs2_frame_log_stats();
             cvs2_hit_poll_and_log();

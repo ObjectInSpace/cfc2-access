@@ -56,38 +56,7 @@ void cvs2_gauges_log_stats(void);
  * forbids narrating DURING play, which these do not do. */
 void cvs2_announce_observe(const BYTE *state, SIZE_T size, ULONGLONG root);
 
-/* ---- Win quotes ---------------------------------------------------------
- * The post-match win screen: speak the winning character's quote.
- *
- * STATE GATE: phase bytes at state+0x78 == 02 01 02 03. Across all 36 captures
- * in build/cvs2-state, exactly the two taken while a quote was on screen carry
- * that value; every in-match capture is 02 01 02 02 and every selection screen
- * 02 01 01 01. The quote screen is a SIBLING of the match state, not a
- * sub-state, so a win quote cannot occur during a round.
- *
- * WINNER: R+0x05931 holds the winning character's ID inside that gate (Sagat 9,
- * Ken 1, both user-confirmed, two independent sessions/arenas).
- *
- * ⚠ That byte is NOT self-gating -- it reads 16 or 1 in nine in-match captures.
- * It is only meaningful once the phase gate has passed, which is why the gate
- * is checked first and never inferred from this field.
- *
- * ⛔ THE 1-IN-8 INDEX IS NOT LOCATED. CVS2 picks one of the character's eight
- * quotes at RANDOM at display time. Byte +2 of the record (R+0x05933) is a
- * LEAD only: it decodes to a coherent quote in both captures, but any value
- * 0..7 would, and its apparent corroboration (a second record agreeing) occurs
- * in 10 of 32 non-quote captures too, so that agreement carries little
- * information. Speaking the wrong quote is indistinguishable from the right one
- * to this user.
- *
- * ⭐ THE QUOTE IS SPOKEN BY DEFAULT ANYWAY, and that is a deliberate decision
- * the user made with the risk stated. Reading the displayed quote is the
- * feature; speaking only the winner's name would be shipping the provable half
- * instead of the requested one. The text is certain -- only the choice among
- * eight is not -- and every display is logged, so ordinary play settles it.
- * `cfc2_cvs2_quote_text.off` falls back to the winner's name alone.
- *
- * ▶ TO SETTLE +2: find two wins by the same character id in CFC2Access.log.
- * A VARYING index confirms the lead; a constant one refutes it, and this must
- * then revert to the winner's name alone. */
+/* Completed native draw buffers; see docs/cvs2-win-quote-reader.md.
+ * ASCII/English only. Output capacity must be at least 161 wchar_t units. */
+BOOL cvs2_quote_decode(const BYTE *state, SIZE_T size, wchar_t *out, SIZE_T capacity);
 void cvs2_quote_observe(const BYTE *state, SIZE_T size, ULONGLONG root);

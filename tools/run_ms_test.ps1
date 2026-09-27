@@ -21,6 +21,7 @@ $minhookSrc = @(
     "$root\src\gmd_find.c" "$root\src\speech.c" "$root\src\log.c" `
     "$root\src\rom_table.c" "$root\src\move_list.c" `
     "$root\src\gui_text.c" "$root\src\gui_markup.c" "$root\src\prompt_id.c" `
+    "$root\src\text_channel.c" `
     @minhookSrc `
     -I "$root\libs\minhook\include" `
     "$root\src\memsafe.c" -luser32

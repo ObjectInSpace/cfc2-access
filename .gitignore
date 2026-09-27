@@ -20,3 +20,5 @@ riprefs.pkl
 # absolute path to this checkout and to the Steam install, so a committed copy
 # would grant nothing on another machine while looking as though it did.
 .claude/
+!tools/fixtures/cvs2-quote-complete.bin
+!tools/fixtures/cvs2-credits-stream.bin

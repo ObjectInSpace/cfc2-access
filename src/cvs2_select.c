@@ -1,6 +1,9 @@
 /* CVS2 native-state evidence: docs/cvs2-state-access-trace.md.
  * No keyboard history, guest-address assumption, or game-memory writes. */
 #include "cvs2_select.h"
+#include "cvs2_story.h"
+#include "cvs2_text.h"
+#include "text_channel.h"
 #include "memsafe.h"
 #include "speech.h"
 #include "log.h"
@@ -217,7 +220,7 @@ void cvs2_select_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
     }
     /* One utterance for simultaneous changes; no queued stream of obsolete
      * P2 positions. Only record names actually accepted by the backend. */
-    if (message[0] && speech_say(message,TRUE)) {
+    if (message[0] && tc_say(message,TRUE,"cvs2-select")) {
         for (p=0; p<2; p++) if (changed[p]) {
             spoken[p] = ids[p];
             log_line("cvs2-select: accepted player=%d kind=%s id=%d",p+1,
@@ -361,6 +364,8 @@ void cvs2_select_tick(void)
     cvs2_gauges_observe(state,sizeof state,root);
     cvs2_announce_observe(state,sizeof state,root);
     cvs2_quote_observe(state,sizeof state,root);
+    cvs2_story_observe(state,sizeof state,root);
+    cvs2_text_observe(root);
     return;
 inactive:
     last_poll = 0;
@@ -368,6 +373,8 @@ inactive:
     cvs2_gauges_observe(NULL,0,0);
     cvs2_announce_observe(NULL,0,0);
     cvs2_quote_observe(NULL,0,0);
+    cvs2_story_observe(NULL,0,0);
+    cvs2_text_observe(0);
 }
 
 /* ---- In-match gauges ---------------------------------------------------- */
@@ -647,7 +654,7 @@ void cvs2_announce_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
                 g_an_size[p] = (int)n;
                 if (p == 0) wcscat(line, L". ");
             }
-            if (speech_say(line, TRUE)) {
+            if (tc_say(line, TRUE, "cvs2-announce")) {
                 g_an_match_done = 1;
                 /* The fighters now on screen are announced, so do not repeat
                  * them as a round change immediately afterwards. */
@@ -681,71 +688,62 @@ void cvs2_announce_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
         g_an_char[p] = id;
         said = 1;
     }
-    if (said) speech_say(line, TRUE);
+    if (said) tc_say(line, TRUE, "cvs2-announce");
 }
 
 /* ---- Win quotes --------------------------------------------------------- */
+/* Native draw buffers, traced in docs/cvs2-win-quote-reader.md. No table lookup
+ * or pointer chasing: these bytes already belong to the guarded state copy. */
+/* ⭐ The "two identical reads settle it" policy is shared -- tc_settle in
+ * src/text_channel.h. This reader keeps only the CVS2 decode. */
+static tc_settle g_wq;
 
-#include "quote_table.h"
+static unsigned quote_word(const BYTE *s, unsigned off)
+{
+    return s[off] | ((unsigned)s[off+1] << 8);
+}
 
-/* The state gate and the winner field. Evidence in cvs2_select.h. */
-/* ⚠ Kept as a RECORD, not as live constants -- nothing reads them now.
- *   WQ_PHASE  02 01 02 03 at state+0x78 -- the quote screen. This part HELD:
- *             all three quote captures carry it and no other capture does.
- *             ⚠ byte 4 varies (2, 2, 1), so there are sub-states within it.
- *   0x05931   shipped as the winner. REFUTED in play -- see below.
- *   0x05933   the "+2" quote index lead. Never confirmed, and moot until a
- *             winner field exists. */
-
-static ULONGLONG g_wq_root;
-static int g_wq_spoken;       /* one quote per visit to the screen */
-
-
-/* ⛔⛔⛔ DISABLED 2026-09-25: R+0x05931 IS NOT THE WINNER, PROVEN IN PLAY.
- *
- * This shipped on two captures in which the field happened to equal the winner.
- * Two live matches destroyed it:
- *
- *   match 1  user's team Ryu/Ken/Yun, RAIDEN (the opponent) won.
- *            The field read 0 = Ryu -- the user's own slot-0 character. It
- *            named the wrong character AND the wrong side, and spoke a quote.
- *   match 2  user P1 Sagat, HAOHMARU (P2) won, captured live on the quote
- *            screen (winquote-raiden-03). The field read 0 -- empty.
- *
- * ⛔ AND THE APPROACH IS DEAD, not just the offset: across the three quote
- * captures, the number of offsets in the whole 136 KB window that hold the
- * winner's ID in ALL THREE is ZERO. There is no such byte to find here.
- *
- * ⛔ B+0x5D3 IS ALSO REFUTED. It read 1-on-the-winner in the first two
- * captures; in match 2 it reads 1 on P1, who LOST. Both candidates were
- * coincidences of a two-sample set.
- *
- * ⚠ A THIRD PHASE SHAPE EXISTS: byte 4 is 2 in the first two captures and 1 in
- * match 2, all with 02 01 02 03. So the quote screen has sub-states the gate
- * does not distinguish, and health is 0/0 in all of them.
- *
- * ⭐⭐ WHY THIS WAS SHIPPABLE-LOOKING AND WRONG: both original captures had the
- * winner ALSO being that side's active fighter, and one had the winner as P1
- * slot 0. A sample where those coincide cannot separate "winner" from "active
- * fighter", "slot 0", or "P1". The user's first real match separated all three
- * at once. Two samples that agree are not two pieces of evidence.
- *
- * The reader stays compiled but returns immediately. The quote TEXT and its
- * decoding are solid (src/quote_table.h, 384 verified quotes) -- what is
- * missing is any trustworthy way to know whose quote is on screen. Re-enabling
- * requires a field that predicts the winner correctly on winquote-raiden-03
- * (Haohmaru 43, P2) as well as the two originals, and cases 7f/7g enforce
- * exactly that. */
-
+BOOL cvs2_quote_decode(const BYTE *s, SIZE_T size, wchar_t *out, SIZE_T capacity)
+{
+    unsigned mode, lines, line, used=0;
+    if (!out || capacity < 161) return FALSE;
+    out[0]=0;
+    if (!s || size != CVS2_STATE_SIZE ||
+        memcmp(s+0x78,"\x02\x01\x02\x03\x02",5) ||
+        (s[0x20f50] != 3 && s[0x20f50] != 4)) return FALSE;
+    mode=quote_word(s,0x20f3e);
+    lines=quote_word(s,0x20f40);
+    if (mode > 2 || lines < 1 || lines > 2) return FALSE;
+    if (mode == 0) lines=2; /* two-speaker branch always draws both */
+    for (line=0; line<lines; line++) {
+        unsigned n=quote_word(s,0x20f54+line*2), i;
+        const BYTE *text=s+0x20f5c+line*0x50;
+        if (!n || n >= 0x50 || quote_word(s,0x20f58+line*2) != n ||
+            text[n]) { out[0]=0; return FALSE; }
+        for (i=0; i<n; i++)
+            if (text[i] < 32 || text[i] > 126) { out[0]=0; return FALSE; }
+        if (line && used && out[used-1] != L' ' && text[0] != ' ')
+            out[used++]=L' ';
+        for (i=0; i<n; i++) out[used++]=(wchar_t)text[i];
+    }
+    out[used]=0;
+    return used != 0;
+}
 
 void cvs2_quote_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
 {
-    /* ⛔ Silent by construction. The winner is not known, so nothing is said:
-     * a wrong winner is indistinguishable from a right one to this user, and
-     * that has now happened in play.
-     *
-     * The state tracking stays live so that re-enabling is a matter of filling
-     * in the read, not rebuilding the once-per-screen logic. */
-    (void)root;
-    if (!s || size != CVS2_STATE_SIZE) { g_wq_root = 0; g_wq_spoken = 0; return; }
+    wchar_t text[161];
+    if (!s || size != CVS2_STATE_SIZE || !root ||
+        memcmp(s+0x78,"\x02\x01\x02\x03",4) || s[0x7c] < 2) {
+        tc_settle_reset(&g_wq);
+        return;
+    }
+    if (!cvs2_quote_decode(s,size,text,161)) {
+        /* A failed decode breaks the pair, so a torn read cannot pair with a
+         * later identical one across the interruption. */
+        tc_settle_break(&g_wq);
+        return;
+    }
+    if (!tc_settle_ready(&g_wq,root,text)) return;
+    if (tc_say(text,FALSE,"cvs2-quote")) tc_settle_mark(&g_wq);
 }
