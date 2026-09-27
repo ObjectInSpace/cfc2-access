@@ -1,5 +1,14 @@
 # CFC2 Access
 
+Current collection-port direction: follow [the Astra-to-Opus workflow](docs/collection-workflow.md)
+and [staged port plan](docs/collection-port-plan.md). Astra leads upfront tracing,
+shared-system proof and difficult reviews; Opus implements evidence-backed task
+packets. Every integration path needs tracing, and shared-system changes must
+propagate across games unless a documented game-specific reason applies.
+The [next Astra session brief](docs/collection-astra-brief.md) records the starting
+point. This workflow does not authorize assuming an untraced field or claiming
+an offline test proves live behavior.
+
 For CVS2 in-game research, read [the 2026-09-18 prior-art audit](docs/cvs2-prior-art-audit.md)
 before relying on the historical conclusions below. It corrects the NAOMI RAM
 size, the claimed coverage of SH-4 searches, and the guest-pointer mapping

@@ -5,6 +5,11 @@ initial technical investigation, architecture and staged execution plan.
 Runtime ports remain to be implemented; this document does not claim the
 other seven games now have CVS2 parity.
 
+Execution now follows the [Astra-to-Opus workflow](collection-workflow.md):
+front-load tracing and architecture proof here, then hand bounded implementation
+packets to Opus. The [next-session brief](collection-astra-brief.md) gives the
+starting point; model responsibilities do not replace the stage acceptance gates.
+
 Start with the [feature inventory](collection-feature-inventory.md), which
 assigns F01–F19 and explains applicability for every game. The
 [research report](collection-port-research.md) records concrete native entry

@@ -66,6 +66,8 @@ features, assesses each game's applicability, and stages the remaining work.
 Its [shared architecture](docs/collection-port-architecture.md) keeps speech,
 text, audio, settings and lifecycle behavior common while isolating traced
 game/ROM differences. The plan is not a claim that the seven ports are implemented.
+The [Astra-to-Opus workflow](docs/collection-workflow.md) defines investigation,
+implementation handoffs, and review checkpoints.
 
 ## Source
 
