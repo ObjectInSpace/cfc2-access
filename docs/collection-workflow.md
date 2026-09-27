@@ -235,3 +235,48 @@ reuse, so session epoch design still requires a traced discontinuity source.
 F01–F19 acquisition coverage, implemented shared boundaries, CVS1 pilot and
 arena/four-player listening proof remain pending. Runtime Opus packets remain
 draft/not ready; the broader campaign is not complete.
+
+## Handoff continuation — 2026-09-27, from ed547da
+
+Continued offline from clean `ed547da`. The new
+[CVS1 acquisition trace](cvs1-acquisition-trace.md) and
+[manifest](cvs1-acquisition-manifest.json) preserve this increment.
+
+- Established the nested route P+0=2 → P+1=1 → P+2=0 to the existing
+  restore-preparation function, subject to the traced gates. Adjacent table
+  storage does not establish a flat selector domain.
+- Traced the post-copy pool rebuild at `0x1405ADEE0`, reinforcing that root
+  pointer equality cannot establish state continuity. The originating visible
+  reset/load action remains unassigned.
+- Traced the guarded P+0x48 mode dispatch to two different P+3 tables.
+  Concrete selection leads are recorded, but native highlighted IDs and name
+  consumers remain unresolved. Do not reuse a substate map across the branches.
+- Traced CVS1 positioned prompts through formatting, queue reset/drain, and
+  glyph rendering. Record headers are three bytes; strings begin at +3.
+  The renderer interprets caret escapes and has a distinct style-7 path.
+  CVS2's +8 text offset and decoding policy cannot be copied into this reader.
+- Traced one blinking free-play/coin/start producer and five selected literals.
+  F17/F18 have partial code evidence only, not live visibility or a reader.
+- Added `tools/cvs1_acquisition_audit.py`: 19 bounded spans, seven explicit
+  table edges, five literals and ten guarded mode entries. It is separate
+  from the metadata capture's lifecycle manifest; live read scope is unchanged.
+
+Validation actually run:
+
+- `python tools/cvs1_acquisition_audit.py --manifest-out docs/cvs1-acquisition-manifest.json`:
+  exit 0, counts above.
+- `python tools/test_cvs1_acquisition_audit.py`: exit 0, five tests passed,
+  including changed table/literal rejection and nested-selector preservation.
+- `git diff --check`: exit 0. No runtime source changed; no DLL build,
+  deployment, CFC2 attachment, live capture or audible check. The previous
+  17 lifecycle/metadata tests were not rerun because those files did not change.
+
+Next concrete offline work: follow `0x141237D80` and `0x141240D98` through
+the real choice writers and name/sprite consumers; trace style-7 renderer
+`0x140F31050`; establish a bounded text capture ABI and frame/overlay ownership
+before asking for a text session. Continue the outstanding destructor/event
+trace. The existing metadata run card remains ready for the lifecycle/Alpha 3
+session, but cannot prove text rendering or in-place state replacement.
+
+The shared-boundary implementation, CVS1 pilot and arena/four-player listening
+proof are still pending. Runtime Opus packets remain draft/not ready.

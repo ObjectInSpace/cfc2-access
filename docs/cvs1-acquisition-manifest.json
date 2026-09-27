@@ -1,0 +1,290 @@
+{
+  "schema": 1,
+  "evidence": "offline instruction/data evidence; no live validation",
+  "limitations": [
+    "Individual table edges do not prove selector bounds or screen meanings.",
+    "Text enqueue is not visibility; renderer execution needs live checks.",
+    "No character-ID/name map or safe hook ABI established."
+  ],
+  "sections": [
+    {
+      "name": "sec_00001000_code.bin",
+      "live": "0x140001000",
+      "size": 16625664,
+      "sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b"
+    },
+    {
+      "name": "sec_00fdc000_data.bin",
+      "live": "0x140fdc000",
+      "size": 2072576,
+      "sha256": "e6e7ed51ec50e1a76956112f0f7b3f448450c4e5ecb4312e43522422119e604e"
+    },
+    {
+      "name": "sec_011d6000_data.bin",
+      "live": "0x1411d6000",
+      "size": 28758016,
+      "sha256": "a12f6a815677755c8ef7762f30d93a1c50dac792e48176c3dead68945d0720d5"
+    },
+    {
+      "name": "sec_02d43000_data.bin",
+      "live": "0x142d43000",
+      "size": 745472,
+      "sha256": "6c563af6289ea521d4638b6d7cd8125249bbaff02be604a26c688105e611b520"
+    },
+    {
+      "name": "sec_02df9000_data.bin",
+      "live": "0x142df9000",
+      "size": 4096,
+      "sha256": "fc089ff2133dcb045c1f6dafb3792c7f3f4a8a3968e7b3498aee8ed9b75152ef"
+    },
+    {
+      "name": "sec_02dfa000_data.bin",
+      "live": "0x142dfa000",
+      "size": 270336,
+      "sha256": "1dbe3ea172a960421ded4894bb5873096352e4b1c590a896121b72efea9a7be1"
+    },
+    {
+      "name": "sec_02e3c000_code.bin",
+      "live": "0x142e3c000",
+      "size": 233472,
+      "sha256": "7caa7f74754bb019f8f60d1ecdb5c71b15d3276a15429b8164ec49465fdf8467"
+    },
+    {
+      "name": "sec_02e75000_data.bin",
+      "live": "0x142e75000",
+      "size": 270336,
+      "sha256": "b65eefce10af6f47a0adb2fcba3e63f733b111b2187a70a074baa5db10b1fe68"
+    },
+    {
+      "name": "sec_02eb7000_code.bin",
+      "live": "0x142eb7000",
+      "size": 13451264,
+      "sha256": "b99c2f8570010866ab6eca39e08f1b8162be8f4d170910420f4930fa0d7d3890"
+    }
+  ],
+  "spans": [
+    {
+      "label": "phase-publication",
+      "start": "0x1405a6522",
+      "end_exclusive": "0x1405a6536",
+      "sha256": "974f24b4c074ddc5b469ce8aba446193e9f13a23d9d26844d40acd2a8381fd74"
+    },
+    {
+      "label": "native-update",
+      "start": "0x1405a65f0",
+      "end_exclusive": "0x1405a665d",
+      "sha256": "0e0c1025c7727b313d5e341ca4aafb057f436ca7126d47d3104b962d57711047"
+    },
+    {
+      "label": "phase-dispatch",
+      "start": "0x1405ae5f0",
+      "end_exclusive": "0x1405ae675",
+      "sha256": "5a06b6a87a0dc55dd894c7619a99108166190829ac84e1ea67076df9c0414f11"
+    },
+    {
+      "label": "phase-2-subdispatch",
+      "start": "0x1405c5770",
+      "end_exclusive": "0x1405c57a7",
+      "sha256": "921d8ffecf9ab009ba89d28a251713e3dbe2e03dad56b0384df719e4e51a4fae"
+    },
+    {
+      "label": "phase-2-substate-1-dispatch",
+      "start": "0x1405c5d30",
+      "end_exclusive": "0x1405c5d47",
+      "sha256": "cae3c990f5dc1948885bf17946bc96cf80cbd1679cb852a5266d3ba453e539d5"
+    },
+    {
+      "label": "restore-preparation",
+      "start": "0x1405c5d50",
+      "end_exclusive": "0x1405c5e4b",
+      "sha256": "74611a90da53ed04345070631fa43f1b3c6b9b68d5e830cba82ece3859c40abf"
+    },
+    {
+      "label": "copy-restore",
+      "start": "0x1405a6840",
+      "end_exclusive": "0x1405a69b1",
+      "sha256": "34ee2e409c6a938ad5a3664bf6fade23882b9f6e38a12fc0c3228e1b7583ac04"
+    },
+    {
+      "label": "post-restore-pool-reset",
+      "start": "0x1405adee0",
+      "end_exclusive": "0x1405ae162",
+      "sha256": "b6fdff4f820e3e9024596498e8080601961fc2d8768e544752b6a6f225e895e3"
+    },
+    {
+      "label": "mode-dispatch",
+      "start": "0x1405c5e50",
+      "end_exclusive": "0x1405c5e7f",
+      "sha256": "17e41d17e1f63a6fb633e37db6d151173e37dfd053dc9fb49f48bb8d63d5be7d"
+    },
+    {
+      "label": "mode-branch-A-dispatch",
+      "start": "0x1405d8b10",
+      "end_exclusive": "0x1405d8b27",
+      "sha256": "a10e48d01e013b4c892b48c91cc2b23532788332f92fe19c02df66e3471a06b5"
+    },
+    {
+      "label": "mode-branch-B-dispatch",
+      "start": "0x140602440",
+      "end_exclusive": "0x14060252d",
+      "sha256": "9a3b1a0649aaba802195fdce9f4d180d7aaa41c98759060f2af2f4ef94f9e6c2"
+    },
+    {
+      "label": "phase-1-subdispatch",
+      "start": "0x1405c4200",
+      "end_exclusive": "0x1405c427c",
+      "sha256": "11fa8f9d33aa19ca397414791830e1afbb63a061635e1aca6a26706805f8a5fc"
+    },
+    {
+      "label": "phase-1-substate-6",
+      "start": "0x1405c5590",
+      "end_exclusive": "0x1405c55e7",
+      "sha256": "2b92ca0bd70dd3f0a1895ed2b8c8a4b99500da020194e8546c141de302ccb890"
+    },
+    {
+      "label": "blinking-prompt-producer",
+      "start": "0x1405c4560",
+      "end_exclusive": "0x1405c468c",
+      "sha256": "5fcec3e6e1a337a761d932a2254c2d751f4c470630f80bdd707eb00a387b94f1"
+    },
+    {
+      "label": "text-record-producer",
+      "start": "0x1405af6b0",
+      "end_exclusive": "0x1405af722",
+      "sha256": "5ea22455332b0dc53b46a4bcc93a881499836acc97ffd37eacd0e86984e136e1"
+    },
+    {
+      "label": "text-format-wrapper",
+      "start": "0x1405af8a0",
+      "end_exclusive": "0x1405af8fc",
+      "sha256": "cc784789f63b4307084c8291e1c32ae6338496854843a9d98769c64736640c12"
+    },
+    {
+      "label": "text-queue-reset",
+      "start": "0x1405af7c0",
+      "end_exclusive": "0x1405af7df",
+      "sha256": "b0978afcd6a789867aa84247ad04476b8da6c2ce1f84d175fe74c90ad4ff54de"
+    },
+    {
+      "label": "text-and-callback-drain",
+      "start": "0x1405af730",
+      "end_exclusive": "0x1405af7b1",
+      "sha256": "e668cf3feac43ac8fc1083dae7729e1dafca519f83752e2840ee3fd1cf5dcf8a"
+    },
+    {
+      "label": "text-record-renderer",
+      "start": "0x1405c8db0",
+      "end_exclusive": "0x1405c9071",
+      "sha256": "0148fbaac01b7a42b544a99133e1ebaaa1a693cc0613d2282b3458ee6f84805e"
+    }
+  ],
+  "dispatch_edges": [
+    {
+      "owner": "phase",
+      "selector": "P+0 signed byte",
+      "table": "0x141217568",
+      "index": 1,
+      "slot": "0x141217570",
+      "bytes": "00425c4001000000",
+      "target": "0x1405c4200"
+    },
+    {
+      "owner": "phase",
+      "selector": "P+0 signed byte",
+      "table": "0x141217568",
+      "index": 2,
+      "slot": "0x141217578",
+      "bytes": "70575c4001000000",
+      "target": "0x1405c5770"
+    },
+    {
+      "owner": "phase-2",
+      "selector": "P+1 signed byte",
+      "table": "0x141222420",
+      "index": 0,
+      "slot": "0x141222420",
+      "bytes": "90585c4001000000",
+      "target": "0x1405c5890"
+    },
+    {
+      "owner": "phase-2",
+      "selector": "P+1 signed byte",
+      "table": "0x141222420",
+      "index": 1,
+      "slot": "0x141222428",
+      "bytes": "305d5c4001000000",
+      "target": "0x1405c5d30"
+    },
+    {
+      "owner": "phase-2-substate-1",
+      "selector": "P+2 signed byte",
+      "table": "0x141222430",
+      "index": 0,
+      "slot": "0x141222430",
+      "bytes": "505d5c4001000000",
+      "target": "0x1405c5d50"
+    },
+    {
+      "owner": "phase-2-substate-1",
+      "selector": "P+2 signed byte",
+      "table": "0x141222430",
+      "index": 1,
+      "slot": "0x141222438",
+      "bytes": "505e5c4001000000",
+      "target": "0x1405c5e50"
+    },
+    {
+      "owner": "phase-1",
+      "selector": "P+1 signed byte",
+      "table": "0x141222398",
+      "index": 6,
+      "slot": "0x1412223c8",
+      "bytes": "90555c4001000000",
+      "target": "0x1405c5590"
+    }
+  ],
+  "prompt_literals": [
+    {
+      "address": "0x14106e608",
+      "bytes": "4652454520504c415900",
+      "text": "FREE PLAY"
+    },
+    {
+      "address": "0x14106e618",
+      "bytes": "505245535320535441525420425554544f4e00",
+      "text": "PRESS START BUTTON"
+    },
+    {
+      "address": "0x14106e630",
+      "bytes": "494e53455254204d4f524520434f494e28532900",
+      "text": "INSERT MORE COIN(S)"
+    },
+    {
+      "address": "0x14106e648",
+      "bytes": "31204352454449545320544f20535441525400",
+      "text": "1 CREDITS TO START"
+    },
+    {
+      "address": "0x14106e660",
+      "bytes": "494e5345525420434f494e28532900",
+      "text": "INSERT COIN(S)"
+    }
+  ],
+  "mode_table": {
+    "address": "0x1405c5e80",
+    "selector": "P+0x48 signed byte; unsigned <=9 guard",
+    "bytes": "745e5c00795e5c00745e5c007e5e5c00795e5c00795e5c00745e5c00795e5c00745e5c00745e5c00",
+    "targets": [
+      "0x1405c5e74",
+      "0x1405c5e79",
+      "0x1405c5e74",
+      "0x1405c5e7e",
+      "0x1405c5e79",
+      "0x1405c5e79",
+      "0x1405c5e74",
+      "0x1405c5e79",
+      "0x1405c5e74",
+      "0x1405c5e74"
+    ]
+  }
+}

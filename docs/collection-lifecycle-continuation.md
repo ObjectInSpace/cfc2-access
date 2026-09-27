@@ -109,3 +109,10 @@ Validation commands and outcomes are recorded in the workflow handoff. Tests
 use synthetic memory and the pinned dump, plus a Windows transport self-read;
 none are game fixtures or audible validation. Shared runtime source is unchanged,
 so the 28 DLL runners and DLL build are not required for this increment.
+
+Follow-up from `ed547da`: the [CVS1 acquisition trace](cvs1-acquisition-trace.md)
+resolves the restore caller's nested P+1/P+2 dispatch and the post-copy pool
+rebuild. It also traces a formatted positioned-prompt producer through its
+native record queue to the glyph renderer. Selection/name semantics and live
+validation remain open; adjacent pointer tables must not be flattened into
+one inferred phase map.
