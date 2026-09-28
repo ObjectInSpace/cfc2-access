@@ -25,6 +25,14 @@ SPANS = (
     ('post-restore-pool-reset', 0x1405ADEE0, 0x1405AE162),
     ('mode-dispatch', 0x1405C5E50, 0x1405C5E7F),
     ('mode-branch-A-dispatch', 0x1405D8B10, 0x1405D8B27),
+    ('mode-branch-A-substate-6', 0x1405DBC30, 0x1405DBFCD),
+    ('mode-branch-A-actor-4-entry', 0x1405D9E70, 0x1405D9F30),
+    ('mode-branch-A-navigation-excerpt', 0x1405D9F30, 0x1405DA306),
+    ('mode-branch-A-choice-actor-consumer', 0x1405DA306, 0x1405DA3BC),
+    ('mode-branch-A-object-state-dispatch', 0x14060B500, 0x14060B50F),
+    ('mode-branch-A-object-substate-dispatch', 0x14060A730, 0x14060A73F),
+    ('mode-branch-A-object-choice-writer', 0x14060A800, 0x14060B44E),
+    ('mode-branch-A-choice-object-creation', 0x140610CF0, 0x140611189),
     ('mode-branch-B-dispatch', 0x140602440, 0x14060252D),
     ('mode-branch-B-initializer', 0x140602530, 0x140602AE8),
     ('mode-branch-B-actor-dispatch', 0x140602B70, 0x140602CA3),
@@ -69,6 +77,10 @@ SPANS = (
 # Explicit individual edges, NOT inferred table lengths. Adjacent dispatch
 # tables share storage boundaries, and some callable entries have two routes.
 TABLE_EDGES = (
+    ('mode-branch-A', 'P+3 signed byte', 0x141237D80, 6, 0x1405DBC30),
+    ('mode-branch-A-actor', 'actor+4 unsigned byte', 0x141237DC0, 4, 0x1405D9E70),
+    ('mode-branch-A-object', 'object+4 unsigned byte', 0x141242468, 1, 0x14060A730),
+    ('mode-branch-A-object-substate', 'object+5 unsigned byte', 0x141242450, 1, 0x14060A800),
     ('phase', 'P+0 signed byte', 0x141217568, 1, 0x1405C4200),
     ('phase', 'P+0 signed byte', 0x141217568, 2, 0x1405C5770),
     ('phase-2', 'P+1 signed byte', 0x141222420, 0, 0x1405C5890),
@@ -107,6 +119,7 @@ RENDER_TARGETS = (
 )
 
 CHECKED_RVA_TABLES = (
+    ('branch-A-P4-6-entry-only', 0x1405DBFE8, (0x1405DBE21,)),
     ('side-graphic-mode', 0x1405C8BB0,
      (0x1405C8B2F, 0x1405C8B2F, 0x1405C8B2F, 0x1405C8B21, 0x1405C8B21,
       0x1405C8B21, 0x1405C8B2F, 0x1405C8B28, 0x1405C8B2F, 0x1405C8B2F)),

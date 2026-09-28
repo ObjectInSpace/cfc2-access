@@ -124,6 +124,54 @@
       "sha256": "a10e48d01e013b4c892b48c91cc2b23532788332f92fe19c02df66e3471a06b5"
     },
     {
+      "label": "mode-branch-A-substate-6",
+      "start": "0x1405dbc30",
+      "end_exclusive": "0x1405dbfcd",
+      "sha256": "c60e4498c546d794aef3fafc894eabd1773a66be352898d2e02554f70e8867b9"
+    },
+    {
+      "label": "mode-branch-A-actor-4-entry",
+      "start": "0x1405d9e70",
+      "end_exclusive": "0x1405d9f30",
+      "sha256": "120925110720a540417d570dc155d4804320bda1d94fc57446a790e98c3f0a8b"
+    },
+    {
+      "label": "mode-branch-A-navigation-excerpt",
+      "start": "0x1405d9f30",
+      "end_exclusive": "0x1405da306",
+      "sha256": "8dd5f9db27359538585eb7d68f1b87bd7ab85fc8fefacb128daceda5780a4a6e"
+    },
+    {
+      "label": "mode-branch-A-choice-actor-consumer",
+      "start": "0x1405da306",
+      "end_exclusive": "0x1405da3bc",
+      "sha256": "1ac4adea477dd3831e91b704616b82a803d633cef5663353e75dbfe0775362ae"
+    },
+    {
+      "label": "mode-branch-A-object-state-dispatch",
+      "start": "0x14060b500",
+      "end_exclusive": "0x14060b50f",
+      "sha256": "53a29eccf184c11c8d79a5e30760490d94a738c5602b7f800a5297ae7920d4cb"
+    },
+    {
+      "label": "mode-branch-A-object-substate-dispatch",
+      "start": "0x14060a730",
+      "end_exclusive": "0x14060a73f",
+      "sha256": "f56f92b8f773beb4eb922e83be6e682907b606785c07b9e7d41939aa95f73daa"
+    },
+    {
+      "label": "mode-branch-A-object-choice-writer",
+      "start": "0x14060a800",
+      "end_exclusive": "0x14060b44e",
+      "sha256": "a406186cf8e2b7a20b8bbf2c97b622e5f67f80b5977521dd7f97341068e4741f"
+    },
+    {
+      "label": "mode-branch-A-choice-object-creation",
+      "start": "0x140610cf0",
+      "end_exclusive": "0x140611189",
+      "sha256": "5745ca3c26cd29258ccc3c715a5d31652f41a605b52b6e0279c255e74afdd96e"
+    },
+    {
       "label": "mode-branch-B-dispatch",
       "start": "0x140602440",
       "end_exclusive": "0x14060252d",
@@ -359,6 +407,42 @@
     }
   ],
   "dispatch_edges": [
+    {
+      "owner": "mode-branch-A",
+      "selector": "P+3 signed byte",
+      "table": "0x141237d80",
+      "index": 6,
+      "slot": "0x141237db0",
+      "bytes": "30bc5d4001000000",
+      "target": "0x1405dbc30"
+    },
+    {
+      "owner": "mode-branch-A-actor",
+      "selector": "actor+4 unsigned byte",
+      "table": "0x141237dc0",
+      "index": 4,
+      "slot": "0x141237de0",
+      "bytes": "709e5d4001000000",
+      "target": "0x1405d9e70"
+    },
+    {
+      "owner": "mode-branch-A-object",
+      "selector": "object+4 unsigned byte",
+      "table": "0x141242468",
+      "index": 1,
+      "slot": "0x141242470",
+      "bytes": "30a7604001000000",
+      "target": "0x14060a730"
+    },
+    {
+      "owner": "mode-branch-A-object-substate",
+      "selector": "object+5 unsigned byte",
+      "table": "0x141242450",
+      "index": 1,
+      "slot": "0x141242458",
+      "bytes": "00a8604001000000",
+      "target": "0x14060a800"
+    },
     {
       "owner": "phase",
       "selector": "P+0 signed byte",
@@ -597,6 +681,14 @@
     }
   ],
   "graphic_tables": [
+    {
+      "label": "branch-A-P4-6-entry-only",
+      "address": "0x1405dbfe8",
+      "bytes": "21be5d00",
+      "targets": [
+        "0x1405dbe21"
+      ]
+    },
     {
       "label": "side-graphic-mode",
       "address": "0x1405c8bb0",

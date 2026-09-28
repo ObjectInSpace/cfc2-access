@@ -508,3 +508,37 @@ transition values; `git diff --check` passed. Source/tests unchanged and not
 rerun. Next independent work is branch-A writer/consumer tracing for actor
 state 4 against the retained live sequence. Names and runtime packets remain
 unverified/draft; no further user inputs are needed for this finished window.
+
+## Handoff continuation — branch-A trace from ac1ef14
+
+Traced the active branch against movement window 02. See
+[branch-A selection evidence](cvs1-branch-a-selection.md).
+
+- P+3=6 and P+4=6 lead through `0x1405DBC30` to the actor dispatch;
+  actor state 4 selects `0x1405D9E70`. Pinned each individual table edge.
+- The actor handler reads the selected slot, updates group/position fields
+  using input words, and copies the selected byte into the actor indexed by
+  owner+2*actor[5]. With the live actor[5]=0 this matches the captured field.
+- Located a separate list-4 selection-object writer. Its group/position match
+  gates publish object+0xc6 into the active selected slot at `0x14060b431`.
+  Traced object creation/callback publication and both nested dispatches.
+- Object catalog rows supply native IDs; setup caller semantics, input-word
+  publication, character names and exact input/transition timing remain open.
+- Existing capture omits P+0x104/+0x10c/+0x111 and actor+0x5be/+0x5d8;
+  it cannot reconstruct the navigation decisions behind 1→0→16→0. Do not
+  extend the branch-B asset contract by analogy.
+
+Acquisition audit now pins 57 spans and 17 explicit pointer-table edges plus
+the branch-A P+4=6 RVA entry. All added spans are <=4 KiB; larger actor
+handler evidence is explicitly split into bounded excerpts, not a full CFG.
+
+Validation: regenerated manifest; thirteen acquisition tests passed, including
+branch-A dispatch mutation rejection; nine selection-capture tests passed
+against the expanded signatures; `git diff --check` passed. No live reads,
+game inputs, capture-scope expansion, runtime changes or deployment this turn.
+
+Next: trace setup/catalog and input-word publication; add the specific group,
+position and input fields to state-only capture with failure tests before
+requesting further movement. The code/live evidence now connects native
+choice publication to the actor copy, but names, branch-A graphics and runtime
+packets remain unverified/draft.

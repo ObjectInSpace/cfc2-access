@@ -16,6 +16,16 @@ class AcquisitionAuditTests(unittest.TestCase):
         manifest = Path(__file__).resolve().parents[1] / 'docs/cvs1-acquisition-manifest.json'
         self.assertEqual(audit.compact(self.report), json.loads(manifest.read_bytes()))
 
+    def test_branch_a_subdispatch_mutation_refused(self):
+        original = audit.Dump.read
+        def changed(dump, address, size):
+            if address == 0x1405DBFE8:
+                return bytes(size)
+            return original(dump, address, size)
+        with patch.object(audit.Dump, 'read', changed):
+            with self.assertRaisesRegex(ValueError, 'Graphic route differs: branch-A'):
+                audit.produce(audit.DEFAULT_DUMP)
+
     def test_restore_route_keeps_nested_selector(self):
         edges = self.report['dispatch_edges']
         restore = next(e for e in edges if e['target'] == '0x1405c5d50')
