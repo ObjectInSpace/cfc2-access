@@ -573,3 +573,27 @@ is ready, retaining action notes. Independent tracing remains available:
 input-record+0x38 producer, intervening input helpers, branch-A setup/catalog
 semantics, and character-name provenance. Runtime packets remain draft;
 the larger collection proof work is still pending.
+
+## Handoff continuation — repeat-mask producer after 8b457f5
+
+CFC2 was not running when continuation began. Asked the user to return to
+CVS1 character select for schema-2 capture; no attachment or live reads
+were attempted. Continued the independent input trace meanwhile.
+
+Resolved input-record+0x38 to `0x1405a9c00`: clear output, compare current
+and previous masks, reset counter on change, otherwise emit the held mask
+when the incremented counter exceeds 35 and reset to 30. The native update
+calls this for both records after copying their previous repeat outputs to
+actors; mode 5 skips it, observed mode 0 does not. The optional input
+override helper requires mode 4 and phase 2,1,2,2, excluding the captured
+mode 0 at its first gate. Details and limits are in the branch-A evidence.
+
+Added repeat routine and override-gate prefix to the audit, now 61 bounded
+spans. Regenerated manifest; all 13 acquisition and 11 selection-capture
+tests passed. No capture source changes, runtime changes or deployment.
+
+Next live work remains the expanded control/movement window once the user
+reports readiness. Do not equate this repeat-path evidence with an explanation
+of the old three-transition sequence: that fixture lacks input words.
+Remaining offline leads include setup/catalog naming, device-bit mapping,
+and intervening helpers. Runtime packets remain draft.

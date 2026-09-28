@@ -19,6 +19,8 @@ SPANS = (
     ('native-update', 0x1405A65F0, 0x1405A665D),
     ('native-input-publication', 0x1405AA1C0, 0x1405AA5DD),
     ('actor-input-derived-copy', 0x1405AA5E0, 0x1405AA702),
+    ('native-input-repeat', 0x1405A9C00, 0x1405A9C31),
+    ('optional-input-override-gates', 0x1405A9D80, 0x1405A9DBF),
     ('phase-dispatch', 0x1405AE5F0, 0x1405AE675),
     ('phase-2-subdispatch', 0x1405C5770, 0x1405C57A7),
     ('phase-2-substate-1-dispatch', 0x1405C5D30, 0x1405C5D47),

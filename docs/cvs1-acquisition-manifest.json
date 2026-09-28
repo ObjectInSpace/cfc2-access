@@ -88,6 +88,18 @@
       "sha256": "50101df0fa694338e97e9629d40fcc1ce5feaba87f5b67e914343021ca9f1c96"
     },
     {
+      "label": "native-input-repeat",
+      "start": "0x1405a9c00",
+      "end_exclusive": "0x1405a9c31",
+      "sha256": "37e5aaeb6d3f22d06c2a2fb1191e7c70f73e8720308f1fe03beb78c2c8443043"
+    },
+    {
+      "label": "optional-input-override-gates",
+      "start": "0x1405a9d80",
+      "end_exclusive": "0x1405a9dbf",
+      "sha256": "0b95709bf88ba11bc0e14c85102208af3d441ac9684abda6a8fc1771c23e925e"
+    },
+    {
       "label": "phase-dispatch",
       "start": "0x1405ae5f0",
       "end_exclusive": "0x1405ae675",

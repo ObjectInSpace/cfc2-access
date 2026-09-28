@@ -142,3 +142,35 @@ fields participate in the before/after comparison. Old fixtures remain
 schema 1 and cannot retroactively supply these bytes. No expanded live
 capture has been performed. Sampling can miss short input pulses and
 cannot prove frame ordering or eliminate ABA.
+
+## Repeat producer continuation after 8b457f5
+
+The next trace resolves the record+0x38 producer described above.
+`0x1405a9c00..0x1405a9c31` is a complete leaf routine, now pinned in the
+audit. RCX is the input-record address. It clears word +0x38 on entry,
+compares current word +0 with previous word +2, and resets word counter
++0x3a to zero when they differ. If equal, it increments that 16-bit counter.
+Unsigned counter values through 35 emit nothing; when the incremented value
+exceeds 35 it writes the current mask to +0x38 and resets the counter to 30.
+Thus a continually unchanged nonzero mask produces a repeat after 36 equal
+comparisons, then every six equal comparisons. This is counted in calls,
+not a measured wall-clock duration. A zero held mask still produces zero.
+
+The already-pinned native update calls this helper at `0x1405a6619` and
+`0x1405a662c`, passing R+0x3c76 and R+0x3cb2. Mode 5 skips these calls;
+the observed mode 0 does not. Both calls occur after `0x1405aa1c0` copied
+the records into actors. Therefore the normal copy path publishes the
+previously generated repeat value to actor+0x5d8 before generating the next
+record value. This establishes staged ordering within the update; it does
+not prove that other paths cannot overwrite the state between updates.
+
+The optional helper `0x1405a9d80` called within input publication starts
+with mode=4 and phase 2,1,2,2 gates. Its pinned prefix ends at
+`0x1405a9dbf`. The captured mode 0 fails its first gate and branches to the
+epilogue at `0x1405aa1b7`; its body is not evidence of a mode-0 input rewrite.
+Other intervening helpers and device-to-bit mapping remain open.
+
+The capture keeps offset-labelled words; this evidence supports interpreting
++0x5d8 as a staged repeat-mask value on the traced path. It does not assign
+directions or account for the three earlier transitions by itself. The
+schema-1 movement fixture lacks these words, and polling may miss pulses.
