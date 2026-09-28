@@ -25,8 +25,9 @@ Lossless gzip copies are committed for reproduction:
 
 The second label describes the requested action, not confirmed input: the
 assistant asked for one move, a pause, then a move back without confirmation.
-The user's actual action timing/control and visible character were not yet
-reported when this note was written. Do not call it a verified movement test.
+The user later said they did not think they made the requested moves. Retain
+this as a steady control, not a verified movement test. The visible character
+was not independently identified.
 
 ## Observations and limits
 

@@ -483,3 +483,28 @@ Validation for this evidence increment: both fixture gzip copies round-trip
 to the original JSONL bytes and recorded hashes; parsed all samples and
 compared brackets/selection transitions; `git diff --check` passed. No source
 changes or test/build reruns. Runtime packets remain draft/not ready.
+
+## Handoff continuation — confirmed movement window, 2026-09-28
+
+The user clarified that the first window probably had no requested movement,
+then reported CVS1 character select open again. Recorded a new 60-second
+state-only window from PID 29680; process exit 0, all 240 samples retained.
+See [movement window 02](cvs1-live-movement-02.md) and its lossless fixture.
+
+The user confirmed the requested Right/pause/Left inputs were made with the
+game focused and produced movement sounds; highlighted names were unknown.
+The native side-0 selected and actor bytes changed together through
+1→0→16→0. Mode 0 / phase bytes 2,1,1,6,6 remained stable. Three transitions
+versus two reported inputs means direction/timing correspondence is not
+proved. Do not invent a name or navigation order from these numbers.
+
+There were 239 equal brackets outside the branch-B asset gate and one phase
+block mismatch, no read errors or asset reads. Side 1 stayed inactive in the
+sampled fields. No runtime changes, hooks, deployment or speech feature.
+
+Updated the earlier control's action provenance. Verified the new gzip fixture
+round-trips to the original JSONL and recorded its hash; parsed all rows and
+transition values; `git diff --check` passed. Source/tests unchanged and not
+rerun. Next independent work is branch-A writer/consumer tracing for actor
+state 4 against the retained live sequence. Names and runtime packets remain
+unverified/draft; no further user inputs are needed for this finished window.
