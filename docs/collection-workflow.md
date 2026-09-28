@@ -388,3 +388,39 @@ than the character itself. Trace P+0x18 and input-source publication before
 assigning controller identity. Branch A, lifecycle discontinuities, prepared
 live observations, shared-boundary proof and the broader feature campaign
 remain pending. Runtime Opus packets remain draft/not ready.
+
+## Handoff continuation — 2026-09-27, from 48db0a8
+
+Continued offline from clean `48db0a8`; extended the
+[CVS1 acquisition trace](cvs1-acquisition-trace.md).
+
+- Verified that this dump's CVS1 root and common-context pointers are null.
+  Populated selection assets cannot be recovered through those pointers;
+  asset-content verification requires a prepared live resource capture.
+- Connected the non-special selected byte to actor+1, two subtype-10 object
+  descriptors, a change-triggered refresh request and an asset-address consumer.
+  Side 1 remaps IDs 9, 0x12 and 0x19 to 0x23, 0x24 and 0x25; no names assigned.
+- Traced staged refresh: request 3 handles side 0 and leaves side 1 pending.
+  Mapped mode-dependent resource slots and the bounded registration check in
+  `0x140F31BE0`; final upload and visual content remain unproved.
+- Traced resource offset fixups and shared command enqueue. This is still
+  upstream of final rendering, not proof that a queued graphic is visible.
+- Corrected the choice-writer span label/prose to say excerpt: code continues
+  past `0x14060690A` into confirmation logic. Do not treat it as a full CFG.
+- Audit now records 49 spans, 13 explicit pointer-table edges, six selected
+  descriptors, graphic-mode/resource-subtype tables, one command-type entry,
+  and dump pointer snapshots, in addition to the prior evidence.
+
+Validation: regenerated acquisition manifest; twelve acquisition tests passed,
+including a changed graphic-mode route; `git diff --check` passed. No runtime
+changes, deployment, game attachment, live asset capture or audible validation.
+Unchanged suites and DLL build not rerun.
+
+Next work: prepare a separately tested bounded selection/resource capture
+using the traced side/slot/refresh provenance, and inspect `0x140049170` plus
+the downstream graphics queue consumer. Character-name mapping still needs
+asset or live evidence. The 0x23 special path, full confirmation CFG, physical
+controller association, branch A and lifecycle discontinuities remain open.
+Existing metadata capture remains ready for its own lifecycle/Alpha 3 session;
+it cannot substitute for the new selection measurements. Shared-boundary proof,
+CVS1 pilot and the broader feature campaign remain pending; Opus packets draft.

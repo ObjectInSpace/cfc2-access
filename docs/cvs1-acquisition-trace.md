@@ -164,7 +164,7 @@ zero-extended actor+4 indexes `0x141240DC0`; entry 6 is `0x140606290`.
 Actor ownership is read from signed actor+0x688. Initialization is traced
 below; association with a physical controller remains unproved.
 
-The choice-update function `0x140606290..0x14060690A` reads:
+The choice-update excerpt `0x140606290..0x14060690A` reads:
 
 - Owner from actor+0x688 at `0x1406062ba`.
 - Current slot from P+0xa0+owner at `0x1406062e6`.
@@ -402,13 +402,88 @@ the producer remain open. F17 is partially code-traced; it is not captured,
 implemented or live-validated. F18 can reuse the eventual record capture but
 must include empty-frame replacement and capture freshness.
 
+## Character-graphic refresh and dump availability
+
+The reviewed image-section dump contains zero at both CVS1 root slot
+`0x1422D2B90` and common-context slot `0x142C79B40`. The audit records
+these snapshot values. It cannot follow either pointer to a populated
+resource buffer. This is a limitation of this snapshot, not a finding that
+the game never allocates these resources. Graphic-content inspection needs
+a separately prepared live capture; the existing metadata tool does not
+dereference roots or collect resource payloads.
+
+The choice writer's earlier recorded span is an excerpt, not a complete
+function. It continues past `0x14060690A` into slot-confirmation logic and
+has branches beyond that end. Its audit label now states this explicitly;
+no complete control-flow or hook ABI claim follows from the excerpt.
+
+Within that excerpt, the non-0x23 path writes selected BL into actor+1 at
+`0x14060671c`. The special 0x23 path has separate behavior and must not be
+collapsed into this assignment. The two selected descriptor rows 60 and 61
+are `3b0a0007` and `3c0a0007`: resource IDs 0x3b/0x3c, object subtype 10,
+position index zero, mask 7. The object dispatch table's entry 10 points to
+`0x1406048D0..0x140604C51` (the following bytes are a jump table, not code).
+
+The handler dispatches initialization on resource−0x39 with an unsigned
+<=5 guard. The checked six-entry table maps resources 0x3b/0x3c to the
+branch setting object+7=1. It saves side=object+0x37 AND 1 and initializes
+object+0x36 to 0xff. Thus these rows yield sides 0 and 1 respectively.
+After phase/actor gates, its object+7=1 path compares actor+1 against the
+saved byte. On change, it saves the new byte at `0x140604a66`, sets
+R+0x30bfb=1 and ORs side+1 into R+0x30bfc. This is a change-triggered
+graphic-refresh request, not a string producer.
+
+The native update calls `0x1405AF690`, which calls `0x1405C8BE0` after
+the phase update. With the refresh flag nonzero, request value 1 calls
+`0x1405C8AF0(0)`; value 2 calls it with side 1. Value 3 refreshes side 0,
+leaves flag=1/request=2 and returns, scheduling the other side for a later
+invocation. The other reviewed exit paths clear the flag/request. Request
+4 follows a different asset path and is not given the same interpretation.
+This staging is another reason one memory sample cannot certify both
+sides' final images.
+
+`0x1405C8AF0..0x1405C8BAD` reads actor+1 for its side. Side 1 remaps
+native values 9→0x23, 0x12→0x24 and 0x19→0x25; side 0 does not apply
+those substitutions. It computes a source pointer as common-context buffer
+(context+8) +0xab0000 +(mapped_value<<15). It supplies resource slot
+0x400+side+mode_offset to `0x140F31BE0`. The checked mode table selects
+offset 1 for modes 0,1,2,6,8,9; 2 for 3,4,5; and 3 for 7. The out-of-range
+branch does not establish a safe default, so no external reader should invent
+one. Numeric native values and remaps still have no verified character names.
+
+`0x140F31BE0..0x140F31C44` adds context+0x1e0098 to the slot, requires
+unsigned slot<0x1000 and a nonzero word in the corresponding 24-byte entry,
+then calls `0x140049170`, forwarding the source pointer on the stack and
+three words from that entry. This establishes the selected byte's concrete
+asset-address consumer. The asset format, final upload and character-name
+labels remain open.
+
+Two supporting resource/queue spans are now pinned. Fixup helper
+`0x1405AD9B0..0x1405ADA33` normalizes the resource header to 0x10,
+subtracts the header delta from offsets, and adjusts a sentinel-terminated
+array before calling common resource helpers. Its mutation means on-disk
+and post-fixup offsets cannot automatically be interchanged.
+`0x140F2F390..0x140F2FB39` is a command enqueue routine: the type-2 table
+entry reaches `0x140f2f69b`; the eventual queue path checks a count below
+0x800, records type/pointer/size metadata, copies the descriptor into the
+context staging buffer and increments counts. Its entry also checks the
+accumulated staging size against 0xe0000. It is not the final GPU consumer;
+queue acceptance does not establish visible output.
+
+Next measurement preparation should retain phase/mode, side, slot, selected
+byte, actor+1, both pending-refresh bytes and resource-slot/source provenance
+alongside any bounded raw asset capture. Include special 0x23 behavior and
+side-1 remaps before defining a character-ID map. No live resource-capture
+tool, detour or speech reader is introduced by this trace.
+
 ## Validation and next measurement
 
-Eleven audit tests passed, exit 0: manifest reproduction; nested selector
+Twelve audit tests passed, exit 0: manifest reproduction; nested selector
 preservation; changed nested-pointer rejection; changed literal rejection;
 actor/object selector separation; changed object-subtype rejection;
 changed pool-insertion target rejection; overlapping flag-reset preservation;
-render-branch swap rejection; resource-destination mutation rejection; and
+render-branch swap rejection; resource-destination mutation rejection;
+graphic-mode route mutation rejection; and
 jump-table escape rejection. They use the pinned dump and synthetic
 mutations, not gameplay fixtures. No runtime files changed or DLL deployed.
 

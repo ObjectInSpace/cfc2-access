@@ -142,7 +142,7 @@
       "sha256": "00d30f843458d0459d010ac88c0ae503d6cf9531504b47a998494f2b4d380bc7"
     },
     {
-      "label": "mode-branch-B-choice-update",
+      "label": "mode-branch-B-choice-update-excerpt",
       "start": "0x140606290",
       "end_exclusive": "0x14060690a",
       "sha256": "8f1a74b1952929fed32ef2142b10733f048e104a4c46da0e97325ef8aa71d70e"
@@ -260,6 +260,48 @@
       "start": "0x140f34cf0",
       "end_exclusive": "0x140f34e34",
       "sha256": "b7ac78594b4c80d46262812a531e46d25c413d2a2185527f7cdc5e344e4838ac"
+    },
+    {
+      "label": "resource-offset-fixup",
+      "start": "0x1405ad9b0",
+      "end_exclusive": "0x1405ada33",
+      "sha256": "040478e333ae0e3f74e0d06022919115e877965059fb35ca7e4e825dcf92a879"
+    },
+    {
+      "label": "shared-command-queue",
+      "start": "0x140f2f390",
+      "end_exclusive": "0x140f2fb39",
+      "sha256": "587f31d256b399e5f6118cc032ef5509a87a5d7cc55e0b3876a7c1874d8434a1"
+    },
+    {
+      "label": "mode-branch-B-graphic-change-object",
+      "start": "0x1406048d0",
+      "end_exclusive": "0x140604c51",
+      "sha256": "5a45d25e40d8d5d4465d97af60c183931bc881426208da4250feb0fcc7bdcaee"
+    },
+    {
+      "label": "side-graphic-refresh",
+      "start": "0x1405c8af0",
+      "end_exclusive": "0x1405c8bad",
+      "sha256": "ab3111044f9279bde95d862758eb382dd0272ae0bc4756c538067b54f3ec6dab"
+    },
+    {
+      "label": "graphic-refresh-dispatch",
+      "start": "0x1405c8be0",
+      "end_exclusive": "0x1405c8da8",
+      "sha256": "deec24017f556aea94d7dfc80a3b6a79eb0e5e8c2d76753babd6eb315f7d9275"
+    },
+    {
+      "label": "graphic-refresh-wrapper",
+      "start": "0x140f31be0",
+      "end_exclusive": "0x140f31c44",
+      "sha256": "b44d7faf2939f1ecf3e70cfc516f293d03fe16f78289448846ccaa83a9e9a3cf"
+    },
+    {
+      "label": "native-post-phase-update",
+      "start": "0x1405af690",
+      "end_exclusive": "0x1405af6aa",
+      "sha256": "074928c7f775c61916f192f29980a8d9b670a9b4e2578a871a664b71724b6e25"
     },
     {
       "label": "phase-1-subdispatch",
@@ -424,6 +466,15 @@
       "slot": "0x141217548",
       "bytes": "60dc5a4001000000",
       "target": "0x1405adc60"
+    },
+    {
+      "owner": "mode-branch-B-object",
+      "selector": "object+0x34 unsigned byte",
+      "table": "0x141240e10",
+      "index": 10,
+      "slot": "0x141240e60",
+      "bytes": "d048604001000000",
+      "target": "0x1406048d0"
     }
   ],
   "prompt_literals": [
@@ -454,6 +505,16 @@
     }
   ],
   "selected_object_descriptors": [
+    {
+      "index": 60,
+      "address": "0x1412404d0",
+      "bytes": "3b0a0007"
+    },
+    {
+      "index": 61,
+      "address": "0x1412404d4",
+      "bytes": "3c0a0007"
+    },
     {
       "index": 211,
       "address": "0x14124072c",
@@ -535,6 +596,50 @@
       "bytes": "00d0a2000068a4000000900000009e00"
     }
   ],
+  "graphic_tables": [
+    {
+      "label": "side-graphic-mode",
+      "address": "0x1405c8bb0",
+      "bytes": "2f8b5c002f8b5c002f8b5c00218b5c00218b5c00218b5c002f8b5c00288b5c002f8b5c002f8b5c00",
+      "targets": [
+        "0x1405c8b2f",
+        "0x1405c8b2f",
+        "0x1405c8b2f",
+        "0x1405c8b21",
+        "0x1405c8b21",
+        "0x1405c8b21",
+        "0x1405c8b2f",
+        "0x1405c8b28",
+        "0x1405c8b2f",
+        "0x1405c8b2f"
+      ]
+    },
+    {
+      "label": "graphic-object-resource-subtype",
+      "address": "0x140604c54",
+      "bytes": "0c4960000c49600012496000124960002349600023496000",
+      "targets": [
+        "0x14060490c",
+        "0x14060490c",
+        "0x140604912",
+        "0x140604912",
+        "0x140604923",
+        "0x140604923"
+      ]
+    },
+    {
+      "label": "command-type-2-entry-only",
+      "address": "0x140f2fb44",
+      "bytes": "9bf6f200",
+      "targets": [
+        "0x140f2f69b"
+      ]
+    }
+  ],
+  "dump_pointer_snapshot": {
+    "0x1422d2b90": "0x0",
+    "0x142c79b40": "0x0"
+  },
   "mode_table": {
     "address": "0x1405c5e80",
     "selector": "P+0x48 signed byte; unsigned <=9 guard",

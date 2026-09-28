@@ -106,6 +106,17 @@ class AcquisitionAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Selection resource route differs'):
                 audit.produce(audit.DEFAULT_DUMP)
 
+    def test_changed_graphic_mode_route_refused(self):
+        original = audit.Dump.read
+        def changed(dump, address, size):
+            raw = original(dump, address, size)
+            if address == 0x1405C8BB0:
+                return raw[:16] + raw[:4] + raw[20:]
+            return raw
+        with patch.object(audit.Dump, 'read', changed):
+            with self.assertRaisesRegex(ValueError, 'Graphic route differs'):
+                audit.produce(audit.DEFAULT_DUMP)
+
     def test_mode_table_cannot_escape_guarded_branches(self):
         original = audit.Dump.read
         def changed(dump, address, size):

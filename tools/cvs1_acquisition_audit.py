@@ -28,7 +28,7 @@ SPANS = (
     ('mode-branch-B-dispatch', 0x140602440, 0x14060252D),
     ('mode-branch-B-initializer', 0x140602530, 0x140602AE8),
     ('mode-branch-B-actor-dispatch', 0x140602B70, 0x140602CA3),
-    ('mode-branch-B-choice-update', 0x140606290, 0x14060690A),
+    ('mode-branch-B-choice-update-excerpt', 0x140606290, 0x14060690A),
     ('mode-branch-B-object-dispatch', 0x140602EC0, 0x140602ECF),
     ('mode-branch-B-choice-coordinates', 0x140603220, 0x140603468),
     ('selection-actor-owner-initialization', 0x1405C4070, 0x1405C41F4),
@@ -48,6 +48,13 @@ SPANS = (
     ('selection-resource-branch-prefix', 0x1405AC282, 0x1405AC2AD),
     ('resource-publication', 0x1405AABA0, 0x1405AACE2),
     ('shared-resource-command-submission', 0x140F34CF0, 0x140F34E34),
+    ('resource-offset-fixup', 0x1405AD9B0, 0x1405ADA33),
+    ('shared-command-queue', 0x140F2F390, 0x140F2FB39),
+    ('mode-branch-B-graphic-change-object', 0x1406048D0, 0x140604C51),
+    ('side-graphic-refresh', 0x1405C8AF0, 0x1405C8BAD),
+    ('graphic-refresh-dispatch', 0x1405C8BE0, 0x1405C8DA8),
+    ('graphic-refresh-wrapper', 0x140F31BE0, 0x140F31C44),
+    ('native-post-phase-update', 0x1405AF690, 0x1405AF6AA),
     ('phase-1-subdispatch', 0x1405C4200, 0x1405C427C),
     ('phase-1-substate-6', 0x1405C5590, 0x1405C55E7),
     ('blinking-prompt-producer', 0x1405C4560, 0x1405C468C),
@@ -74,6 +81,7 @@ TABLE_EDGES = (
     ('mode-branch-B-actor', 'actor+4 unsigned byte', 0x141240DC0, 6, 0x140606290),
     ('mode-branch-B-object', 'object+0x34 unsigned byte', 0x141240E10, 2, 0x140603220),
     ('object-pool-insertion', 'R8B unsigned byte at pool entry', 0x141217548, 0, 0x1405ADC60),
+    ('mode-branch-B-object', 'object+0x34 unsigned byte', 0x141240E10, 10, 0x1406048D0),
 )
 
 PROMPTS = (
@@ -84,9 +92,10 @@ PROMPTS = (
     (0x14106E660, 'INSERT COIN(S)'),
 )
 
-# Four selected rows from the initializer's 215-row, four-byte descriptor loop.
+# Selected rows from the initializer's 215-row, four-byte descriptor loop.
 # Resource byte, subtype, position index, mode mask; not character names.
 OBJECT_DESCRIPTORS = (
+    (60, '3b0a0007'), (61, '3c0a0007'),
     (211, '2c020007'), (212, '2e020007'),
     (213, '2d020007'), (214, '2f020007'),
 )
@@ -95,6 +104,15 @@ RENDER_TARGETS = (
     0x1405E1A20, 0x1405E1BA2, 0x1405E1BAF, 0x1405E1BBC,
     0x1405E1BC9, 0x1405E1CD9, 0x1405E1DB1, 0x1405E1DBE,
     0x1405E1DCB, 0x1405E1DD8, 0x1405E1DE2, 0x1405E1DEC,
+)
+
+CHECKED_RVA_TABLES = (
+    ('side-graphic-mode', 0x1405C8BB0,
+     (0x1405C8B2F, 0x1405C8B2F, 0x1405C8B2F, 0x1405C8B21, 0x1405C8B21,
+      0x1405C8B21, 0x1405C8B2F, 0x1405C8B28, 0x1405C8B2F, 0x1405C8B2F)),
+    ('graphic-object-resource-subtype', 0x140604C54,
+     (0x14060490C, 0x14060490C, 0x140604912, 0x140604912, 0x140604923, 0x140604923)),
+    ('command-type-2-entry-only', 0x140F2FB44, (0x140F2F69B,)),
 )
 
 
@@ -154,6 +172,14 @@ def produce(directory):
             raise ValueError(f'Selection resource route differs: {selector:#x}')
         resources.append(dict(selector=selector, compressed_index=index, target=hex(target),
                               layout_address=hex(0x141217070 + selector * 16), bytes=layout.hex()))
+    graphic_tables = []
+    for label, address, expected in CHECKED_RVA_TABLES:
+        raw = dump.read(address, len(expected) * 4)
+        targets = tuple(0x140000000 + rva for rva in struct.unpack('<' + 'I' * len(expected), raw))
+        if targets != expected:
+            raise ValueError(f'Graphic route differs: {label}')
+        graphic_tables.append(dict(label=label, address=hex(address), bytes=raw.hex(),
+                                   targets=[hex(t) for t in targets]))
     return dict(schema=1, evidence='offline instruction/data evidence; no live validation',
                 limitations=['Individual table edges do not prove selector bounds or screen meanings.',
                              'Text enqueue is not visibility; renderer execution needs live checks.',
@@ -168,6 +194,9 @@ def produce(directory):
                 input_copy_flag_writes=dict(address='0x1422d2b85',
                                            scope='0x1405fec40..0x1405fed2e only', writes=flag_writes),
                 selected_resource_routes=resources,
+                graphic_tables=graphic_tables,
+                dump_pointer_snapshot={hex(a): hex(dump.pointer(a))
+                                       for a in (0x1422D2B90, 0x142C79B40)},
                 mode_table=dict(address='0x1405c5e80', selector='P+0x48 signed byte; unsigned <=9 guard',
                                 bytes=mode_raw.hex(), targets=[hex(t) for t in mode_targets]))
 
