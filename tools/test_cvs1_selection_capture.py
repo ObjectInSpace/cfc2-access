@@ -18,7 +18,7 @@ class SelectionMemory(Memory):
         self.data[0x100000] = bytes(header)
         self.data[capture.CONTEXT_SLOT] = struct.pack('<Q', 0x500000)
         self.data[capture.PHASE_SLOT] = struct.pack('<Q', 0x403E58)
-        phase = bytearray(256)
+        phase = bytearray(0x112)
         phase[:4] = bytes((2, 1, 1, 2))
         phase[0x48] = 4
         phase[0x78] = phase[0x7C] = 9
@@ -29,6 +29,8 @@ class SelectionMemory(Memory):
             raw[1], raw[4], raw[5] = 9, 6, 6
             self.data[actor] = bytes(raw)
             self.data[actor+0x688] = bytes((side,))
+            self.data[actor+0x5BA] = bytes(0x20)
+        self.data[0x4327BC] = struct.pack('<8H', *range(1, 9))
         self.data[0x430BFB] = bytes(2)
         self.data[0x1422D2B85] = bytes((1,))
         self.data[0x500008] = struct.pack('<Q', 0x1000000)
@@ -58,13 +60,15 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(row['status'], 'matching')
         self.assertEqual([a['mapped_id'] for a in row['assets']], [9, 0x23])
         self.assertEqual([bytes.fromhex(a['hex']) for a in row['assets']], [b'A'*4096, b'B'*4096])
-        self.assertLess(sum(size for _, size in memory.calls), 10000)
-        self.assertLess(len(memory.calls), 60)
+        self.assertEqual(sum(size for _, size in memory.calls), 9670)
+        self.assertEqual(len(memory.calls), 60)
 
     def test_default_never_reads_asset(self):
         memory = SelectionMemory(self.lifecycle)
         row = capture.capture(memory.read, self.lifecycle)
         self.assertEqual(row['assets'], [])
+        self.assertEqual(sum(size for _, size in memory.calls), 1478)
+        self.assertEqual(len(memory.calls), 58)
         self.assertFalse(any(a >= 0x1000000 and a < 0x2000000 for a, _ in memory.calls))
 
     def test_wrong_identity_never_dereferences_root_or_context(self):
@@ -126,6 +130,46 @@ class SelectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             capture.capture(memory.read, self.lifecycle, 4097)
         self.assertEqual(memory.calls, [])
+
+    def test_navigation_raw_values_and_invalid_group_are_bounded(self):
+        memory = SelectionMemory(self.lifecycle)
+        p = bytearray(memory.data[0x403E58])
+        p[:5] = bytes((2, 1, 1, 6, 6)); p[0x48] = 0
+        p[0x104:0x112] = bytes((0, 1, 255, 3, 4, 5, 6, 7, 255, 127, 255, 1, 0, 0xAB))
+        memory.data[0x403E58] = bytes(p)
+        inputs = bytearray(0x20)
+        struct.pack_into('<H', inputs, 4, 0x400)
+        struct.pack_into('<H', inputs, 0x1E, 0x800)
+        memory.data[0x404572] = bytes(inputs)
+        row = capture.capture(memory.read, self.lifecycle, 4096)
+        self.assertEqual(row['status'], 'outside_scope')
+        self.assertEqual(row['assets'], [])
+        nav = row['before']['navigation']
+        self.assertEqual(nav['enabled_mask'], 0xAB)
+        self.assertEqual(nav['sides'][0], dict(side=0, group=-1, delta=-1,
+                                             positions=[0, 1, -1, 3], counts=[1, 2, 3, 4]))
+        self.assertEqual(nav['sides'][1]['group'], 127)
+        self.assertEqual(nav['sides'][1]['counts'], [5, 6, 7, 8])
+        words = row['before']['actors'][0]['input_words']
+        self.assertEqual((words['0x5be'], words['0x5d8']), (0x400, 0x800))
+        self.assertEqual(len(memory.calls), 58)
+
+    def test_navigation_failures_and_between_observation_changes(self):
+        for address in (0x4327BC, 0x404572, 0x404C72):
+            with self.subTest(address=hex(address)):
+                memory = SelectionMemory(self.lifecycle)
+                memory.data[address] = b'\0'  # Partial reads must fail closed.
+                self.assertEqual(capture.capture(memory.read, self.lifecycle)['status'], 'unreadable')
+        for address, offset in ((0x403E58, 0x10C), (0x4327BC, 0), (0x404572, 4)):
+            with self.subTest(changed=hex(address)):
+                memory = SelectionMemory(self.lifecycle)
+                def changed(a, size):
+                    raw = memory.read(a, size)
+                    if a == address:
+                        value = bytearray(memory.data[a]); value[offset] ^= 1
+                        memory.data[a] = bytes(value)
+                    return raw
+                self.assertEqual(capture.capture(changed, self.lifecycle)['status'], 'changed')
 
 
 if __name__ == '__main__':

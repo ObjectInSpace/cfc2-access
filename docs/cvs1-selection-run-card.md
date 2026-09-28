@@ -1,14 +1,17 @@
 # CVS1 selection evidence run card
 
-Prepared from `30be231`. Tool: `tools/cvs1_selection_capture.py`.
-Ready for a targeted run after synthetic tests; no live game capture or
-audible validation has been performed with this tool.
+Schema 2 extension prepared after `1ce9d1b`. Tool: `tools/cvs1_selection_capture.py`.
+The earlier schema has live controls and a confirmed movement window; the
+expanded navigation fields have synthetic validation only.
 
 ## What this answers
 
 Record phase, mode, side, slot, selected byte, actor byte, cooldown,
 pending graphic refresh and input-copy state during selection. Optionally
 retain a small raw asset prefix to compare the traced source addresses.
+Schema 2 also retains phase through +0x111, all eight group counts, and
+actor input blocks +0x5ba..+0x5d9. Decoded navigation uses fixed side/group
+indices; invalid native group/owner values never control a memory address.
 This does not identify character names, export an image, prove visibility,
 or provide accessibility speech. Prefixes alone may not identify a graphic.
 
@@ -24,9 +27,9 @@ the published primary block with size 0x32ab0, and nonzero common context.
 The phase pointer must equal root+0x3e58. These are observational gates,
 not proof against stale pointers or same-address reuse.
 
-A full sample reads 1,282 bytes in 52 requests, across two observations.
+A full sample reads 1,478 bytes in 58 requests, across two observations.
 With the maximum optional 4,096-byte prefix for each eligible side, that
-becomes at most 9,474 bytes in 54 requests. Startup signature reads are
+becomes at most 9,670 bytes in 60 requests. Startup signature reads are
 additional. Sampling defaults to one observation pair; the nominal schedule
 is capped at 60 seconds, excluding read/output time.
 
@@ -104,7 +107,11 @@ even `matching` cannot exclude an in-place asset change or ABA transition.
 All decoded numbers remain native values without speech labels. Keep the
 provenance row, raw records, failures and action notes together.
 
-The next review compares moves against selected/actor bytes, staged refresh,
-side remaps and asset-prefix hashes. A verified character-name map and any
+The next branch-A review compares group, all four positions/counts per side,
+enabled mask, delta, and input words against selected/actor transitions.
+The default 250 ms interval can miss transient input bits; absence in a
+sample is not evidence that a button was not pressed. Matching observations
+are not a frame boundary. Use state-only capture for the observed mode 0;
+the branch-B asset gates remain unchanged. A verified character-name map and any
 larger asset capture require further evidence. The existing collection
 metadata run card remains the separate lifecycle/Alpha 3 measurement.

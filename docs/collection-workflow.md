@@ -542,3 +542,34 @@ position and input fields to state-only capture with failure tests before
 requesting further movement. The code/live evidence now connects native
 choice publication to the actor copy, but names, branch-A graphics and runtime
 packets remain unverified/draft.
+
+## Handoff continuation — branch-A input publication and schema 2
+
+Continued from `1ce9d1b` in the Astra investigation phase. Traced the
+immediate actor input publishers and the native update call order; details
+are appended to [branch-A evidence](cvs1-branch-a-selection.md).
+Actor+0x5be receives the native newly pressed mask through staged input
+records. Actor+0x5d8 copies +0x5c6, sourced from input record+0x38; its
+upstream meaning and physical button mapping remain unproved. Added two
+bounded spans, bringing the acquisition signature manifest to 59 spans.
+
+Expanded the read-only selection tool to schema 2: phase through +0x111,
+eight group counts, and two actor input blocks. Fixed-domain decoding
+retains invalid groups without using them as memory indices. The new bytes
+participate in both observations and their comparison. State-only bounds
+are 1,478 bytes / 58 reads per pair; optional maximum assets make that
+9,670 bytes / 60 reads. Branch-B asset eligibility is unchanged.
+
+Validation: regenerated acquisition manifest; 13 acquisition, 11 selection
+capture, and 11 metadata/transport tests passed. Selection tests cover exact
+read budgets, raw navigation/input values, invalid group values, partial
+reads and between-observation changes. No expanded live capture, game
+inputs, runtime changes, DLL build or deployment. Old live fixtures remain
+schema 1. Updated the run card for a future state-only measurement; short
+input pulses may still be missed by polling.
+
+Next: use schema 2 for a coordinated control/movement window when the user
+is ready, retaining action notes. Independent tracing remains available:
+input-record+0x38 producer, intervening input helpers, branch-A setup/catalog
+semantics, and character-name provenance. Runtime packets remain draft;
+the larger collection proof work is still pending.

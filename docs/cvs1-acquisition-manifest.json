@@ -76,6 +76,18 @@
       "sha256": "0e0c1025c7727b313d5e341ca4aafb057f436ca7126d47d3104b962d57711047"
     },
     {
+      "label": "native-input-publication",
+      "start": "0x1405aa1c0",
+      "end_exclusive": "0x1405aa5dd",
+      "sha256": "db5dbc619e913b6b47d5eae4f2d8fe5bcaa5aea14ae6d61af36a2e0c9c5c1c6b"
+    },
+    {
+      "label": "actor-input-derived-copy",
+      "start": "0x1405aa5e0",
+      "end_exclusive": "0x1405aa702",
+      "sha256": "50101df0fa694338e97e9629d40fcc1ce5feaba87f5b67e914343021ca9f1c96"
+    },
+    {
       "label": "phase-dispatch",
       "start": "0x1405ae5f0",
       "end_exclusive": "0x1405ae675",

@@ -62,22 +62,34 @@ def observe(read, lifecycle):
         if phase != root + 0x3E58:
             result['reason'] = 'phase pointer mismatch'
             return result
-        p = block('phase', phase, 0x100)
+        p = block('phase', phase, 0x112)
+        counts = block('navigation_counts', root + 0x327BC, 16)
         actors = []
         for side in range(2):
             actor = root + 0x3FB8 + side * 0x700
             header = block(f'actor_{side}_header', actor, 0x38)
             owner = number(block(f'actor_{side}_owner', actor + 0x688, 1), fmt='b')
+            inputs = block(f'actor_{side}_inputs', actor + 0x5BA, 0x20)
             slot = number(p, 0xA0 + side, 'b')
             selected = number(p, 0x78 + 4 * side + slot, 'b') if 0 <= slot < 4 else None
             actors.append(dict(side=side, owner=owner, slot=slot, selected=selected,
                                actor_id=header[1], state=header[4], activity=header[5],
-                               cooldown=number(header, 0x30, 'H')))
+                               cooldown=number(header, 0x30, 'H'),
+                               input_words={hex(offset): number(inputs, offset - 0x5BA, 'H')
+                                            for offset in (0x5BA, 0x5BC, 0x5BE, 0x5C0,
+                                                           0x5C2, 0x5C4, 0x5C6, 0x5D8)}))
         block('pending_refresh', root + 0x30BFB, 2)
         block('input_copy_flag', 0x1422D2B85, 1)
         buffer = number(block('context_buffer', context + 8, 8))
         block('resource_base', root + 0x52B0, 8)
         result.update(actors=actors, buffer=hex(buffer), mode=p[0x48])
+        # Fixed side/group domains only. Never index reads using an untrusted owner/group.
+        result['navigation'] = dict(enabled_mask=p[0x111], sides=[
+            dict(side=side, group=number(p, 0x10C + side, 'b'),
+                 delta=number(p, 0x10E + side, 'b'),
+                 positions=[number(p, 0x104 + 4 * side + group, 'b') for group in range(4)],
+                 counts=[number(counts, 2 * (4 * side + group), 'H') for group in range(4)])
+            for side in range(2)])
         result['eligible'] = p[:4] == bytes((2, 1, 1, 2)) and p[0x48] in (1, 4, 5, 7)
         result['reason'] = 'branch-B selection gate' if result['eligible'] else 'outside reviewed branch-B phase'
     except OSError as exc:
@@ -142,7 +154,7 @@ def main():
     reader = metadata.ProcessReader(args.pid)
     try:
         checked = verify(reader.read, lifecycle, acquisition)
-        provenance = dict(kind='cvs1-selection-capture', schema=1, pid=args.pid,
+        provenance = dict(kind='cvs1-selection-capture', schema=2, pid=args.pid,
                           label=args.label, mode=args.mode, language=args.language,
                           created_utc=metadata.utc(), asset_bytes=args.asset_bytes,
                           count=args.count, interval=args.interval, checked_code_spans=checked,

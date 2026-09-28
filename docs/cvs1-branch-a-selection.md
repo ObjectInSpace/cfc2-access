@@ -102,3 +102,43 @@ the state-only capture with these specific bounded fields and tests before
 requesting another targeted session. Retain the existing asset gate until a
 branch-A graphic/name consumer is established. No runtime reader, live
 capture expansion or speech implementation is introduced here.
+## Input publication continuation after 1ce9d1b
+
+Same dump/code hash as the preceding evidence. Added audit spans
+`0x1405aa1c0..0x1405aa5dd` and `0x1405aa5e0..0x1405aa702`, with exclusive
+ends. These decode continuously from function entries; byte-scan candidates
+were only leads. The acquisition manifest now checks 59 bounded spans.
+
+Native update calls `0x1405aa1c0` at `0x1405a65f9`, before phase dispatch
+at `0x1405a6640`. For two sides, stride 0x3c, it saves R+0x3c76 to +0x3c78,
+calls `0x140048bb0` with side 0/1, and stores returned AX at +0x3c76.
+Instructions `0x1405aa216..0x1405aa229` calculate
+`(~previous) & current` into word R+0x3c7a. This is a newly pressed bit
+mask at this native boundary; physical control assignments remain unproved.
+
+The copies at `0x1405aa296..0x1405aa323` transfer the two 0x3c-byte input
+records from R+0x3c76/+0x3cb2 to R+0x3d66/+0x3da2. The stores at
+`0x1405aa376` and `0x1405aa410` then copy R+0x3d6a/+0x3da6 to
+R+0x4576/+0x4c76, which are the two actors' +0x5be words. Previous actor
++0x5be values are retained at +0x5c0 before these stores.
+
+The same function copies R+0x3d9e/+0x3dda into actor+0x5c6 at
+`0x1405aa3bc` / `0x1405aa456`. Calls at `0x1405aa592` / `0x1405aa5a5`
+pass the two actor addresses to `0x1405aa5e0`. Its store at `0x1405aa605`
+copies actor+0x5c6 into actor+0x5d8 before its conditional direction-bit
+transformation of other fields. Thus +0x5d8 is sourced from record+0x38;
+the upstream writer and semantic meaning of that source remain open.
+Do not call it a repeat mask without tracing its producer.
+
+This pins immediate publication, not the absence of intervening writers:
+native update calls other helpers before phase dispatch, and optional
+`0x1405a9d80` runs inside input publication. Upstream device mapping and
+those helpers remain relevant to full input provenance.
+
+Schema 2 capture retains P through +0x111, sixteen bytes at R+0x327bc,
+and 32 bytes per actor at +0x5ba. It decodes fixed-side group/positions,
+counts, delta, enabled mask and offset-labelled input words. All added
+fields participate in the before/after comparison. Old fixtures remain
+schema 1 and cannot retroactively supply these bytes. No expanded live
+capture has been performed. Sampling can miss short input pulses and
+cannot prove frame ordering or eliminate ABA.
