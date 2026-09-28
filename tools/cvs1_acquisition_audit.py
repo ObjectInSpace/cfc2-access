@@ -9,6 +9,9 @@ import json
 from pathlib import Path
 import struct
 
+from capstone import CS_AC_WRITE
+from capstone.x86 import X86_OP_MEM, X86_REG_RIP
+
 from collection_lifecycle_audit import Dump, DEFAULT_DUMP
 
 SPANS = (
@@ -36,6 +39,15 @@ SPANS = (
     ('mode-branch-B-input-update', 0x1406079E0, 0x140607A72),
     ('object-resource-lookup', 0x1405C3170, 0x1405C318E),
     ('render-callback-enqueue', 0x1405AF7E0, 0x1405AF810),
+    ('selection-render-callback', 0x1405DDCD0, 0x1405DDDAF),
+    ('selection-list-renderer', 0x1405E1980, 0x1405E1EAD),
+    ('selection-render-type-10', 0x1405DF8E0, 0x1405DFB62),
+    ('shared-resource-draw-wrapper', 0x140F36200, 0x140F36215),
+    ('input-copy-flag-initialization', 0x1405FEC40, 0x1405FED2E),
+    ('resource-selector-dispatch-prefix', 0x1405ABD30, 0x1405ABD6B),
+    ('selection-resource-branch-prefix', 0x1405AC282, 0x1405AC2AD),
+    ('resource-publication', 0x1405AABA0, 0x1405AACE2),
+    ('shared-resource-command-submission', 0x140F34CF0, 0x140F34E34),
     ('phase-1-subdispatch', 0x1405C4200, 0x1405C427C),
     ('phase-1-substate-6', 0x1405C5590, 0x1405C55E7),
     ('blinking-prompt-producer', 0x1405C4560, 0x1405C468C),
@@ -79,6 +91,26 @@ OBJECT_DESCRIPTORS = (
     (213, '2d020007'), (214, '2f020007'),
 )
 
+RENDER_TARGETS = (
+    0x1405E1A20, 0x1405E1BA2, 0x1405E1BAF, 0x1405E1BBC,
+    0x1405E1BC9, 0x1405E1CD9, 0x1405E1DB1, 0x1405E1DBE,
+    0x1405E1DCB, 0x1405E1DD8, 0x1405E1DE2, 0x1405E1DEC,
+)
+
+
+def overlapping_rip_writes(dump, start, end, address):
+    """Writes covering a byte in one bounded span, not all possible writers."""
+    result = []
+    for ins in dump.instructions(start, end):
+        for op in ins.operands:
+            if op.type != X86_OP_MEM or op.mem.base != X86_REG_RIP or not op.access & CS_AC_WRITE:
+                continue
+            target = ins.address + ins.size + op.mem.disp
+            if target <= address < target + op.size:
+                result.append(dict(instruction=hex(ins.address), target=hex(target),
+                                   width=op.size, bytes=ins.bytes.hex()))
+    return result
+
 
 def produce(directory):
     dump = Dump(directory)
@@ -108,6 +140,20 @@ def produce(directory):
         if raw.hex() != expected:
             raise ValueError(f'Object descriptor differs: {index}')
         descriptors.append(dict(index=index, address=hex(address), bytes=raw.hex()))
+    render_raw = dump.read(0x1405E1EB0, 48)
+    render_targets = tuple(0x140000000 + rva for rva in struct.unpack('<12I', render_raw))
+    if render_targets != RENDER_TARGETS:
+        raise ValueError('Render jump-table differs from reviewed dispatch')
+    flag_writes = overlapping_rip_writes(dump, 0x1405FEC40, 0x1405FED2E, 0x1422D2B85)
+    resources = []
+    for selector in (0x29, 0x2A, 0x35):
+        index = dump.read(0x1405AC588 + selector, 1)[0]
+        target = 0x140000000 + struct.unpack('<I', dump.read(0x1405AC540 + index * 4, 4))[0]
+        layout = dump.read(0x141217070 + selector * 16, 16)
+        if index != 12 or target != 0x1405AC282 or layout.hex() != '00d0a2000068a4000000900000009e00':
+            raise ValueError(f'Selection resource route differs: {selector:#x}')
+        resources.append(dict(selector=selector, compressed_index=index, target=hex(target),
+                              layout_address=hex(0x141217070 + selector * 16), bytes=layout.hex()))
     return dict(schema=1, evidence='offline instruction/data evidence; no live validation',
                 limitations=['Individual table edges do not prove selector bounds or screen meanings.',
                              'Text enqueue is not visibility; renderer execution needs live checks.',
@@ -116,6 +162,12 @@ def produce(directory):
                                sha256=hashlib.sha256(s.data).hexdigest()) for s in dump.sections],
                 spans=spans, dispatch_edges=edges, prompt_literals=prompts,
                 selected_object_descriptors=descriptors,
+                render_table=dict(address='0x1405e1eb0',
+                                  selector='object+0x9c dword & 0xf; unsigned <=11 guard',
+                                  bytes=render_raw.hex(), targets=[hex(t) for t in render_targets]),
+                input_copy_flag_writes=dict(address='0x1422d2b85',
+                                           scope='0x1405fec40..0x1405fed2e only', writes=flag_writes),
+                selected_resource_routes=resources,
                 mode_table=dict(address='0x1405c5e80', selector='P+0x48 signed byte; unsigned <=9 guard',
                                 bytes=mode_raw.hex(), targets=[hex(t) for t in mode_targets]))
 

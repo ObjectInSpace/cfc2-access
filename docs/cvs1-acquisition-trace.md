@@ -188,8 +188,8 @@ callback `0x140602EC0` into R12 at `0x14060299b`. Its descriptor loop
 conditionally obtains an object from `0x1405ADA90`, checks for null, and
 stores R12 into object+0x18 at `0x140602a12`. It stores the descriptor's
 subtype in object+0x34 and loop index in object+0x37. This establishes
-callback publication. The list insertion and scheduler are now traced below;
-the final draw still requires further tracing.
+callback publication. The list insertion, scheduler and route to the shared
+draw wrapper are now traced below; final composited visibility remains open.
 
 The loop covers 215 four-byte descriptors at `0x1412403E0`, using fields
 resource byte, subtype, position index and mode mask. Four individually
@@ -213,7 +213,7 @@ and object+0x40. Later mode/ID branches adjust them. This connects the
 choice writer to a selection-coordinate consumer, but does not prove a
 character name, portrait, final visibility, or owner/controller identity.
 
-The next bounded checks are physical-controller attribution, the final draw,
+The next bounded checks are physical-controller attribution, final visibility,
 and a name/resource consumer for this native ID. A live selection capture also needs phase,
 mode, owner, slot, cooldown and special-ID context; raw P+0x78 alone is
 insufficient. No live reader or new hook is installed by this increment.
@@ -278,8 +278,8 @@ The branch also enqueues callback `0x1405DDCD0` at `0x140602517` through
 limit check is equality with 16. It writes the callback into the array
 at `0x1422D2A30`, drained by the already-traced `0x1405AF730` before
 text records. Exploratory follow-up shows that callback uses the specialized
-list renderer `0x1405E1980` with CL=4. Its per-object render-type branches
-and resource interpretation remain the next draw investigation; do not
+list renderer `0x1405E1980` with CL=4. Its type-10 route is now traced below;
+deeper resource interpretation remains the next draw investigation. Do not
 substitute the nearby generic list renderer `0x1405AE4A0`.
 
 The pinned resource helper `0x1405C3170..0x1405C318E` uses base
@@ -288,6 +288,98 @@ B+unsigned_dword(T+4*ECX). Descriptor resource bytes feed this lookup.
 This offset-based record is not established as a text string or character
 name. Tracing the resource publication, record consumer and selected native
 ID remains necessary before assigning speech labels.
+
+## Input-copy flag writer and render-type-10 route
+
+`0x1405FEC40..0x1405FED2E`, called by the pinned phase initializer at
+`0x1405c5be4`, first clears four bytes starting at `0x1422D2B82` at
+`0x1405fec5b`. This covers input-copy flag `0x1422D2B85`. An exact-address
+cross-reference lookup misses this reset because its target is three bytes
+earlier. The audit now extracts RIP-relative write footprints overlapping
+the flag within this function, including both this dword reset and the
+one-byte write described next. This is a bounded writer inventory, not proof
+that aliases or other routines never write the flag.
+
+When P+0x48 equals 4, the routine sets P+0xb7 to 1 and copies P+0x18
+to the flag at `0x1405fecf9`; otherwise it returns with the flag zero.
+The mode-4 path also calls `0x1405C0330` for both actors. The earlier input
+copy rule thus has a concrete mode-dependent source. P+0x18's complete
+allowed values and controller meaning still need proof: do not silently
+clamp the flag or assign a mode name from this numeric comparison.
+
+The render callback `0x1405DDCD0..0x1405DDDAF` calls the specialized
+list renderer with CL=4 at `0x1405ddd6d`. The renderer
+`0x1405E1980..0x1405E1EAD` starts from R+0x30928+8*list, skips objects
+whose word+0x150 is zero, and dispatches on dword(object+0x9c) AND 0xf.
+An unsigned <=11 guard bounds its twelve-entry RVA table at
+`0x1405E1EB0`. The audit checks the exact ordered targets, so swapping two
+otherwise valid branches is rejected.
+
+The selection initializer sets object+0x9c to 0x0a at `0x140602a46`.
+The subtype-2 coordinate handler does not overwrite that field in its
+reviewed span. Type 10 reaches `0x1405e1de2`, which passes the object in
+RCX to `0x1405DF8E0` at `0x1405e1de5`. This ties the traced coordinates
+and resource pointer to a concrete render route, subject to object lifetime,
+the active word and any other writers.
+
+`0x1405DF8E0..0x1405DFB62` applies view/transform state according to
+object+0x9c and object+0x98. In particular, bit 0 of object+0x98 passes
+object+0x3c to `0x140F33520` at `0x1405df9b2`, connecting the coordinates
+written by the subtype-2 handler. Bit 4 passes object+0x58 to
+`0x140F33450` for scaling. The coordinate handler sets these flags to
+0x11. This identifies transform inputs without asserting their final
+screen-space values.
+
+At `0x1405dfb2a` the routine loads object+0x90 into RCX. Bit 0x20 of
+object+0x98 selects `0x140F36220` with another value loaded into XMM1;
+otherwise `0x1405dfb3f` calls `0x140F36200`. The latter bounded wrapper
+sets R9D=2, clears EDX, loads XMM2 from a constant and tail-jumps to
+`0x140F34CF0`. It forwards the resource pointer. The shared resource
+command-submission routine is traced below; downstream interpretation and
+final compositing remain open. This is a draw invocation path, not proof of
+visibility or a certified detour ABI.
+
+Next resource work: trace publication of R+0x52b0 for this selection route,
+decode the record consumed by `0x140F34CF0`, and relate the native selected
+ID to a name or character graphic rather than merely the selection marker.
+No glyph/texture content is assigned a character label in this evidence.
+
+### Resource publication and command submission
+
+For the initializer's calls to `0x1405ABD30`, selected CL values 0x29,
+0x2a and 0x35 go through a two-stage dispatch. The prefix sign-extends CL,
+checks unsigned <=0x3c, reads a byte at `0x1405AC588+selector`, then a
+DWORD RVA at `0x1405AC540+4*index`. All three individually pinned entries
+have index 12 and target `0x1405AC282`. This does not make all initializer
+branches reachable in every mode; calls to other loaders remain separate.
+
+That branch passes ECX=0x400 and EDX=selector to `0x1405AABA0`.
+The helper reads four DWORD offsets from `0x141217070+16*selector`:
+0xa2d000, 0xa46800, 0x900000, 0x9e0000 for these three selected rows.
+It adds them to the buffer at +8 of the common context reached through
+`0x142C79B40`. After processing/copying resources through native helpers,
+`0x1405aac5d` publishes the second address (buffer+0xa46800) at R+0x52b0.
+The source buffer, size lookup and fixup-helper contents are not themselves
+captured here. The subsequent loop uses the published resource count and
+the existing offset lookup. A nonzero result from the call at `0x1405aaca9`
+branches at `0x1405aacb0` to a self-loop at `0x1405aace0`. No recovery
+behavior is inferred from that path.
+
+`0x140F34CF0..0x140F34E34` accepts the resource pointer in RCX and starts
+at resource+0x18. It processes records while their leading signed DWORD is
+negative. Each record advances by 0x50 plus its signed DWORD at +0x4c.
+Depending on context+0x1f855c, it either passes the record pointer onward or
+copies the record into a context staging buffer, checking the accumulated
+size against 0xe0000. At `0x140f34ded` it calls `0x140F2F390` with the
+wrapper's R9D value in ECX, a stack descriptor in RDX and R8D=0x130.
+This proves structured graphics-command submission, not text decoding or
+the final interpretation of each payload. No externally safe resource
+length or complete capture ABI follows from the native record walk.
+
+Next: inspect resource/fixup data and the submitted command consumer; seek
+the selected native ID's character resource separately from the coordinate
+marker. The raw data may require a targeted live resource capture if the
+reviewed dump lacks the populated game buffer.
 
 ## A concrete blinking-prompt producer
 
@@ -312,10 +404,11 @@ must include empty-frame replacement and capture freshness.
 
 ## Validation and next measurement
 
-Eight audit tests passed, exit 0: manifest reproduction; nested selector
+Eleven audit tests passed, exit 0: manifest reproduction; nested selector
 preservation; changed nested-pointer rejection; changed literal rejection;
 actor/object selector separation; changed object-subtype rejection;
-changed pool-insertion target rejection; and
+changed pool-insertion target rejection; overlapping flag-reset preservation;
+render-branch swap rejection; resource-destination mutation rejection; and
 jump-table escape rejection. They use the pinned dump and synthetic
 mutations, not gameplay fixtures. No runtime files changed or DLL deployed.
 

@@ -208,6 +208,60 @@
       "sha256": "bac2773205f20025c7ed3d4bb3f4edb67ad9a15e4ae6567416e34af651705982"
     },
     {
+      "label": "selection-render-callback",
+      "start": "0x1405ddcd0",
+      "end_exclusive": "0x1405dddaf",
+      "sha256": "453d8c37ab6af28b4f107e99be61e039a85dcc2e4fc7684a07a568727c068615"
+    },
+    {
+      "label": "selection-list-renderer",
+      "start": "0x1405e1980",
+      "end_exclusive": "0x1405e1ead",
+      "sha256": "ca8770bf01a9a54dd9b2132d8683ca860d94d1f8476f011e383d8d231dfdd270"
+    },
+    {
+      "label": "selection-render-type-10",
+      "start": "0x1405df8e0",
+      "end_exclusive": "0x1405dfb62",
+      "sha256": "49c96fc4fa330fdcc7720020608c11ae58628014486cea0d04c46143bbbfae6c"
+    },
+    {
+      "label": "shared-resource-draw-wrapper",
+      "start": "0x140f36200",
+      "end_exclusive": "0x140f36215",
+      "sha256": "f1e3a5de30859820ac028753fe04061c1b4e7140ab5941774724348a6b3964ed"
+    },
+    {
+      "label": "input-copy-flag-initialization",
+      "start": "0x1405fec40",
+      "end_exclusive": "0x1405fed2e",
+      "sha256": "c4b0a83fe94bfc47523e980e1e055622f02f9cf78b1cf0a3313078fac4590809"
+    },
+    {
+      "label": "resource-selector-dispatch-prefix",
+      "start": "0x1405abd30",
+      "end_exclusive": "0x1405abd6b",
+      "sha256": "9d7f4be419d2b95a493edd2ebe669cf8f5cc89f1a4dcb65437282e26f00f014e"
+    },
+    {
+      "label": "selection-resource-branch-prefix",
+      "start": "0x1405ac282",
+      "end_exclusive": "0x1405ac2ad",
+      "sha256": "68ec581380757087f298241f606c57a9bb86c6b2e0f4ab6c8aee1c82b7609320"
+    },
+    {
+      "label": "resource-publication",
+      "start": "0x1405aaba0",
+      "end_exclusive": "0x1405aace2",
+      "sha256": "f707a7c478a9134a6fc542793f15fee0a6159cdc3221c717cf721fa3c58c450b"
+    },
+    {
+      "label": "shared-resource-command-submission",
+      "start": "0x140f34cf0",
+      "end_exclusive": "0x140f34e34",
+      "sha256": "b7ac78594b4c80d46262812a531e46d25c413d2a2185527f7cdc5e344e4838ac"
+    },
+    {
       "label": "phase-1-subdispatch",
       "start": "0x1405c4200",
       "end_exclusive": "0x1405c427c",
@@ -419,6 +473,66 @@
       "index": 214,
       "address": "0x141240738",
       "bytes": "2f020007"
+    }
+  ],
+  "render_table": {
+    "address": "0x1405e1eb0",
+    "selector": "object+0x9c dword & 0xf; unsigned <=11 guard",
+    "bytes": "201a5e00a21b5e00af1b5e00bc1b5e00c91b5e00d91c5e00b11d5e00be1d5e00cb1d5e00d81d5e00e21d5e00ec1d5e00",
+    "targets": [
+      "0x1405e1a20",
+      "0x1405e1ba2",
+      "0x1405e1baf",
+      "0x1405e1bbc",
+      "0x1405e1bc9",
+      "0x1405e1cd9",
+      "0x1405e1db1",
+      "0x1405e1dbe",
+      "0x1405e1dcb",
+      "0x1405e1dd8",
+      "0x1405e1de2",
+      "0x1405e1dec"
+    ]
+  },
+  "input_copy_flag_writes": {
+    "address": "0x1422d2b85",
+    "scope": "0x1405fec40..0x1405fed2e only",
+    "writes": [
+      {
+        "instruction": "0x1405fec5b",
+        "target": "0x1422d2b82",
+        "width": 4,
+        "bytes": "c7051d3fcd0100000000"
+      },
+      {
+        "instruction": "0x1405fecf9",
+        "target": "0x1422d2b85",
+        "width": 1,
+        "bytes": "880d863ecd01"
+      }
+    ]
+  },
+  "selected_resource_routes": [
+    {
+      "selector": 41,
+      "compressed_index": 12,
+      "target": "0x1405ac282",
+      "layout_address": "0x141217300",
+      "bytes": "00d0a2000068a4000000900000009e00"
+    },
+    {
+      "selector": 42,
+      "compressed_index": 12,
+      "target": "0x1405ac282",
+      "layout_address": "0x141217310",
+      "bytes": "00d0a2000068a4000000900000009e00"
+    },
+    {
+      "selector": 53,
+      "compressed_index": 12,
+      "target": "0x1405ac282",
+      "layout_address": "0x1412173c0",
+      "bytes": "00d0a2000068a4000000900000009e00"
     }
   ],
   "mode_table": {

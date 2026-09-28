@@ -78,6 +78,34 @@ class AcquisitionAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Dispatch entry differs: object-pool-insertion'):
                 audit.produce(audit.DEFAULT_DUMP)
 
+    def test_flag_reset_includes_overlapping_dword(self):
+        writes = self.report['input_copy_flag_writes']['writes']
+        self.assertEqual([(w['instruction'], w['target'], w['width']) for w in writes],
+                         [('0x1405fec5b', '0x1422d2b82', 4),
+                          ('0x1405fecf9', '0x1422d2b85', 1)])
+
+    def test_render_type_swap_refused_even_between_valid_branches(self):
+        original = audit.Dump.read
+        def changed(dump, address, size):
+            raw = original(dump, address, size)
+            if address == 0x1405E1EB0:
+                return raw[:40] + raw[44:48] + raw[40:44]
+            return raw
+        with patch.object(audit.Dump, 'read', changed):
+            with self.assertRaisesRegex(ValueError, 'Render jump-table differs'):
+                audit.produce(audit.DEFAULT_DUMP)
+
+    def test_changed_resource_destination_refused(self):
+        original = audit.Dump.read
+        def changed(dump, address, size):
+            raw = original(dump, address, size)
+            if address == 0x141217070 + 0x29 * 16:
+                return raw[:4] + bytes(4) + raw[8:]
+            return raw
+        with patch.object(audit.Dump, 'read', changed):
+            with self.assertRaisesRegex(ValueError, 'Selection resource route differs'):
+                audit.produce(audit.DEFAULT_DUMP)
+
     def test_mode_table_cannot_escape_guarded_branches(self):
         original = audit.Dump.read
         def changed(dump, address, size):

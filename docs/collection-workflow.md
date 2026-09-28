@@ -348,3 +348,43 @@ publication before assigning controller identity. Continue branch A and
 the outstanding lifecycle discontinuity investigation independently.
 Prepared lifecycle/Alpha 3 live measurements, shared-boundary proof, CVS1
 pilot and arena/four-player work remain pending. Opus packets remain draft.
+
+## Handoff continuation — 2026-09-27, from 215b70a
+
+Continued offline from clean `215b70a`. Updated the
+[CVS1 acquisition trace](cvs1-acquisition-trace.md) and audit manifest.
+
+- Found the input-copy flag's overlapping dword reset at `0x1405fec5b`
+  and mode-4 write from P+0x18 at `0x1405fecf9`. Added bounded write-footprint
+  extraction so exact-address lookup does not hide the reset. Allowed flag
+  values and physical-controller meaning remain unproved.
+- Traced the specialized list renderer's active-object gate and guarded
+  twelve-entry render-type table. Selection-coordinate objects are initialized
+  with type 10, which calls `0x1405DF8E0`.
+- Connected object coordinates/scaling and resource+0x90 to the shared
+  `0x140F36200` wrapper, then `0x140F34CF0`. This is an offline draw path;
+  character-name mapping and final composited visibility remain open.
+- Traced three selected compressed resource routes through publication of
+  R+0x52b0 as context-buffer+0xa46800. Other loader routes remain separate.
+  The shared draw routine walks structured records and submits commands;
+  downstream command interpretation and character labels remain open.
+- Audit now pins 42 spans, 12 explicit pointer-table edges, the twelve-entry
+  render table, four selected descriptors, five literals, ten mode entries,
+  two overlapping flag writes in the reviewed initializer, and three selected
+  resource routes/layout rows.
+
+Validation: regenerated the acquisition manifest, exit 0; eleven acquisition
+tests passed, including valid-render-branch swap rejection and preservation
+of the wider flag reset, plus resource-destination mutation rejection;
+`git diff --check`, exit 0. No runtime source change,
+DLL build, deployment, live capture or audible check. Other suites unchanged
+and not rerun.
+
+Next offline work: trace resource fixups and the command consumer downstream
+of `0x140F34CF0`, then find the selected ID's character graphic/name consumer.
+Determine whether the dump contains the populated resource buffer before
+preparing a targeted capture. The coordinate objects may describe a marker rather
+than the character itself. Trace P+0x18 and input-source publication before
+assigning controller identity. Branch A, lifecycle discontinuities, prepared
+live observations, shared-boundary proof and the broader feature campaign
+remain pending. Runtime Opus packets remain draft/not ready.
