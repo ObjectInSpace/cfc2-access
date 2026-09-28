@@ -160,6 +160,54 @@
       "sha256": "cea0295370b92ac70a53b9627e26508e291cc22b96d24fac3f5cf94cf8768460"
     },
     {
+      "label": "selection-actor-owner-initialization",
+      "start": "0x1405c4070",
+      "end_exclusive": "0x1405c41f4",
+      "sha256": "998f8558052315faf0e6a9fa196da9c6be27ecf82b0ea55f9c3c6f82b1d845d2"
+    },
+    {
+      "label": "phase-2-substate-0-initialization",
+      "start": "0x1405c5890",
+      "end_exclusive": "0x1405c5d22",
+      "sha256": "22328361fa7654edd2dfe67de2ec344a73b69dad509eeb96b9f76132ab08ff83"
+    },
+    {
+      "label": "object-pool-acquisition",
+      "start": "0x1405ada90",
+      "end_exclusive": "0x1405adb5f",
+      "sha256": "dcccab899ba14fc0beadcceaae373caa61e833f1246e4813e7200d5c5d45e624"
+    },
+    {
+      "label": "object-list-prepend",
+      "start": "0x1405adc60",
+      "end_exclusive": "0x1405adcd7",
+      "sha256": "aed02820cdd08e92a003d693ab309a07dc3d24ca3125e2bd3189d11aeae72dcf"
+    },
+    {
+      "label": "object-callback-scheduler",
+      "start": "0x1405ae460",
+      "end_exclusive": "0x1405ae495",
+      "sha256": "2b2c06312819c7fd7fd7429de3c0c5c90c0334508a40267ad0091d92ebdbf5f6"
+    },
+    {
+      "label": "mode-branch-B-input-update",
+      "start": "0x1406079e0",
+      "end_exclusive": "0x140607a72",
+      "sha256": "0a2a4328259e26d43019ad29af3b0d3b8c09914678c6c198f226e9f2a0e8575f"
+    },
+    {
+      "label": "object-resource-lookup",
+      "start": "0x1405c3170",
+      "end_exclusive": "0x1405c318e",
+      "sha256": "c51be315e942c506e70c51e96f2314c01ad5fa57fcb25574a659d218a6473378"
+    },
+    {
+      "label": "render-callback-enqueue",
+      "start": "0x1405af7e0",
+      "end_exclusive": "0x1405af810",
+      "sha256": "bac2773205f20025c7ed3d4bb3f4edb67ad9a15e4ae6567416e34af651705982"
+    },
+    {
       "label": "phase-1-subdispatch",
       "start": "0x1405c4200",
       "end_exclusive": "0x1405c427c",
@@ -313,6 +361,15 @@
       "slot": "0x141240e20",
       "bytes": "2032604001000000",
       "target": "0x140603220"
+    },
+    {
+      "owner": "object-pool-insertion",
+      "selector": "R8B unsigned byte at pool entry",
+      "table": "0x141217548",
+      "index": 0,
+      "slot": "0x141217548",
+      "bytes": "60dc5a4001000000",
+      "target": "0x1405adc60"
     }
   ],
   "prompt_literals": [

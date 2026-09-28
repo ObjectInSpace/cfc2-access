@@ -161,8 +161,8 @@ The audit records individual entries, not an inferred selector range.
 `0x140602B70..0x140602CA3` dispatches actors at R+0x3fb8 and R+0x46b8
 (stride 0x700). Each dispatch is gated by P+0x65 AND actor+0x58c. The
 zero-extended actor+4 indexes `0x141240DC0`; entry 6 is `0x140606290`.
-Actor ownership is read from signed actor+0x688. Its initialization and
-association with a human controller are still unproved.
+Actor ownership is read from signed actor+0x688. Initialization is traced
+below; association with a physical controller remains unproved.
 
 The choice-update function `0x140606290..0x14060690A` reads:
 
@@ -188,8 +188,8 @@ callback `0x140602EC0` into R12 at `0x14060299b`. Its descriptor loop
 conditionally obtains an object from `0x1405ADA90`, checks for null, and
 stores R12 into object+0x18 at `0x140602a12`. It stores the descriptor's
 subtype in object+0x34 and loop index in object+0x37. This establishes
-callback publication; the object scheduler's invocation and final draw
-still require tracing.
+callback publication. The list insertion and scheduler are now traced below;
+the final draw still requires further tracing.
 
 The loop covers 215 four-byte descriptors at `0x1412403E0`, using fields
 resource byte, subtype, position index and mode mask. Four individually
@@ -213,11 +213,81 @@ and object+0x40. Later mode/ID branches adjust them. This connects the
 choice writer to a selection-coordinate consumer, but does not prove a
 character name, portrait, final visibility, or owner/controller identity.
 
-The next bounded checks are actor+0x688 initialization,
-the scheduler's object+0x18 call, and a name/resource
-consumer for this native ID. A live selection capture also needs phase,
+The next bounded checks are physical-controller attribution, the final draw,
+and a name/resource consumer for this native ID. A live selection capture also needs phase,
 mode, owner, slot, cooldown and special-ID context; raw P+0x78 alone is
 insufficient. No live reader or new hook is installed by this increment.
+
+## Actor ownership, input routing and object scheduling
+
+Two concrete owner-initialization paths are now pinned:
+
+- `0x1405C4070..0x1405C41F4` zeroes two 0x700-byte actors, then writes
+  loop index 0 or 1 to R+0x4640+0x700*index at `0x1405c40de`.
+  It also writes actor+0x58c masks 1 and 2 at `0x1405c4135` and
+  `0x1405c4146`, and resets phase bytes into the P+0=2 route. Its external
+  entry event and CL argument meaning remain unassigned.
+- The already-established P+0=2, P+1=0 table entry leads to
+  `0x1405C5890..0x1405C5D22`. Subject to its entry gate, it increments
+  P+1 and runs a two-actor loop. ESI is zeroed at `0x1405c5bfd`;
+  EBX/EDI start at zero at `0x1405c5c9f`. At `0x1405c5ccb` it writes
+  loop index BL to actor+0x688, advances the actor offset by 0x700, and
+  stops at index 2. This is an initialization path, not proof that no later
+  writer or restore changes ownership.
+
+`0x1406079E0..0x140607A72` takes a side index in ECX. It reads a word
+from R+0x3c76+0x3c*side, saves the previous word from
+`0x1422D3E60+2*side` into `0x1422D3E64+2*side`, and stores the current
+word back into the former. The newly pressed word at
+`0x1422D3E68+2*side` is current AND NOT previous. The repeat word at
+`0x1422D3E6C+2*side` starts at zero. When input is unchanged, a byte
+counter is incremented; after the signed comparisons against 0x1e and
+0x23 pass, it resets to 0x1e and publishes the current word as repeat.
+Changed input resets the counter. This proves bit-word mechanics, not
+button names or elapsed repeat timing.
+
+Branch B at `0x14060245e` reads byte `0x1422D2B85`. When its signed
+value is <=0, it updates sides 0 and 1 independently. With positive g,
+it updates side g−1, then copies four words (current, previous, newly
+pressed and repeat) from side g−1 to side 2−g. No upper bound for g is
+proved here. Values 1 and 2 therefore mirror one side's input to the other;
+the flag's mode/controller meaning needs its writer and live observation.
+The choice writer's OR of newly pressed and repeat words cannot by itself
+identify a physical controller.
+
+The initializer calls `0x1405ADA90` with RCX=0, DL=4 and R8B=0.
+`0x1405ADA90..0x1405ADB5F` returns null if the free count R+0x309dc is
+zero; otherwise it removes a 0x250-byte record from the free list, clears
+it, stores list number DL at object+3 and increments that list's count.
+Original R8B indexes `0x141217548`; explicit entry 0 points to
+`0x1405ADC60..0x1405ADCD7`. That helper receives the object in RDX and
+list number in R8B. It publishes the empty list's head/tail or prepends
+the object to the existing head, linking next through object+0x10 and
+previous through object+8. Thus these successfully allocated objects enter
+list 4, whose head is R+0x30928+4*8.
+
+After the branch's P+3 handler returns, `0x140602509` sets CL=4 and
+`0x14060250b` calls `0x1405AE460..0x1405AE495`. This scheduler loads
+the selected list head, passes each object in RCX, calls object+0x18 at
+`0x1405ae483`, and follows object+0x10. This closes the offline route
+from descriptor creation through callback dispatch to the coordinate
+consumer; it is not a claim that every descriptor is visible each frame.
+
+The branch also enqueues callback `0x1405DDCD0` at `0x140602517` through
+`0x1405AF7E0..0x1405AF810`. The enqueue gate is R+0x529e and the count
+limit check is equality with 16. It writes the callback into the array
+at `0x1422D2A30`, drained by the already-traced `0x1405AF730` before
+text records. Exploratory follow-up shows that callback uses the specialized
+list renderer `0x1405E1980` with CL=4. Its per-object render-type branches
+and resource interpretation remain the next draw investigation; do not
+substitute the nearby generic list renderer `0x1405AE4A0`.
+
+The pinned resource helper `0x1405C3170..0x1405C318E` uses base
+B=*(R+0x52b0), computes T=B+signed_dword(B), then returns
+B+unsigned_dword(T+4*ECX). Descriptor resource bytes feed this lookup.
+This offset-based record is not established as a text string or character
+name. Tracing the resource publication, record consumer and selected native
+ID remains necessary before assigning speech labels.
 
 ## A concrete blinking-prompt producer
 
@@ -242,9 +312,10 @@ must include empty-frame replacement and capture freshness.
 
 ## Validation and next measurement
 
-Seven audit tests passed, exit 0: manifest reproduction; nested selector
+Eight audit tests passed, exit 0: manifest reproduction; nested selector
 preservation; changed nested-pointer rejection; changed literal rejection;
-actor/object selector separation; changed object-subtype rejection; and
+actor/object selector separation; changed object-subtype rejection;
+changed pool-insertion target rejection; and
 jump-table escape rejection. They use the pinned dump and synthetic
 mutations, not gameplay fixtures. No runtime files changed or DLL deployed.
 

@@ -314,3 +314,37 @@ text-hook ABI, frame/overlay ownership, lifecycle discontinuities and the
 existing metadata live observations remain outstanding. Shared-boundary
 implementation, CVS1 pilot and arena/four-player proof remain pending;
 runtime Opus packets are still draft/not ready.
+
+## Handoff continuation — 2026-09-27, from b29ef63
+
+Continued offline from clean `b29ef63`. Extended the
+[CVS1 acquisition trace](cvs1-acquisition-trace.md) and reproducible audit.
+
+- Traced two explicit owner-initialization loops that write actor indices
+  0 and 1. One is on the already-pinned phase-2/substate-0 route. Later
+  ownership changes and physical-controller association remain open.
+- Traced the branch-B input helper's current/previous/new/repeat words and
+  the branch's conditional copying from one side to the other. Owner index
+  alone cannot identify the physical input source.
+- Closed object allocation → list-4 insertion → callback scheduling →
+  coordinate consumer. The pool insertion target is now an explicit checked
+  table entry. Final composited visibility remains unproved.
+- Traced the offset-based graphic-resource lookup and render-callback
+  enqueue. The specialized list-renderer lead is `0x1405E1980`, through
+  callback `0x1405DDCD0`; the nearby generic list renderer is not this route.
+- Acquisition evidence now has 33 spans, 12 table edges, four selected object
+  descriptors, five literals and ten guarded mode entries. No runtime reader,
+  lifecycle-capture scope or implementation-packet readiness changed.
+
+Validation: regenerated the acquisition manifest, exit 0; eight acquisition
+tests passed, including rejection of a changed pool-insertion target;
+`git diff --check`, exit 0. No DLL build, deployment, game attachment,
+live capture or listening check. Unchanged runtime/lifecycle tests not rerun.
+
+Next work: follow `0x1405E1980` render-type branches and the resource's
+publication/record consumers toward the selected native ID's name/graphic
+mapping; trace writers of input-copy flag `0x1422D2B85` and input-source
+publication before assigning controller identity. Continue branch A and
+the outstanding lifecycle discontinuity investigation independently.
+Prepared lifecycle/Alpha 3 live measurements, shared-boundary proof, CVS1
+pilot and arena/four-player work remain pending. Opus packets remain draft.

@@ -68,6 +68,16 @@ class AcquisitionAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Object descriptor differs'):
                 audit.produce(audit.DEFAULT_DUMP)
 
+    def test_changed_pool_insertion_target_refused(self):
+        original = audit.Dump.read
+        def changed(dump, address, size):
+            if address == 0x141217548:
+                return bytes(size)
+            return original(dump, address, size)
+        with patch.object(audit.Dump, 'read', changed):
+            with self.assertRaisesRegex(ValueError, 'Dispatch entry differs: object-pool-insertion'):
+                audit.produce(audit.DEFAULT_DUMP)
+
     def test_mode_table_cannot_escape_guarded_branches(self):
         original = audit.Dump.read
         def changed(dump, address, size):

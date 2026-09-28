@@ -28,6 +28,14 @@ SPANS = (
     ('mode-branch-B-choice-update', 0x140606290, 0x14060690A),
     ('mode-branch-B-object-dispatch', 0x140602EC0, 0x140602ECF),
     ('mode-branch-B-choice-coordinates', 0x140603220, 0x140603468),
+    ('selection-actor-owner-initialization', 0x1405C4070, 0x1405C41F4),
+    ('phase-2-substate-0-initialization', 0x1405C5890, 0x1405C5D22),
+    ('object-pool-acquisition', 0x1405ADA90, 0x1405ADB5F),
+    ('object-list-prepend', 0x1405ADC60, 0x1405ADCD7),
+    ('object-callback-scheduler', 0x1405AE460, 0x1405AE495),
+    ('mode-branch-B-input-update', 0x1406079E0, 0x140607A72),
+    ('object-resource-lookup', 0x1405C3170, 0x1405C318E),
+    ('render-callback-enqueue', 0x1405AF7E0, 0x1405AF810),
     ('phase-1-subdispatch', 0x1405C4200, 0x1405C427C),
     ('phase-1-substate-6', 0x1405C5590, 0x1405C55E7),
     ('blinking-prompt-producer', 0x1405C4560, 0x1405C468C),
@@ -53,6 +61,7 @@ TABLE_EDGES = (
     ('mode-branch-B', 'P+3 signed byte', 0x141240D98, 2, 0x140602B70),
     ('mode-branch-B-actor', 'actor+4 unsigned byte', 0x141240DC0, 6, 0x140606290),
     ('mode-branch-B-object', 'object+0x34 unsigned byte', 0x141240E10, 2, 0x140603220),
+    ('object-pool-insertion', 'R8B unsigned byte at pool entry', 0x141217548, 0, 0x1405ADC60),
 )
 
 PROMPTS = (
