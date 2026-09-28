@@ -458,3 +458,28 @@ names or increasing capture scope. Independently continue `0x140049170`,
 the graphics queue consumer, special-choice/confirmation paths and lifecycle
 proof. The capture is ready for measurement; the runtime implementation
 packets, shared-boundary proof and broader collection campaign remain pending.
+
+## Handoff continuation — first live control, 2026-09-28
+
+After `ddefd10`, the user reported CVS1 selection ready. Read-only capture
+attached to PID 12508 and passed the signature/identity gates. See
+[the live control record](cvs1-live-selection-control.md) and its two lossless
+compressed JSONL fixtures (eight control samples plus 120 requested-movement
+samples). No assets, hooks, deployment or speech changes.
+
+The captured screen uses native mode 0 / phase bytes 2,1,1,6, outside the
+branch-B asset gate. Side-0 selected and actor bytes remained 16; side-1
+selected byte remained −1. All 128 brackets matched with no read errors.
+This is a first live state/identity control, not a verified movement or
+character-name test. Actual input actions and mode label await user report.
+
+On resumption, the complete sample file survived but the process handle was
+gone and CFC2 was not running. Asked the user to clarify the earlier action
+and relaunch/return to selection when ready. Next coordinated capture should
+allow time for focus switching. Independently follow branch A's P+3=6 lead
+`0x1405DBC30` and its P+4 dispatch; do not widen asset gates by analogy.
+
+Validation for this evidence increment: both fixture gzip copies round-trip
+to the original JSONL bytes and recorded hashes; parsed all samples and
+compared brackets/selection transitions; `git diff --check` passed. No source
+changes or test/build reruns. Runtime packets remain draft/not ready.
