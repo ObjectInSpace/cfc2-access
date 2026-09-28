@@ -424,3 +424,37 @@ controller association, branch A and lifecycle discontinuities remain open.
 Existing metadata capture remains ready for its own lifecycle/Alpha 3 session;
 it cannot substitute for the new selection measurements. Shared-boundary proof,
 CVS1 pilot and the broader feature campaign remain pending; Opus packets draft.
+
+## Handoff continuation — 2026-09-27, selection capture from 30be231
+
+Prepared the next concrete measurement rather than extending offline labels.
+See the [CVS1 selection run card](cvs1-selection-run-card.md).
+
+- Added `tools/cvs1_selection_capture.py`, reusing the read-only Windows
+  transport and raw metadata observation. Startup verifies both manifests'
+  code spans and the relevant dispatch/descriptor bytes. No game writes/hooks.
+- CVS1 ROM/callback/publication checks gate native-state reads. The phase
+  pointer must match R+0x3e58. Two observations retain raw phase, actors,
+  owners, slots, refresh flags, input-copy flag and resource provenance.
+- Optional asset prefixes are capped at 4 KiB per side with conservative
+  phase/owner/slot/actor/cooldown/ID gates and the traced side-1 remaps.
+  Special 0x23 is skipped; no character name or image decoding is claimed.
+- Full state samples request 1,282 bytes in 52 reads; optional maximum
+  prefixes raise this to 9,474 bytes in 54 reads. Startup signatures are
+  separate. Matching brackets cannot exclude ABA or in-place asset changes.
+- Prepared screen-reader-friendly commands and a small movement/control
+  session. No live game attachment, capture, deployment or audible check.
+
+Validation: nine new selection-capture tests passed (dump signatures/data
+mutation, remap/raw payload, default no-asset read, wrong-identity no-root
+read, root transition, unreadable/partial reads, special-ID/slot/owner/cooldown
+gates, phase gates, asset cap); eleven shared metadata/transport tests passed;
+CLI `--help` and `git diff --check` passed. No runtime source changes, DLL
+build or unchanged acquisition/lifecycle test reruns.
+
+Next: run the prepared selection session and retain action notes, native
+values, failures and optional raw prefixes. Review the results before mapping
+names or increasing capture scope. Independently continue `0x140049170`,
+the graphics queue consumer, special-choice/confirmation paths and lifecycle
+proof. The capture is ready for measurement; the runtime implementation
+packets, shared-boundary proof and broader collection campaign remain pending.

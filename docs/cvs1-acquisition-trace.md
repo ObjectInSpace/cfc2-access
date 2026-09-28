@@ -476,6 +476,11 @@ alongside any bounded raw asset capture. Include special 0x23 behavior and
 side-1 remaps before defining a character-ID map. No live resource-capture
 tool, detour or speech reader is introduced by this trace.
 
+The subsequent [selection run card](cvs1-selection-run-card.md) now provides
+a tested, read-only state/prefix capture tool. It uses conservative identity,
+phase and per-side gates and retains raw observations. This prepares the
+missing measurement; it does not change this trace's offline-only status.
+
 ## Validation and next measurement
 
 Twelve audit tests passed, exit 0: manifest reproduction; nested selector
