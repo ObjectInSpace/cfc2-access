@@ -597,3 +597,23 @@ reports readiness. Do not equate this repeat-path evidence with an explanation
 of the old three-transition sequence: that fixture lacks input words.
 Remaining offline leads include setup/catalog naming, device-bit mapping,
 and intervening helpers. Runtime packets remain draft.
+
+## Handoff continuation — first schema-2 live movement
+
+User returned to CVS1 character select. Completed eight control samples and
+240 movement samples from PID 34768 with the schema-2 tool at `641044b`.
+User confirmed both requested Right/Left taps with the game focused.
+See [schema-2 live evidence](cvs1-live-schema2.md) and its two compressed
+fixtures. No game writes, assets, deployment or runtime source changes.
+
+Mode 0 / phase 2,1,1,6,6 persisted. Side-0 group stayed 1 with count 16;
+position/selected pairs changed 0/0 -> 1/1 -> 0/0 -> 15/16 -> 0/0.
+Held-word samples caught 0x400 and 0x800; press/repeat pulses were not caught.
+Four transitions versus two confirmed taps remains unresolved. One bracket
+changed in raw phase; all other brackets matched; no read errors.
+
+Verified gzip round trips and original hashes, parsed all samples and
+transition values, and checked the diff. No source changes or test reruns.
+The movement window is complete; no further user inputs needed for it.
+Next investigate position writers/intervening input paths before requesting
+another run. Names and implementation packets remain unverified/draft.
