@@ -196,6 +196,18 @@
       "sha256": "5745ca3c26cd29258ccc3c715a5d31652f41a605b52b6e0279c255e74afdd96e"
     },
     {
+      "label": "mode-branch-A-catalog-setup",
+      "start": "0x1405d9900",
+      "end_exclusive": "0x1405d9a73",
+      "sha256": "ce8a32903a2cd0c4e79edd235479f4b01ca1834796229602ccd092bf73cc304d"
+    },
+    {
+      "label": "mode-branch-A-catalog-availability",
+      "start": "0x14060a430",
+      "end_exclusive": "0x14060a4bf",
+      "sha256": "eabcc140d17ff9b403ed521d6dc6c6bb917827c9c0ebc8bac083ed20de98a813"
+    },
+    {
       "label": "mode-branch-B-dispatch",
       "start": "0x140602440",
       "end_exclusive": "0x14060252d",
@@ -612,6 +624,60 @@
       "text": "INSERT COIN(S)"
     }
   ],
+  "branch_a_catalog": {
+    "selector": 0,
+    "address": "0x141237be0",
+    "bytes": "21000b0005000c2807241a081d241b241c00220000310119020903190601041120050e011e01181115051305121d1409111110390a0e090e08061702190e160e0f030d031f03",
+    "pointer": {
+      "address": "0x141237c78",
+      "bytes": "e07b234101000000"
+    },
+    "groups": [
+      [
+        33,
+        11,
+        5,
+        12,
+        7,
+        26,
+        29,
+        27,
+        28,
+        34
+      ],
+      [
+        0,
+        1,
+        2,
+        3,
+        6,
+        4,
+        32,
+        14,
+        30,
+        24,
+        21,
+        19,
+        18,
+        20,
+        17,
+        16
+      ],
+      [
+        10,
+        9,
+        8,
+        23,
+        25,
+        22
+      ],
+      [
+        15,
+        13,
+        31
+      ]
+    ]
+  },
   "selected_object_descriptors": [
     {
       "index": 60,

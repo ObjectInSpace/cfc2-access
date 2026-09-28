@@ -24,6 +24,7 @@ def verify(read, lifecycle, acquisition):
     rows = list(acquisition['dispatch_edges']) + list(acquisition['selected_object_descriptors'])
     rows += list(acquisition['graphic_tables'])
     rows += [acquisition['render_table'], acquisition['mode_table']]
+    rows += [acquisition['branch_a_catalog'], acquisition['branch_a_catalog']['pointer']]
     for row in rows:
         address = int(row.get('slot', row.get('address')), 16)
         raw = bytes.fromhex(row['bytes'])

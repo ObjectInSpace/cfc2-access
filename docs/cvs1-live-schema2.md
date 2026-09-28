@@ -52,17 +52,19 @@ including newly pressed +0x5be and staged repeat +0x5d8. The sampled delta
 was zero. A 250 ms interval can miss brief pulses, so these zeros do not
 exclude press or repeat events between observations.
 
-Four transitions accompany two user-confirmed taps. Their cause is unresolved;
-do not assign each transition a physical direction, invent extra user input,
-or claim repeats explain them. The new fields narrow the discrepancy to
-position updates rather than a group switch. Matching brackets do not prove
-atomicity, frame order, or absence of ABA.
+The user subsequently clarified that they made four taps, not two. The
+earlier account confused the requested two-tap schedule with the actual
+input count. Four recorded transitions are consistent with four taps; there
+is no remaining count discrepancy requiring an extra-transition investigation.
+Individual action timestamps and directions were not recorded, so this does
+not establish a per-tap correspondence or device-bit mapping. Matching
+brackets do not prove atomicity, frame order, or absence of ABA.
 
 ## Next measurement and independent work
 
 Retain this window as completed; no further actions were requested after it.
-Before another movement request, investigate the position writers and
-intervening input paths against this pattern. If a new measurement is needed,
+No additional movement request is needed to explain the transition count.
+If a new measurement is needed for a different unresolved contract,
 use one direction per window with explicit action timing and consider the
 existing 100 ms minimum interval, still acknowledging missed pulses.
 Character names and implementation packets remain unverified/draft.

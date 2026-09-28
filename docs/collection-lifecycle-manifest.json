@@ -510,6 +510,60 @@
   ],
   "spans": [
     {
+      "label": "initializer-dispatch-complete",
+      "start": "0x14004c540",
+      "end_exclusive": "0x14004c674",
+      "sha256": "6b14586c450641f8c77585c0d7c5a9b93f55f808ce163fda20ddec45ef93eef3"
+    },
+    {
+      "label": "initializer-entry-038af0-prefix",
+      "start": "0x140038af0",
+      "end_exclusive": "0x140038b21",
+      "sha256": "239cebd76c2c519bbe2612e300ecdb82c3d80b41712a67075d6ae8d9752608cc"
+    },
+    {
+      "label": "initializer-entry-038f90-prefix",
+      "start": "0x140038f90",
+      "end_exclusive": "0x140038fd6",
+      "sha256": "ad06878dccb9763412486badbbfbc9c040de0b4eacf60f4270459b3a233263b1"
+    },
+    {
+      "label": "initializer-entry-08c8a0-prefix",
+      "start": "0x14008c8a0",
+      "end_exclusive": "0x14008c9e6",
+      "sha256": "80737031d72a29dd94ef3a1e747f7d47aa605510bc76fd74f06f939fcd11ff7d"
+    },
+    {
+      "label": "initializer-entry-0a65e0-prefix",
+      "start": "0x1400a65e0",
+      "end_exclusive": "0x1400a6c45",
+      "sha256": "9e79206192d1818f199b12c43d53a41bef1ea9cd93827b27ab1a65a4b33ea6b1"
+    },
+    {
+      "label": "initializer-entry-0b0d80-prefix",
+      "start": "0x1400b0d80",
+      "end_exclusive": "0x1400b0fa8",
+      "sha256": "872a9fe9f7dd8c7c347d6382fe8f3e877d947a0f569048729c517d991698a0e7"
+    },
+    {
+      "label": "initializer-entry-0b4900-prefix",
+      "start": "0x1400b4900",
+      "end_exclusive": "0x1400b49e2",
+      "sha256": "ad37f9d908435fd77be6c933b90095bb90532971928a70737672698163d1af04"
+    },
+    {
+      "label": "initializer-preparation-gate",
+      "start": "0x14004c6f0",
+      "end_exclusive": "0x14004c706",
+      "sha256": "b527db8259990031a51b4d04d7cc7f39737e7f5497c705c8a069a688b79da5f6"
+    },
+    {
+      "label": "shell-owner-constructor-prefix",
+      "start": "0x140047e00",
+      "end_exclusive": "0x140047e61",
+      "sha256": "92028c21b3562b6d67616871d6da53f316d9da163ede56a54dff552c7cd2eb46"
+    },
+    {
       "label": "shell-destructor-body",
       "start": "0x140048380",
       "end_exclusive": "0x1400486b1",
@@ -631,9 +685,9 @@
     },
     {
       "label": "cleanup-other-consumer",
-      "start": "0x14004adc4",
+      "start": "0x14004adc0",
       "end_exclusive": "0x14004ade9",
-      "sha256": "e91cbe95210ee403c573cbab50250d238f7b799085940c70a5d9213990f32613"
+      "sha256": "6a697d6e18ace7d1a8f12cc99c92927889eff77a485ee3e3036e1d25b8e25983"
     },
     {
       "label": "common-cleanup-thunk",
@@ -852,6 +906,11 @@
       "sha256": "cd62eab4fa11aebb9a35e732a3f9548b0e72169bae12764827bfe9f798229ca7"
     }
   ],
+  "shell_destructor_vtable": {
+    "address": "0x140fe12f0",
+    "bytes": "0087044001000000",
+    "target": "0x140048700"
+  },
   "cvs1_phase_table_leads": [
     {
       "index": 1,

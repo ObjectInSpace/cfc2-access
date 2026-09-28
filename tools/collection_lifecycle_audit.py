@@ -34,6 +34,15 @@ PATHS = (
 
 # Explicit, instruction-aligned, exclusive ends; excerpts are not whole CFGs.
 SHARED_SPANS = (
+    ("initializer-dispatch-complete", 0x14004C540, 0x14004C674),
+    ("initializer-entry-038af0-prefix", 0x140038AF0, 0x140038B21),
+    ("initializer-entry-038f90-prefix", 0x140038F90, 0x140038FD6),
+    ("initializer-entry-08c8a0-prefix", 0x14008C8A0, 0x14008C9E6),
+    ("initializer-entry-0a65e0-prefix", 0x1400A65E0, 0x1400A6C45),
+    ("initializer-entry-0b0d80-prefix", 0x1400B0D80, 0x1400B0FA8),
+    ("initializer-entry-0b4900-prefix", 0x1400B4900, 0x1400B49E2),
+    ("initializer-preparation-gate", 0x14004C6F0, 0x14004C706),
+    ("shell-owner-constructor-prefix", 0x140047E00, 0x140047E61),
     ("shell-destructor-body", 0x140048380, 0x1400486B1),
     ("shell-deleting-destructor", 0x140048700, 0x140048762),
     ("CVS1-phase-publication", 0x1405A6522, 0x1405A6536),
@@ -54,7 +63,7 @@ SHARED_SPANS = (
     ("update-consumer", 0x14003A6FC, 0x14003A717),
     ("secondary-callback-consumer", 0x14003A767, 0x14003A78D),
     ("cleanup-before-reinitialize", 0x14004FFD0, 0x14005007B),
-    ("cleanup-other-consumer", 0x14004ADC4, 0x14004ADE9),
+    ("cleanup-other-consumer", 0x14004ADC0, 0x14004ADE9),
     ("common-cleanup-thunk", 0x1405A5A30, 0x1405A5A35),
     ("common-cleanup-thunk-2", 0x1405A5D80, 0x1405A5D85),
     ("common-cleanup-body", 0x140F2F1F0, 0x140F2F269),
@@ -221,12 +230,18 @@ def produce(directory):
                           bytes=dump.read(0x141217568 + index * 8, 8).hex(),
                           target=hex(dump.pointer(0x141217568 + index * 8)))
                      for index in (1, 2)]
+    destructor_slot = 0x140FE12F0
+    if dump.pointer(destructor_slot) != 0x140048700:
+        raise ValueError("Shell destructor vtable slot differs")
     return dict(schema=1, evidence="offline instruction/data trace; no live validation",
                 limitations=["Bounded spans are not complete control-flow graphs.",
                              "Root publication is not readiness or lifetime proof.",
                              "No gameplay field, safe hook ABI, or callback cadence is validated.",
                              "CFJ cleanup callees, destructor entry paths and reset/load coverage remain open."],
                 sections=baseline["sections"], paths=paths, roms=roms, spans=spans,
+                shell_destructor_vtable=dict(address=hex(destructor_slot),
+                                            bytes=dump.read(destructor_slot, 8).hex(),
+                                            target=hex(0x140048700)),
                 cvs1_phase_table_leads=phase_entries)
 
 

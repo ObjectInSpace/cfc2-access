@@ -1,0 +1,393 @@
+{
+  "schema": 1,
+  "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
+  "evidence": "offline code trace; no live event or hook ABI validation",
+  "limitations": [
+    "Preparation can change state before the restore routine.",
+    "Bypass and save paths must not be mistaken for restoration.",
+    "Selective restore ranges and downstream helper side effects are not a full write inventory.",
+    "Callers are bounded prefixes; indirect callers and UI event labels remain open."
+  ],
+  "paths": [
+    {
+      "game": "CVS1",
+      "entry": "0x1405a6840",
+      "root_slot": "0x1422d2b90",
+      "secondary_slot": "0x1422d2b98",
+      "save_bytes": "0x32ab0",
+      "payload_header_bytes": 8,
+      "bypass_gates": [
+        {
+          "offset": "0x7b4",
+          "compare": "0x1405a684b",
+          "branch": "0x1405a6852"
+        },
+        {
+          "offset": "0x828",
+          "compare": "0x1405a6858",
+          "branch": "0x1405a685f"
+        },
+        {
+          "offset": "0x80c",
+          "compare": "0x1405a6865",
+          "branch": "0x1405a686c"
+        }
+      ],
+      "save_call": "0x1405a688f",
+      "restore_branch": "0x1405a6882",
+      "restore_entry": "0x1405a68ea",
+      "preparation_edge": "0x1405c5e46",
+      "restore_kind": "full-copy"
+    },
+    {
+      "game": "CVS2",
+      "entry": "0x1406aab40",
+      "root_slot": "0x1422debd0",
+      "secondary_slot": "0x1422debd8",
+      "save_bytes": "0x216b0",
+      "payload_header_bytes": 8,
+      "bypass_gates": [
+        {
+          "offset": "0x7b4",
+          "compare": "0x1406aab4b",
+          "branch": "0x1406aab52"
+        },
+        {
+          "offset": "0x828",
+          "compare": "0x1406aab58",
+          "branch": "0x1406aab5f"
+        },
+        {
+          "offset": "0x80c",
+          "compare": "0x1406aab65",
+          "branch": "0x1406aab6c"
+        }
+      ],
+      "save_call": "0x1406aab8f",
+      "restore_branch": "0x1406aab82",
+      "restore_entry": "0x1406aabe6",
+      "preparation_edge": "0x1406bad41",
+      "restore_kind": "full-copy"
+    },
+    {
+      "game": "CFJ",
+      "entry": "0x1407cbb00",
+      "root_slot": "0x1422f3a80",
+      "secondary_slot": "0x1422f3a88",
+      "save_bytes": "0x26e80",
+      "payload_header_bytes": 8,
+      "bypass_gates": [
+        {
+          "offset": "0x7b4",
+          "compare": "0x1407cbb0b",
+          "branch": "0x1407cbb12"
+        },
+        {
+          "offset": "0x828",
+          "compare": "0x1407cbb18",
+          "branch": "0x1407cbb1f"
+        },
+        {
+          "offset": "0x80c",
+          "compare": "0x1407cbb25",
+          "branch": "0x1407cbb2c"
+        }
+      ],
+      "save_call": "0x1407cbb4f",
+      "restore_branch": "0x1407cbb42",
+      "restore_entry": "0x1407cbba6",
+      "preparation_edge": "0x1407ddeb8",
+      "restore_kind": "full-copy"
+    },
+    {
+      "game": "Z3U",
+      "entry": "0x14086d590",
+      "root_slot": "0x1422fb960",
+      "secondary_slot": "0x1422fb968",
+      "save_bytes": "0x12f98",
+      "payload_header_bytes": 8,
+      "bypass_gates": [
+        {
+          "offset": "0x7b4",
+          "compare": "0x14086d59b",
+          "branch": "0x14086d5a2"
+        },
+        {
+          "offset": "0x828",
+          "compare": "0x14086d5a8",
+          "branch": "0x14086d5af"
+        },
+        {
+          "offset": "0x80c",
+          "compare": "0x14086d5b5",
+          "branch": "0x14086d5bc"
+        }
+      ],
+      "save_call": "0x14086d5e4",
+      "restore_branch": "0x14086d5d1",
+      "restore_entry": "0x14086d63d",
+      "preparation_edge": "0x140899780",
+      "restore_kind": "selective"
+    },
+    {
+      "game": "Z3U-alternate",
+      "entry": "0x140dcc840",
+      "root_slot": "0x142c44050",
+      "secondary_slot": "0x142c44058",
+      "save_bytes": "0x1b528",
+      "payload_header_bytes": 8,
+      "bypass_gates": [
+        {
+          "offset": "0x7b4",
+          "compare": "0x140dcc84b",
+          "branch": "0x140dcc852"
+        },
+        {
+          "offset": "0x828",
+          "compare": "0x140dcc858",
+          "branch": "0x140dcc85f"
+        },
+        {
+          "offset": "0x80c",
+          "compare": "0x140dcc865",
+          "branch": "0x140dcc86c"
+        }
+      ],
+      "save_call": "0x140dcc894",
+      "restore_branch": "0x140dcc881",
+      "restore_entry": "0x140dcc8ed",
+      "preparation_edge": "0x140dfa7c7",
+      "restore_kind": "selective"
+    },
+    {
+      "game": "PWS1",
+      "entry": "0x140974180",
+      "root_slot": "0x1423188c0",
+      "secondary_slot": "0x1423188c8",
+      "save_bytes": "0x428f0",
+      "payload_header_bytes": 16,
+      "bypass_gates": [
+        {
+          "offset": "0x7b4",
+          "compare": "0x14097418b",
+          "branch": "0x140974192"
+        },
+        {
+          "offset": "0x828",
+          "compare": "0x140974198",
+          "branch": "0x14097419f"
+        },
+        {
+          "offset": "0x80c",
+          "compare": "0x1409741a5",
+          "branch": "0x1409741ac"
+        }
+      ],
+      "save_call": "0x1409741cf",
+      "restore_branch": "0x1409741c2",
+      "restore_entry": "0x14097422d",
+      "preparation_edge": "0x140976cec",
+      "restore_kind": "full-copy"
+    },
+    {
+      "game": "PWS2",
+      "entry": "0x140a472f0",
+      "root_slot": "0x14262f0b0",
+      "secondary_slot": "0x14262f0b8",
+      "save_bytes": "0x8cd40",
+      "payload_header_bytes": 16,
+      "bypass_gates": [
+        {
+          "offset": "0x7b4",
+          "compare": "0x140a472fb",
+          "branch": "0x140a47302"
+        },
+        {
+          "offset": "0x828",
+          "compare": "0x140a47308",
+          "branch": "0x140a4730f"
+        },
+        {
+          "offset": "0x80c",
+          "compare": "0x140a47315",
+          "branch": "0x140a4731c"
+        }
+      ],
+      "save_call": "0x140a4733f",
+      "restore_branch": "0x140a47332",
+      "restore_entry": "0x140a473a6",
+      "preparation_edge": "0x140a4caf3",
+      "restore_kind": "full-copy"
+    },
+    {
+      "game": "MJUS",
+      "entry": "0x140b93630",
+      "root_slot": "0x142996830",
+      "secondary_slot": "0x142996838",
+      "save_bytes": "0x9e8a8",
+      "payload_header_bytes": 8,
+      "bypass_gates": [
+        {
+          "offset": "0x7b4",
+          "compare": "0x140b9363b",
+          "branch": "0x140b93642"
+        },
+        {
+          "offset": "0x828",
+          "compare": "0x140b93648",
+          "branch": "0x140b9364f"
+        },
+        {
+          "offset": "0x80c",
+          "compare": "0x140b93655",
+          "branch": "0x140b9365c"
+        }
+      ],
+      "save_call": "0x140b9367f",
+      "restore_branch": "0x140b9366c",
+      "restore_entry": "0x140b936d6",
+      "preparation_edge": "0x140b9e1e6",
+      "restore_kind": "selective"
+    },
+    {
+      "game": "STG2",
+      "entry": "0x140ccccc0",
+      "root_slot": "0x142be6370",
+      "secondary_slot": "0x142be6378",
+      "save_bytes": "0x511b8",
+      "payload_header_bytes": 8,
+      "bypass_gates": [
+        {
+          "offset": "0x7b4",
+          "compare": "0x140cccccb",
+          "branch": "0x140ccccd2"
+        },
+        {
+          "offset": "0x828",
+          "compare": "0x140ccccd8",
+          "branch": "0x140ccccdf"
+        },
+        {
+          "offset": "0x80c",
+          "compare": "0x140cccce5",
+          "branch": "0x140ccccec"
+        }
+      ],
+      "save_call": "0x140cccd0f",
+      "restore_branch": "0x140cccd02",
+      "restore_entry": "0x140cccd69",
+      "preparation_edge": "0x140cde377",
+      "restore_kind": "full-copy"
+    }
+  ],
+  "spans": [
+    {
+      "label": "CVS1-save-restore",
+      "start": "0x1405a6840",
+      "end_exclusive": "0x1405a69b1",
+      "sha256": "34ee2e409c6a938ad5a3664bf6fade23882b9f6e38a12fc0c3228e1b7583ac04"
+    },
+    {
+      "label": "CVS1-preparation-prefix",
+      "start": "0x1405c5d50",
+      "end_exclusive": "0x1405c5e4b",
+      "sha256": "74611a90da53ed04345070631fa43f1b3c6b9b68d5e830cba82ece3859c40abf"
+    },
+    {
+      "label": "CVS2-save-restore",
+      "start": "0x1406aab40",
+      "end_exclusive": "0x1406aac2c",
+      "sha256": "070ddcf9e84912030e2e4d9c356e4aeb0cbb6d50c21b46f7acca39a4eb588875"
+    },
+    {
+      "label": "CVS2-preparation-prefix",
+      "start": "0x1406babc0",
+      "end_exclusive": "0x1406bad46",
+      "sha256": "8aa8ac679cc4f07e29f8e59e4074c0a964819fbcde91bbc1555e5ffe243a6e95"
+    },
+    {
+      "label": "CFJ-save-restore",
+      "start": "0x1407cbb00",
+      "end_exclusive": "0x1407cbbd1",
+      "sha256": "dd2a9aa32a9d0a044c16e6dfd83a806a06922e0c739980ff72732d5a69164ed3"
+    },
+    {
+      "label": "CFJ-preparation-prefix",
+      "start": "0x1407ddd80",
+      "end_exclusive": "0x1407ddebd",
+      "sha256": "a02c73c0a03f9fdb88efc337ab5d8c2f6e77a6d03021880c69d420d0f3cc0203"
+    },
+    {
+      "label": "Z3U-save-restore",
+      "start": "0x14086d590",
+      "end_exclusive": "0x14086da97",
+      "sha256": "d10c108bdecacff974cac4f2d206a6b36de9c827d1c588ef3eee1d91977f1c31"
+    },
+    {
+      "label": "Z3U-preparation-prefix",
+      "start": "0x140899700",
+      "end_exclusive": "0x140899785",
+      "sha256": "be672a0de66984f9757013656017aa57f5a354d45b3a8fc59a0a8a100504c309"
+    },
+    {
+      "label": "Z3U-alternate-save-restore",
+      "start": "0x140dcc840",
+      "end_exclusive": "0x140dccd57",
+      "sha256": "7da91e91f6aa9f792ea3c7d69025b8f4a7038ca078ddcbcdb25df2a2d28e8a2e"
+    },
+    {
+      "label": "Z3U-alternate-preparation-prefix",
+      "start": "0x140dfa750",
+      "end_exclusive": "0x140dfa7cc",
+      "sha256": "d8a7eb43060c663025c828399c4c562936e6aaf25c365ff1a7ac9f0d2837be7d"
+    },
+    {
+      "label": "PWS1-save-restore",
+      "start": "0x140974180",
+      "end_exclusive": "0x1409742f2",
+      "sha256": "06e5d67878fbb469121381447ce7e22145c9ffd71f325ac40a1232965f3e7b3b"
+    },
+    {
+      "label": "PWS1-preparation-prefix",
+      "start": "0x140976b50",
+      "end_exclusive": "0x140976cf1",
+      "sha256": "a07745e88624d537238bc7e1bee7cb64c31e9d45bc60688a40a1720d03da515b"
+    },
+    {
+      "label": "PWS2-save-restore",
+      "start": "0x140a472f0",
+      "end_exclusive": "0x140a47552",
+      "sha256": "a9544e9e8f7e5a681e2f1d3c138ebc6bd9764711d8187bc0089fe3302181fff1"
+    },
+    {
+      "label": "PWS2-preparation-prefix",
+      "start": "0x140a4ca30",
+      "end_exclusive": "0x140a4caf8",
+      "sha256": "169b60b7fb72aad54d816884d60ce379629408e2a6ed8819e8497d7393463c20"
+    },
+    {
+      "label": "MJUS-save-restore",
+      "start": "0x140b93630",
+      "end_exclusive": "0x140b93ab2",
+      "sha256": "8f45c8b2b6736e283e5b4ba5ea1653a5d5ee0b90cbb9ca791202175b83b12cc9"
+    },
+    {
+      "label": "MJUS-preparation-prefix",
+      "start": "0x140b9e170",
+      "end_exclusive": "0x140b9e1eb",
+      "sha256": "0ce0e2e0200410f530fc7e0652881bbfdbfb519bb045b6bf6f735b884c13579b"
+    },
+    {
+      "label": "STG2-save-restore",
+      "start": "0x140ccccc0",
+      "end_exclusive": "0x140cccda5",
+      "sha256": "da30455e3cd0f843ce35f504afb86c6f7a90739bd91612f4f627e1b409e81a33"
+    },
+    {
+      "label": "STG2-preparation-prefix",
+      "start": "0x140cde150",
+      "end_exclusive": "0x140cde37c",
+      "sha256": "1b5d5a7ec385bdbcabdd386b669186c2113852fdbfd92519d8340c1a147e4561"
+    }
+  ]
+}

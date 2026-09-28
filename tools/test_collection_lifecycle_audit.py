@@ -37,9 +37,38 @@ class LifecycleAuditTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Code differs"):
                 audit.Dump(audit.DEFAULT_DUMP)
 
+    def test_initializer_entry_sites_are_instruction_aligned(self):
+        expected = {0x140038B1C, 0x140038FD1, 0x14005005B, 0x14008C9E1,
+                    0x1400A6C40, 0x1400B0FA3, 0x1400B49DD}
+        sites = set()
+        for label, start, end in audit.SHARED_SPANS:
+            if label.startswith('initializer-entry-') or label == 'cleanup-before-reinitialize':
+                for ins in self.dump.instructions(start, end):
+                    if ins.mnemonic == 'call' and ins.op_str == '0x14004c540':
+                        sites.add(ins.address)
+        self.assertEqual(sites, expected)
+
+    def test_dispatcher_has_no_direct_generation_counter_write(self):
+        # A visible increment on selected callers is not a universal epoch.
+        from capstone import CS_AC_WRITE
+        from capstone.x86 import X86_OP_MEM
+        for ins in self.dump.instructions(0x14004C540, 0x14004C674):
+            for operand in ins.operands:
+                self.assertFalse(operand.type == X86_OP_MEM and
+                                 operand.access & CS_AC_WRITE and
+                                 operand.mem.disp == 0x7dc)
+
     def test_missing_range_is_not_empty_evidence(self):
         with self.assertRaisesRegex(ValueError, "Missing dump range"):
             self.dump.read(0x10, 8)
+
+    def test_destructor_vtable_target_mutation_rejected(self):
+        original = audit.Dump.pointer
+        def changed(dump, address):
+            return 0 if address == 0x140FE12F0 else original(dump, address)
+        with patch.object(audit.Dump, 'pointer', changed):
+            with self.assertRaisesRegex(ValueError, 'destructor vtable slot differs'):
+                audit.produce(audit.DEFAULT_DUMP)
 
     def test_partial_instruction_rejected(self):
         # Real failure encountered while preparing the trace: this endpoint is

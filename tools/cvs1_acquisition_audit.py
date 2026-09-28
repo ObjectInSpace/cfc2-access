@@ -37,6 +37,8 @@ SPANS = (
     ('mode-branch-A-object-substate-dispatch', 0x14060A730, 0x14060A73F),
     ('mode-branch-A-object-choice-writer', 0x14060A800, 0x14060B44E),
     ('mode-branch-A-choice-object-creation', 0x140610CF0, 0x140611189),
+    ('mode-branch-A-catalog-setup', 0x1405D9900, 0x1405D9A73),
+    ('mode-branch-A-catalog-availability', 0x14060A430, 0x14060A4BF),
     ('mode-branch-B-dispatch', 0x140602440, 0x14060252D),
     ('mode-branch-B-initializer', 0x140602530, 0x140602AE8),
     ('mode-branch-B-actor-dispatch', 0x140602B70, 0x140602CA3),
@@ -150,6 +152,18 @@ def overlapping_rip_writes(dump, start, end, address):
 def produce(directory):
     dump = Dump(directory)
     spans = [dump.span(*spec) for spec in SPANS]
+    # Only selector 0, observed in the schema-2 fixture; no inferred table bounds.
+    catalog_pointer = dump.read(0x141237C78, 8)
+    catalog_raw = dump.read(0x141237BE0, 70)
+    expected_catalog = ('21000b0005000c2807241a081d241b241c002200003101190209031906010411'
+                        '20050e011e01181115051305121d1409111110390a0e090e08061702190e160e0f030d031f03')
+    if (struct.unpack('<Q', catalog_pointer)[0] != 0x141237BE0 or
+            catalog_raw.hex() != expected_catalog):
+        raise ValueError('Branch-A catalog 0 differs')
+    catalog = dict(selector=0, address='0x141237be0', bytes=catalog_raw.hex(),
+                   pointer=dict(address='0x141237c78', bytes=catalog_pointer.hex()),
+                   groups=[[catalog_raw[i] for i in range(0, 70, 2)
+                            if catalog_raw[i+1] & 3 == group] for group in range(4)])
     edges = []
     for owner, selector, table, index, expected in TABLE_EDGES:
         raw = dump.read(table + index * 8, 8)
@@ -204,6 +218,7 @@ def produce(directory):
                 sections=[dict(name=s.name, live=hex(s.live), size=len(s.data),
                                sha256=hashlib.sha256(s.data).hexdigest()) for s in dump.sections],
                 spans=spans, dispatch_edges=edges, prompt_literals=prompts,
+                branch_a_catalog=catalog,
                 selected_object_descriptors=descriptors,
                 render_table=dict(address='0x1405e1eb0',
                                   selector='object+0x9c dword & 0xf; unsigned <=11 guard',

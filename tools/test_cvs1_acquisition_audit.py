@@ -16,6 +16,37 @@ class AcquisitionAuditTests(unittest.TestCase):
         manifest = Path(__file__).resolve().parents[1] / 'docs/cvs1-acquisition-manifest.json'
         self.assertEqual(audit.compact(self.report), json.loads(manifest.read_bytes()))
 
+    def test_catalog_mutations_refused(self):
+        original = audit.Dump.read
+        for target in (0x141237C78, 0x141237BE0):
+            with self.subTest(target=hex(target)):
+                def changed(dump, address, size):
+                    raw = original(dump, address, size)
+                    return bytes(size) if address == target else raw
+                with patch.object(audit.Dump, 'read', changed):
+                    with self.assertRaisesRegex(ValueError, 'catalog 0 differs'):
+                        audit.produce(audit.DEFAULT_DUMP)
+
+    def test_catalog_matches_live_navigation_fixture(self):
+        import gzip
+        fixture = Path(__file__).parent / 'fixtures/cvs1-movement-schema2-20260928.jsonl.gz'
+        rows = [json.loads(line) for line in gzip.decompress(fixture.read_bytes()).splitlines()][1:]
+        groups = self.report['branch_a_catalog']['groups']
+        self.assertEqual([len(group) for group in groups], [10, 16, 6, 3])
+        seen = set()
+        for row in rows:
+            for bracket in ('before', 'after'):
+                b = row[bracket]
+                p = bytes.fromhex(b['records']['phase']['hex'])
+                self.assertEqual((p[0x4B], p[0x76]), (0, 0))
+                nav = b['navigation']['sides'][0]
+                self.assertEqual(nav['counts'], [len(group) for group in groups])
+                group = nav['group']; position = nav['positions'][group]
+                ident = b['actors'][0]['selected']
+                self.assertEqual(groups[group][position], ident)
+                seen.add((position, ident))
+        self.assertEqual(seen, {(0, 0), (1, 1), (15, 16)})
+
     def test_branch_a_subdispatch_mutation_refused(self):
         original = audit.Dump.read
         def changed(dump, address, size):

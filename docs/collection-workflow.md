@@ -609,11 +609,82 @@ fixtures. No game writes, assets, deployment or runtime source changes.
 Mode 0 / phase 2,1,1,6,6 persisted. Side-0 group stayed 1 with count 16;
 position/selected pairs changed 0/0 -> 1/1 -> 0/0 -> 15/16 -> 0/0.
 Held-word samples caught 0x400 and 0x800; press/repeat pulses were not caught.
-Four transitions versus two confirmed taps remains unresolved. One bracket
+The user later clarified four actual taps, resolving the apparent transition
+count discrepancy caused by recording the requested two-tap schedule. One bracket
 changed in raw phase; all other brackets matched; no read errors.
 
 Verified gzip round trips and original hashes, parsed all samples and
 transition values, and checked the diff. No source changes or test reruns.
 The movement window is complete; no further user inputs needed for it.
-Next investigate position writers/intervening input paths before requesting
-another run. Names and implementation packets remain unverified/draft.
+No extra run is needed to explain the transition count. Names and
+implementation packets remain unverified/draft.
+
+## Handoff continuation — catalog check after b60d3bf
+
+Completed review of the pending selector-0 catalog extraction and startup
+verification. The acquisition manifest now pins 63 spans, the catalog
+pointer and its 35 records. Setup sources side-0 selector from P+0x76;
+the captured zero selector and group filter reproduce counts 10,16,6,3.
+Every before/after side-0 position in the 240-sample movement fixture maps
+to its recorded selected ID, including position 15 mapping to ID 16.
+See the catalog continuation in [branch-A evidence](cvs1-branch-a-selection.md).
+
+All 26 CVS1 tests passed, including pointer/data mutation rejection and
+fixture checks. Availability has additional state-dependent gates, so the
+raw catalog is not a general selectable roster. No character names, new
+live reads, runtime changes or deployment. The user subsequently clarified
+four actual taps, consistent with four transitions. Next work is
+character-name provenance and the remaining acquisition contracts;
+implementation packets remain draft.
+
+## Astra allocation clarification and session-boundary continuation
+
+The user explicitly wants this Astra thread used for all upfront Astra work.
+Do not default back to bounded character-name mapping after proposing it as
+Opus-suitable work. Keep that as a separate research assignment. Prioritize
+cross-game lifecycle and acquisition contracts, implemented shared-boundary
+proof, arena/four-player audio design, and concrete handoff packets here.
+No model switching or subagents were requested.
+
+Corrected the schema-2 action account: the user made four taps. The former
+two-tap premise came from the requested schedule. Four observed transitions
+are consistent with the corrected count; timestamps/direction attribution
+remain unmeasured. No extra run is needed to explain the count.
+
+The [session-boundary review](collection-session-boundary-review.md) records
+seven instruction-aligned direct initializer call sites, the complete
+dispatcher and the preparation gate. Lifecycle manifest now has 65 spans.
+Eight lifecycle tests and 26 CVS1 tests passed; diff whitespace checks passed.
+No runtime edits, DLL build, deployment or new live capture.
+
+Common-router implementation must cover teardown before initialization,
+in-place restore without root replacement, and both frame-thread and worker
+audio ownership. S+0x7dc is not an approved universal generation counter.
+Next trace the remaining teardown/restore boundaries and hook ordering before
+implementing generation-aware output. The larger Astra campaign remains open.
+
+## Astra continuation — all nine in-place restore branches
+
+Added [collection restore evidence](collection-restore-trace.md), a dedicated
+offline audit and compact manifest: nine save/restore routines and nine
+instruction-aligned preparation prefixes. All check S+0x7b4/+0x828/+0x80c
+before testing signed secondary-control B[0]. Save and bypass calls are not
+restore events. Power Stone uses 16-byte payload headers; other paths use 8.
+Both Alpha 3 branches and Project Justice selectively restore regions, so a
+universal full-block memcpy hook cannot provide complete event coverage.
+
+Preparation already changes native state before the restore routines; copy
+return also precedes repair work. Shared design now explicitly separates
+temporary suspension, replacement-generation change and readiness to resume.
+Earliest boundaries, UI event ownership, thread ordering and hook ABI remain
+unproved; no runtime router is installed on this evidence alone.
+
+Pinned the shell-owner constructor prefix and its deleting-destructor vtable
+slot in the lifecycle audit, now 66 spans. Actual virtual invocation remains
+open. All 25 collection audit/metadata tests passed, including five new
+restore tests and the destructor target mutation check. Whitespace checks
+passed. No runtime source edits, DLL build, deployment or live capture.
+
+Next Astra work: follow preparation ownership/shared state-load consumers,
+complete lifecycle capture contracts, then implement and prove the common
+router/output boundaries. Bounded character-name mapping remains Opus work.

@@ -174,3 +174,42 @@ The capture keeps offset-labelled words; this evidence supports interpreting
 +0x5d8 as a staged repeat-mask value on the traced path. It does not assign
 directions or account for the three earlier transitions by itself. The
 schema-1 movement fixture lacks these words, and polling may miss pulses.
+
+## Catalog continuation after b60d3bf
+
+Reviewed the pending catalog extraction against the same pinned dump. The
+audit now retains 63 bounded spans, including setup
+`0x1405d9900..0x1405d9a73` and availability
+`0x14060a430..0x14060a4bf` (exclusive ends).
+
+Setup passes signed P+0x76 as catalog selector for side 0, and P+0x77 for
+side 1, to `0x140610cf0`. Calls supply group arguments 0 through 3. The
+schema-2 movement fixture has side-0 selector P+0x76=0 throughout. Pointer
+slot `0x141237c78` contains `0x141237be0`; the audit pins that pointer and
+70 catalog bytes, comprising 35 two-byte records. No other selector or
+pointer-table bound is inferred.
+
+When P+0x4b is zero, the availability helper first requires the second
+record byte masked with 3 to match the requested group. It also performs
+additional state-dependent checks for IDs 13, 14, 30, 15 and 31 through
+`0x1422d2ee0 + 0x20*side`. Consequently grouping raw catalog records alone
+is not a general availability model.
+
+The four raw group lengths are 10, 16, 6 and 3. In the retained movement
+fixture, P+0x4b is zero and the side-0 counts match these lengths in every
+before and after observation. Group 1's native IDs, in catalog order, are:
+
+`0, 1, 2, 3, 6, 4, 32, 14, 30, 24, 21, 19, 18, 20, 17, 16`.
+
+Every captured side-0 position selects the recorded native ID from that
+group: position 0 gives ID 0, position 1 gives ID 1, and position 15 gives
+ID 16. This checks the observed wrap against catalog order. It neither
+names the characters nor establishes physical-button mapping. The user
+subsequently clarified that four taps were made, consistent with the four
+recorded transitions; the earlier two-tap premise was incorrect.
+Other availability configurations and side 1 remain unvalidated.
+
+The capture startup verifier now checks the catalog bytes and pointer.
+Offline mutation tests reject either changing; fixture checks cover both
+observations of all 240 movement samples. All 26 CVS1 acquisition/capture
+tests passed. No new live capture or runtime speech change was made.
