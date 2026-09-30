@@ -24,6 +24,7 @@
 #include "cvs2_story.h"
 #include "cvs2_text.h"
 #include "text_channel.h"
+#include "collection_probe.h"
 #include "image.h"
 #include "gmd_find.h"
 #include "pad_watch.h"
@@ -1705,6 +1706,8 @@ static DWORD WINAPI worker(LPVOID param)
     if (unpacked) cvs2_hit_install();
     if (unpacked && hook_enabled) cvs2_story_install();
     if (unpacked && hook_enabled) cvs2_text_install();
+    if (unpacked && hook_enabled && opt_in_file_present("cfc2_collection_probe.on"))
+        collection_probe_install();
 
     /* ⭐ The shell registers LAST, so a running game answers the ` key first and the
      * menus are the fallback. Order here IS the priority order, which is why
@@ -2018,6 +2021,7 @@ static DWORD WINAPI worker(LPVOID param)
 
             /* Read actual CVS2 selection on the speech worker, never a hook. */
             cvs2_select_tick();
+            collection_probe_tick();
 
             /* ⚠ AFTER cvs2_select_tick(), not beside the keypress. That tick is
              * what validates the session and tells each reader whether its game

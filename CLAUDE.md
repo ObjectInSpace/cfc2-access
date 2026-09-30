@@ -9,6 +9,12 @@ The [next Astra session brief](docs/collection-astra-brief.md) records the start
 point. This workflow does not authorize assuming an untraced field or claiming
 an offline test proves live behavior.
 
+The optional [collection boundary probe](docs/collection-boundary-run-card.md)
+is implemented for the next lifecycle capture. It is off unless
+`cfc2_collection_probe.on` is present, respects `cfc2_hook.off`, and is not a
+production session router. Its new runner brings the regression set to 29.
+Do not treat synthetic probe CSVs under `build/test` as live evidence.
+
 For CVS2 in-game research, read [the 2026-09-18 prior-art audit](docs/cvs2-prior-art-audit.md)
 before relying on the historical conclusions below. It corrects the NAOMI RAM
 size, the claimed coverage of SH-4 searches, and the guest-pointer mapping

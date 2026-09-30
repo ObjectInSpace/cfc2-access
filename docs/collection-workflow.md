@@ -729,3 +729,24 @@ S+0x465c when S+0x4654 is 3, after the game update returns. These transfers
 are distinct from full-root snapshot loads; UI semantics remain unlabelled.
 Nine restore tests and all 38 collection tests pass. The capture boundary
 must cover wrapper continuation as well as the native update and replay.
+
+## Boundary probe implementation
+
+An opt-in [boundary probe](collection-boundary-run-card.md) now records five
+reviewed entry/exit sites, thread identity, shallow state metadata and nesting.
+It uses bounded nonblocking capture and worker-only file output, preserves
+the original call arguments/load result/last-error state, refuses changed
+whole-body fingerprints, and rolls back partial hook installation. It is
+enabled only by `cfc2_collection_probe.on`, respecting `cfc2_hook.off`.
+
+The probe has synthetic forwarding/overflow/installation tests and a real
+test-thread completion race. The CSV analyzer distinguishes incomplete and
+lossy files from complete observations. The first run card covers a labelled
+CVS2-to-CVS1 switch; snapshot load needs a separate exercised path. No new live
+capture or deployment has occurred. The production router and larger Astra
+deliverables remain open.
+
+Final probe validation: all 29 PowerShell runners, all 50 collection Python
+tests and the DLL build passed. A delayed producer cannot race the completion
+footer into falsely reporting a clean capture. The final DLL hash and exact
+live exercise are in the run card. No deployment has been performed.
