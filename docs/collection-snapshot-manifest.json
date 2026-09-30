@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
   "evidence": "offline instruction trace; no live callback ordering proof",
   "root_registration": {
@@ -17,6 +17,32 @@
   },
   "load_completion_counter_offset": "0x76c",
   "intermediate_update_flag_offset": "0x770",
+  "virtual_slots": [
+    {
+      "address": "0x140ff02d8",
+      "target": "0x1400b9020"
+    },
+    {
+      "address": "0x140ff02f0",
+      "target": "0x1400b99c0"
+    },
+    {
+      "address": "0x140ff02f8",
+      "target": "0x1400b9520"
+    },
+    {
+      "address": "0x140ff0398",
+      "target": "0x1400b9c10"
+    },
+    {
+      "address": "0x140ff03b0",
+      "target": "0x1400b9e80"
+    },
+    {
+      "address": "0x140ff03b8",
+      "target": "0x1400b9c40"
+    }
+  ],
   "limitations": [
     "Root registration retains raw pointers; lifetime is not proved.",
     "Load replaces live state without changing the root pointer.",
@@ -24,6 +50,7 @@
     "Replay invokes multiple native updates while session+0x770 is set.",
     "Shell batching also sets session+0x770; it is not replay-exclusive.",
     "A cleared replay flag alone does not establish presentation eligibility.",
+    "Normal callback advance calls finish, which can poll and replay again.",
     "Callback registration alone does not establish UI or network semantics.",
     "Span alignment is not a complete control-flow or write inventory."
   ],
@@ -123,6 +150,96 @@
       "start": "0x1400ba840",
       "end_exclusive": "0x1400ba8c2",
       "sha256": "05632d5311cf347f1e2bb335c89590a9036977afd2c435e577c51895b061e615"
+    },
+    {
+      "label": "shell-callback-path",
+      "start": "0x14003a7a0",
+      "end_exclusive": "0x14003adb7",
+      "sha256": "5ef4ba650448d50f4528d3ff0ca8d9e8e7639d8f721dd6f8848ff3000da6228e"
+    },
+    {
+      "label": "callback-normal-advance",
+      "start": "0x1400b6b80",
+      "end_exclusive": "0x1400b6c82",
+      "sha256": "dac30615c677b9c14a0f227806811dc0f7d683c0f277e1a3d4121461e9fcbed6"
+    },
+    {
+      "label": "callback-poll-wrapper",
+      "start": "0x1400b6880",
+      "end_exclusive": "0x1400b688e",
+      "sha256": "7243a49a353208ac109e56504767915ed33c8fb434f706d47f9cc884aa83dc33"
+    },
+    {
+      "label": "virtual-poll-wrapper",
+      "start": "0x1400b76c0",
+      "end_exclusive": "0x1400b76d0",
+      "sha256": "f2d933b6e4a068b00309d505f8314905629f7f8f82fe0af45315bb67e6a55854"
+    },
+    {
+      "label": "virtual-input-wrapper",
+      "start": "0x1400b7810",
+      "end_exclusive": "0x1400b7820",
+      "sha256": "25b533bc498c4a3663427c67146979aaddd1fc60255c75edfc411047faf7742a"
+    },
+    {
+      "label": "virtual-finish-wrapper",
+      "start": "0x1400b7680",
+      "end_exclusive": "0x1400b7690",
+      "sha256": "ae6d5e8bde0243422c62eace799e68c8388ba2f32593875256c4981bd5f6b6f0"
+    },
+    {
+      "label": "primary-explicit-replay-caller",
+      "start": "0x1400b8f80",
+      "end_exclusive": "0x1400b901b",
+      "sha256": "e8980c07425b9e0e6c6d734d451b06f3023a9d89c2261eaad3d5dba8be10a3f5"
+    },
+    {
+      "label": "primary-poll",
+      "start": "0x1400b9020",
+      "end_exclusive": "0x1400b94c8",
+      "sha256": "df977c749b53599a937c89a5897ee9111fe82dec5dfadd7bb43f00afe90b9034"
+    },
+    {
+      "label": "primary-finish",
+      "start": "0x1400b9520",
+      "end_exclusive": "0x1400b9590",
+      "sha256": "bf84ffc805f6dbf655378fa06d6e43667db3ed2dd0ea58ecc94891d314004d2f"
+    },
+    {
+      "label": "secondary-poll",
+      "start": "0x1400b9c10",
+      "end_exclusive": "0x1400b9c34",
+      "sha256": "557e3cf72721c4f9e152949307b68fab3c9dc95ec6b96e2d4b6c0a5fa37cfd58"
+    },
+    {
+      "label": "secondary-finish",
+      "start": "0x1400b9c40",
+      "end_exclusive": "0x1400b9c61",
+      "sha256": "4d77275dfe97004095c1520e94f8b4385b98de6b57b3b0285b047cf0d10fafe2"
+    },
+    {
+      "label": "callback-mode-toggle",
+      "start": "0x1400520b0",
+      "end_exclusive": "0x1400520f0",
+      "sha256": "64fe25575cc2705137183d0ca15f75213bec8690a62c0ba824aeb36b5b02a814"
+    },
+    {
+      "label": "callback-object-close",
+      "start": "0x1400b6830",
+      "end_exclusive": "0x1400b687d",
+      "sha256": "8e03bef182337c9f71c38180295c633c96ab239cf01bd3239a46aa26959e68fa"
+    },
+    {
+      "label": "virtual-close-wrapper",
+      "start": "0x1400b7690",
+      "end_exclusive": "0x1400b76b2",
+      "sha256": "b26a86c1f9926207a38f5bdcdd2fc50fb214b3c3f285cfb038ab2e72a703addd"
+    },
+    {
+      "label": "shell-post-update-drain",
+      "start": "0x14006d530",
+      "end_exclusive": "0x14006d579",
+      "sha256": "6123ba7fe7c3eb27acdfa8ce3d4bc3ef03bbb69faae6411cf4eee46826b1a0ca"
     }
   ]
 }

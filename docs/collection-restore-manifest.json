@@ -1,5 +1,5 @@
 {
-  "schema": 2,
+  "schema": 3,
   "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
   "evidence": "offline code trace; no live event or hook ABI validation",
   "limitations": [
@@ -8,6 +8,80 @@
     "Selective restore ranges and downstream helper side effects are not a full write inventory.",
     "Preparation dispatch slots do not establish all callers or UI event labels.",
     "Preparation and native update can continue after restoration."
+  ],
+  "post_update_transfers": [
+    {
+      "game": "CVS1",
+      "entry": "0x1405a5d90",
+      "control": "0x1405a5f24",
+      "branch": "0x1405a5f2c",
+      "join": "0x1405a6060",
+      "published_bytes": "0x480"
+    },
+    {
+      "game": "CVS2",
+      "entry": "0x1406a9de0",
+      "control": "0x1406a9e59",
+      "branch": "0x1406a9e60",
+      "join": "0x1406a9f5e",
+      "published_bytes": "0xb00"
+    },
+    {
+      "game": "CFJ",
+      "entry": "0x1407cb090",
+      "control": "0x1407cb169",
+      "branch": "0x1407cb170",
+      "join": "0x1407cb2be",
+      "published_bytes": "0x420"
+    },
+    {
+      "game": "Z3U",
+      "entry": "0x14086c870",
+      "control": "0x14086c8ee",
+      "branch": "0x14086c8f5",
+      "join": "0x14086cb49",
+      "published_bytes": "0x1100"
+    },
+    {
+      "game": "Z3U-alternate",
+      "entry": "0x140dcbaf0",
+      "control": "0x140dcbb6e",
+      "branch": "0x140dcbb75",
+      "join": "0x140dcbe05",
+      "published_bytes": "0x17c0"
+    },
+    {
+      "game": "PWS1",
+      "entry": "0x140973670",
+      "control": "0x140973753",
+      "branch": "0x14097375a",
+      "join": "0x1409737ef",
+      "published_bytes": "0xb4"
+    },
+    {
+      "game": "PWS2",
+      "entry": "0x140a46900",
+      "control": "0x140a469be",
+      "branch": "0x140a469c5",
+      "join": "0x140a46a43",
+      "published_bytes": "0x5a"
+    },
+    {
+      "game": "MJUS",
+      "entry": "0x140b92a30",
+      "control": "0x140b92bd5",
+      "branch": "0x140b92bdd",
+      "join": "0x140b92d09",
+      "published_bytes": "0x280"
+    },
+    {
+      "game": "STG2",
+      "entry": "0x140ccc310",
+      "control": "0x140ccc4a6",
+      "branch": "0x140ccc4ad",
+      "join": "0x140ccc5e3",
+      "published_bytes": "0x190"
+    }
   ],
   "preparation_slots": [
     {
@@ -515,6 +589,60 @@
       "start": "0x140cccb60",
       "end_exclusive": "0x140cccc12",
       "sha256": "f84e838fabe7191cd3ce2042c6d29f1ee5148f4e84ee3a9eb8797efacab8c82d"
+    },
+    {
+      "label": "CVS1-post-update-transfer-prefix",
+      "start": "0x1405a5d90",
+      "end_exclusive": "0x1405a6060",
+      "sha256": "fe7a80122844726dfbeff607c1f5b26eac91cbd7e859969f62ac6e7276bfcf85"
+    },
+    {
+      "label": "CVS2-post-update-transfer-prefix",
+      "start": "0x1406a9de0",
+      "end_exclusive": "0x1406a9f5e",
+      "sha256": "0df8ba9d24b8d0d0f8737b83a9ff9654a4437c6378ad1748943cd93a2ff5877f"
+    },
+    {
+      "label": "CFJ-post-update-transfer-prefix",
+      "start": "0x1407cb090",
+      "end_exclusive": "0x1407cb2be",
+      "sha256": "62ff57450b15c95d58f35f39b91dd6982fd27ab22c4d83e6a98d12e09b61b55d"
+    },
+    {
+      "label": "Z3U-post-update-transfer-prefix",
+      "start": "0x14086c870",
+      "end_exclusive": "0x14086cb49",
+      "sha256": "1f55b74ad8f29c54d774e0e8ac61563b23d960acf4e2c43f88ca475a489122af"
+    },
+    {
+      "label": "Z3U-alternate-post-update-transfer-prefix",
+      "start": "0x140dcbaf0",
+      "end_exclusive": "0x140dcbe05",
+      "sha256": "3b12a96cc726c265c6479ec45ae8e83ff2e420c5f8ad17793b33aa751051bddd"
+    },
+    {
+      "label": "PWS1-post-update-transfer-prefix",
+      "start": "0x140973670",
+      "end_exclusive": "0x1409737ef",
+      "sha256": "6267d01d4b4b1d46ea7e991eece00654a76c4f4e36569aade45d8eba53382ba7"
+    },
+    {
+      "label": "PWS2-post-update-transfer-prefix",
+      "start": "0x140a46900",
+      "end_exclusive": "0x140a46a43",
+      "sha256": "51d6ac80313c6ece7215ae38311ab363a4d7a39d0ed79762420599217b941178"
+    },
+    {
+      "label": "MJUS-post-update-transfer-prefix",
+      "start": "0x140b92a30",
+      "end_exclusive": "0x140b92d09",
+      "sha256": "4f94d82680e9c587b0fc0ddae66915f12d4e4b03db03b402836a2ea319430ceb"
+    },
+    {
+      "label": "STG2-post-update-transfer-prefix",
+      "start": "0x140ccc310",
+      "end_exclusive": "0x140ccc5e3",
+      "sha256": "0015f4120fa0c5cc539e4bcccceb5753220a8755d747a4a454f02241374f21c9"
     }
   ]
 }

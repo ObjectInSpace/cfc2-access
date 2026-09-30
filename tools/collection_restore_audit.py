@@ -60,6 +60,20 @@ PREPARATION_EDGES = (
     (0x140CCCC0D, 'jmp', '0x140ccdc60'),
 )
 
+# Wrapper work runs after the native update. Mode 3 copies a smaller state
+# region back from S+0x465c. Ends are the non-mode-3 join, not whole functions.
+TAIL_TRANSFERS = (
+    ('CVS1', 0x1405A5D90, 0x1405A6060, 0x1405A5F24, 0x1405A5F2C, 0x480),
+    ('CVS2', 0x1406A9DE0, 0x1406A9F5E, 0x1406A9E59, 0x1406A9E60, 0xB00),
+    ('CFJ', 0x1407CB090, 0x1407CB2BE, 0x1407CB169, 0x1407CB170, 0x420),
+    ('Z3U', 0x14086C870, 0x14086CB49, 0x14086C8EE, 0x14086C8F5, 0x1100),
+    ('Z3U-alternate', 0x140DCBAF0, 0x140DCBE05, 0x140DCBB6E, 0x140DCBB75, 0x17C0),
+    ('PWS1', 0x140973670, 0x1409737EF, 0x140973753, 0x14097375A, 0xB4),
+    ('PWS2', 0x140A46900, 0x140A46A43, 0x140A469BE, 0x140A469C5, 0x5A),
+    ('MJUS', 0x140B92A30, 0x140B92D09, 0x140B92BD5, 0x140B92BDD, 0x280),
+    ('STG2', 0x140CCC310, 0x140CCC5E3, 0x140CCC4A6, 0x140CCC4AD, 0x190),
+)
+
 
 def require(condition, message):
     if not condition:
@@ -124,13 +138,31 @@ def produce(directory):
     for label, address, target in PREPARATION_SLOTS:
         require(dump.pointer(address) == target, label + ': preparation table slot differs')
     spans.extend(dump.span(*span) for span in PREPARATION_SPANS)
-    return dict(schema=2, code_sha256=CODE_SHA256,
+    transfers = []
+    for tag, start, end, control, branch, size in TAIL_TRANSFERS:
+        ins = dump.instructions(start, end)
+        by_address = {i.address:i for i in ins}
+        cmp, jump = by_address[control], by_address[branch]
+        require(cmp.mnemonic == 'cmp' and cmp.op_str.endswith(' + 0x4654], 3')
+                and jump.mnemonic == 'jne' and jump.operands[0].imm == end,
+                tag + ': post-update transfer control differs')
+        require(any(i.mnemonic == 'mov' and i.op_str.endswith(f' + 0x4658], {size:#x}')
+                    for i in ins), tag + ': post-update transfer size differs')
+        require(any(rip_targets(i) == [paths[tag][4]] for i in ins),
+                tag + ': post-update root differs')
+        require(any(rip_targets(i) == [0x141C14F98] for i in ins),
+                tag + ': post-update session differs')
+        spans.append(dump.span(tag+'-post-update-transfer-prefix', start, end))
+        transfers.append(dict(game=tag, entry=hex(start), control=hex(control),
+                              branch=hex(branch), join=hex(end), published_bytes=hex(size)))
+    return dict(schema=3, code_sha256=CODE_SHA256,
                 evidence='offline code trace; no live event or hook ABI validation',
                 limitations=['Preparation can change state before the restore routine.',
                              'Bypass and save paths must not be mistaken for restoration.',
                              'Selective restore ranges and downstream helper side effects are not a full write inventory.',
                              'Preparation dispatch slots do not establish all callers or UI event labels.',
                              'Preparation and native update can continue after restoration.'],
+                post_update_transfers=transfers,
                 preparation_slots=[dict(label=label, address=hex(address), target=hex(target))
                                    for label,address,target in PREPARATION_SLOTS],
                 paths=rows, spans=spans)

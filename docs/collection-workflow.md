@@ -713,3 +713,19 @@ Remaining Astra prerequisites: callback/root-registration lifetime, complete
 outer completion and teardown ownership, hook ABI/thread ordering, then the
 shared implementation proof. Per-feature acquisition and arena/four-player
 audio work also remain open; this is not completion of the campaign.
+
+The snapshot continuation now pins 31 spans and six virtual slots. Both
+ordinary and callback-driven updates pass through the shared shell routine.
+The callback finish path can poll and replay again after a normal game update,
+so native-update return alone cannot authorize publication. Explicit callback
+object close is traced; it zeros the object slot but does not clear the root
+registration table in the reviewed body. Nine snapshot tests and all 36
+collection tests pass. The outer shell caller continues through another helper;
+actual presentation, transitive writes and live thread ordering remain open.
+
+Nine additional post-update wrapper prefixes are now pinned in the restore
+audit (41 spans total). All can copy smaller native regions back from
+S+0x465c when S+0x4654 is 3, after the game update returns. These transfers
+are distinct from full-root snapshot loads; UI semantics remain unlabelled.
+Nine restore tests and all 38 collection tests pass. The capture boundary
+must cover wrapper continuation as well as the native update and replay.

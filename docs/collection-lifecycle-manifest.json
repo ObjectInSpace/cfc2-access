@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "evidence": "offline instruction/data trace; no live validation",
   "limitations": [
     "Bounded spans are not complete control-flow graphs.",
@@ -510,6 +510,30 @@
   ],
   "spans": [
     {
+      "label": "game-screen-constructor",
+      "start": "0x140037000",
+      "end_exclusive": "0x140037071",
+      "sha256": "e6238e392d309440a9f3f86157f38a527e98bbc76d6c46052953b28f0b851a23"
+    },
+    {
+      "label": "game-screen-update",
+      "start": "0x140038f90",
+      "end_exclusive": "0x140039778",
+      "sha256": "b2e0baca5568cbbc779f57aab642f0d0564eee3b31857b4f8a343f9ec2028f4f"
+    },
+    {
+      "label": "game-screen-release",
+      "start": "0x140037140",
+      "end_exclusive": "0x140037292",
+      "sha256": "a5d7a68d95175ab8beb6784de815127daf5101cc405edf40fc9535f888e2c19c"
+    },
+    {
+      "label": "post-update-shell-state",
+      "start": "0x140039ed0",
+      "end_exclusive": "0x14003a284",
+      "sha256": "d67dd6485c0ccf73b1dabf4804f4c188444c47c878d3dd22d11447cb527c29c9"
+    },
+    {
       "label": "initializer-dispatch-complete",
       "start": "0x14004c540",
       "end_exclusive": "0x14004c674",
@@ -904,6 +928,16 @@
       "start": "0x140ccb440",
       "end_exclusive": "0x140ccb457",
       "sha256": "cd62eab4fa11aebb9a35e732a3f9548b0e72169bae12764827bfe9f798229ca7"
+    }
+  ],
+  "game_screen_vtable": [
+    {
+      "address": "0x140fde728",
+      "target": "0x140038f90"
+    },
+    {
+      "address": "0x140fde730",
+      "target": "0x140037140"
     }
   ],
   "shell_destructor_vtable": {

@@ -58,6 +58,13 @@ class RestoreAuditTests(unittest.TestCase):
         # Keep the five-byte jump, but change its target.
         self.assert_mutation_refused(0x140976D55, 8, 'preparation continuation differs')
 
+    def test_post_update_transfer_mode_cannot_be_relabelled(self):
+        self.assert_mutation_refused(0x140A469C4, 2, 'post-update transfer control differs')
+
+    def test_post_update_transfers_cover_all_branches(self):
+        self.assertEqual({r['game'] for r in self.report['post_update_transfers']},
+                         {p[0] for p in audit.PATHS})
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -139,6 +139,35 @@ These findings reject publication at the restore helper's return. They do
 not certify the outer update as a presented frame: shared replay can invoke
 that update repeatedly, as the snapshot continuation explains.
 
+## Additional copies after native update
+
+The schema-3 audit also pins nine wrapper prefixes, bringing it to 41 spans.
+These wrappers are the tail targets of the S+0x10 callbacks, so they run
+after the native game update. All use S+0x4654 as a transfer control,
+S+0x4658 as a published byte count and S+0x465c as the shell-side buffer.
+Control zero becomes 2; control 2 copies out of the game; control 3 copies
+back into native state and returns the control to 1. Some paths also clear
+native fields after copying. These prefixes stop at the control-3 join;
+the wrappers continue into other work afterward.
+
+The published lengths differ: CVS1 0x480, CVS2 0xb00, CFJ 0x420,
+Alpha 3 0x1100, alternate Alpha 3 0x17c0, Power Stone 0xb4,
+Power Stone 2 0x5a, Project Justice 0x280 and Plasma Sword 0x190.
+They are smaller transfers, distinct from the full registered root and
+secondary save/restore payload. Inline copies occur here too.
+
+Concrete reverse-copy examples:
+
+- CVS2 copies S+0x465c to R+0x203ec, length 0xb00, at `0x1406a9e7a`.
+- Alpha 3 copies to R+0xe630, length 0x1100, at `0x14086c90f`.
+- Alternate Alpha 3 copies to R+0x15488, length 0x17c0, at `0x140dcbb8f`.
+- Power Stone 2 starts inline stores to R+0x52f17 at `0x140a469ce`,
+  finishing with a word store at `0x140a46a24`.
+
+The visible purpose and triggering UI commands remain unlabelled. Do not call
+these copies a whole-session reset. They independently rule out assuming
+that native-update return is the final write to a game's state block.
+
 ## Destructor ownership continuation
 
 A data-pointer search finds `0x140048700` in slot `0x140fe12f0`.
@@ -156,11 +185,12 @@ absence of direct calls is not absence of destruction.
 
 ## Verification and next evidence
 
-Seven restore-audit tests pass: manifest reproduction, nine-branch coverage
+Nine restore-audit tests pass: manifest reproduction, nine-branch coverage
 and differences, signed-control mutation rejection, Power Stone header
 mutation rejection, bypass-polarity mutation rejection, alternate task-slot
-mutation rejection and post-restore tail mutation rejection. The collection
-test group passes 34 tests, including snapshot, lifecycle and metadata checks.
+mutation rejection, post-restore tail mutation rejection, post-update mode
+mutation rejection and all-branch transfer coverage. The collection test
+group passes 38 tests, including snapshot, lifecycle and metadata checks.
 
 The [shared snapshot continuation](collection-snapshot-trace.md) now traces
 an additional load callback, its registration and two restore-and-replay

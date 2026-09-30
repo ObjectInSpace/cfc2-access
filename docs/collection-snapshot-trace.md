@@ -83,6 +83,44 @@ the flag between iterations. A zero value also does not prove that state is
 stable while another thread copies it. The native update boundary and the
 outer batch boundary must participate in publication.
 
+## Outer callback completion and close
+
+The expanded audit pins 31 spans and six exact virtual slots. The common
+shell update calls `0x14003a7a0` at `0x14003a30e` on its callback-driven
+branch, then joins the ordinary path at `0x14003a767`. This branch is
+selected through the shell owner, which is distinct from S.
+
+The callback-driven routine registers one of the two callback objects on
+initialization. On later invocations it polls at `0x14003abcf`, then calls
+`0x1400b6b80` at `0x14003ac2a`. That routine obtains inputs, calls the
+native-update bridge at `0x1400b6bf1`, and calls the object's finish method
+through `0x1400b7680` at `0x1400b6c37`.
+
+The primary object's table is `0x140ff02d0`; poll, input and finish occupy
++8, +0x20 and +0x28. Its poll routine `0x1400b9020` calls the selected
+restore/replay routine at `0x1400b915a`. Crucially, finish `0x1400b9520`
+calls poll again at `0x1400b9541`. Therefore the normal native-update
+return can precede another replay in the same shell update. Capturing there
+and publishing immediately can publish state that is about to be replaced.
+
+The secondary object's table is `0x140ff0390` with different implementations
+in the same slots. Its finish `0x1400b9c40` also calls its poll slot, then
+performs more processing. The primary object's replay schema must not be
+assumed for the secondary object merely because the callback layout matches.
+
+The shell path also invokes a secondary callback and finally tail-transfers
+to `0x14006d530`, which drains a native work queue. The outer return is a
+candidate observation boundary, not yet a proven presentation or thread
+boundary. The inspected direct caller at `0x140039430` continues into
+`0x140039ed0` afterward; that caller continuation is a remaining lead.
+
+Close is explicit: `0x1400520b0` with DL=0 calls `0x1400b6830`, which
+invokes virtual destruction on the callback object at `0x14221ce58` and
+then zeros that slot. It clears scratch but does not clear the registered
+root pointer table in its reviewed body. The shell-owner mode byte +0x1cd
+is cleared after close returns. This does not establish that every possible
+callback reference has ceased or that teardown cannot race a worker.
+
 ## Consequences for the shared architecture
 
 Keep three independent concepts:
@@ -107,7 +145,8 @@ or a copy-hook return as sufficient. No deployment is justified by this audit.
 
 ## Verification
 
-Seven tests reproduce the manifest and reject mutations to copy direction,
+Nine tests reproduce the manifest and reject mutations to copy direction,
 payload offset, registered callback address, replay flag, load callback slot
-and repeated advance slot. The collection group passes 34 tests. These test
+and repeated advance slot, plus final polling and the secondary virtual slot.
+The collection group passes 38 tests. These test
 the retained evidence contract, not live execution or thread safety.

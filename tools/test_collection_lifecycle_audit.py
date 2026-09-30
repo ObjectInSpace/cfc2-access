@@ -76,6 +76,23 @@ class LifecycleAuditTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Incomplete instruction span"):
             self.dump.instructions(0x1400B6250, 0x1400B62B0)
 
+    def test_screen_release_slot_mutation_rejected(self):
+        original = audit.Dump.pointer
+        def changed(dump, address):
+            return 0 if address == 0x140FDE730 else original(dump, address)
+        with patch.object(audit.Dump, 'pointer', changed):
+            with self.assertRaisesRegex(ValueError, 'Game-screen vtable slot differs'):
+                audit.produce(audit.DEFAULT_DUMP)
+
+    def test_screen_release_closes_callback_object_before_game_cleanup(self):
+        calls = [(i.address, i.op_str) for i in self.dump.instructions(0x140037140, 0x140037292)
+                 if i.mnemonic == 'call']
+        self.assertIn((0x140037179, '0x1400520b0'), calls)
+        self.assertIn((0x14003719D, '0x14004adc0'), calls)
+        # DL=0 selects close; DL=1 would instead keep the callback path enabled.
+        ins = self.dump.instructions(0x140037177, 0x140037179)[0]
+        self.assertEqual((ins.mnemonic, ins.op_str), ('xor', 'edx, edx'))
+
     def test_missing_callback_is_not_partial_success(self):
         instructions = self.dump.instructions(0x1405A5A40, 0x1405A5C5C)
         instructions = [i for i in instructions if i.address != 0x1405A5B28]

@@ -98,3 +98,27 @@ is a separate bounded Opus research task; it is not the next Astra task.
 The restore continuation also identifies the destructor vtable's owning shell
 object and pins its constructor publication. The actual virtual invocation
 and lifetime trigger remain open. Lifecycle manifest now contains 66 spans.
+
+## Screen update and conditional release continuation
+
+The lifecycle audit now pins 70 spans. Constructor `0x140037000` allocates
+a 0xb8-byte object and installs table `0x140fde6f0`. Its +0x38 slot holds
+the complete update body `0x140038f90`; +0x40 holds `0x140037140`.
+These slots belong to this screen object, not the large shell owner whose
+deleting destructor was traced earlier.
+
+Update calls the shared shell update at `0x140039430`, then
+`0x140039ed0` at `0x140039438`. The latter updates shell/session fields
+after the native game processing; its full bounded body is now retained.
+
+When screen-object byte +0x38 is nonzero, the +0x40 method first disables
+the callback path through `0x1400520b0` with DL=0 at `0x140037179`, then
+calls game cleanup through `0x14004adc0` at `0x14003719d`. This establishes
+close-before-cleanup on that branch. The conditional bypass and other entry
+paths remain distinct. Vtable membership alone does not prove when the
+engine invokes either method or on which thread.
+
+The collection group now passes 40 tests, including screen-slot mutation
+rejection and the close-before-cleanup instruction check. A bounded event
+probe is the next implementation step for live ordering; no production
+router or new live validation is claimed.

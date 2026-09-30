@@ -34,6 +34,10 @@ PATHS = (
 
 # Explicit, instruction-aligned, exclusive ends; excerpts are not whole CFGs.
 SHARED_SPANS = (
+    ("game-screen-constructor", 0x140037000, 0x140037071),
+    ("game-screen-update", 0x140038F90, 0x140039778),
+    ("game-screen-release", 0x140037140, 0x140037292),
+    ("post-update-shell-state", 0x140039ED0, 0x14003A284),
     ("initializer-dispatch-complete", 0x14004C540, 0x14004C674),
     ("initializer-entry-038af0-prefix", 0x140038AF0, 0x140038B21),
     ("initializer-entry-038f90-prefix", 0x140038F90, 0x140038FD6),
@@ -233,12 +237,17 @@ def produce(directory):
     destructor_slot = 0x140FE12F0
     if dump.pointer(destructor_slot) != 0x140048700:
         raise ValueError("Shell destructor vtable slot differs")
-    return dict(schema=1, evidence="offline instruction/data trace; no live validation",
+    screen_slots = ((0x140FDE728, 0x140038F90), (0x140FDE730, 0x140037140))
+    for address, target in screen_slots:
+        if dump.pointer(address) != target:
+            raise ValueError("Game-screen vtable slot differs")
+    return dict(schema=2, evidence="offline instruction/data trace; no live validation",
                 limitations=["Bounded spans are not complete control-flow graphs.",
                              "Root publication is not readiness or lifetime proof.",
                              "No gameplay field, safe hook ABI, or callback cadence is validated.",
                              "CFJ cleanup callees, destructor entry paths and reset/load coverage remain open."],
                 sections=baseline["sections"], paths=paths, roms=roms, spans=spans,
+                game_screen_vtable=[dict(address=hex(a), target=hex(t)) for a,t in screen_slots],
                 shell_destructor_vtable=dict(address=hex(destructor_slot),
                                             bytes=dump.read(destructor_slot, 8).hex(),
                                             target=hex(0x140048700)),

@@ -26,7 +26,7 @@ class SnapshotAuditTests(unittest.TestCase):
             return bytes(raw)
 
         with patch.object(audit.Dump, 'read', changed):
-            with self.assertRaisesRegex(ValueError, 'snapshot (operation|reference) differs'):
+            with self.assertRaisesRegex(ValueError, 'snapshot (operation|reference|virtual slot) differs'):
                 audit.produce(audit.DEFAULT_DUMP)
 
     def test_load_destination_cannot_become_source(self):
@@ -47,6 +47,12 @@ class SnapshotAuditTests(unittest.TestCase):
 
     def test_replay_cannot_skip_advance_callback(self):
         self.assert_mutation_refused(0x1400BA514, 0x28)
+
+    def test_finish_cannot_skip_final_poll(self):
+        self.assert_mutation_refused(0x1400B9543, 0x20)
+
+    def test_secondary_finish_cannot_use_primary_schema(self):
+        self.assert_mutation_refused(0x140FF03B8, 0x20)
 
 
 if __name__ == '__main__':
