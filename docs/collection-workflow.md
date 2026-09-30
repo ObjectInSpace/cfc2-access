@@ -688,3 +688,28 @@ passed. No runtime source edits, DLL build, deployment or live capture.
 Next Astra work: follow preparation ownership/shared state-load consumers,
 complete lifecycle capture contracts, then implement and prove the common
 router/output boundaries. Bounded character-name mapping remains Opus work.
+
+## Astra continuation — shared snapshot and repeated-update ownership
+
+The [snapshot trace](collection-snapshot-trace.md) adds 16 pinned spans and
+seven mutation/manifest tests. A shared callback replaces the registered
+S+0x1b0 state block in place and increments S+0x76c. Two traced consumers
+load an earlier snapshot and repeatedly invoke the same native update while
+S+0x770 is set. The shell also sets +0x770 for intermediate batch updates;
+it is not a replay-exclusive flag or a worker synchronization primitive.
+
+The shared contract now separates owner generation, state revision and
+eligible publication sequence. Restoring state does not automatically re-arm
+accepted speech. Copy completion and ordinary native-update invocation are
+insufficient to establish that an observation should reach output.
+
+The restore audit now has 32 spans, eight validated preparation/task slots
+and seven tests. Dispatch and post-restore processing are pinned across all
+nine runtime branches. Alpha 3 task loops and later helpers in other games
+rule out publishing at restore-helper return. All 34 collection tests pass.
+No runtime changes, deployment or new live capture.
+
+Remaining Astra prerequisites: callback/root-registration lifetime, complete
+outer completion and teardown ownership, hook ABI/thread ordering, then the
+shared implementation proof. Per-feature acquisition and arena/four-player
+audio work also remain open; this is not completion of the campaign.

@@ -86,14 +86,14 @@ six full-copy paths continue native processing after that copy returns.
 ## Earlier state changes and the router contract
 
 Every retained preparation prefix contains state changes before invoking the
-save/restore routine. These caller prefixes are not yet connected to complete
-phase dispatch or named quick-load/reset commands for every game. Several
-contain conditional branches beyond the retained prefix.
+save/restore routine. Additional dispatch and continuation evidence is retained
+below. Named quick-load/reset commands and all transitive callers remain open.
 
 The safe design must distinguish three concepts:
 
 - Temporary capture/output suspension while native state is changing.
-- A new output generation when a confirmed replacement occurs.
+- A state revision when a confirmed replacement occurs, separate from owner
+  generation and speech event/visit identity.
 - Resumption only after the relevant native completion boundary and readiness
   checks; a copy-helper return is not sufficient.
 
@@ -101,6 +101,43 @@ Do not increment the generation on every preparation call without proving its
 semantics. Do not read replacement fields concurrently merely because the root
 address still matches. Determining the earliest suspension boundary, exact ABI,
 thread ordering and completion boundary remains Astra work before deployment.
+
+## Preparation dispatch and continued processing
+
+The schema-2 audit retains 32 spans, including 14 additional dispatch,
+scheduler and continuation bodies. Eight exact table slots are validated;
+their neighboring bytes are not treated as proof of table length.
+
+- CVS1, CVS2 and CFJ have preparation dispatch routines at `0x1405c5d30`,
+  `0x1406baba0` and `0x1407ddd60`. Each uses signed phase+2 as an index;
+  entry zero of its table points to the reviewed preparation routine.
+- Alpha 3's scheduler `0x14086e700` uses a task table whose index 3 points
+  to `0x140895c50`. That task calls the preparation table at
+  `0x140895cf1`; entry zero is `0x140899700`. After preparation returns,
+  the task can perform more work and loop back to `0x140895c90`.
+- Alternate Alpha 3 has a separate scheduler at `0x140dcd5b0`, task-table
+  index 3 targeting `0x140df6c50`, and preparation-table entry zero
+  targeting `0x140dfa750`. Its task can also loop. These are separate
+  schemas, not one shared set of offsets.
+- Power Stone's outer update at `0x140973300` calls preparation at
+  `0x140973523`. Preparation calls restore at `0x140976cec`, continues
+  through player/helper processing, and has a tail transfer at
+  `0x140976d54` to `0x1409a8760`. The outer update also continues.
+- Power Stone 2's outer update at `0x140a48cc0` conditionally calls
+  preparation at `0x140a48d80`, then continues through helpers. The
+  preparation body continues after restore call `0x140a4caf3` into mode
+  dispatch. Its retained code ends before the table at `0x140a4cdb8`.
+- Project Justice's scheduler `0x140b93b60` dispatches task-table index 5
+  to preparation `0x140b9e170`. Preparation continues after restore call
+  `0x140b9e1e6` through a mode dispatch, ending with a tail transfer to
+  `0x140b93ce0` at `0x140b9e40a`. Trailing table bytes are excluded.
+- Plasma Sword's native update `0x140cccb60` calls preparation at
+  `0x140cccba4` when root byte zero is 3. It continues afterward and
+  eventually tail-transfers to `0x140ccdc60` at `0x140cccc0d`.
+
+These findings reject publication at the restore helper's return. They do
+not certify the outer update as a presented frame: shared replay can invoke
+that update repeatedly, as the snapshot continuation explains.
 
 ## Destructor ownership continuation
 
@@ -119,12 +156,18 @@ absence of direct calls is not absence of destruction.
 
 ## Verification and next evidence
 
-Five restore-audit tests pass: manifest reproduction, nine-branch coverage
+Seven restore-audit tests pass: manifest reproduction, nine-branch coverage
 and differences, signed-control mutation rejection, Power Stone header
-mutation rejection and bypass-polarity mutation rejection. The collection
-test group passes 25 tests, including lifecycle and metadata checks.
+mutation rejection, bypass-polarity mutation rejection, alternate task-slot
+mutation rejection and post-restore tail mutation rejection. The collection
+test group passes 34 tests, including snapshot, lifecycle and metadata checks.
 
-Next: trace preparation ownership and the shared state-load consumers to
+The [shared snapshot continuation](collection-snapshot-trace.md) now traces
+an additional load callback, its registration and two restore-and-replay
+consumers. It requires separate owner, revision and publication identities;
+one generation reset for every restoration would re-arm speech during replay.
+
+Next: complete preparation ownership and shared state-load lifetime to
 identify which events require suspension versus a new generation. Keep the
 existing live metadata run card for labelled transitions; pointer observations
 alone cannot validate inline restore execution. An event probe requires its

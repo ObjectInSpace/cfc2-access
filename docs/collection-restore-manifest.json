@@ -1,12 +1,55 @@
 {
-  "schema": 1,
+  "schema": 2,
   "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
   "evidence": "offline code trace; no live event or hook ABI validation",
   "limitations": [
     "Preparation can change state before the restore routine.",
     "Bypass and save paths must not be mistaken for restoration.",
     "Selective restore ranges and downstream helper side effects are not a full write inventory.",
-    "Callers are bounded prefixes; indirect callers and UI event labels remain open."
+    "Preparation dispatch slots do not establish all callers or UI event labels.",
+    "Preparation and native update can continue after restoration."
+  ],
+  "preparation_slots": [
+    {
+      "label": "CVS1",
+      "address": "0x141222430",
+      "target": "0x1405c5d50"
+    },
+    {
+      "label": "CVS2",
+      "address": "0x14128cd78",
+      "target": "0x1406babc0"
+    },
+    {
+      "label": "CFJ",
+      "address": "0x1412b6920",
+      "target": "0x1407ddd80"
+    },
+    {
+      "label": "Z3U",
+      "address": "0x1412d7a48",
+      "target": "0x140899700"
+    },
+    {
+      "label": "Z3U-task",
+      "address": "0x1412d0358",
+      "target": "0x140895c50"
+    },
+    {
+      "label": "Z3U-alternate",
+      "address": "0x1419e3bb8",
+      "target": "0x140dfa750"
+    },
+    {
+      "label": "Z3U-alternate-task",
+      "address": "0x1419dc638",
+      "target": "0x140df6c50"
+    },
+    {
+      "label": "MJUS-task",
+      "address": "0x141787288",
+      "target": "0x140b9e170"
+    }
   ],
   "paths": [
     {
@@ -388,6 +431,90 @@
       "start": "0x140cde150",
       "end_exclusive": "0x140cde37c",
       "sha256": "1b5d5a7ec385bdbcabdd386b669186c2113852fdbfd92519d8340c1a147e4561"
+    },
+    {
+      "label": "CVS1-preparation-dispatch",
+      "start": "0x1405c5d30",
+      "end_exclusive": "0x1405c5d47",
+      "sha256": "cae3c990f5dc1948885bf17946bc96cf80cbd1679cb852a5266d3ba453e539d5"
+    },
+    {
+      "label": "CVS2-preparation-dispatch",
+      "start": "0x1406baba0",
+      "end_exclusive": "0x1406babb7",
+      "sha256": "5cdd4d92e05c1d4fb48299b9f6a19d144eeadce60e4ae6efc929d62feabb30af"
+    },
+    {
+      "label": "CFJ-preparation-dispatch",
+      "start": "0x1407ddd60",
+      "end_exclusive": "0x1407ddd77",
+      "sha256": "2bcf32f6772ef04e7fc723f858d80641eaf62487589bcbf115310dee3162f595"
+    },
+    {
+      "label": "Z3U-phase-task",
+      "start": "0x140895c50",
+      "end_exclusive": "0x140895d88",
+      "sha256": "8891714e6bd432167e16b5a4f5e654b5556868ba3695ba1f701797f8be8dedf1"
+    },
+    {
+      "label": "Z3U-task-scheduler",
+      "start": "0x14086e700",
+      "end_exclusive": "0x14086e786",
+      "sha256": "6715edd8687a4bdb5a1902015aa321fc733c272a00c741f3f28a63469d776db8"
+    },
+    {
+      "label": "Z3U-alternate-phase-task",
+      "start": "0x140df6c50",
+      "end_exclusive": "0x140df6da5",
+      "sha256": "93e64b4eb4b8ebd13215db103f7a05e895a98b34c2da8c5e444d65ae118673ce"
+    },
+    {
+      "label": "Z3U-alternate-task-scheduler",
+      "start": "0x140dcd5b0",
+      "end_exclusive": "0x140dcd65c",
+      "sha256": "7ac880f5e76dd2e7b5292db05a3731779304078514344a3663de19b1f1a944db"
+    },
+    {
+      "label": "PWS1-outer-update",
+      "start": "0x140973300",
+      "end_exclusive": "0x1409735ab",
+      "sha256": "5501aa9df74eb18d2a563442bdbf65093d73bc5da53547ba60fc5e9f1899002f"
+    },
+    {
+      "label": "PWS1-preparation-complete",
+      "start": "0x140976b50",
+      "end_exclusive": "0x140976d5e",
+      "sha256": "8578f2b1e5a3a944fdafdff2beff503f95c78d84baa2c76b58c71d55fa204d50"
+    },
+    {
+      "label": "PWS2-outer-update",
+      "start": "0x140a48cc0",
+      "end_exclusive": "0x140a48dd0",
+      "sha256": "13ce5d9a9beb135c1f8f13d76ca83d2e61850aa07059ef760a893671326d5fd8"
+    },
+    {
+      "label": "PWS2-preparation-code",
+      "start": "0x140a4ca30",
+      "end_exclusive": "0x140a4cdb8",
+      "sha256": "d64c5fd26104f4e63ba89d48569c7282d2f148eb0b62492ea37106d03cc7f447"
+    },
+    {
+      "label": "MJUS-task-scheduler",
+      "start": "0x140b93b60",
+      "end_exclusive": "0x140b93bf8",
+      "sha256": "7fecc6c495bbfa59a9908374b7f3a41996472946018c08bb751dc5de0ec9210f"
+    },
+    {
+      "label": "MJUS-preparation-code",
+      "start": "0x140b9e170",
+      "end_exclusive": "0x140b9e40f",
+      "sha256": "cb34b42bed84c31e43eb22324fccfa2a7efb89888e0cacf2504125e521881fc1"
+    },
+    {
+      "label": "STG2-native-update",
+      "start": "0x140cccb60",
+      "end_exclusive": "0x140cccc12",
+      "sha256": "f84e838fabe7191cd3ce2042c6d29f1ee5148f4e84ee3a9eb8797efacab8c82d"
     }
   ]
 }

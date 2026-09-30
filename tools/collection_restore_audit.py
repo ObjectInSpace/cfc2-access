@@ -20,6 +20,46 @@ RESTORES = (
     ('STG2', 0x140CCCCC0, 0x140CCCDA5, 0x140CCCD0F, 0x140CCCD69, 8, 0x140CDE150, 0x140CDE377),
 )
 
+PREPARATION_SPANS = (
+    ('CVS1-preparation-dispatch', 0x1405C5D30, 0x1405C5D47),
+    ('CVS2-preparation-dispatch', 0x1406BABA0, 0x1406BABB7),
+    ('CFJ-preparation-dispatch', 0x1407DDD60, 0x1407DDD77),
+    ('Z3U-phase-task', 0x140895C50, 0x140895D88),
+    ('Z3U-task-scheduler', 0x14086E700, 0x14086E786),
+    ('Z3U-alternate-phase-task', 0x140DF6C50, 0x140DF6DA5),
+    ('Z3U-alternate-task-scheduler', 0x140DCD5B0, 0x140DCD65C),
+    ('PWS1-outer-update', 0x140973300, 0x1409735AB),
+    ('PWS1-preparation-complete', 0x140976B50, 0x140976D5E),
+    ('PWS2-outer-update', 0x140A48CC0, 0x140A48DD0),
+    ('PWS2-preparation-code', 0x140A4CA30, 0x140A4CDB8),
+    ('MJUS-task-scheduler', 0x140B93B60, 0x140B93BF8),
+    ('MJUS-preparation-code', 0x140B9E170, 0x140B9E40F),
+    ('STG2-native-update', 0x140CCCB60, 0x140CCCC12),
+)
+
+# Only the identified slot is claimed; these are not inferred table extents.
+PREPARATION_SLOTS = (
+    ('CVS1', 0x141222430, 0x1405C5D50),
+    ('CVS2', 0x14128CD78, 0x1406BABC0),
+    ('CFJ', 0x1412B6920, 0x1407DDD80),
+    ('Z3U', 0x1412D7A48, 0x140899700),
+    ('Z3U-task', 0x1412D0358, 0x140895C50),
+    ('Z3U-alternate', 0x1419E3BB8, 0x140DFA750),
+    ('Z3U-alternate-task', 0x1419DC638, 0x140DF6C50),
+    ('MJUS-task', 0x141787288, 0x140B9E170),
+)
+
+PREPARATION_EDGES = (
+    (0x140973523, 'call', '0x140976b50'),
+    (0x140A48D80, 'call', '0x140a4ca30'),
+    (0x140CCCBA4, 'call', '0x140cde150'),
+    (0x140895CF1, 'call', 'qword ptr [rsi + rax*8 + 0x12d7a48]'),
+    (0x140DF6CF1, 'call', 'qword ptr [rsi + rax*8 + 0x19e3bb8]'),
+    (0x140976D54, 'jmp', '0x1409a8760'),
+    (0x140B9E40A, 'jmp', '0x140b93ce0'),
+    (0x140CCCC0D, 'jmp', '0x140ccdc60'),
+)
+
 
 def require(condition, message):
     if not condition:
@@ -75,12 +115,24 @@ def produce(directory):
                          restore_kind='selective' if tag in ('Z3U','Z3U-alternate','MJUS') else 'full-copy'))
         spans.extend((dump.span(tag+'-save-restore',start,end),
                       dump.span(tag+'-preparation-prefix',caller,site+5)))
-    return dict(schema=1, code_sha256=CODE_SHA256,
+    preparation_ins = {i.address:i for _, start, end in PREPARATION_SPANS
+                       for i in dump.instructions(start, end)}
+    for address, mnemonic, operands in PREPARATION_EDGES:
+        ins = preparation_ins[address]
+        require((ins.mnemonic, ins.op_str) == (mnemonic, operands),
+                f'{address:#x}: preparation continuation differs')
+    for label, address, target in PREPARATION_SLOTS:
+        require(dump.pointer(address) == target, label + ': preparation table slot differs')
+    spans.extend(dump.span(*span) for span in PREPARATION_SPANS)
+    return dict(schema=2, code_sha256=CODE_SHA256,
                 evidence='offline code trace; no live event or hook ABI validation',
                 limitations=['Preparation can change state before the restore routine.',
                              'Bypass and save paths must not be mistaken for restoration.',
                              'Selective restore ranges and downstream helper side effects are not a full write inventory.',
-                             'Callers are bounded prefixes; indirect callers and UI event labels remain open.'],
+                             'Preparation dispatch slots do not establish all callers or UI event labels.',
+                             'Preparation and native update can continue after restoration.'],
+                preparation_slots=[dict(label=label, address=hex(address), target=hex(target))
+                                   for label,address,target in PREPARATION_SLOTS],
                 paths=rows, spans=spans)
 
 

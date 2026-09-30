@@ -166,6 +166,14 @@ snapshot; discrete speech needs event/visit identity to avoid duplicate replay.
 Backend speech already accepted may require interruption on departure; clearing
 an internal queue alone does not clear the screen reader's queue. Test this.
 
+The [shared snapshot trace](collection-snapshot-trace.md) now proves that
+in-place restoration can bypass the per-game restore routines and invoke the
+same native update repeatedly. Keep owner generation, state revision and
+eligible publication sequence separate. S+0x770 brackets replay and also
+marks intermediate shell updates; polling it is not synchronization. A
+revision change invalidates old observations without automatically re-arming
+accepted speech. The outer completion and thread contract remain unproved.
+
 ## Rules for game-specific exceptions
 
 An exception must name the differing visible behavior or technical contract,

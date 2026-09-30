@@ -51,6 +51,13 @@ class RestoreAuditTests(unittest.TestCase):
         # First near jne -> je, preserving instruction size and target.
         self.assert_mutation_refused(0x1406AAB53, 0x84, 'bypass gate differs')
 
+    def test_alternate_alpha_task_slot_cannot_use_base_branch(self):
+        self.assert_mutation_refused(0x1419DC638, 0x51, 'preparation table slot differs')
+
+    def test_post_restore_tail_cannot_be_ignored(self):
+        # Keep the five-byte jump, but change its target.
+        self.assert_mutation_refused(0x140976D55, 8, 'preparation continuation differs')
+
 
 if __name__ == '__main__':
     unittest.main()

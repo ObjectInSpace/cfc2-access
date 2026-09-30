@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
+  "evidence": "offline instruction trace; no live callback ordering proof",
+  "root_registration": {
+    "pointer_offset": "0x1b0",
+    "size_offset": "0x1b8",
+    "pointer_table": "0x14211ca90",
+    "size_table": "0x14211cb90",
+    "count": "0x14211cc10",
+    "scratch": "0x14211ce50"
+  },
+  "callbacks": {
+    "load": "0x1400b6d50",
+    "save": "0x1400b7130",
+    "advance": "0x1400b6cb0"
+  },
+  "load_completion_counter_offset": "0x76c",
+  "intermediate_update_flag_offset": "0x770",
+  "limitations": [
+    "Root registration retains raw pointers; lifetime is not proved.",
+    "Load replaces live state without changing the root pointer.",
+    "The completion counter is not a universal session epoch.",
+    "Replay invokes multiple native updates while session+0x770 is set.",
+    "Shell batching also sets session+0x770; it is not replay-exclusive.",
+    "A cleared replay flag alone does not establish presentation eligibility.",
+    "Callback registration alone does not establish UI or network semantics.",
+    "Span alignment is not a complete control-flow or write inventory."
+  ],
+  "spans": [
+    {
+      "label": "shell-update-batch",
+      "start": "0x14003a290",
+      "end_exclusive": "0x14003a79d",
+      "sha256": "5c6cf55664cedf950440d62044ca86d1a4b6a1162b8e2120dec5a45eac390adf"
+    },
+    {
+      "label": "register-root",
+      "start": "0x1400b6570",
+      "end_exclusive": "0x1400b65de",
+      "sha256": "3ec8f564c8b8a65bd67dcfb832d7a69298d62c7f9a7a6736f1619e895b113235"
+    },
+    {
+      "label": "load-scatter",
+      "start": "0x1400b65e0",
+      "end_exclusive": "0x1400b6663",
+      "sha256": "aba1754c109e84d33f2de679e6c1776ca3ea5f0876ae778a7d313b6bd02da47e"
+    },
+    {
+      "label": "save-gather",
+      "start": "0x1400b6670",
+      "end_exclusive": "0x1400b66f3",
+      "sha256": "92f5a699b4c95c50034748ba5a64e86d823639ac563c9a908239dd10518c5f28"
+    },
+    {
+      "label": "input-update-bridge",
+      "start": "0x1400b6700",
+      "end_exclusive": "0x1400b682e",
+      "sha256": "7720d149899e0dd3cbe48748289add96607474dff849c3139926f5f4d8aba54d"
+    },
+    {
+      "label": "registration-A-prefix",
+      "start": "0x1400b6890",
+      "end_exclusive": "0x1400b6931",
+      "sha256": "1df4c24e5ae5ff06f6095b513f82b1e22b4395dc0670f4ac39f72c6c742f3a58"
+    },
+    {
+      "label": "registration-B",
+      "start": "0x1400b6aa0",
+      "end_exclusive": "0x1400b6b72",
+      "sha256": "7db6063db74509b3903ecff220c59a2b605e583d89798af2c4c17b691a3240b4"
+    },
+    {
+      "label": "advance-callback",
+      "start": "0x1400b6cb0",
+      "end_exclusive": "0x1400b6d3d",
+      "sha256": "9a80d49ce72df1684c477b864ec10ead5633640e6c8e5f7b06526c1a9011b44c"
+    },
+    {
+      "label": "load-callback",
+      "start": "0x1400b6d50",
+      "end_exclusive": "0x1400b6dba",
+      "sha256": "72d8a588d352f22e69fb8704ab518a6d491682b2d9b22debfac88f73e8326bdb"
+    },
+    {
+      "label": "save-callback",
+      "start": "0x1400b7130",
+      "end_exclusive": "0x1400b718e",
+      "sha256": "66a59400a89ff3cfc760252d63b8162a6af18038cc876b21e81378b02e4f8c21"
+    },
+    {
+      "label": "constructor-A-prefix",
+      "start": "0x1400b8650",
+      "end_exclusive": "0x1400b87ac",
+      "sha256": "f625a2b9f09202a48337c8c9a7f46233b42ce43245110bdf9ab19a85ee891c68"
+    },
+    {
+      "label": "constructor-B",
+      "start": "0x1400b9a00",
+      "end_exclusive": "0x1400b9b5d",
+      "sha256": "a39dc964fd02e93988e9ec73d14d10c1ddf9947f1c352fcf1547537e61e2853c"
+    },
+    {
+      "label": "callback-copy-to-replay-prefix",
+      "start": "0x1400ba690",
+      "end_exclusive": "0x1400ba720",
+      "sha256": "d6510e92e061bb58dd41312bcfca5ccf76ea6c4957af776acc1cf0b995bfce35"
+    },
+    {
+      "label": "restore-replay-explicit",
+      "start": "0x1400ba2c0",
+      "end_exclusive": "0x1400ba3e0",
+      "sha256": "c9f0db9c02e8acbe185ab3e989c258ad16240734e824ee221ce12524a6ed1d1b"
+    },
+    {
+      "label": "restore-replay-selected",
+      "start": "0x1400ba3e0",
+      "end_exclusive": "0x1400ba548",
+      "sha256": "3f2de6ae1c0d2154112969f38fc50e701d250d43f4e9f6bf6a96537f8dd21cb8"
+    },
+    {
+      "label": "snapshot-ring-save",
+      "start": "0x1400ba840",
+      "end_exclusive": "0x1400ba8c2",
+      "sha256": "05632d5311cf347f1e2bb335c89590a9036977afd2c435e577c51895b061e615"
+    }
+  ]
+}
