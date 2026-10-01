@@ -287,6 +287,42 @@
       "sha256": "f351c90e06b1ecb07744cb87fe01630205ad8d7e4840241971e0638093c6ca1f"
     },
     {
+      "label": "shared-template-matrix-copy",
+      "start": "0x140f33610",
+      "end_exclusive": "0x140f33643",
+      "sha256": "740a4c3d4e379140014c4381c79332e9172e1e1bbd7da6fa8fd2b2340848b12f"
+    },
+    {
+      "label": "shared-translation-matrix-construction",
+      "start": "0x140f334d0",
+      "end_exclusive": "0x140f33520",
+      "sha256": "ba9151d84f11ab3669785877ec2771f7af551ef94c0c820f4742e916bb37a799"
+    },
+    {
+      "label": "shared-projective-matrix-construction",
+      "start": "0x140f338f0",
+      "end_exclusive": "0x140f33a40",
+      "sha256": "399f4bb82e9e0af61e5a274b6b8c1e140af34653c45d67ba9e1d011b668a7580"
+    },
+    {
+      "label": "draw-direction-state-setter",
+      "start": "0x140f36390",
+      "end_exclusive": "0x140f363d0",
+      "sha256": "8baf1a35d6f97a369a7d67de4ad42be2403f1ae5b67d07dd23a947e5758fb822"
+    },
+    {
+      "label": "draw-direction-vector-rescale",
+      "start": "0x140f33f90",
+      "end_exclusive": "0x140f34010",
+      "sha256": "9f3c11aa5c778cd7cb114aad938d51e1078d0d2be66af718850d36be232f8abf"
+    },
+    {
+      "label": "draw-state-flag-setter",
+      "start": "0x140f364e0",
+      "end_exclusive": "0x140f364f2",
+      "sha256": "a6d5cb299824dbe6baf851552d631de9e5f5d27276593089e85fbe81ac03d4bc"
+    },
+    {
       "label": "record-pool-rebuild",
       "start": "0x140a4bf10",
       "end_exclusive": "0x140a4c3d2",

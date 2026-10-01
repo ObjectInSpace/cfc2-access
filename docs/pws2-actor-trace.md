@@ -7,7 +7,7 @@ python tools/pws2_actor_audit.py --manifest-out docs/pws2-actor-manifest.json
 python tools/test_pws2_actor_audit.py
 ```
 
-The manifest retains thirty-two instruction-aligned spans and the main code SHA-256
+The manifest retains thirty-eight instruction-aligned spans and the main code SHA-256
 `9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b`.
 This is initial F06–F12/F19 acquisition evidence, not an implemented adapter.
 No PWS2 attachment, live capture, deployment or audible validation occurred.
@@ -166,7 +166,7 @@ and render consumers. Do not reuse CVS2's midpoint camera or assume a world
 axis is height. Prepare small labelled captures once those candidate paths
 are bounded; no full-arena sweep or user input is needed for this first trace.
 
-The audit reproduces thirty-two spans. Five offline tests cover manifest agreement,
+The audit reproduces thirty-eight spans. Five offline tests cover manifest agreement,
 changed code/table/projection-constant rejection and incomplete instruction
 refusal. These checks do
 not prove live gameplay semantics. No runtime source changed, so the DLL
@@ -278,3 +278,33 @@ camera pass, or a worker-safe sampling point. A useful capture must retain
 actor identity, input/phase eligibility, pass and transform-record indices,
 all required matrices, and the resulting point together at the draw stage.
 No runtime projection decoder has been enabled.
+
+
+## Matrix setup and excluded camera shortcuts
+
+Six more complete helper spans bound the setup calls. The draw prefix calls
+`0x140f364e0`, which only writes 1 to context+0x1f8518. Despite being
+called with matrix slot 2 selected, it does not modify a matrix. Likewise,
+`0x140f36390` writes the three coordinate differences into
+context+0x1f850c/+0x1f8510/+0x1f8514 and tail-calls `0x140f33f90`.
+That helper squares and sums the vector components, calls `0x140fd661c`,
+then divides the components by the result, with an explicit zero-result
+branch. The math-library callee has not been retained/reviewed here.
+Neither helper writes through the current-matrix pointer. These differences
+cannot be labelled a view-matrix constructor based on the nearby slot switch.
+
+The alternate-pass setup selects slot 3, calls `0x140f33610` to copy the
+64-byte template at `0x141c00250` into the current matrix, then calls
+`0x140f334d0`. The latter copies that template to a local matrix, replaces
+its translation entries with three arguments, and passes it to
+`0x140f32730`. The next call, `0x140f338f0`, constructs a projective
+matrix from the low 16 bits of ECX, three float arguments, context+0x1f8240
+and +0x1f8244, and two math-library calls. It also passes its local matrix
+to `0x140f32730` and clears context+0x1f8518. The template is mutable
+data; its role must not be inferred solely from its dump snapshot.
+
+The constructor's matrix-combination helper `0x140f32730`, math-library
+callees, template writers and ordinary-pass slot-3 initialization remain the
+next bounded setup trace. No projection parameters, angle units or camera
+role are certified from names or conventional matrix patterns. The earlier
+composite/endpoint arithmetic remains independently established.

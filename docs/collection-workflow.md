@@ -10,7 +10,7 @@ probe from `21da6ff` remains staged only, with no deployment/live result.
 Shared runtime integration and arena/four-player proof remain incomplete.
 
 The [initial PWS2 record/input trace](pws2-actor-trace.md) starts the independent
-four-player investigation. It retains thirty-two spans and five passing offline
+four-player investigation. It retains thirty-eight spans and five passing offline
 tests. Four fixed records, a filtered list, conditional indexed input routing
 and variable processing order are established; controller/HUD
 ownership, gameplay field semantics and live observations remain open.
@@ -21,7 +21,9 @@ math and temporary resource matrix push/pop. A further continuation traces
 homogeneous projection, perspective divide, mutable viewport composition and
 rejection for one actor-linked two-point primitive. HUD ownership and the
 audible camera pass remain unproved; the current-matrix pointer cannot be
-sampled independently of its draw stage.
+sampled independently of its draw stage. Setup helpers also distinguish
+context direction/flag writes from actual matrix mutation; constructor
+combination and ordinary-pass initialization remain open.
 
 User-approved direction, 2026-09-26. Use Astra here for the upfront discovery,
 architecture proof and difficult reviews; hand bounded implementation work to
