@@ -9,6 +9,12 @@ retains 83 spans. All 52 collection Python tests pass. The tested five-site
 probe from `21da6ff` remains staged only, with no deployment/live result.
 Shared runtime integration and arena/four-player proof remain incomplete.
 
+The [initial PWS2 record/input trace](pws2-actor-trace.md) starts the independent
+four-player investigation. It retains thirteen spans and four passing offline
+tests. Four fixed records, a filtered list, conditional indexed input routing
+and variable processing order are established; controller/HUD
+ownership, field semantics, projection and live observations remain open.
+
 User-approved direction, 2026-09-26. Use Astra here for the upfront discovery,
 architecture proof and difficult reviews; hand bounded implementation work to
 Opus. This is a work allocation, not a claim that either model is incapable of

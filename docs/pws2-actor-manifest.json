@@ -1,0 +1,159 @@
+{
+  "schema": 1,
+  "evidence": "offline native record/list structure; no live player/HUD mapping",
+  "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
+  "root_slot": "0x14262f0b0",
+  "root_bytes": "0x8cd40",
+  "fixed_records": {
+    "base": "0x40818",
+    "stride": "0x42b8",
+    "count": 4,
+    "index_byte": "0x1",
+    "filter_byte": "0x401c",
+    "previous_pointer": "0x10",
+    "next_pointer": "0x18",
+    "callback_pointer": "0x8",
+    "list_zero_head": "0x40750"
+  },
+  "input_records": {
+    "base": "0x53114",
+    "stride": "0x28",
+    "count": 4,
+    "current_word": "0x10",
+    "previous_word": "0x12",
+    "rising_word": "0x14",
+    "falling_word": "0x16",
+    "source": "S+0x218+4*index, through 0x140048bb0 mask conversion",
+    "gated_copy_base": "0x531b4",
+    "actor_copy_offset": "0x4b0",
+    "actor_copy_scope": "R+0x52ee5=1 with record+0x4028=0; mode 2 has an additional float gate"
+  },
+  "processing_order": {
+    "address": "0x1417308d0",
+    "bytes": "000102030001030200020103000203010003010200030201",
+    "rows": [
+      [
+        0,
+        1,
+        2,
+        3
+      ],
+      [
+        0,
+        1,
+        3,
+        2
+      ],
+      [
+        0,
+        2,
+        1,
+        3
+      ],
+      [
+        0,
+        2,
+        3,
+        1
+      ],
+      [
+        0,
+        3,
+        1,
+        2
+      ],
+      [
+        0,
+        3,
+        2,
+        1
+      ]
+    ]
+  },
+  "limitations": [
+    "Record indices are not yet mapped to controllers or HUD owners.",
+    "Nonzero filter byte establishes list inclusion, not alive/human/visible semantics.",
+    "No health, meter, position, camera, transformation or safe hook ABI is certified.",
+    "Root content and links can be rebuilt without changing root identity."
+  ],
+  "spans": [
+    {
+      "label": "native-update",
+      "start": "0x140a47290",
+      "end_exclusive": "0x140a472c2",
+      "sha256": "b41ed6b2ed2a822cc644f85382eb4976cd0c166621fac237a28cafb335d789e2"
+    },
+    {
+      "label": "phase-dispatch",
+      "start": "0x140a48cc0",
+      "end_exclusive": "0x140a48dd0",
+      "sha256": "13ce5d9a9beb135c1f8f13d76ca83d2e61850aa07059ef760a893671326d5fd8"
+    },
+    {
+      "label": "four-input-record-update",
+      "start": "0x140a490a0",
+      "end_exclusive": "0x140a49132",
+      "sha256": "d64e2b8b7af083892464f27c4286eac8df0f0c430004dc7b0e2b4de18bc31006"
+    },
+    {
+      "label": "four-input-record-reset",
+      "start": "0x140a49140",
+      "end_exclusive": "0x140a49178",
+      "sha256": "d7b61c4e6ccc095e054f689b8d13f56633b908a27049225062a3eff7b12eabd9"
+    },
+    {
+      "label": "shared-input-mask-conversion",
+      "start": "0x140048bb0",
+      "end_exclusive": "0x140048c81",
+      "sha256": "d153679181ef3ec8d6615882bf285f71d5b6c53b0fb3c182bbea907eec12dae7"
+    },
+    {
+      "label": "gated-input-copy",
+      "start": "0x140a4e870",
+      "end_exclusive": "0x140a4eb83",
+      "sha256": "5d7e5e30bc59b7e7fdd60db9b056309db189b57b5397d8de779fc24d07194b6e"
+    },
+    {
+      "label": "actor-input-and-processing-order",
+      "start": "0x140a7ce00",
+      "end_exclusive": "0x140a7d790",
+      "sha256": "ce60a0a115db5e4ab507b20c7c8aa1e2de83dac2bd0995863f0be5f9ffb7fda8"
+    },
+    {
+      "label": "actor-processing-caller",
+      "start": "0x140a4c710",
+      "end_exclusive": "0x140a4c7d6",
+      "sha256": "8efae680bf6b5d0e07d29b10563e19ac1305cc518d1ed4312c4f17df87910135"
+    },
+    {
+      "label": "record-pool-rebuild",
+      "start": "0x140a4bf10",
+      "end_exclusive": "0x140a4c3d2",
+      "sha256": "e5a3dd6d1b1cec940e9c8d811bd51cdba5cefa30a51be1b9c9a2bdc4842f111f"
+    },
+    {
+      "label": "list-dispatch",
+      "start": "0x140a4c3e0",
+      "end_exclusive": "0x140a4c415",
+      "sha256": "68bb18cf60a8459837a45113c1af371b4bf9f9f68a4cfdac47299a84cec24e59"
+    },
+    {
+      "label": "filtered-list-rebuild",
+      "start": "0x140a65a60",
+      "end_exclusive": "0x140a65cc1",
+      "sha256": "4e2248867d7bc10bdecf90953f05f1ca3ac32e3f7d078973ef5acc4e4cadee65"
+    },
+    {
+      "label": "allocate-record-resource-a",
+      "start": "0x140a644a0",
+      "end_exclusive": "0x140a64525",
+      "sha256": "66ab2869faeba793f8af6264cb1e556fb7b8ef417e702a5f9dcf348dffd8681a"
+    },
+    {
+      "label": "allocate-record-resource-b",
+      "start": "0x140a65330",
+      "end_exclusive": "0x140a653b1",
+      "sha256": "1c227b01b57d4ac8a31c7acd7f6c8a316fa259d5ff81dddac912250ee23003a0"
+    }
+  ]
+}

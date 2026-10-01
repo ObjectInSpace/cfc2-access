@@ -200,3 +200,9 @@ Prove propagation with one shared retry test exercised through both adapters,
 one shared setting affecting both, and game-switch tests that reject stale
 CVS2 events while CVS1 owns audio. Later run the same contracts for every title,
 including four-player synthetic observations before PWS2 runtime integration.
+
+The [initial PWS2 record trace](pws2-actor-trace.md) establishes four fixed
+native records and a filtered linked list. List ordinal can change when an
+earlier record is excluded, so it cannot own a persistent audio voice. The
+fixed index still needs controller/HUD mapping and participant-incarnation
+tracking; neither list inclusion nor record reuse proves human/alive status.
