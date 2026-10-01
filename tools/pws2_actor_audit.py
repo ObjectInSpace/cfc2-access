@@ -18,11 +18,34 @@ SPANS = (
     ('draw-pass-transform-setup', 0x140A5D8B0, 0x140A5D94E),
     ('draw-four-records-prefix', 0x140A5D950, 0x140A5DA1F),
     ('shared-transform-block-copy', 0x140F32440, 0x140F32487),
+    ('actor-vector-draw-consumer', 0x140A548D0, 0x140A54A0D),
+    ('actor-resource-extents-prefix', 0x140A5E060, 0x140A5E2B2),
+    ('shared-affine-vector-transform', 0x140F31C60, 0x140F31D04),
+    ('shared-transform-slot-selection', 0x140F326E0, 0x140F32724),
+    ('resource-transform-translation-helper', 0x1409BAD20, 0x1409BAD45),
+    ('shared-current-transform-translation', 0x140F31F80, 0x140F31F99),
+    ('shared-transform-stack-push', 0x140F331C0, 0x140F3324E),
+    ('shared-transform-stack-pop', 0x140F33130, 0x140F331BD),
+    ('actor-two-point-primitive-wrapper', 0x140F380A0, 0x140F380B6),
+    ('two-point-projection-and-rejection', 0x140F37CA0, 0x140F37F34),
+    ('shared-homogeneous-vector-transform', 0x140F31D10, 0x140F31DEB),
+    ('shared-composite-transform', 0x140F33830, 0x140F3388B),
+    ('shared-current-transform-copy-out', 0x140F31F40, 0x140F31F72),
+    ('shared-transform-postmultiply', 0x140F32C20, 0x140F3310F),
+    ('viewport-scale-writer-prefix', 0x140F30830, 0x140F30A1C),
     ('record-pool-rebuild', 0x140A4BF10, 0x140A4C3D2),
     ('list-dispatch', 0x140A4C3E0, 0x140A4C415),
     ('filtered-list-rebuild', 0x140A65A60, 0x140A65CC1),
     ('allocate-record-resource-a', 0x140A644A0, 0x140A64525),
     ('allocate-record-resource-b', 0x140A65330, 0x140A653B1),
+)
+
+PROJECTION_CONSTANTS = (
+    (0x14106E298, '00002044', 640.0),
+    (0x14106E32C, '0000f043', 480.0),
+    (0x140FDE828, '0000803f', 1.0),
+    (0x140FE4244, '0000003f', 0.5),
+    (0x140FE428C, '000000bf', -0.5),
 )
 
 # Review anchors distinguish these four fixed records from the separate
@@ -43,6 +66,9 @@ ANCHORS = (
 
 def produce(directory=DEFAULT_DUMP):
     dump = Dump(directory)
+    for address, expected, value in PROJECTION_CONSTANTS:
+        if dump.read(address, 4).hex() != expected:
+            raise ValueError(f'Projection constant differs at {address:#x}')
     order_bytes = dump.read(0x1417308D0, 24)
     if order_bytes != bytes((0,1,2,3, 0,1,3,2, 0,2,1,3, 0,2,3,1, 0,3,1,2, 0,3,2,1)):
         raise ValueError('Actor processing-order table differs')
@@ -67,7 +93,16 @@ def produce(directory=DEFAULT_DUMP):
                               rows=[list(order_bytes[i:i+4]) for i in range(0,24,4)]),
         draw_leads=dict(transform_base='0x51d90', transform_stride='0x308',
                         copied_bytes='0x40', index_global='0x14297a9e0',
-                        pass_global='0x14297a9dc', scope='pass identity and projection semantics unresolved'),
+                        pass_global='0x14297a9dc', current_matrix_slot='0x142c79b48',
+                        matrix_slots_offset='0x1f80ac', matrix_slot_count=4,
+                        affine_helper='0x140f31c60',
+                        scope='affine and two-point homogeneous projection established; pass identity unresolved'),
+        projection=dict(primitive='0x140f37ca0', homogeneous_helper='0x140f31d10',
+                        composite_offset='0x1f8200', viewport_matrix='0x141c00210',
+                        composition='current * slot2 * slot3 * mutable viewport matrix',
+                        constants=[dict(address=hex(a), bytes=b, value=v)
+                                   for a, b, v in PROJECTION_CONSTANTS],
+                        scope='actor-linked two-point primitive only; no HUD owner or live camera certification'),
         limitations=['Record indices are not yet mapped to controllers or HUD owners.',
                      'Nonzero filter byte establishes list inclusion, not alive/human/visible semantics.',
                      'No health, meter, position, camera, transformation or safe hook ABI is certified.',

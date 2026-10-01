@@ -7,7 +7,7 @@ python tools/pws2_actor_audit.py --manifest-out docs/pws2-actor-manifest.json
 python tools/test_pws2_actor_audit.py
 ```
 
-The manifest retains seventeen instruction-aligned spans and the main code SHA-256
+The manifest retains thirty-two instruction-aligned spans and the main code SHA-256
 `9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b`.
 This is initial F06–F12/F19 acquisition evidence, not an implemented adapter.
 No PWS2 attachment, live capture, deployment or audible validation occurred.
@@ -152,8 +152,9 @@ two passes are labelled split-screen, reflection, or a user-visible camera.
 The retained prefix `0x140a5d950..0x140a5da1f` uses further float fields
 from the same indexed 0x308-stride storage, then visits all four fixed actor
 records. It calls `0x140a5e060` only if actor+0x401c and actor+0xc0 are
-nonzero; it also calls `0x140a548d0` for each record. Those consumers remain
-open. The prefix is not the complete drawing routine or proof of final visible
+nonzero; it also calls `0x140a548d0` for each record. Their bounded
+continuations are retained below. The prefix is not the complete drawing
+routine or proof of final visible
 output. This repeated-pass structure means a per-draw callback cannot alone
 be a once-per-frame observation or select the audible spatial perspective.
 
@@ -165,7 +166,115 @@ and render consumers. Do not reuse CVS2's midpoint camera or assume a world
 axis is height. Prepare small labelled captures once those candidate paths
 are bounded; no full-arena sweep or user input is needed for this first trace.
 
-The audit reproduces seventeen spans. Four offline tests cover manifest agreement,
-changed code/table rejection and incomplete instruction refusal. These checks do
+The audit reproduces thirty-two spans. Five offline tests cover manifest agreement,
+changed code/table/projection-constant rejection and incomplete instruction
+refusal. These checks do
 not prove live gameplay semantics. No runtime source changed, so the DLL
 build/regression set was not repeated for this research increment.
+
+## Transform mechanism continuation
+
+The matrix-slot selector `0x140f326e0..0x140f32724` accepts unsigned
+indices below four, saves the previous index at context+0x1f80a8, writes
+the current index at +0x1f80a4, and publishes
+context+0x1f80ac+64*index through `0x142c79b48`. The context itself
+comes from `0x142c79b40`. These are matrix slots, not player identities.
+The draw path uses slots 1, 2 and 3 at different stages; a matrix slot number
+must not be confused with the independent transform-record index or pass ID.
+
+`0x140f31c60..0x140f31d04` transforms a three-float input through the
+matrix currently referenced by `0x142c79b48`. With M as sixteen consecutive
+floats and input `(x,y,z)`, its outputs are:
+
+```text
+x' = x*M[0] + y*M[4] + z*M[8]  + M[12]
+y' = x*M[1] + y*M[5] + z*M[9]  + M[13]
+z' = x*M[2] + y*M[6] + z*M[10] + M[14]
+```
+
+There is no perspective divide, clipping or viewport mapping in this body.
+It is an affine transform, not by itself a screen-position decoder. Float
+operation ordering remains defined by the retained instructions; the formula
+summarizes the math and is not a bit-exact emulation implementation.
+
+The resource-extent prefix `0x140a5e060..0x140a5e2b2` loads actor+0x78
+into matrix slot 1, calls `0x140f32190` with a null argument (its full
+matrix modification remains unreviewed), then visits 19 subordinate resource
+pointers from actor+0xe0. For each resource it passes resource+0x34 to
+`0x1409bad20`, then transforms the resulting vector with the affine helper.
+It accumulates extrema of the first and third components. This does not
+establish their screen or height meanings.
+
+The complete helper `0x1409bad20..0x1409bad45` temporarily pushes/loads
+the supplied 64-byte matrix through `0x140f331c0`, extracts the current
+matrix's +0x30/+0x34/+0x38 translation through `0x140f31f80`, then pops
+one matrix through `0x140f33130`. Push can fail when no stack capacity
+remains; this caller does not test that return before extracting/popping.
+The native normal-capacity path is established, not a universally safe helper
+for a mod to invoke. Read/copy evidence rather than calling native rendering
+helpers from the worker.
+
+The other actor draw consumer `0x140a548d0..0x140a54a0d` reads the
+three-float vector at actor+0x3c, adjusts its second component on one path,
+reads another vector at +0x4134, and passes both plus an index-selected value
+to `0x140f380a0`. Numerous phase, inclusion, resource and pointer guards
+precede that call. The primitive projection is traced below; its visual meaning
+is unverified;
+neither consumer proves HUD ownership or a health gauge. Numeric offset matches
+in unrelated record types were excluded from evidence.
+
+The common spatial contract must capture the actor, transform record, matrix
+role and eligible pass together. A worker read of the mutable current-matrix
+pointer can observe a temporary resource matrix or a different stage. The
+projection continuation below establishes composition and primitive rejection;
+selection of the eligible pass and HUD ownership remain acquisition tasks.
+No runtime hook or spatial cue is enabled here.
+
+
+## Two-point perspective and viewport continuation
+
+The wrapper `0x140f380a0..0x140f380b6` passes opcode 8 to
+`0x140f37ca0..0x140f37f34`. This primitive transforms each of the two
+actor-linked vectors, divides XYZ by positive W, performs whole-primitive
+rejection tests, and submits a record to `0x140f2f390`. Submission and final
+rasterization are not traced here. The wrapper returns zero regardless of the
+primitive's result; it cannot serve as a visibility observation.
+
+The complete homogeneous helper `0x140f31d10..0x140f31deb` uses the same
+XYZ equations as the affine helper and adds
+`w' = x*M[3] + y*M[7] + z*M[11] + M[15]`. It writes four floats;
+the caller performs the divide. With finite values, the primitive rejects if
+either W is nonpositive, or if both endpoints are beyond the same bound:
+Z below 0 or above 1, X below 0 or at least 640, Y below 0 or at least 480.
+This is trivial rejection, not a complete segment-clipping implementation.
+NaN handling in the native comparisons is not a finite-value validation
+contract; a future accessibility decoder must validate its own inputs.
+
+`0x140f33830..0x140f3388b` temporarily preserves the current matrix,
+postmultiplies it by slot 2, slot 3 and the matrix at `0x141c00210`,
+then copies the result into context+0x1f8200 and restores the current matrix.
+The complete multiplication body `0x140f32c20..0x140f3310f` computes
+`out[row,col] = sum(current[row,k] * argument[k,col])` in row-major
+storage. Thus a row-vector point follows `point * current * slot2 * slot3 *
+viewport` on the actor path with a distinct current slot. Do not generalize
+this formula to aliasing calls that modify one of the later source slots.
+The primitive temporarily loads the composite separately for each endpoint.
+The stack-capacity caveat above applies to these helpers too.
+
+The viewport matrix is mutable. The retained writer prefix
+`0x140f30830..0x140f30a1c` selects dimensions by mode, stores width and
+height at context+0x1f82a4/+0x1f82a8, and writes width/2 to matrix
+entries 0 and 12, -height/2 to entry 5, and height/2 to entry 13.
+The dump snapshot has diagonal `(320,-240,1,1)` and translation
+`(320,240,0)`. That snapshot is not a live invariant. The primitive's
+640-by-480 rejection constants are independently pinned by the audit;
+they are native drawing coordinates, not a Windows client-size observation.
+The composition helper does not consume the caller's apparent width/height
+XMM arguments, so those loads alone do not establish its dimensions.
+
+This closes the math path for this specific two-point primitive. It does not
+certify a fighter-body anchor, a health gauge, HUD ownership, the audible
+camera pass, or a worker-safe sampling point. A useful capture must retain
+actor identity, input/phase eligibility, pass and transform-record indices,
+all required matrices, and the resulting point together at the draw stage.
+No runtime projection decoder has been enabled.

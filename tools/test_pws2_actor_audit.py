@@ -37,6 +37,17 @@ class ActorAuditTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'processing-order table differs'):
                 audit.produce()
 
+    def test_changed_projection_constants_refused(self):
+        original = audit.Dump.read
+        for target, _, _ in audit.PROJECTION_CONSTANTS:
+            with self.subTest(address=hex(target)):
+                def changed(dump, address, size):
+                    data = original(dump, address, size)
+                    return bytes([data[0] ^ 1]) + data[1:] if address == target else data
+                with patch.object(audit.Dump, 'read', changed):
+                    with self.assertRaisesRegex(ValueError, 'Projection constant differs'):
+                        audit.produce()
+
 
 if __name__ == '__main__':
     unittest.main()

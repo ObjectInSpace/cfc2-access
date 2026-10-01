@@ -76,7 +76,46 @@
     "copied_bytes": "0x40",
     "index_global": "0x14297a9e0",
     "pass_global": "0x14297a9dc",
-    "scope": "pass identity and projection semantics unresolved"
+    "current_matrix_slot": "0x142c79b48",
+    "matrix_slots_offset": "0x1f80ac",
+    "matrix_slot_count": 4,
+    "affine_helper": "0x140f31c60",
+    "scope": "affine and two-point homogeneous projection established; pass identity unresolved"
+  },
+  "projection": {
+    "primitive": "0x140f37ca0",
+    "homogeneous_helper": "0x140f31d10",
+    "composite_offset": "0x1f8200",
+    "viewport_matrix": "0x141c00210",
+    "composition": "current * slot2 * slot3 * mutable viewport matrix",
+    "constants": [
+      {
+        "address": "0x14106e298",
+        "bytes": "00002044",
+        "value": 640.0
+      },
+      {
+        "address": "0x14106e32c",
+        "bytes": "0000f043",
+        "value": 480.0
+      },
+      {
+        "address": "0x140fde828",
+        "bytes": "0000803f",
+        "value": 1.0
+      },
+      {
+        "address": "0x140fe4244",
+        "bytes": "0000003f",
+        "value": 0.5
+      },
+      {
+        "address": "0x140fe428c",
+        "bytes": "000000bf",
+        "value": -0.5
+      }
+    ],
+    "scope": "actor-linked two-point primitive only; no HUD owner or live camera certification"
   },
   "limitations": [
     "Record indices are not yet mapped to controllers or HUD owners.",
@@ -156,6 +195,96 @@
       "start": "0x140f32440",
       "end_exclusive": "0x140f32487",
       "sha256": "316274e3b1705660d4cdbd7867d192826bb8d94b359feadb4bd67624f7b64e3b"
+    },
+    {
+      "label": "actor-vector-draw-consumer",
+      "start": "0x140a548d0",
+      "end_exclusive": "0x140a54a0d",
+      "sha256": "6b5c27e4ecbde4a935398e306824eedece4bd5a902d22d64629c5df374eaeecd"
+    },
+    {
+      "label": "actor-resource-extents-prefix",
+      "start": "0x140a5e060",
+      "end_exclusive": "0x140a5e2b2",
+      "sha256": "99bf49e388597a19de49ea677a900ca0eb2be6051c2705f1ebcb4322762e99e9"
+    },
+    {
+      "label": "shared-affine-vector-transform",
+      "start": "0x140f31c60",
+      "end_exclusive": "0x140f31d04",
+      "sha256": "c3b6777e47b9e1fe59363ffa2f41390bd6da678476f8bb2c797328e06d9bb713"
+    },
+    {
+      "label": "shared-transform-slot-selection",
+      "start": "0x140f326e0",
+      "end_exclusive": "0x140f32724",
+      "sha256": "310b2dd8e138de069098b9b89e503e4c75c0d662ca52d347df40c41bf6583ece"
+    },
+    {
+      "label": "resource-transform-translation-helper",
+      "start": "0x1409bad20",
+      "end_exclusive": "0x1409bad45",
+      "sha256": "a9865fafdb11da9c275689627eb19bfaa204bddb2c3548eaee5bf30fd0b31012"
+    },
+    {
+      "label": "shared-current-transform-translation",
+      "start": "0x140f31f80",
+      "end_exclusive": "0x140f31f99",
+      "sha256": "bca374f04070ac290d9eb6ce96ac75bd90d7949a350553384873544ec81759a1"
+    },
+    {
+      "label": "shared-transform-stack-push",
+      "start": "0x140f331c0",
+      "end_exclusive": "0x140f3324e",
+      "sha256": "7def2c2d0aa84bc9c99d59d2e2c51e19a42f9281be2cc8a8a77b795eb98605fb"
+    },
+    {
+      "label": "shared-transform-stack-pop",
+      "start": "0x140f33130",
+      "end_exclusive": "0x140f331bd",
+      "sha256": "ccf43e0b9ed6286156ef0324741ef883d31615dfc073929b7e0498bcadc820d6"
+    },
+    {
+      "label": "actor-two-point-primitive-wrapper",
+      "start": "0x140f380a0",
+      "end_exclusive": "0x140f380b6",
+      "sha256": "0a29e6f5eb4031cdd6cc18cee185d58ec29e299b1dc080428910542c33fb10c5"
+    },
+    {
+      "label": "two-point-projection-and-rejection",
+      "start": "0x140f37ca0",
+      "end_exclusive": "0x140f37f34",
+      "sha256": "a81ac0e3c1d2ce5557f50c57ba4a49dbe98e49a363039925947c37076eaf8862"
+    },
+    {
+      "label": "shared-homogeneous-vector-transform",
+      "start": "0x140f31d10",
+      "end_exclusive": "0x140f31deb",
+      "sha256": "406cf1bba1d14a736963419290bec04c07cc7d51b14d847cf2cad375a1eb99b6"
+    },
+    {
+      "label": "shared-composite-transform",
+      "start": "0x140f33830",
+      "end_exclusive": "0x140f3388b",
+      "sha256": "0dd8cfdf768dee2364639a8aaff9650b3eb68aca48e1bba79e41f3e54d7698ba"
+    },
+    {
+      "label": "shared-current-transform-copy-out",
+      "start": "0x140f31f40",
+      "end_exclusive": "0x140f31f72",
+      "sha256": "c5d64a3f4d6b2561612a0b1bba409309a350f96b30fe582b4f15f845ab09cca9"
+    },
+    {
+      "label": "shared-transform-postmultiply",
+      "start": "0x140f32c20",
+      "end_exclusive": "0x140f3310f",
+      "sha256": "41b07b18ce60d95f7fb0cf86b5c13581fc909746f53973b257877ef24c5ca2ee"
+    },
+    {
+      "label": "viewport-scale-writer-prefix",
+      "start": "0x140f30830",
+      "end_exclusive": "0x140f30a1c",
+      "sha256": "f351c90e06b1ecb07744cb87fe01630205ad8d7e4840241971e0638093c6ca1f"
     },
     {
       "label": "record-pool-rebuild",
