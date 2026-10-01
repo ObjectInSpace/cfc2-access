@@ -10,7 +10,7 @@ probe from `21da6ff` remains staged only, with no deployment/live result.
 Shared runtime integration and arena/four-player proof remain incomplete.
 
 The [initial PWS2 record/input trace](pws2-actor-trace.md) starts the independent
-four-player investigation. It retains thirty-eight spans and five passing offline
+four-player investigation. It retains forty-three spans and six passing offline
 tests. Four fixed records, a filtered list, conditional indexed input routing
 and variable processing order are established; controller/HUD
 ownership, gameplay field semantics and live observations remain open.
@@ -22,8 +22,10 @@ homogeneous projection, perspective divide, mutable viewport composition and
 rejection for one actor-linked two-point primitive. HUD ownership and the
 audible camera pass remain unproved; the current-matrix pointer cannot be
 sampled independently of its draw stage. Setup helpers also distinguish
-context direction/flag writes from actual matrix mutation; constructor
-combination and ordinary-pass initialization remain open.
+context direction/flag writes from actual matrix mutation. Constructor
+premultiplication, the fixed-angle math path and initial/post-draw slot-3
+setup are now traced. Their depth parameters differ; ordinary-draw entry
+contents still need stage-specific evidence. Template writer coverage remains open.
 
 User-approved direction, 2026-09-26. Use Astra here for the upfront discovery,
 architecture proof and difficult reviews; hand bounded implementation work to
@@ -790,3 +792,27 @@ No runtime source change, deployment, attachment, capture or audible proof.
 Next: bound the two projective math callees, mutable-template writers and
 ordinary-pass slot-3 initialization. HUD ownership, participant semantics,
 shared integration and arena/four-player listening proof remain open.
+
+## PWS2 projective setup continuation — 2026-10-01
+
+Continued from clean `0e1fbe8`. The [PWS2 trace](pws2-actor-trace.md) now
+retains 43 spans. The fixed constructor argument `0x1d28` is scaled by
+approximately 2*pi/65536/2; the two math helpers follow cosine/sine polynomial
+paths for that input in both SSE and AVX/FMA variants. Code and separately
+pinned constants establish these paths; all-input math-library behavior remains
+outside this result.
+
+Initial and alternate-pass slot-3 setup use depth parameter b=12000; the
+post-main-draw reconstruction uses b=120000. The ordinary main branch consumes
+inherited slot-3 contents before that reconstruction. This prevents certifying
+the earlier draw from a later matrix snapshot. The global template is identity
+in the dump, but no writer or live invariance has been established.
+
+Validation: audit/manifest generation exited 0; all six PWS2 audit tests passed,
+including changed-math-data rejection; `git diff --check` exited 0. No runtime
+source changed and no DLL build, deployment, attachment, capture or audible
+check occurred. Other suites were not rerun for this isolated trace increment.
+
+Next: follow the three later draw helpers and their matrix preservation, then
+the indexed transform-record writers. Actor callback publication, HUD ownership,
+ordinary-pass entry values and audible-perspective selection remain open.

@@ -1,6 +1,7 @@
 """Retain bounded PWS2 four-record/list evidence; no gameplay field semantics."""
 import argparse
 import json
+import struct
 from pathlib import Path
 
 from collection_lifecycle_audit import CODE_SHA256, DEFAULT_DUMP, Dump
@@ -37,6 +38,10 @@ SPANS = (
     ('shared-template-matrix-copy', 0x140F33610, 0x140F33643),
     ('shared-translation-matrix-construction', 0x140F334D0, 0x140F33520),
     ('shared-projective-matrix-construction', 0x140F338F0, 0x140F33A40),
+    ('projective-cosine-callee', 0x140EFDC30, 0x140EFE12F),
+    ('projective-sine-callee', 0x140EFE130, 0x140EFE826),
+    ('pws2-initializer-through-render-setup', 0x140A46EB0, 0x140A47009),
+    ('pws2-render-setup-prefix', 0x140A46460, 0x140A465E4),
     ('draw-direction-state-setter', 0x140F36390, 0x140F363D0),
     ('draw-direction-vector-rescale', 0x140F33F90, 0x140F34010),
     ('draw-state-flag-setter', 0x140F364E0, 0x140F364F2),
@@ -53,6 +58,39 @@ PROJECTION_CONSTANTS = (
     (0x140FDE828, '0000803f', 1.0),
     (0x140FE4244, '0000003f', 0.5),
     (0x140FE428C, '000000bf', -0.5),
+    (0x140FE4268, 'db0fc940', 6.2831854820251465),
+    (0x14101B704, '00008037', 1.52587890625e-05),
+    (0x140FE42C0, '00000080', -0.0),
+    (0x140FE52CC, '000080bf', -1.0),
+    (0x14104FB08, 'abaaaa3f', 1.3333333730697632),
+    (0x14106E328, '9a99993e', 0.30000001192092896),
+    (0x14106E330, '00803b46', 12000.0),
+    (0x141083F40, '0060ea47', 120000.0),
+    (0x14106E75C, '0000a043', 320.0),
+    (0x14106E870, '00007043', 240.0),
+)
+
+# Constants for the two small-angle polynomial paths reached by PWS2's
+# argument 0x1d28, on both instruction variants. Other ranges/exception
+# callees are retained as leads, not certified implementations of libm.
+SMALL_ANGLE_DATA = (
+    (0x1410F4360, '000000000000f03f'),
+    (0x1410F4370, '000000000000e03f'),
+    (0x1410F43A0, '182d4454fb21e93f'),
+    (0x1410F4440, '000000000000803f'),
+    (0x1410F4470, '0000807f'),
+    (0x1410F4530, '0000807f'),
+    (0x1410F4560, '182d4454fb21e93f'),
+    (0x1410F4580, '000000000000803f'),
+    (0x1410F8EC0, '000000000000e0bf'),
+    (0x1410F8EC8, '555555555555a53f'),
+    (0x1410F8ED0, '166cc1166cc156bf'),
+    (0x1410F8ED8, '19a0011aa001fa3e'),
+    (0x1410F8EE0, '5c9f78b74f7e92be'),
+    (0x1410F8EF0, '555555555555c5bf'),
+    (0x1410F8EF8, '111111111111813f'),
+    (0x1410F8F00, '1aa0011aa0012abf'),
+    (0x1410F8F08, '34c756a5e31dc73e'),
 )
 
 # Review anchors distinguish these four fixed records from the separate
@@ -76,6 +114,9 @@ def produce(directory=DEFAULT_DUMP):
     for address, expected, value in PROJECTION_CONSTANTS:
         if dump.read(address, 4).hex() != expected:
             raise ValueError(f'Projection constant differs at {address:#x}')
+    for address, expected in SMALL_ANGLE_DATA:
+        if dump.read(address, len(bytes.fromhex(expected))).hex() != expected:
+            raise ValueError(f'Small-angle data differs at {address:#x}')
     order_bytes = dump.read(0x1417308D0, 24)
     if order_bytes != bytes((0,1,2,3, 0,1,3,2, 0,2,1,3, 0,2,3,1, 0,3,1,2, 0,3,2,1)):
         raise ValueError('Actor processing-order table differs')
@@ -110,6 +151,19 @@ def produce(directory=DEFAULT_DUMP):
                         constants=[dict(address=hex(a), bytes=b, value=v)
                                    for a, b, v in PROJECTION_CONSTANTS],
                         scope='actor-linked two-point primitive only; no HUD owner or live camera certification'),
+        projective_setup=dict(
+            argument_word='0x1d28',
+            angle_scaling='float(low16(ECX)) * float(2*pi) * 2^-16 * 0.5',
+            cosine_callee='0x140efdc30', sine_callee='0x140efe130',
+            math_scope='small-angle polynomial paths for the PWS2 constant, including SSE and AVX/FMA variants; not all-input libm proof',
+            small_angle_data=[dict(address=hex(a), bytes=b) for a, b in SMALL_ANGLE_DATA],
+            initial_and_alternate=dict(divisor_address='0x14104fb08',
+                                       depth_a_address='0x14106e328', depth_b_address='0x14106e330'),
+            post_draw=dict(call='0x140a5d84d', depth_b_address='0x141083f40'),
+            ordinary_draw='slot 2 copied before draw; slot 3 rebuilt after draw, so entry contents still require stage-specific observation',
+            template_snapshot=dict(address='0x141c00250', bytes=dump.read(0x141C00250, 64).hex(),
+                                   values=list(struct.unpack('<16f', dump.read(0x141C00250, 64))),
+                                   scope='dump snapshot only; writable storage does not establish a writer or live invariance')),
         limitations=['Record indices are not yet mapped to controllers or HUD owners.',
                      'Nonzero filter byte establishes list inclusion, not alive/human/visible semantics.',
                      'No health, meter, position, camera, transformation or safe hook ABI is certified.',

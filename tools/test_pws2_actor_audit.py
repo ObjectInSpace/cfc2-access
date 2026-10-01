@@ -48,6 +48,17 @@ class ActorAuditTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, 'Projection constant differs'):
                         audit.produce()
 
+    def test_changed_small_angle_data_refused(self):
+        original = audit.Dump.read
+        for target, _ in audit.SMALL_ANGLE_DATA:
+            with self.subTest(address=hex(target)):
+                def changed(dump, address, size):
+                    data = original(dump, address, size)
+                    return bytes([data[0] ^ 1]) + data[1:] if address == target else data
+                with patch.object(audit.Dump, 'read', changed):
+                    with self.assertRaisesRegex(ValueError, 'Small-angle data differs'):
+                        audit.produce()
+
 
 if __name__ == '__main__':
     unittest.main()

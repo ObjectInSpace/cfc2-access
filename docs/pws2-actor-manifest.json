@@ -113,9 +113,169 @@
         "address": "0x140fe428c",
         "bytes": "000000bf",
         "value": -0.5
+      },
+      {
+        "address": "0x140fe4268",
+        "bytes": "db0fc940",
+        "value": 6.2831854820251465
+      },
+      {
+        "address": "0x14101b704",
+        "bytes": "00008037",
+        "value": 1.52587890625e-05
+      },
+      {
+        "address": "0x140fe42c0",
+        "bytes": "00000080",
+        "value": -0.0
+      },
+      {
+        "address": "0x140fe52cc",
+        "bytes": "000080bf",
+        "value": -1.0
+      },
+      {
+        "address": "0x14104fb08",
+        "bytes": "abaaaa3f",
+        "value": 1.3333333730697632
+      },
+      {
+        "address": "0x14106e328",
+        "bytes": "9a99993e",
+        "value": 0.30000001192092896
+      },
+      {
+        "address": "0x14106e330",
+        "bytes": "00803b46",
+        "value": 12000.0
+      },
+      {
+        "address": "0x141083f40",
+        "bytes": "0060ea47",
+        "value": 120000.0
+      },
+      {
+        "address": "0x14106e75c",
+        "bytes": "0000a043",
+        "value": 320.0
+      },
+      {
+        "address": "0x14106e870",
+        "bytes": "00007043",
+        "value": 240.0
       }
     ],
     "scope": "actor-linked two-point primitive only; no HUD owner or live camera certification"
+  },
+  "projective_setup": {
+    "argument_word": "0x1d28",
+    "angle_scaling": "float(low16(ECX)) * float(2*pi) * 2^-16 * 0.5",
+    "cosine_callee": "0x140efdc30",
+    "sine_callee": "0x140efe130",
+    "math_scope": "small-angle polynomial paths for the PWS2 constant, including SSE and AVX/FMA variants; not all-input libm proof",
+    "small_angle_data": [
+      {
+        "address": "0x1410f4360",
+        "bytes": "000000000000f03f"
+      },
+      {
+        "address": "0x1410f4370",
+        "bytes": "000000000000e03f"
+      },
+      {
+        "address": "0x1410f43a0",
+        "bytes": "182d4454fb21e93f"
+      },
+      {
+        "address": "0x1410f4440",
+        "bytes": "000000000000803f"
+      },
+      {
+        "address": "0x1410f4470",
+        "bytes": "0000807f"
+      },
+      {
+        "address": "0x1410f4530",
+        "bytes": "0000807f"
+      },
+      {
+        "address": "0x1410f4560",
+        "bytes": "182d4454fb21e93f"
+      },
+      {
+        "address": "0x1410f4580",
+        "bytes": "000000000000803f"
+      },
+      {
+        "address": "0x1410f8ec0",
+        "bytes": "000000000000e0bf"
+      },
+      {
+        "address": "0x1410f8ec8",
+        "bytes": "555555555555a53f"
+      },
+      {
+        "address": "0x1410f8ed0",
+        "bytes": "166cc1166cc156bf"
+      },
+      {
+        "address": "0x1410f8ed8",
+        "bytes": "19a0011aa001fa3e"
+      },
+      {
+        "address": "0x1410f8ee0",
+        "bytes": "5c9f78b74f7e92be"
+      },
+      {
+        "address": "0x1410f8ef0",
+        "bytes": "555555555555c5bf"
+      },
+      {
+        "address": "0x1410f8ef8",
+        "bytes": "111111111111813f"
+      },
+      {
+        "address": "0x1410f8f00",
+        "bytes": "1aa0011aa0012abf"
+      },
+      {
+        "address": "0x1410f8f08",
+        "bytes": "34c756a5e31dc73e"
+      }
+    ],
+    "initial_and_alternate": {
+      "divisor_address": "0x14104fb08",
+      "depth_a_address": "0x14106e328",
+      "depth_b_address": "0x14106e330"
+    },
+    "post_draw": {
+      "call": "0x140a5d84d",
+      "depth_b_address": "0x141083f40"
+    },
+    "ordinary_draw": "slot 2 copied before draw; slot 3 rebuilt after draw, so entry contents still require stage-specific observation",
+    "template_snapshot": {
+      "address": "0x141c00250",
+      "bytes": "0000803f000000000000000000000000000000000000803f000000000000000000000000000000000000803f000000000000000000000000000000000000803f",
+      "values": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "scope": "dump snapshot only; writable storage does not establish a writer or live invariance"
+    }
   },
   "limitations": [
     "Record indices are not yet mapped to controllers or HUD owners.",
@@ -309,6 +469,30 @@
       "start": "0x140f338f0",
       "end_exclusive": "0x140f33a40",
       "sha256": "399f4bb82e9e0af61e5a274b6b8c1e140af34653c45d67ba9e1d011b668a7580"
+    },
+    {
+      "label": "projective-cosine-callee",
+      "start": "0x140efdc30",
+      "end_exclusive": "0x140efe12f",
+      "sha256": "e9ff5990022b1334225c0d81df7a417110ca4a5a9ac962a03ca1d040d215d337"
+    },
+    {
+      "label": "projective-sine-callee",
+      "start": "0x140efe130",
+      "end_exclusive": "0x140efe826",
+      "sha256": "46d98b0169be0b0b8b87098ec9670fd5c8807b48743d1315778a3ed619650098"
+    },
+    {
+      "label": "pws2-initializer-through-render-setup",
+      "start": "0x140a46eb0",
+      "end_exclusive": "0x140a47009",
+      "sha256": "89f89549a3ec1d186bf60f92f4ebcf3497bbd2ac8ea381dc4e09792ca2b319d4"
+    },
+    {
+      "label": "pws2-render-setup-prefix",
+      "start": "0x140a46460",
+      "end_exclusive": "0x140a465e4",
+      "sha256": "e6aae353257594829b8e826b7688057bfc79297cdd7b1f94491e3ad74941b216"
     },
     {
       "label": "draw-direction-state-setter",

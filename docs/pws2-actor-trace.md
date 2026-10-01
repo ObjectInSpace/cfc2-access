@@ -7,7 +7,7 @@ python tools/pws2_actor_audit.py --manifest-out docs/pws2-actor-manifest.json
 python tools/test_pws2_actor_audit.py
 ```
 
-The manifest retains thirty-nine instruction-aligned spans and the main code SHA-256
+The manifest retains forty-three instruction-aligned spans and the main code SHA-256
 `9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b`.
 This is initial F06–F12/F19 acquisition evidence, not an implemented adapter.
 No PWS2 attachment, live capture, deployment or audible validation occurred.
@@ -166,8 +166,8 @@ and render consumers. Do not reuse CVS2's midpoint camera or assume a world
 axis is height. Prepare small labelled captures once those candidate paths
 are bounded; no full-arena sweep or user input is needed for this first trace.
 
-The audit reproduces thirty-nine spans. Five offline tests cover manifest agreement,
-changed code/table/projection-constant rejection and incomplete instruction
+The audit reproduces forty-three spans. Six offline tests cover manifest agreement,
+changed code/table/projection-constant/math-data rejection and incomplete instruction
 refusal. These checks do
 not prove live gameplay semantics. No runtime source changed, so the DLL
 build/regression set was not repeated for this research increment.
@@ -346,3 +346,83 @@ Next bounded work: retain/review the projective constructor's two math callees
 ordinary-pass slot-3 setup. Actor callback writers and HUD ownership remain
 independent acquisition work. Sampling eligibility and the audible perspective
 are still unproved; this continuation does not enable a projection reader.
+
+## Fixed-angle math and stage-dependent projection setup
+
+Continued offline from clean `0e1fbe8`, 2026-10-01. Four new spans retain the
+two complete top-level math callees, the PWS2 initializer through its render
+setup call, and that setup's prefix through slot-3 construction. The math
+interpretation below is bounded to the actual fixed PWS2 argument; retaining
+the full bodies does not certify their external range-reduction or exception
+callees, all-input accuracy, or floating-point exception behavior.
+
+`0x140f338f0` converts unsigned CX to float, multiplies sequentially by
+float `6.2831854820251465`, `1/65536` and `0.5`, and supplies that value
+to both math callees. All three retained PWS2 call sites use CX=`0x1d28`.
+The resulting float is approximately `0.35780102014541626`. The unhalved
+angular scale is 65536 units per turn; this constant corresponds to about
+41.00098 degrees before halving. This establishes the constructor's numeric
+angle convention, not a user-visible field-of-view label.
+
+For this input, `0x140efdc30` follows a cosine polynomial through degree 10;
+`0x140efe130` follows a sine polynomial through degree 9. The retained data
+contains the alternating coefficients beginning with -1/2 and 1/24 for the
+former, -1/6 and 1/120 for the latter. Both routines branch on the dword at
+`0x142c78c68` into SSE or AVX/FMA instruction variants. The fixed input is
+between 1/128 and pi/4, so the reviewed paths avoid the large-angle reducers
+and exceptional-input callees in either variant. The instruction ordering
+and use of fused operations can affect rounding. No game function was executed
+to establish these facts; the code and constant bytes are the evidence.
+
+With C and S the respective float return values, q the first float argument,
+a/b the next two, and u/v context+0x1f8240/+0x1f8244, the local projective
+matrix has these nonzero or potentially nonzero entries in row-major storage:
+
+- P[0] = (C/S)/q and P[5] = C/S.
+- P[8] = -u and P[9] = -v, using sign-bit XOR.
+- P[10] = -(a+b)/(b-a), P[11] = -1.
+- P[14] = -((b+b)*a/(b-a)); all other entries are zero.
+
+These equations summarize finite arithmetic; the retained instructions define
+rounding and sign-bit behavior. Neither the constructor nor these equations
+validate a nonzero denominator. Keep a/b as numeric depth parameters: the
+earlier primitive's Z rejection at 0 and 1 is separate evidence, so familiar
+matrix form alone must not assign physical near/far clipping semantics.
+
+The initializer prefix `0x140a46eb0..0x140a47009` calls the viewport setup
+then `0x140a46460`. Its retained prefix selects slot 3, copies the template,
+and calls the projective constructor with q approximately 4/3, a approximately
+0.3 and b=12000, before selecting slot 1. The alternate-pass helper uses the
+same parameters, with the additional translation construction already traced;
+its translation arguments divide the two supplied values by 320 and 240.
+
+At `0x140a5d821..0x140a5d85c`, after the ordinary main draw or both alternate
+main draws, the dispatcher rebuilds slot 3 using q approximately 4/3,
+a approximately 0.3 and **b=120000**. It then selects slot 1 and calls three
+further draw helpers. The R+0x53104 branch can skip the main draws and this
+rebuild. Thus initialization, alternate main passes and later draw work do
+not all use identical projection parameters. The ordinary main branch copies
+slot 2 but does not itself rebuild slot 3 before `0x140a5d950`; its effective
+slot-3 contents remain inherited and require tracing intervening writers or
+capturing at that stage. A post-draw snapshot cannot prove the earlier value.
+
+The template at `0x141c00250` is identity in this dump. A freshness-checked
+`build_riprefs.load_refs()` lookup for targets in its 64-byte range yielded
+only direct loads in the current index. This is a bounded negative lookup,
+not proof that no indirect writer exists. Earlier wording "mutable template"
+means writable global storage with unproved lifetime invariance; no actual
+template writer has been established. The manifest retains the snapshot and
+explicitly does not promote it to a live invariant.
+
+Validation actually run: `python tools/pws2_actor_audit.py --manifest-out
+docs/pws2-actor-manifest.json` exited 0 with 43 spans;
+`python tools/test_pws2_actor_audit.py` exited 0 with six passing tests,
+including rejection of changes to each new math-data entry. `git diff --check`
+exited 0. Runtime source did not change, so the DLL regression/build set was
+not repeated. These are offline evidence checks, not gameplay validation.
+
+The next useful trace is the three later draw helpers (`0x140a5de70`,
+`0x140a5dc80`, `0x140a5e9b0`) and their slot-3 writes/preservation, followed
+by the indexed transform-record writers. HUD owner mapping and actor callback
+publication remain separate open acquisition paths. No runtime reader, hook,
+deployment, attachment, capture or listening validation was performed.
