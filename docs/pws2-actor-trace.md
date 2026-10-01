@@ -7,7 +7,7 @@ python tools/pws2_actor_audit.py --manifest-out docs/pws2-actor-manifest.json
 python tools/test_pws2_actor_audit.py
 ```
 
-The manifest retains thirteen instruction-aligned spans and the main code SHA-256
+The manifest retains seventeen instruction-aligned spans and the main code SHA-256
 `9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b`.
 This is initial F06–F12/F19 acquisition evidence, not an implemented adapter.
 No PWS2 attachment, live capture, deployment or audible validation occurred.
@@ -133,6 +133,30 @@ list dispatches; the visible mode and all its entry paths remain open.
 
 ## Remaining work and validation
 
+The draw continuation `0x140a5d5a0..0x140a5d8a6`, called at the phase
+dispatcher tail except for nested value 99, exposes indexed transform data.
+On the R+0x52fdc=0 branch it takes signed R+0x52e88 into global
+`0x14297a9e0`, addresses R+0x51d90+0x308*index, and passes that address
+to `0x140f32440`. The latter copies exactly 64 bytes into the current
+indexed slot of the shared rendering context from `0x142c79b40`. This
+establishes the copied transform block, not its world/view/projection convention.
+
+The nonzero R+0x52fdc branch uses a parameter table, sets pass global
+`0x14297a9dc` to 2, configures the transform through `0x140a5d8b0`,
+and calls `0x140a5d950`. It then advances the transform index modulo four,
+sets the pass global to 3, configures again and calls the draw routine again.
+It restores the globals afterward and clears R+0x52fdc at the function end.
+Parameter-table bounds and values are unreviewed. Neither that field nor the
+two passes are labelled split-screen, reflection, or a user-visible camera.
+
+The retained prefix `0x140a5d950..0x140a5da1f` uses further float fields
+from the same indexed 0x308-stride storage, then visits all four fixed actor
+records. It calls `0x140a5e060` only if actor+0x401c and actor+0xc0 are
+nonzero; it also calls `0x140a548d0` for each record. Those consumers remain
+open. The prefix is not the complete drawing routine or proof of final visible
+output. This repeated-pass structure means a per-draw callback cannot alone
+be a once-per-frame observation or select the audible spatial perspective.
+
 Next trace the writers of each actor callback and the HUD owner's selected
 actor. Extend the established input branches to actual controller/mode labels.
 Trace health, visible transformation/
@@ -141,7 +165,7 @@ and render consumers. Do not reuse CVS2's midpoint camera or assume a world
 axis is height. Prepare small labelled captures once those candidate paths
 are bounded; no full-arena sweep or user input is needed for this first trace.
 
-The audit reproduces thirteen spans. Four offline tests cover manifest agreement,
+The audit reproduces seventeen spans. Four offline tests cover manifest agreement,
 changed code/table rejection and incomplete instruction refusal. These checks do
 not prove live gameplay semantics. No runtime source changed, so the DLL
 build/regression set was not repeated for this research increment.

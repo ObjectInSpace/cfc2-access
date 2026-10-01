@@ -70,6 +70,14 @@
       ]
     ]
   },
+  "draw_leads": {
+    "transform_base": "0x51d90",
+    "transform_stride": "0x308",
+    "copied_bytes": "0x40",
+    "index_global": "0x14297a9e0",
+    "pass_global": "0x14297a9dc",
+    "scope": "pass identity and projection semantics unresolved"
+  },
   "limitations": [
     "Record indices are not yet mapped to controllers or HUD owners.",
     "Nonzero filter byte establishes list inclusion, not alive/human/visible semantics.",
@@ -124,6 +132,30 @@
       "start": "0x140a4c710",
       "end_exclusive": "0x140a4c7d6",
       "sha256": "8efae680bf6b5d0e07d29b10563e19ac1305cc518d1ed4312c4f17df87910135"
+    },
+    {
+      "label": "draw-pass-dispatch",
+      "start": "0x140a5d5a0",
+      "end_exclusive": "0x140a5d8a6",
+      "sha256": "6b1d6ff9ec2cf922392e4335b3ffe12e7e7eddd96b75ba953da3fd06e9ec2c95"
+    },
+    {
+      "label": "draw-pass-transform-setup",
+      "start": "0x140a5d8b0",
+      "end_exclusive": "0x140a5d94e",
+      "sha256": "cc50e19898c05dc06b64e10d73597dce5c9d56f5ff9a94bb8c43d3243cd3e795"
+    },
+    {
+      "label": "draw-four-records-prefix",
+      "start": "0x140a5d950",
+      "end_exclusive": "0x140a5da1f",
+      "sha256": "6fb2d1205270e339604225d19ad1aa7845964bbe6ae9d5d7eba160b1591b180f"
+    },
+    {
+      "label": "shared-transform-block-copy",
+      "start": "0x140f32440",
+      "end_exclusive": "0x140f32487",
+      "sha256": "316274e3b1705660d4cdbd7867d192826bb8d94b359feadb4bd67624f7b64e3b"
     },
     {
       "label": "record-pool-rebuild",
