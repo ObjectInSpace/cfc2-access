@@ -281,6 +281,12 @@
       "sha256": "41b07b18ce60d95f7fb0cf86b5c13581fc909746f53973b257877ef24c5ca2ee"
     },
     {
+      "label": "shared-transform-premultiply",
+      "start": "0x140f32730",
+      "end_exclusive": "0x140f32c17",
+      "sha256": "4f82d89ddb9e2b4cd8b5bc508a02e769d9121d0ff370fb67c553410de83b8ee6"
+    },
+    {
       "label": "viewport-scale-writer-prefix",
       "start": "0x140f30830",
       "end_exclusive": "0x140f30a1c",

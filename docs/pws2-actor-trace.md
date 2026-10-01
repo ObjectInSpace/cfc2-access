@@ -7,7 +7,7 @@ python tools/pws2_actor_audit.py --manifest-out docs/pws2-actor-manifest.json
 python tools/test_pws2_actor_audit.py
 ```
 
-The manifest retains thirty-eight instruction-aligned spans and the main code SHA-256
+The manifest retains thirty-nine instruction-aligned spans and the main code SHA-256
 `9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b`.
 This is initial F06–F12/F19 acquisition evidence, not an implemented adapter.
 No PWS2 attachment, live capture, deployment or audible validation occurred.
@@ -166,7 +166,7 @@ and render consumers. Do not reuse CVS2's midpoint camera or assume a world
 axis is height. Prepare small labelled captures once those candidate paths
 are bounded; no full-arena sweep or user input is needed for this first trace.
 
-The audit reproduces thirty-eight spans. Five offline tests cover manifest agreement,
+The audit reproduces thirty-nine spans. Five offline tests cover manifest agreement,
 changed code/table/projection-constant rejection and incomplete instruction
 refusal. These checks do
 not prove live gameplay semantics. No runtime source changed, so the DLL
@@ -308,3 +308,41 @@ callees, template writers and ordinary-pass slot-3 initialization remain the
 next bounded setup trace. No projection parameters, angle units or camera
 role are certified from names or conventional matrix patterns. The earlier
 composite/endpoint arithmetic remains independently established.
+
+## Constructor multiplication order continuation
+
+Continued offline from clean `622c0be`, 2026-10-01. The complete constructor
+combination helper `0x140f32730..0x140f32c17` reads the argument matrix
+through RCX and the current matrix through `0x142c79b48`. In row-major
+storage it computes `out[row,col] = sum(argument[row,k] * current[k,col])`.
+This is premultiplication, distinct from the postmultiplication helper
+`0x140f32c20` used by the composite path. For example, the first output
+uses argument offsets 0/4/8/12 and current offsets 0/16/32/48. The next
+three argument rows begin at +0x10, +0x20 and +0x30. All source matrix
+loads precede the first output store at `0x140f32b90`; four 16-byte stores
+replace the current matrix, ending at `0x140f32c09`. The body has no calls,
+branches, perspective divide or current-slot selection. It assumes readable
+matrix pointers and does not provide a worker-safe invocation contract.
+
+Let B be the mutable template at `0x141c00250`, T the local template copy
+whose translation entries the translation constructor replaces, and P the
+local projective matrix built by `0x140f338f0`. On the retained alternate
+setup path, slot 3 receives B, then T * B, then P * (T * B). These are
+native sequential floating-point operations; this notation does not authorize
+reassociation for bit-exact decoding. The setup subsequently selects slot 2
+and copies the indexed transform record there. The composite helper still
+postmultiplies the actor's current matrix by slot 2, slot 3 and viewport.
+Thus the constructor order changes the interpretation of slot 3 without
+changing the independently traced composite order. No assumption that B is
+identity is needed, and no camera role or angle unit follows from this order.
+
+The audit now retains 39 instruction-aligned spans under the existing code
+hash. Validation: audit/manifest regeneration and all five PWS2 audit tests
+passed; `git diff --check` passed. No runtime source changed; no DLL build,
+deployment, game attachment, live capture or audible check was performed.
+
+Next bounded work: retain/review the projective constructor's two math callees
+`0x140efdc30` / `0x140efe130`, trace writers of the mutable template and the
+ordinary-pass slot-3 setup. Actor callback writers and HUD ownership remain
+independent acquisition work. Sampling eligibility and the audible perspective
+are still unproved; this continuation does not enable a projection reader.

@@ -775,3 +775,18 @@ Final probe validation: all 29 PowerShell runners, all 50 collection Python
 tests and the DLL build passed. A delayed producer cannot race the completion
 footer into falsely reporting a clean capture. The final DLL hash and exact
 live exercise are in the run card. No deployment has been performed.
+
+## PWS2 constructor-order continuation — 2026-10-01
+
+Continued from clean `622c0be`. The [PWS2 trace](pws2-actor-trace.md) now
+retains the complete constructor matrix-combination helper: it premultiplies
+`argument * current`, whereas the composite helper postmultiplies. The
+alternate setup therefore builds slot 3 as P * (T * B), with B the mutable
+template, T its translation-modified copy and P the projective constructor's
+local matrix. No camera role, identity-template invariant or angle unit is
+assigned. The manifest now retains 39 spans; its five offline tests pass.
+No runtime source change, deployment, attachment, capture or audible proof.
+
+Next: bound the two projective math callees, mutable-template writers and
+ordinary-pass slot-3 initialization. HUD ownership, participant semantics,
+shared integration and arena/four-player listening proof remain open.

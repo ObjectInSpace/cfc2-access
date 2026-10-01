@@ -32,6 +32,7 @@ SPANS = (
     ('shared-composite-transform', 0x140F33830, 0x140F3388B),
     ('shared-current-transform-copy-out', 0x140F31F40, 0x140F31F72),
     ('shared-transform-postmultiply', 0x140F32C20, 0x140F3310F),
+    ('shared-transform-premultiply', 0x140F32730, 0x140F32C17),
     ('viewport-scale-writer-prefix', 0x140F30830, 0x140F30A1C),
     ('shared-template-matrix-copy', 0x140F33610, 0x140F33643),
     ('shared-translation-matrix-construction', 0x140F334D0, 0x140F33520),
