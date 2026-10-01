@@ -34,6 +34,15 @@ PATHS = (
 
 # Explicit, instruction-aligned, exclusive ends; excerpts are not whole CFGs.
 SHARED_SPANS = (
+    ("game-screen-type-registration", 0x140026F70, 0x140026FC0),
+    ("game-screen-base-constructor", 0x140178790, 0x1401787C9),
+    ("game-screen-type-getter", 0x1400372B0, 0x1400372B8),
+    ("screen-request-game-path", 0x14003C800, 0x14003C97A),
+    ("screen-manager-allocating-constructor", 0x1401A5900, 0x1401A5A50),
+    ("screen-manager-pending-request", 0x1401A61F0, 0x1401A61F8),
+    ("screen-manager-update", 0x1401A6200, 0x1401A62A6),
+    ("screen-manager-release-all", 0x1401A6390, 0x1401A6403),
+    ("screen-manager-replace", 0x1401A6420, 0x1401A65E7),
     ("game-screen-constructor", 0x140037000, 0x140037071),
     ("game-screen-update", 0x140038F90, 0x140039778),
     ("game-screen-release", 0x140037140, 0x140037292),
@@ -46,6 +55,10 @@ SHARED_SPANS = (
     ("initializer-entry-0b0d80-prefix", 0x1400B0D80, 0x1400B0FA8),
     ("initializer-entry-0b4900-prefix", 0x1400B4900, 0x1400B49E2),
     ("initializer-preparation-gate", 0x14004C6F0, 0x14004C706),
+    ("initializer-preparation-target", 0x140047270, 0x1400472DB),
+    ("preparation-token-check", 0x1401A0300, 0x1401A0355),
+    ("preparation-token-mode", 0x1401998C0, 0x140199942),
+    ("preparation-option-forward", 0x14019AEC0, 0x14019AF32),
     ("shell-owner-constructor-prefix", 0x140047E00, 0x140047E61),
     ("shell-destructor-body", 0x140048380, 0x1400486B1),
     ("shell-deleting-destructor", 0x140048700, 0x140048762),
@@ -237,16 +250,28 @@ def produce(directory):
     destructor_slot = 0x140FE12F0
     if dump.pointer(destructor_slot) != 0x140048700:
         raise ValueError("Shell destructor vtable slot differs")
-    screen_slots = ((0x140FDE728, 0x140038F90), (0x140FDE730, 0x140037140))
+    screen_slots = ((0x140FDE710, 0x1400372B0), (0x140FDE728, 0x140038F90),
+                    (0x140FDE730, 0x140037140))
     for address, target in screen_slots:
         if dump.pointer(address) != target:
             raise ValueError("Game-screen vtable slot differs")
-    return dict(schema=2, evidence="offline instruction/data trace; no live validation",
+    manager_slots = ((0x141018B88, 0x1401A6390), (0x141018B90, 0x1401A6200),
+                     (0x141018BB0, 0x1401A61F0), (0x141018BB8, 0x1401A6420))
+    for address, target in manager_slots:
+        if dump.pointer(address) != target:
+            raise ValueError("Screen-manager vtable slot differs")
+    if dump.read(0x140FDE690, 6) != b'aGame\0' or dump.pointer(0x140FDE6A0) != 0x140037000:
+        raise ValueError("Game-screen factory record differs")
+    return dict(schema=3, evidence="offline instruction/data trace; no live validation",
                 limitations=["Bounded spans are not complete control-flow graphs.",
                              "Root publication is not readiness or lifetime proof.",
                              "No gameplay field, safe hook ABI, or callback cadence is validated.",
                              "CFJ cleanup callees, destructor entry paths and reset/load coverage remain open."],
                 sections=baseline["sections"], paths=paths, roms=roms, spans=spans,
+                screen_manager_vtable=[dict(address=hex(a), target=hex(t)) for a,t in manager_slots],
+                game_screen_factory=dict(name_address='0x140fde690', name='aGame',
+                                         descriptor='0x141c049d0', vtable='0x140fde698',
+                                         constructor_slot='0x140fde6a0', constructor='0x140037000'),
                 game_screen_vtable=[dict(address=hex(a), target=hex(t)) for a,t in screen_slots],
                 shell_destructor_vtable=dict(address=hex(destructor_slot),
                                             bytes=dump.read(destructor_slot, 8).hex(),

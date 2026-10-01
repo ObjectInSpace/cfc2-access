@@ -1,5 +1,5 @@
 {
-  "schema": 2,
+  "schema": 3,
   "evidence": "offline instruction/data trace; no live validation",
   "limitations": [
     "Bounded spans are not complete control-flow graphs.",
@@ -510,6 +510,60 @@
   ],
   "spans": [
     {
+      "label": "game-screen-type-registration",
+      "start": "0x140026f70",
+      "end_exclusive": "0x140026fc0",
+      "sha256": "ee008e81039fd166af461c70263239f70e7959a6ed63e67b64f1107e9f7055f2"
+    },
+    {
+      "label": "game-screen-base-constructor",
+      "start": "0x140178790",
+      "end_exclusive": "0x1401787c9",
+      "sha256": "96c5446161c7a052aa2d2839a5c5e2b188d6d1e08794a1ff0940f525ca3c30a5"
+    },
+    {
+      "label": "game-screen-type-getter",
+      "start": "0x1400372b0",
+      "end_exclusive": "0x1400372b8",
+      "sha256": "04c1a414f4f6e22da509b356e7cf15c5af39f61dda63e08473a4b566274c26ba"
+    },
+    {
+      "label": "screen-request-game-path",
+      "start": "0x14003c800",
+      "end_exclusive": "0x14003c97a",
+      "sha256": "be6b707d321a07e64974c78c5f2009daf9e24ad129d10c6ef64fde87fd32f7f3"
+    },
+    {
+      "label": "screen-manager-allocating-constructor",
+      "start": "0x1401a5900",
+      "end_exclusive": "0x1401a5a50",
+      "sha256": "12a8553dd7e76eccd88207fd66713582272130991bdd2cae6eb859ed39f2eb38"
+    },
+    {
+      "label": "screen-manager-pending-request",
+      "start": "0x1401a61f0",
+      "end_exclusive": "0x1401a61f8",
+      "sha256": "a6a527858ea8cf3de74a7d436269d92c0fddd0fd6f2375960c61242ac2af7163"
+    },
+    {
+      "label": "screen-manager-update",
+      "start": "0x1401a6200",
+      "end_exclusive": "0x1401a62a6",
+      "sha256": "8c0ae503d90ad4e7fa2081bf12ea95364d979843e8d68955d6c71fc800540f60"
+    },
+    {
+      "label": "screen-manager-release-all",
+      "start": "0x1401a6390",
+      "end_exclusive": "0x1401a6403",
+      "sha256": "e7eaf2bdfc09c8246206931f244276fafece67e78a8ec512c95475d0da36bde6"
+    },
+    {
+      "label": "screen-manager-replace",
+      "start": "0x1401a6420",
+      "end_exclusive": "0x1401a65e7",
+      "sha256": "2725826f8fcd77ba129e8182ac88f85d6e232afb1e1a6c85e85cae7699468ecc"
+    },
+    {
       "label": "game-screen-constructor",
       "start": "0x140037000",
       "end_exclusive": "0x140037071",
@@ -580,6 +634,30 @@
       "start": "0x14004c6f0",
       "end_exclusive": "0x14004c706",
       "sha256": "b527db8259990031a51b4d04d7cc7f39737e7f5497c705c8a069a688b79da5f6"
+    },
+    {
+      "label": "initializer-preparation-target",
+      "start": "0x140047270",
+      "end_exclusive": "0x1400472db",
+      "sha256": "9af05f32c4be57ce5a6606bd38a6cc569d21ea7bf1497881c86f68320ad745a9"
+    },
+    {
+      "label": "preparation-token-check",
+      "start": "0x1401a0300",
+      "end_exclusive": "0x1401a0355",
+      "sha256": "4ea880dc8b9588c3b80561609ed10994c0c0f251da45dded1cee6d5f09fd9d3c"
+    },
+    {
+      "label": "preparation-token-mode",
+      "start": "0x1401998c0",
+      "end_exclusive": "0x140199942",
+      "sha256": "3898924d67c02e2a40b9f7390abb976b7bd848833a05c8908c05878bf04e4529"
+    },
+    {
+      "label": "preparation-option-forward",
+      "start": "0x14019aec0",
+      "end_exclusive": "0x14019af32",
+      "sha256": "8a0c1f49f645eff513429b7942f07e7052cc4d5f805b49b4e3e70a65e551d45b"
     },
     {
       "label": "shell-owner-constructor-prefix",
@@ -930,7 +1008,37 @@
       "sha256": "cd62eab4fa11aebb9a35e732a3f9548b0e72169bae12764827bfe9f798229ca7"
     }
   ],
+  "screen_manager_vtable": [
+    {
+      "address": "0x141018b88",
+      "target": "0x1401a6390"
+    },
+    {
+      "address": "0x141018b90",
+      "target": "0x1401a6200"
+    },
+    {
+      "address": "0x141018bb0",
+      "target": "0x1401a61f0"
+    },
+    {
+      "address": "0x141018bb8",
+      "target": "0x1401a6420"
+    }
+  ],
+  "game_screen_factory": {
+    "name_address": "0x140fde690",
+    "name": "aGame",
+    "descriptor": "0x141c049d0",
+    "vtable": "0x140fde698",
+    "constructor_slot": "0x140fde6a0",
+    "constructor": "0x140037000"
+  },
   "game_screen_vtable": [
+    {
+      "address": "0x140fde710",
+      "target": "0x1400372b0"
+    },
     {
       "address": "0x140fde728",
       "target": "0x140038f90"

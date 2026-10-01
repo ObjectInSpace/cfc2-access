@@ -3,6 +3,18 @@
 This is a ready-to-use continuation brief. It initiates the next campaign;
 it does not claim that the campaign has already been performed.
 
+Current continuation, 2026-10-01: start with the latest handoff at the end of
+`collection-workflow.md`; the original first-investigation instructions below
+are historical. At `21da6ff`, the optional boundary probe is built and tested
+(29 runners, 50 collection Python tests, DLL build), not deployed or live
+validated. Follow `collection-boundary-run-card.md` for the pending transition
+capture. Do not repeat the completed baseline just to resume.
+
+Character-ID/name mapping belongs to the bounded Opus research packet
+`port-tasks/cvs1-branch-a-names.md`; do not resume that mapping as Astra work.
+The four actual CVS1 taps explain the four retained transitions. Shared
+lifecycle/observation/output ownership and arena/audio proof remain Astra work.
+
 Work in `C:\Users\amock\CFC2 Access`. Read CLAUDE.md and these documents:
 
 - [Workflow and current handoff status](collection-workflow.md).

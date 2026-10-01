@@ -122,3 +122,87 @@ The collection group now passes 40 tests, including screen-slot mutation
 rejection and the close-before-cleanup instruction check. A bounded event
 probe is the next implementation step for live ordering; no production
 router or new live validation is claimed.
+
+## Preparation target continuation — 2026-10-01
+
+The previously open target `0x140047270..0x1400472db` is now retained,
+along with its three direct callees (74 lifecycle spans total). It uses
+the object from `0x1422c82c8`, distinct from S and the shell owner slots.
+First it passes token `0x12345678` to `0x1401a0300`. That function compares
+object+0x32528 with the token and conditionally calls embedded object
++0x32500's virtual +0x10. The imported entry/exit calls use object+0x32fb0;
+their API identities are not established by this trace.
+
+Preparation clears byte globals `0x141c14e9d/e9e`, dwords
+`0x141c14ea8/e98`, and qword `0x141c14ea0`, then sets byte
+`0x141c14e9c` to 1. It calls `0x1401998c0` with the same object in RCX/RDX
+and R8D=0x10. Subject to object+0x32510=0 and embedded virtual +0x28
+returning AL=1, that callee records the token/owner at +0x32528 and the
+mode at +0x32fa8. Finally preparation tail-calls `0x14019aec0` with the
+same object in RCX/RDX and R8D=2. If +0x32528 matches, it writes
++0x325b4 and conditionally forwards the option through object+0x32f90's
+virtual +0x128.
+
+These direct bodies do not establish a game-root replacement. Their indirect
+callees remain unresolved; absence of a direct root write is not proof that
+they cannot change state. This path is therefore not approved as a universal
+epoch or publication hook. Its subsystem/UI purpose and transitive lifetime
+effects remain open. The existing boundary probe is still the next live
+thread/order measurement; this continuation adds no hooks or deployment.
+
+## Screen manager: deferred replacement after update
+
+The lifecycle manifest is now schema 3 with 83 spans. The `aGame` type
+registration at `0x140026f70..0x140026fc0` registers descriptor
+`0x141c049d0`, size 0xb8, name `0x140fde690`, then installs factory table
+`0x140fde698`. Table +8 is the previously traced constructor `0x140037000`.
+The screen's own virtual +0x20 getter `0x1400372b0` returns that descriptor.
+The base constructor clears byte +0x38; its meaning is readiness in the
+manager route below, not an independently proven visible-screen flag.
+
+Manager constructor `0x1401a5900..0x1401a5a50` allocates 0x7088 bytes,
+installs table `0x141018b60`, and publishes the object at `0x1422c8358`.
+Its virtual +0x50 is `0x1401a61f0`, which only writes the incoming descriptor
+to manager+0x7040. One complete request path `0x14003c800..0x14003c97a`
+passes the `aGame` descriptor to this virtual method, after enabling the
+callback path. This is a pending request, not synchronous game construction.
+The UI action invoking this request path has not been identified.
+
+Manager virtual +0x30, `0x1401a6200..0x1401a62a6`, traverses up to eight
+screen pointers starting at +0x7048. A null pointer stops the traversal.
+For a screen whose byte +0x38 is zero, it calls virtual +0x28; AL=0 stops
+the traversal. Otherwise it calls +0x30 and sets byte +0x38=1. It then
+calls virtual +0x38 at `0x1401a624e`, which is `0x140038f90` when this
+object has the retained game-screen table. This supplies the previously
+missing indirect update consumer, conditional on actual object membership.
+
+After traversal, a nonzero pending descriptor is processed only if the
+screen count is zero or the last counted screen's byte +0x38 is nonzero.
+Virtual +0x58 at `0x1401a6288` invokes `0x1401a6420..0x1401a65e7`;
+the pending descriptor is cleared after it returns. Replacement compares
+existing descriptor ancestry with the requested chain, retains a matching
+prefix, and disposes the remaining screens in reverse order. Even an exact
+nonempty match reduces the retained prefix by one, so requesting the same
+descriptor can replace a screen. Descriptor equality is not a session epoch.
+The native hierarchy construction and all callers are not exhaustively traced.
+
+For each disposed screen the replacement body calls virtual +0x40 at
+`0x1401a6566`, then virtual +0 with EDX=1 at `0x1401a6579`, then clears
+its array slot. New objects are constructed through descriptor virtual +8
+at `0x1401a65bc`, stored into the screen array and assigned their index at
++0x3c. Thus the game-screen release method can be invoked after its update
+returns, within this same manager update invocation. The already-traced
+release branch closes the callback object before calling game cleanup.
+
+A second disposal route is manager virtual +0x28,
+`0x1401a6390..0x1401a6403`: it traverses all eight slots in reverse,
+calling +0x40 then the deleting destructor on each nonnull object, clearing
+slots, pending descriptor and count. Its engine caller remains open.
+
+This ordering is static code evidence, not measured thread identity. It
+strengthens the requirement to revoke output on teardown entry and to reject
+queued observations at consumption time. Neither the inner native update nor
+the game-screen update return alone establishes a final manager state.
+Manager return is a candidate boundary, not an approved new hook: its engine
+callers, other mutation paths and live ordering still need review. The existing
+five-site probe does not enclose the manager call; preserve that capture limit.

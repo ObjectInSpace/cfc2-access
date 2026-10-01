@@ -97,7 +97,23 @@ class LifecycleAuditTest(unittest.TestCase):
         instructions = self.dump.instructions(0x1405A5A40, 0x1405A5C5C)
         instructions = [i for i in instructions if i.address != 0x1405A5B28]
         with self.assertRaisesRegex(ValueError, "four reviewed"):
-            audit.callbacks(instructions)
+                audit.callbacks(instructions)
+
+    def test_manager_replacement_slot_mutation_rejected(self):
+        original = audit.Dump.pointer
+        def changed(dump, address):
+            return 0 if address == 0x141018BB8 else original(dump, address)
+        with patch.object(audit.Dump, 'pointer', changed):
+            with self.assertRaisesRegex(ValueError, 'Screen-manager vtable slot differs'):
+                audit.produce(audit.DEFAULT_DUMP)
+
+    def test_factory_constructor_mutation_rejected(self):
+        original = audit.Dump.pointer
+        def changed(dump, address):
+            return 0 if address == 0x140FDE6A0 else original(dump, address)
+        with patch.object(audit.Dump, 'pointer', changed):
+            with self.assertRaisesRegex(ValueError, 'Game-screen factory record differs'):
+                audit.produce(audit.DEFAULT_DUMP)
 
     def test_duplicate_ROM_descriptor_rejected(self):
         pointer = audit.Dump.pointer

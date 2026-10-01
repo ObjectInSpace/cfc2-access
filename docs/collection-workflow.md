@@ -1,5 +1,14 @@
 # Astra investigation and Opus implementation workflow
 
+Latest continuation, 2026-10-01: the bounded Opus research packet
+[CVS1-R01](port-tasks/cvs1-branch-a-names.md) is ready for research, not runtime
+implementation. No name mapping was performed while preparing it. The current
+[boundary review](collection-session-boundary-review.md) traces the screen
+manager's deferred replacement after screen update; lifecycle manifest schema 3
+retains 83 spans. All 52 collection Python tests pass. The tested five-site
+probe from `21da6ff` remains staged only, with no deployment/live result.
+Shared runtime integration and arena/four-player proof remain incomplete.
+
 User-approved direction, 2026-09-26. Use Astra here for the upfront discovery,
 architecture proof and difficult reviews; hand bounded implementation work to
 Opus. This is a work allocation, not a claim that either model is incapable of
