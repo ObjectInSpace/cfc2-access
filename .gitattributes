@@ -1,0 +1,2 @@
+# Preserve the byte hash pinned by the PWS2-T01 research handoff.
+tools/fixtures/pws2-projection-reference-v1.json text eol=lf

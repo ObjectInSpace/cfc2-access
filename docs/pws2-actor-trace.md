@@ -521,10 +521,18 @@ through all called submission/render functions remains open.
 This creates a useful offline tooling boundary: replay the established
 actor-linked two-point primitive from matrices copied together at its stage.
 Keep the later queue path separate, retain actor/transform/pass identities as
-independent metadata, and report only native trivial-rejection results. A replay
+independent metadata, and report reference results for the native rejection
+rules. A replay
 cannot certify capture timing, audible pass choice or visible fighter position.
 
 Validation for this increment: audit/manifest generation exited 0 with 58
 spans; `python tools/test_pws2_actor_audit.py` exited 0 with all six tests
 passing; `git diff --check` exited 0. No runtime source change, DLL build,
 deployment, attachment, live capture or listening check occurred.
+
+The bounded Opus packet [PWS2-T01](port-tasks/pws2-projection-reference.md)
+uses this evidence to implement an offline float64 projection reference.
+Its 24 supplied cases are synthetic; it does not reconstruct cameras, validate
+sample timing or enable runtime audio. Vector-mode callbacks, transitive
+slot-3 preservation, actor/HUD ownership and stage-specific live captures
+remain Astra acquisition work.

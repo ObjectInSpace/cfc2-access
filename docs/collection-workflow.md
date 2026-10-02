@@ -1,6 +1,13 @@
 # Astra investigation and Opus implementation workflow
 
-Latest continuation, 2026-10-01: the bounded Opus research packet
+Latest continuation, 2026-10-02: [PWS2-T01](port-tasks/pws2-projection-reference.md)
+is ready for bounded Opus offline-tooling implementation, with a 58-span
+evidence base and 24 synthetic acceptance cases. It evaluates supplied
+matrices for one traced primitive; live capture, camera/HUD ownership and
+production audio integration remain outside its acceptance. The reference
+tool has not been implemented. The wider Astra campaign remains incomplete.
+
+The bounded Opus research packet
 [CVS1-R01](port-tasks/cvs1-branch-a-names.md) is ready for research, not runtime
 implementation. No name mapping was performed while preparing it. The current
 [boundary review](collection-session-boundary-review.md) traces the screen
@@ -837,3 +844,31 @@ Validation: audit/manifest generation exited 0; all six PWS2 audit tests passed;
 `git diff --check` exited 0. No runtime source changed, DLL build, deployment,
 attachment, live capture or audible proof. This evidence supports bounded
 offline projection tooling, not a production camera/participant adapter.
+
+## Ready Opus tooling handoff — 2026-10-02
+
+[PWS2-T01](port-tasks/pws2-projection-reference.md) is ready for a sequential
+Opus implementation session. Evidence base: `a065ca9`; the packet and its
+fixture are additional prerequisites in the containing handoff commit.
+
+The task is an offline two-point projection reference with strict sample
+validation, independent actor/transform/pass metadata and streaming JSONL
+output. The supplied fixture has 24 synthetic cases, including composition
+order, perspective divide, boundary inequalities, viewport independence,
+aliasing and malformed inputs. Sixteen numeric cases were checked using
+exact-rational arithmetic during preparation. Eight others specify validation
+outcomes. Fixture JSON/hash checks and `git diff --check` passed.
+
+No reference tool or new runtime reader was implemented while preparing the
+packet. Its implementation tests are acceptance commands to be run by Opus,
+not claimed passing results. The existing six audit tests passed with the
+58-span evidence increment. This handoff can proceed without a play session;
+production projection, controller/HUD ownership, eligible audio pass selection
+and listening acceptance remain incomplete.
+
+Astra continuation after this handoff: trace the transform mode callbacks
+`0x140ae82a0` / `0x140ae82b0` and `0x140aebde0` / `0x140aebe40`;
+resolve transitive slot-3 preservation and actor callback/HUD publication;
+prepare a tested stage-specific capture before consuming a live session.
+Shared session integration, CVS1 pilot and broader F01-F19 acquisition remain
+on the campaign rather than being declared complete by this tooling packet.
