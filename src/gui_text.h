@@ -71,8 +71,8 @@
  * The detours DEREFERENCE NOTHING beyond a single guarded vptr read; all wide
  * reading happens on the worker thread, VirtualQuery-checked and fault-guarded
  * every time and never cached. Originals are always called and their return
- * values passed through untouched. Off switch: cfc2_guitext.on to enable,
- * cfc2_hook.off to disable along with every other hook.
+ * values passed through untouched. Always installed;
+ * cfc2_hook.off disables it along with every other hook.
  */
 #ifndef CFC2_GUI_TEXT_H
 #define CFC2_GUI_TEXT_H

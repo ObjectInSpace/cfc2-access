@@ -310,8 +310,9 @@ had to back out of within the same session.
 
 Now:
 
-- **`cfc2_guitext.on`** → the hook is live; modal prompts, the hints view and
-  per-row captions all work. This is the PLAY setting.
+- **The hook is always installed** (2026-10-02; it used to need
+  `cfc2_guitext.on`, and the v0.2.0 zip shipped without it, silencing these
+  for every user). Modal prompts, the hints view and per-row captions all work.
 - **`cfc2_guitext_diag.on`** → *additionally* print the development reports
   (focus record, instance dump, layout/movelist probes, stats lines, the
   live-text transcript). Absent = off.
@@ -355,8 +356,10 @@ the reason to mute is usually that the cue is in the way *right now*.
 - Persisted to `cfc2_audio.ini` (`vol_health`/`vol_super`/`vol_beacon`/
   `vol_tick`) on each press. Speech is the ONLY feedback — there is no
   on-screen indicator, so an unspoken change is an invisible one.
-- ⚠ NOT gated on `cfc2_audio.on`: a key that silently does nothing because of
-  an unrelated file is exactly what a blind user cannot diagnose.
+- ⭐ In-match audio is ALWAYS ON (2026-10-02). It used to need `cfc2_audio.on`,
+  and the v0.2.0 zip shipped without that file, so no user heard any cue.
+  ⭐⭐ **Shipping features are never behind a switch file.** Switch files are
+  for diagnostics only; `cfc2_hook.off` remains the read-only kill switch.
 
 ⚠⚠ **THE KEYS WERE CHECKED, not assumed** (the user asked directly, and the
 first two proposals were both wrong):
@@ -799,7 +802,7 @@ un_gt_test.ps1`
 18 cases, every mechanism sabotage-verified.
 ⚠ Run it through PowerShell directly -- via some shells a crashing suite
 reported exit 0 with no output.
-Switch: `cfc2_guitext.on` (absent = off). Respects `cfc2_hook.off`.
+Always installed (the old `cfc2_guitext.on` is ignored). Respects `cfc2_hook.off`.
 
 ## Screens named so far (7 rows in `g_screens`)
 Main menu · Options · Museum (992 GALLERY/SOUND) · Select Game (rows +

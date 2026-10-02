@@ -25,8 +25,8 @@
  * ⚠ The values are published for the AUDIO layer, which is lock-free and
  * wait-free by construction (a seqlock). Speech never runs here.
  *
- * Off unless `cfc2_audio.on` exists next to the exe; `cfc2_hook.off` disables
- * it like every other hook.
+ * Installed whenever the audio device opens; `cfc2_hook.off` disables it
+ * like every other hook.
  */
 #ifndef CFC2_FRAME_H
 #define CFC2_FRAME_H

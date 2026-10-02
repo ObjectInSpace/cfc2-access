@@ -396,7 +396,6 @@ BOOL cvs2_frame_install(void)
 {
     MEMORY_BASIC_INFORMATION mbi;
 
-    if (!beside_exe("cfc2_audio.on")) return FALSE;
     if (beside_exe("cfc2_hook.off")) {
         log_line("frame: disabled by cfc2_hook.off");
         return FALSE;

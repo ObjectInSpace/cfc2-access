@@ -1399,10 +1399,9 @@ static BOOL key_pressed(int vk)
  *    comment about the mechanical KB_ naming rule, not a binding;
  *  - F12 is deliberately avoided: it is Steam's default screenshot key.
  *
- * ⚠ These are NOT gated on cfc2_audio.on. A user whose cues are off presses
- * nothing here, and a key that silently does nothing because of an unrelated
- * file is exactly the failure a blind user cannot diagnose. The handler
- * announces the level either way.
+ * ⚠ These are NOT gated on the audio device opening. A key that silently
+ * does nothing is exactly the failure a blind user cannot diagnose. The
+ * handler announces the level either way.
  *
  * ⭐ SPEECH IS THE ONLY FEEDBACK. There is no on-screen indicator, so an
  * unspoken change is an invisible one; the announcement interrupts, because
@@ -1719,10 +1718,12 @@ static DWORD WINAPI worker(LPVOID param)
      * diagnose (the same rule as the per-cue volume keys). */
     menu_speak_register_reader();
 
-    /* Gauge cues. Opt-in while the design is being tuned by ear; the mixer
-     * no-ops if the device will not open, and speech is unaffected either
-     * way (there is deliberately NO ducking). */
-    if (unpacked && opt_in_file_present("cfc2_audio.on")) {
+    /* Gauge cues. Always on: they are part of the mod, not an experiment (they
+     * were opt-in via cfc2_audio.on while tuned by ear, which left a release
+     * zip without them). The mixer no-ops if the device will not open, and
+     * speech is unaffected either way (there is deliberately NO ducking).
+     * Each cue family can be muted from its own volume key. */
+    if (unpacked) {
         wchar_t dir[MAX_PATH];
         DWORD dn = GetModuleFileNameW(NULL, dir, MAX_PATH);
         if (dn > 0 && dn < MAX_PATH) {
@@ -1741,25 +1742,20 @@ static DWORD WINAPI worker(LPVOID param)
                  audio_cue_volume(AUDIO_CUE_TICK));
         /* Health must be read ON the game's frame, not on our poll. */
         if (audio_ready() && hook_enabled) cvs2_frame_install();
-    } else if (unpacked) {
-        log_line("audio: OFF -- create cfc2_audio.on next to the exe for "
-                 "gauge cues.");
     }
 
-    BOOL gt_on = opt_in_file_present("cfc2_guitext.on");
+    /* Always on: the quit/consent dialogs, the hints view and per-row captions
+     * all ride on this hook (see below). It was opt-in via cfc2_guitext.on,
+     * which shipped a release with those dialogs silent. */
     BOOL gt_ok = FALSE;
-    if (unpacked && hook_enabled && gt_on) {
+    if (unpacked && hook_enabled) {
         gt_ok = gt_install();
         if (!gt_ok)
             log_line("gt: install FAILED (reason %d) -- nothing was written to "
                      "game memory, and no GUI text element is available.",
                      (int)gt_install_why());
-    } else if (unpacked && gt_on) {
-        log_line("gt: DISABLED by cfc2_hook.off next to the exe.");
     } else if (unpacked) {
-        log_line("gt: OFF -- create cfc2_guitext.on next to the exe to hook "
-                 "cGUIObjText and log what a live text element contains. "
-                 "This is the step that names the remaining screens.");
+        log_line("gt: DISABLED by cfc2_hook.off next to the exe.");
     }
 
     /* ⭐⭐ TWO THINGS RODE ON ONE FLAG, AND THEY HAVE OPPOSITE AUDIENCES.
