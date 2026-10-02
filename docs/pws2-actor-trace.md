@@ -7,7 +7,7 @@ python tools/pws2_actor_audit.py --manifest-out docs/pws2-actor-manifest.json
 python tools/test_pws2_actor_audit.py
 ```
 
-The manifest retains forty-three instruction-aligned spans and the main code SHA-256
+The manifest retains fifty-eight instruction-aligned spans and the main code SHA-256
 `9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b`.
 This is initial F06–F12/F19 acquisition evidence, not an implemented adapter.
 No PWS2 attachment, live capture, deployment or audible validation occurred.
@@ -166,7 +166,7 @@ and render consumers. Do not reuse CVS2's midpoint camera or assume a world
 axis is height. Prepare small labelled captures once those candidate paths
 are bounded; no full-arena sweep or user input is needed for this first trace.
 
-The audit reproduces forty-three spans. Six offline tests cover manifest agreement,
+The audit reproduces fifty-eight spans. Six offline tests cover manifest agreement,
 changed code/table/projection-constant/math-data rejection and incomplete instruction
 refusal. These checks do
 not prove live gameplay semantics. No runtime source changed, so the DLL
@@ -426,3 +426,105 @@ The next useful trace is the three later draw helpers (`0x140a5de70`,
 by the indexed transform-record writers. HUD owner mapping and actor callback
 publication remain separate open acquisition paths. No runtime reader, hook,
 deployment, attachment, capture or listening validation was performed.
+
+## Transform-record production and later drawing — 2026-10-02
+
+Continued from clean `bad08f5`. Fifteen additional spans retain the transform
+record producers, their basis helpers, and the three later draw bodies. The
+main code hash remains unchanged. All new interpretations are offline.
+
+The actual four transform records begin at R+0x51d58 with stride 0x308.
+`0x140a5bb10..0x140a5bbd2` clears all four, writes their index byte at +0,
+and initializes five float fields at +0x24..+0x34 to 640, 640, 480, 320,
+240. It clears the selected-record byte R+0x52e88. The previously traced
+R+0x51d90 drawing block is record+0x38, not the record's beginning. These
+four transform records are independent of the four actor records.
+
+`0x140a5bcb0..0x140a5bed7` updates record 0 on the R+0x52fdc=0 branch
+and records 0 and 1 on the nonzero branch. Each update calls mode dispatch
+`0x140a5ba60`, then matrix writer `0x140a5bbe0`. The zero branch copies
+all 0x308 bytes from record 0 to record 1. Both branches then copy 0 to 2
+and 1 to 3, and rewrite the four index bytes to 0,1,2,3. Each copy consists
+of six 0x80-byte iterations plus eight final bytes. Thus equal matrices in
+multiple transform slots can be the result of explicit replication; they do
+not prove multiple participants, independently tracked cameras, or a player's
+own view. The native signed selected-record index still has no bounds check
+at its draw consumer; a future reader must validate it independently.
+
+The existing phase-dispatch span establishes timing: after nested phases 0,
+1 or 2 are processed, `0x140a48d9d` calls the transform update/copy helper.
+The R+0x52d2b/R+0x52d2e gates bypass that work while still permitting the
+draw tail unless the saved nested value is 99. Transform state can therefore
+be reused across draws. This is not a once-per-draw freshness guarantee or a
+certified interpretation of either gate as pause.
+
+The mode dispatcher uses record+0x14 as a countdown/sentinel gate and signed
+record+4 to choose callback pairs. Mode 0 reaches `0x140ae82a0` /
+`0x140ae82b0`; mode 1 reaches `0x140aebde0` / `0x140aebe40`; mode 2
+calls `0x140036b70`. Their gameplay roles remain unassigned. The final
+vector-distance helper at `0x140f337b0` is not retained in this increment.
+These callbacks are concrete leads for vector writers, not evidence that the
+record belongs to a particular actor or controller.
+
+The matrix writer copies three floats each from record+0xc8 and +0xf8 into
+local vectors A/B. `0x140a5b520..0x140a5b728` computes an adjustment from
+record state, saves it at +0x204, and adds it to the second component of both
+locals. It does not update the original vector fields here. It then selects
+matrix slot 2, copies the shared template, and calls `0x140f324d0` with
+A, B and the dword at record+0x180. Afterward it copies the current matrix
+to record+0x78 and record+0x38, rewrites only the +0x78 copy through
+`0x140f32190`, and selects slot 1. Drawing consumes the +0x38 copy.
+Consequently raw vector fields alone do not reproduce the full matrix path.
+
+For finite, nondegenerate vectors, `0x140f324d0..0x140f326d9` builds a
+basis using D=normalize(A-B), H=normalize((0,1,0) cross D), and V=D cross H.
+The retained dot and cross bodies establish those operations. The square-root
+callee reaches `sqrtss` for finite nonnegative input; its exceptional-input
+callees remain outside the proof. The vector normalizer explicitly produces
+zero components for a zero length. It does not reject coincident vectors or
+a direction parallel to the fixed up vector, so a reader must not infer an
+invertible camera from successful native return.
+
+The constructed matrix stores H, V and D as its first three columns, with
+translation -dot(A,H), -dot(A,V), -dot(A,D), and homogeneous diagonal entry 1.
+When low16(record+0x180) is nonzero, a template copy is modified using two
+indexed float tables (`0x140f302d0` / `0x140f302f0`) and premultiplied first;
+the basis matrix is premultiplied afterward. Table initialization and angle
+semantics are unreviewed. This establishes basis construction without assuming
+the live shared template is identity or assigning A/B visible camera labels.
+
+`0x140f32190..0x140f32437` chooses its explicit matrix argument, falling
+back to the current pointer only for null. It computes the first three row
+lengths, transposes/rescales their components, derives translated components,
+and writes affine homogeneous entries. It has unguarded divisions by the row
+lengths. This is not evidence of a safe general 4-by-4 inverse for arbitrary
+matrices. Its explicit +0x78 argument in the record writer leaves the saved
++0x38 drawing matrix untouched by this call.
+
+The two later resource-list draw bodies start at R+0x40788 and R+0x40790,
+list indices 7 and 8. They select matrix slot 1, walk +0x18 links, load each
+resource's +0x34 matrix, and dispatch rendering helpers. Their bodies do not
+select slot 3, but their transitive renderer effects have not all been proved.
+Do not elevate this direct-body observation into complete slot-3 preservation.
+
+`0x140a5e9b0..0x140a5ee7f` drains 0x60-byte records from a separate global
+queue. For type 1 or 2 it saves the current matrix, selects slot 2 for an affine
+transform, then slot 3 for two homogeneous transforms, and selects slot 1 before
+popping. It divides by W and explicitly maps X/Y with 640/480 constants. The
+second point is the first transformed point shifted by one along its first
+component, used to scale the output record. It does not call the earlier
+composite-with-viewport helper. It submits through `0x140f36a70`; no final
+visibility or HUD ownership follows from this. Stack capacity and incoming-slot
+assumptions remain relevant. The body reads slot 3; complete preservation
+through all called submission/render functions remains open.
+
+This creates a useful offline tooling boundary: replay the established
+actor-linked two-point primitive from matrices copied together at its stage.
+Keep the later queue path separate, retain actor/transform/pass identities as
+independent metadata, and report only native trivial-rejection results. A replay
+cannot certify capture timing, audible pass choice or visible fighter position.
+
+Validation for this increment: audit/manifest generation exited 0 with 58
+spans; `python tools/test_pws2_actor_audit.py` exited 0 with all six tests
+passing; `git diff --check` exited 0. No runtime source change, DLL build,
+deployment, attachment, live capture or listening check occurred.

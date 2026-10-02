@@ -82,6 +82,56 @@
     "affine_helper": "0x140f31c60",
     "scope": "affine and two-point homogeneous projection established; pass identity unresolved"
   },
+  "transform_records": {
+    "base": "0x51d58",
+    "stride": "0x308",
+    "count": 4,
+    "copied_matrix_offset": "0x38",
+    "rewritten_matrix_offset": "0x78",
+    "vector_a_offset": "0xc8",
+    "vector_b_offset": "0xf8",
+    "optional_basis_rotation_dword": "0x180",
+    "ordinary_copy_pairs": [
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        3
+      ]
+    ],
+    "alternate_copy_pairs": [
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        3
+      ]
+    ],
+    "ordinary_updated_records": [
+      0
+    ],
+    "alternate_updated_records": [
+      0,
+      1
+    ],
+    "copy_bytes": "0x308",
+    "index_bytes_rewritten": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "update_call": "0x140a48d9d",
+    "scope": "transform records, not participant records; mode branch and visible camera ownership unassigned"
+  },
   "projection": {
     "primitive": "0x140f37ca0",
     "homogeneous_helper": "0x140f31d10",
@@ -343,6 +393,96 @@
       "start": "0x140a5d8b0",
       "end_exclusive": "0x140a5d94e",
       "sha256": "cc50e19898c05dc06b64e10d73597dce5c9d56f5ff9a94bb8c43d3243cd3e795"
+    },
+    {
+      "label": "later-list-seven-draw",
+      "start": "0x140a5dc80",
+      "end_exclusive": "0x140a5de6d",
+      "sha256": "63569bd7293b7e1ece3806620b84c3969f9fb47c1b7fd0cd0b02bba1219fc7cc"
+    },
+    {
+      "label": "later-list-eight-draw",
+      "start": "0x140a5de70",
+      "end_exclusive": "0x140a5e05d",
+      "sha256": "0867ed7ff0ee1e897151775753c1e1b8874042d69f9d420e105907925bb99040"
+    },
+    {
+      "label": "later-projected-record-queue",
+      "start": "0x140a5e9b0",
+      "end_exclusive": "0x140a5ee7f",
+      "sha256": "58f18fdf0583faf1036b888e878e530d0a2776f6d9f8986e5ec93c761b9488e8"
+    },
+    {
+      "label": "four-transform-record-initialize",
+      "start": "0x140a5bb10",
+      "end_exclusive": "0x140a5bbd2",
+      "sha256": "97008afc67fff2eac678690c3ae9cad9c3534ea322a626ca7521ba36e7aea9e9"
+    },
+    {
+      "label": "transform-vector-pair-adjustment",
+      "start": "0x140a5b520",
+      "end_exclusive": "0x140a5b728",
+      "sha256": "bc4d12ee3363fc5571a0af7ad8ea03cfea68cc031aca26e9a65e4a9bbcf719f7"
+    },
+    {
+      "label": "transform-record-matrix-writer",
+      "start": "0x140a5bbe0",
+      "end_exclusive": "0x140a5bca4",
+      "sha256": "ab392403036a5d5a52f2de33624c3dd35d45861221a2e61dbb44d63c8743be97"
+    },
+    {
+      "label": "transform-record-mode-dispatch",
+      "start": "0x140a5ba60",
+      "end_exclusive": "0x140a5bb07",
+      "sha256": "c336a9fbadc10dbb64fac2aef40082813dae2e674e151c55041b7c59be68722d"
+    },
+    {
+      "label": "transform-record-update-and-copy",
+      "start": "0x140a5bcb0",
+      "end_exclusive": "0x140a5bed7",
+      "sha256": "3b2acb293d65f0cbfc14a275801a883c642e8d1ed3770136c632961796d71859"
+    },
+    {
+      "label": "shared-two-vector-basis-construction",
+      "start": "0x140f324d0",
+      "end_exclusive": "0x140f326d9",
+      "sha256": "45eefd731addbc66cc9f1760ba7a64f7fd232903f1f9fa41100138e67d72caab"
+    },
+    {
+      "label": "shared-three-component-dot-product",
+      "start": "0x140f33780",
+      "end_exclusive": "0x140f337a5",
+      "sha256": "d9dba88696b4f17f15617eb2dd1b2e39713da0d0225f4e2130e0efc0931c0779"
+    },
+    {
+      "label": "shared-three-component-cross-product",
+      "start": "0x140f33890",
+      "end_exclusive": "0x140f338e6",
+      "sha256": "df9ec22c35f4f0da239a7a0f91e2e86c4956227e1a44e53252f4293cfa7e338e"
+    },
+    {
+      "label": "shared-square-root-finite-path",
+      "start": "0x140fd661c",
+      "end_exclusive": "0x140fd66c7",
+      "sha256": "7eb486973e1d943a0ac1cb5d36a37ef5bceb71bbba15adc2b10780dcdcae0913"
+    },
+    {
+      "label": "shared-row-length-transpose-transform",
+      "start": "0x140f32190",
+      "end_exclusive": "0x140f32437",
+      "sha256": "e9f5a5babea43bfd4a140d5a854cc6654e7e5d87e6ad2360ada84bac0ac157ae"
+    },
+    {
+      "label": "shared-low16-table-lookup-a",
+      "start": "0x140f302d0",
+      "end_exclusive": "0x140f302e0",
+      "sha256": "d802a3fa857cafae92d61fc6f2d6770f1984cce9998d9ebe24aef88665eeecfe"
+    },
+    {
+      "label": "shared-low16-table-lookup-b",
+      "start": "0x140f302f0",
+      "end_exclusive": "0x140f30300",
+      "sha256": "75ac1c8327168ceedcd2998b5bd16a54f4c761e7fc79e5acf57acde65708b14d"
     },
     {
       "label": "draw-four-records-prefix",

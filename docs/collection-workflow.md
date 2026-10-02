@@ -10,7 +10,7 @@ probe from `21da6ff` remains staged only, with no deployment/live result.
 Shared runtime integration and arena/four-player proof remain incomplete.
 
 The [initial PWS2 record/input trace](pws2-actor-trace.md) starts the independent
-four-player investigation. It retains forty-three spans and six passing offline
+four-player investigation. It retains fifty-eight spans and six passing offline
 tests. Four fixed records, a filtered list, conditional indexed input routing
 and variable processing order are established; controller/HUD
 ownership, gameplay field semantics and live observations remain open.
@@ -816,3 +816,24 @@ check occurred. Other suites were not rerun for this isolated trace increment.
 Next: follow the three later draw helpers and their matrix preservation, then
 the indexed transform-record writers. Actor callback publication, HUD ownership,
 ordinary-pass entry values and audible-perspective selection remain open.
+
+## PWS2 transform-production continuation — 2026-10-02
+
+Continued from clean `bad08f5`. The [PWS2 trace](pws2-actor-trace.md) now
+retains 58 spans. Transform records begin at R+0x51d58; the drawing matrix
+is at record+0x38. Ordinary updates build record 0, alternate updates build
+0/1, and subsequent 0x308-byte copies replicate 0 to 2 and 1 to 3 (plus
+0 to 1 on the ordinary branch). Transform identity is independent of actor
+identity. Phase gates can skip matrix updates while allowing drawing.
+
+The matrix writer adjusts two local vectors, constructs a basis and optional
+table-driven rotation, stores the drawing matrix and rewrites a separate copy.
+The later queue projects via slots 2/3 without the earlier viewport-composite
+helper. The other two later draws walk lists 7/8. Their complete transitive
+matrix preservation remains unproved; the main-pass matrix must still be
+observed at its own stage.
+
+Validation: audit/manifest generation exited 0; all six PWS2 audit tests passed;
+`git diff --check` exited 0. No runtime source changed, DLL build, deployment,
+attachment, live capture or audible proof. This evidence supports bounded
+offline projection tooling, not a production camera/participant adapter.
