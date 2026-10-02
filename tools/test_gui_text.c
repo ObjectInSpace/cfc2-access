@@ -2227,6 +2227,42 @@ int main(void)
             check("54. a blanked mate leaves no dangling separator",
                   ok && !trailing, d);
         }
+
+        /* case 55: ⭐⭐ A 7-ROW PAUSE MENU HAS AN 8TH, BLANKED, POOLED LABEL.
+         * Real layout, run 2026-09-11 15:17: seven labels at x=362 plus " " at
+         * y=785 -- the slot the 8-row variant fills with "Quit". Counted, the
+         * column read 8 against the cursor's 7 and the CVS2 intro's pause
+         * menu spoke bare positions. Planted in SCRAMBLED order so a lookup by
+         * insertion order cannot pass. */
+        {
+            static unsigned char pm[8][GT_CLASS_SIZE];
+            void *Q = (void *)0x2BBEB930ULL;      /* the real screen pointer */
+            static const float PY[8] = { 785.f, 465.f, 225.f, 705.f,
+                                         305.f, 625.f, 545.f, 385.f };
+            static const char *const PT[8] = {
+                " ", "Controller Settings", "Resume", "Quit", "Marquee Card",
+                "Change Character", "Display & Sound Settings", "Move List"
+            };
+            const float px = 362.f;
+            for (int i = 0; i < 8; i++) {
+                memset(pm[i], 0, sizeof pm[i]);
+                *(ULONGLONG *)pm[i] = GT_VTABLE_ADDR;
+                memcpy(pm[i] + 0x40, &px, sizeof(float));
+                memcpy(pm[i] + 0x44, &PY[i], sizeof(float));
+                memcpy(pm[i] + 0x88, &Q, sizeof(void *));
+                gt_test_settext_body(pm[i], PT[i], NULL, 0);
+            }
+            int n = gt_column_count(Q, px);
+            char first[64] = { 0 }, last[64] = { 0 };
+            BOOL ok1 = gt_column_item(Q, px, -1.f, 1, first, sizeof first);
+            BOOL ok7 = gt_column_item(Q, px, -1.f, 7, last, sizeof last);
+            char d[200];
+            snprintf(d, sizeof d, "column count %d (want 7); row 1 \"%s\", "
+                     "row 7 \"%s\"", n, first, last);
+            check("55. a blanked pooled slot is not counted as a row",
+                  n == 7 && ok1 && strcmp(first, "Resume") == 0 &&
+                  ok7 && strcmp(last, "Quit") == 0, d);
+        }
     }
 
     mem_guard_remove();

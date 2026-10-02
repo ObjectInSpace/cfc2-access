@@ -2579,6 +2579,21 @@ static int widgets_of(const void *screen, float want_x, gt_widget *out, int cap)
 
         if (!o || ((ULONG_PTR)o & 7u) || !g_inst[i].text[0])
             continue;
+        /* ⭐⭐ A WHITESPACE-ONLY LABEL IS A POOLED SLOT, NOT A WIDGET. The game
+         * keeps one object per possible row and BLANKS the unused ones to " "
+         * instead of destroying them. Measured: every 7-row pause menu in five
+         * runs (2026-09-11) held 8 objects at x=362, the 8th a " " at y=785 --
+         * exactly where the 8-row variant draws "Quit". Counted, it made the
+         * CVS2 intro's pause menu read 8 labels against 7 rows and speak bare
+         * positions. Dropping blanks cannot misname a row: a real row that was
+         * blank would make the count disagree, and the caller refuses. */
+        {
+            const char *q = g_inst[i].text;
+            while (*q == ' ' || *q == '\t' || *q == '\r' || *q == '\n')
+                q++;
+            if (!*q)
+                continue;
+        }
         if (mem_readable_run(o, sizeof(vptr)) < sizeof(vptr))
             continue;
         MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)o);

@@ -1426,9 +1426,12 @@ static const mc_screen g_screens[] = {
      * variant, no count and no map. The same reasoning that made Game Settings
      * work across eight games: the row sets differ, the geometry does not.
      *
-     * ⚠ Five snapshots held a BLANK row in that column. A blank still counts,
-     * so the count guard passes and the blank row alone falls back to a bare
-     * position -- a degraded row, never a misnamed one.
+     * ⛔ Five snapshots held a BLANK " " in that column, and this comment
+     * once said a blank "still counts, so the count guard passes". Wrong: the
+     * blank is the unused 8th POOLED slot (always y=785, where the 8-row
+     * variant draws Quit), so every 7-row menu read 8 labels against 7 rows
+     * and was refused -- the CVS2 intro's pause menu spoke bare positions.
+     * widgets_of() now drops whitespace-only labels; case 55 pins it.
      *
      * ⚠ g_pause_menu_rows / g_training_pause_rows are KEPT as the offline
      * expectation that tools/test_screen_maps.py validates against the corpus;
