@@ -6,7 +6,8 @@ fallback via UniversalSpeech.
 
 This is an active research project — the mod works for the MTFramework shell
 (menus, move lists, training) and in-game support is under active development.
-See [CLAUDE.md](CLAUDE.md) for full technical detail and current status.
+Full technical detail and current status are in the source repository:
+https://github.com/ObjectInSpace/cfc2-access
 
 ## Install
 
@@ -16,7 +17,12 @@ See [CLAUDE.md](CLAUDE.md) for full technical detail and current status.
 
 The four files are `dinput8.dll` (the mod itself), `UniversalSpeech.dll` (the
 speech layer), `nvdaControllerClient.dll` (NVDA), and `ZDSRAPI.dll` (ZDSR).
-Nothing else needs installing.
+Nothing else needs installing, and there is nothing to switch on: every
+feature below is active as soon as the game starts. The two UniversalSpeech
+licence files are included for reference and do not need copying.
+
+If you installed an earlier version, any `cfc2_audio.on` or `cfc2_guitext.on`
+files left in the game folder are now ignored and can be deleted.
 
 ⚠ **Copy all of them, not just `dinput8.dll`.** UniversalSpeech loads
 `nvdaControllerClient.dll` by that exact name, and without it speech **silently
@@ -58,17 +64,18 @@ side is which.
 - MTFramework shell (menus, options, move lists): working.
 - CVS2 in-game: working — character select speech, health and super gauges,
   position beacons, and the round clock.
+- CVS2 text: new in this version and **not yet tested in play** — win quotes,
+  story pages, credits and on-screen prompts are spoken, and the **`` ` ``**
+  key (the key left of 1) reads the current text again. In the menus it
+  repeats the last thing the mod said.
 - The other seven arcade games (CVS1, CFJ, Z3U, PWS1, PWS2, MJUS, STG2):
-  in progress — see `docs/` for design notes.
-
-The [collection port plan](docs/collection-port-plan.md) inventories the CVS2
-features, assesses each game's applicability, and stages the remaining work.
-Its [shared architecture](docs/collection-port-architecture.md) keeps speech,
-text, audio, settings and lifecycle behavior common while isolating traced
-game/ROM differences. The plan is not a claim that the seven ports are implemented.
-The [Astra-to-Opus workflow](docs/collection-workflow.md) defines investigation,
-implementation handoffs, and review checkpoints.
+  in progress, not yet playable with the mod. The plan for porting the CVS2
+  features to them is in `docs/collection-port-plan.md` in the repository.
 
 ## Source
 
-Source, build script (`build.ps1`), and design docs are in this repository.
+Source, build script (`build.ps1`), and design docs are in the repository:
+https://github.com/ObjectInSpace/cfc2-access
+
+`.\build.ps1 -Deploy` builds and copies the mod into the game folder;
+`.\build.ps1 -Package 0.3.0` builds the release zip from a clean checkout.

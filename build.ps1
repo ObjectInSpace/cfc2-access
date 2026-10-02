@@ -2,7 +2,8 @@
 # Usage:
 #   .\build.ps1            # build only
 #   .\build.ps1 -Deploy    # build + copy into the game folder
-param([switch]$Deploy)
+#   .\build.ps1 -Package 0.3.0   # build + build\cfc2-access-v0.3.0.zip
+param([switch]$Deploy, [string]$Package)
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
@@ -44,18 +45,40 @@ New-Item -ItemType Directory -Force -Path "$root\build" | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 Write-Host "Built build\dinput8.dll"
 
+# nvdaControllerClient.dll is REQUIRED for NVDA output: UniversalSpeech
+# loads it by that exact (unsuffixed) name and silently falls back to SAPI5
+# if it is absent. ZDSRAPI.dll likewise backs the ZDSR reader.
+# ⚠ Deploy and Package share this ONE list. Both earlier release zips were
+# packed by hand and each was missing something a player needed.
+$payload = @('UniversalSpeech.dll',
+             'nvdaControllerClient.dll',
+             'ZDSRAPI.dll',
+             'UniversalSpeech-LICENSE.txt',
+             'UniversalSpeech-LICENSE-notice.txt')
+
 if ($Deploy) {
     if (-not (Test-Path $gameDir)) { throw "Game dir not found: $gameDir" }
     Copy-Item "$root\build\dinput8.dll" $gameDir -Force
-    # nvdaControllerClient.dll is REQUIRED for NVDA output: UniversalSpeech
-    # loads it by that exact (unsuffixed) name and silently falls back to SAPI5
-    # if it is absent. ZDSRAPI.dll likewise backs the ZDSR reader.
-    foreach ($name in @('UniversalSpeech.dll',
-                        'nvdaControllerClient.dll',
-                        'ZDSRAPI.dll',
-                        'UniversalSpeech-LICENSE.txt',
-                        'UniversalSpeech-LICENSE-notice.txt')) {
-        Copy-Item "$root\libs\$name" $gameDir -Force
-    }
+    foreach ($name in $payload) { Copy-Item "$root\libs\$name" $gameDir -Force }
     Write-Host "Deployed to $gameDir"
+}
+
+if ($Package) {
+    # A release must be reproducible from a commit, so refuse a dirty tree.
+    $dirty = git -C $root status --porcelain
+    if ($dirty) { throw "Refusing to package: working tree has uncommitted changes" }
+    $commit = git -C $root rev-parse --short HEAD
+    $name = "cfc2-access-v$Package"
+    $stage = "$root\build\$name"
+    $zip = "$root\build\$name.zip"
+    if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
+    if (Test-Path $zip) { Remove-Item -Force $zip }
+    New-Item -ItemType Directory -Path $stage | Out-Null
+    Copy-Item "$root\build\dinput8.dll" $stage
+    foreach ($f in $payload) { Copy-Item "$root\libs\$f" $stage }
+    Copy-Item "$root\README.md" $stage
+    Set-Content -Path "$stage\VERSION.txt" -Value "CFC2 Access v$Package, commit $commit"
+    Compress-Archive -Path $stage -DestinationPath $zip
+    Remove-Item -Recurse -Force $stage
+    Write-Host "Packaged $zip (commit $commit)"
 }
