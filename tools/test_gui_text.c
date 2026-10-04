@@ -642,11 +642,19 @@ int main(void)
     /* --- case 19: the recorder does not go blind when full ---------------
      * ⛔ FROM A REAL RUN. GT_FOCUS_MAX records, then nothing: every later
      * screen silently missing. The 22:50 session did not hit the cap only
-     * because it ended after 40 s. The report clears its window, so the
-     * recorder must accept new records afterwards.
+     * because it ended after 40 s.
      *
-     * ⚠ Asserted by overfilling and then checking a NEW string still lands --
-     * "dropped > 0" alone would pass with a permanently dead recorder. */
+     * ⛔⛔ AND THIS CASE HID THE SAME BUG FOR A SECOND TIME. It used to call
+     * gt_test_focus_clear() "to simulate what the report does" -- but the
+     * report only runs under cfc2_guitext_diag.on. Once speech and diagnostics
+     * were split (2026-10-02), NOTHING emptied the record in shipping play,
+     * and the quit prompts went silent ("sometimes the confirm quit yes/no
+     * prompts are not reading") while this case stayed green: the harness
+     * supplied the very step that no longer happened.
+     *
+     * ⭐ So: overfill with NO clear, and a NEW string must still land. The
+     * recorder evicts its oldest. "dropped > 0" alone would pass with a
+     * permanently dead recorder. */
     {
         gt_test_reset();
         gt_test_focus_enable();
@@ -663,20 +671,30 @@ int main(void)
         long r_full = -1, m_full = -1;
         gt_focus_conclusive(&r_full, &m_full);
 
-        /* Simulate what the report does: clear the window. */
-        gt_test_focus_clear();
-
+        /* ⚠ NO clear here -- shipping play has none. */
         gt_note_focus_move();
         gt_test_settext_body(obj, "Play offline.", NULL, 0);
         char cap[GT_CAPTION_MAX] = { 0 };
         BOOL got = gt_take_caption(cap, (int)sizeof cap);
 
-        char d[220];
+        /* And the newest-prose reader must see it too: it once keyed on the
+         * record INDEX, which stops rising when the record is full. */
+        char nw[GT_CAPTION_MAX] = { 0 };
+        gt_test_settext_body(obj, "Encounter Shin Akuma.", NULL, 0);
+        BOOL got_new = gt_newest_prose_if_new(nw, (int)sizeof nw);
+        gt_test_settext_body(obj, "A second hint.", NULL, 0);
+        char nw2[GT_CAPTION_MAX] = { 0 };
+        BOOL got_new2 = gt_newest_prose_if_new(nw2, (int)sizeof nw2);
+
+        char d[400];
         snprintf(d, sizeof d,
-                 "at cap: records=%ld (max %d); after clear: got=%d cap=\"%s\"",
-                 r_full, 48, got, cap);
-        check("case 19: the recorder accepts records again after a report",
-              r_full == 48 && got && strcmp(cap, "Play offline.") == 0, d);
+                 "at cap: records=%ld (max %d); no clear: got=%d cap=\"%s\"; "
+                 "newest: %d \"%s\" then %d \"%s\"",
+                 r_full, 48, got, cap, got_new, nw, got_new2, nw2);
+        check("case 19: a FULL recorder still takes new strings, with no clear",
+              r_full == 48 && got && strcmp(cap, "Play offline.") == 0 &&
+              got_new && strcmp(nw, "Encounter Shin Akuma.") == 0 &&
+              got_new2 && strcmp(nw2, "A second hint.") == 0, d);
     }
 
     /* --- case 20: the INSTANCE SET is keyed by OBJECT, not by string -------

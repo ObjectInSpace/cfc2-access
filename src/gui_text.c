@@ -164,10 +164,16 @@ typedef struct {
     void     *self;
     LONG      move_seq;     /* value of g_move_seq when this arrived */
     int       which;        /* which of the four overloads fired */
+    LONG      serial;       /* arrival number, unique per record (1, 2, ...) */
 } gt_focus_rec;
 static gt_focus_rec  g_focus[GT_FOCUS_MAX];
 static volatile LONG g_focus_count;
+/* ⭐ EVICTIONS: the oldest record dropped to make room for a new one. See the
+ * append in settext_body() for why the recorder must never refuse instead. */
 static volatile LONG g_focus_dropped;
+/* Last serial handed out. Written only by the render-thread append, under
+ * g_focus_busy. */
+static LONG          g_focus_serial;
 static volatile LONG g_focus_busy;
 /* Stamped by gt_note_focus_move() from the cursor hook. Never read as a
  * timestamp -- only compared for equality/order. */
@@ -518,22 +524,41 @@ static void *settext_body(int which, pfn_settext real, void *self,
                     BOOL dup = (n > 0 &&
                                 strcmp(g_focus[n - 1].text, buf) == 0);
                     if (!dup) {
-                        if (n < GT_FOCUS_MAX) {
-                            /* memcpy + explicit terminator: `buf` is already
-                             * NUL-terminated and the same size, so strncpy's
-                             * truncation warning is about a case that cannot
-                             * arise -- but silencing a warning by ignoring it
-                             * is how a real one gets missed later. */
-                            memcpy(g_focus[n].text, buf, GT_TEXT_MAX - 1);
-                            g_focus[n].text[GT_TEXT_MAX - 1] = 0;
-                            g_focus[n].self = self;
-                            g_focus[n].move_seq = g_move_seq;
-                            g_focus[n].which = which;
-                            /* Publish the count last. */
-                            InterlockedExchange(&g_focus_count, n + 1);
-                        } else {
+                        /* ⛔⛔ WHEN FULL, EVICT THE OLDEST -- never refuse the
+                         * newest.
+                         *
+                         * USER-REPORTED: "sometimes the confirm quit yes/no
+                         * prompts are not reading." This used to drop every
+                         * string once 48 were held, and the ONLY thing that
+                         * emptied the record was gt_focus_report(), which runs
+                         * only under cfc2_guitext_diag.on. Splitting speech
+                         * from diagnostics (2026-10-02) left shipping play with
+                         * nothing to empty it: ~48 distinct strings into a
+                         * session the record went blind for good, and the quit
+                         * prompt, the hints view and per-row captions with it.
+                         *
+                         * ⭐ Readers want the NEWEST strings, so the oldest is
+                         * what goes. ~13 KB moved per NEW distinct string,
+                         * which arrive at human speed, not per frame. */
+                        if (n >= GT_FOCUS_MAX) {
+                            memmove(&g_focus[0], &g_focus[1],
+                                    sizeof(g_focus[0]) * (GT_FOCUS_MAX - 1));
+                            n = GT_FOCUS_MAX - 1;
                             InterlockedIncrement(&g_focus_dropped);
                         }
+                        /* memcpy + explicit terminator: `buf` is already
+                         * NUL-terminated and the same size, so strncpy's
+                         * truncation warning is about a case that cannot
+                         * arise -- but silencing a warning by ignoring it
+                         * is how a real one gets missed later. */
+                        memcpy(g_focus[n].text, buf, GT_TEXT_MAX - 1);
+                        g_focus[n].text[GT_TEXT_MAX - 1] = 0;
+                        g_focus[n].self = self;
+                        g_focus[n].move_seq = g_move_seq;
+                        g_focus[n].which = which;
+                        g_focus[n].serial = ++g_focus_serial;
+                        /* Publish the count last. */
+                        InterlockedExchange(&g_focus_count, n + 1);
                     }
                     InterlockedExchange(&g_focus_busy, 0);
                 }
@@ -839,9 +864,16 @@ void gt_test_focus_clear(void) { g_focus_count = 0; }
  * movement-stamped channel is structurally blind to them. */
 BOOL gt_prose_at(int nth, char *out, int outlen)
 {
+    return gt_prose_serial_at(nth, out, outlen, NULL);
+}
+
+BOOL gt_prose_serial_at(int nth, char *out, int outlen, LONG *serial)
+{
     BOOL got = FALSE;
     int  seen = 0;
 
+    if (serial)
+        *serial = 0;
     if (!out || outlen <= 0 || nth < 0)
         return FALSE;
     out[0] = '\0';
@@ -861,6 +893,8 @@ BOOL gt_prose_at(int nth, char *out, int outlen)
                 continue;
             strncpy(out, g_focus[i].text, (size_t)outlen - 1);
             out[outlen - 1] = '\0';
+            if (serial)
+                *serial = g_focus[i].serial;
             got = TRUE;
             break;
         }
@@ -926,9 +960,14 @@ BOOL gt_take_caption(char *out, int outlen)
  *
  * ⚠ Returns FALSE when nothing has arrived since the last call, which is the
  * normal case on every poll. */
+/* ⛔ KEYED ON THE ARRIVAL SERIAL, NOT THE RECORD INDEX. The index stops rising
+ * once the record is full and evicts its oldest -- every new string then lands
+ * at the same last slot, and "index <= last taken" would call it seen forever.
+ * File-scope so gt_test_reset() can rewind it with the serial counter. */
+static LONG g_prose_taken_serial;
+
 BOOL gt_newest_prose_if_new(char *out, int outlen)
 {
-    static LONG last_taken = -1;
     BOOL got = FALSE;
 
     if (!out || outlen <= 0)
@@ -943,18 +982,14 @@ BOOL gt_newest_prose_if_new(char *out, int outlen)
         for (LONG i = n - 1; i >= 0; i--) {
             if (strchr(g_focus[i].text, '<') != NULL)
                 continue;           /* a hint strip is not the view's text */
-            if (i <= last_taken)
+            if (g_focus[i].serial <= g_prose_taken_serial)
                 break;              /* already handed out; nothing new */
             strncpy(out, g_focus[i].text, (size_t)outlen - 1);
             out[outlen - 1] = '\0';
-            last_taken = i;
+            g_prose_taken_serial = g_focus[i].serial;
             got = TRUE;
             break;
         }
-        /* ⚠ The record can be cleared or rewound; never hold an index past its
-         * end or a later arrival at that slot would be treated as seen. */
-        if (last_taken >= n)
-            last_taken = n - 1;
     }
     InterlockedExchange(&g_focus_busy, 0);
     return got;
@@ -1911,7 +1946,8 @@ void gt_focus_report(void)
     }
 
     log_line("gt: === FOCUS RECORD: %ld distinct string(s) across %ld cursor "
-             "movement(s), %ld dropped (buffer full) ===", n, notes, dropped);
+             "movement(s), %ld oldest evicted to make room ===", n, notes,
+             dropped);
 
     {
         LONG with_move = 0;      /* strings that arrived after a movement */
@@ -3591,6 +3627,8 @@ void gt_test_reset(void)
         g_inst[i].move_seq = 0; g_inst[i].sets = 0;
     }
     g_focus_count = 0; g_focus_dropped = 0; g_focus_busy = 0;
+    g_focus_serial = 0;
+    g_prose_taken_serial = 0;
     g_move_seq = 0; g_move_notifications = 0;
     for (int i = 0; i < GT_FOCUS_MAX; i++) {
         g_focus[i].text[0] = 0;

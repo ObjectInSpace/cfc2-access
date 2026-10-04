@@ -3994,9 +3994,26 @@ void menu_speak_test_set_modal_resolver(BOOL (*fn)(int, char *, unsigned))
 
 void menu_speak_check_modal(void)
 {
-    static char last[GT_CAPTION_MAX];
+    /* ⭐⭐ WHICH APPEARANCE was last announced, and with which option.
+     *
+     * ⛔ USER-REPORTED: "sometimes the confirm quit yes/no prompts are not
+     * reading." This used to key on the prompt TEXT and re-arm only when no
+     * prompt was left in the focus record. But the record is a HISTORY: a
+     * closed dialog's prompt stays in it. Open "Exit the game?", answer No,
+     * open it again (the 22:28 run did exactly this at move 12) -- the old
+     * prompt never left, the guard never re-armed, and the second appearance
+     * matched the first and was silent. It only ever worked while the
+     * diagnostic report happened to be emptying the record.
+     *
+     * ⭐ Each opening sets the prompt afresh (prompt, Yes, No -- once per
+     * opening, measured in the 22:28 and 15:17 runs), and a fresh set is a new
+     * record with a new ARRIVAL SERIAL. So a new serial is a new appearance,
+     * whether or not the text matches the last one. */
+    static LONG last_serial;
+    static int  last_sel = -2;
     char text[GT_CAPTION_MAX];
     char flat[GT_CAPTION_MAX];
+    LONG serial = 0;
 
     /* ⛔⛔ SCAN FOR A MATCH, DO NOT TAKE THE NEWEST.
      *
@@ -4014,16 +4031,17 @@ void menu_speak_check_modal(void)
     int at = -1;
     {
         int i;
-        for (i = 0; gt_prose_at(i, text, (int)sizeof(text)); i++) {
+        for (i = 0; gt_prose_serial_at(i, text, (int)sizeof(text), &serial);
+             i++) {
             if (menu_speak_is_modal_prompt(text, modal_resolve)) {
                 at = i;
                 break;
             }
         }
         if (at < 0) {
-            /* ⚠ Nothing on screen is a prompt: clear the guard so the same
-             * dialog opened again speaks again. */
-            last[0] = '\0';
+            /* No prompt in the record at all (evicted, or never seen). */
+            last_serial = 0;
+            last_sel = -2;
             return;
         }
     }
@@ -4046,19 +4064,20 @@ void menu_speak_check_modal(void)
     BOOL prompt_is_new;
     {
         int sel = -1;
-        char key[GT_CAPTION_MAX];
-        (void)gt_modal_selection(&sel);
-        /* `last` holds "<index>|<prompt>"; compare the prompt half alone to
-         * tell "a new dialog" from "the same dialog, other option". */
-        const char *bar = strchr(last, '|');
-        prompt_is_new = !bar || strcmp(bar + 1, text) != 0;
+        BOOL have_sel = gt_modal_selection(&sel);
 
-        _snprintf(key, sizeof(key), "%d|%s", sel, text);
-        key[sizeof(key) - 1] = '\0';
-        if (strcmp(last, key) == 0)
-            return;                     /* same prompt AND same option */
-        _snprintf(last, sizeof(last), "%s", key);
-        last[sizeof(last) - 1] = '\0';
+        prompt_is_new = (serial != last_serial);
+        if (!prompt_is_new) {
+            /* ⚠ The same appearance: speak only a READABLE change of option.
+             * An unreadable selection here is most likely the dialog having
+             * closed (its "Yes" object gone) with the prompt still in the
+             * history -- announcing "Yes or No" then would talk about a dialog
+             * that is no longer there. */
+            if (!have_sel || sel == last_sel)
+                return;
+        }
+        last_serial = serial;
+        last_sel = sel;
     }
 
     /* ⭐ The prompt only when it is NEW; otherwise the line starts empty and

@@ -455,6 +455,15 @@ void gt_note_focus_move(void);
  * item -- that is the timing join gt_take_caption() exists to refuse. */
 BOOL gt_prose_at(int nth, char *out, int outlen);
 
+/* gt_prose_at(), plus the record's ARRIVAL NUMBER (unique, increasing; 0 when
+ * nothing is returned).
+ *
+ * ⭐ The record is a HISTORY, not the screen: a closed dialog's prompt stays in
+ * it until evicted. A dialog re-opened sets its prompt again, which arrives as
+ * a NEW record with a NEW serial -- that is how a caller tells "opened again"
+ * from "still the old one", without needing the record to be emptied. */
+BOOL gt_prose_serial_at(int nth, char *out, int outlen, LONG *serial);
+
 /* ⭐⭐ The newest prose, and ONLY IF IT HAS ARRIVED SINCE THE LAST CALL.
  *
  * ⛔ For a view that produces NO cursor movement, where gt_take_caption()'s
