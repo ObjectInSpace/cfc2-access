@@ -186,8 +186,8 @@ typedef struct {
 
 /* Voice slots: the gauge voices first, then the two PERSISTENT BEACONS.
  * Beacons occupy fixed slots at the end so the mix loop stays uniform. */
-#define BEACON_VOICE(p)  (AUDIO_GAUGE_COUNT * 2 + (p))
-#define VOICE_COUNT      (AUDIO_GAUGE_COUNT * 2 + 2)
+#define BEACON_VOICE(p)  (AUDIO_GAUGE_COUNT * AUDIO_PARTICIPANTS + (p))
+#define VOICE_COUNT      (AUDIO_GAUGE_COUNT * AUDIO_PARTICIPANTS + AUDIO_PARTICIPANTS)
 static voice g_voice[VOICE_COUNT];
 
 /* Per-gauge tone character. Timbre identifies the gauge, so these must stay
@@ -301,15 +301,15 @@ static const gauge_tone g_tone[AUDIO_GAUGE_COUNT] = {
  *   rate = how often the pluck repeats (a few Hz)
  * P1 is higher and faster, P2 lower and slower: two cues agreeing, so the
  * players stay distinct even if one axis is masked by game audio. */
-static const float g_beacon_tone[2] = { 700.0f, 470.0f };
-static const float g_beacon_rate[2] = { 9.0f, 6.2f };
+static const float g_beacon_tone[AUDIO_PARTICIPANTS] = { 700.0f, 470.0f, 930.0f, 330.0f };
+static const float g_beacon_rate[AUDIO_PARTICIPANTS] = { 9.0f, 6.2f, 12.7f, 4.3f };
 typedef struct {
     float pan;                          /* -1..+1, fighter's screen X        */
     float stance;                       /* pitch multiplier, see ladder      */
     BOOL  live;                         /* in a match: sound continuously    */
 } beacon_state;
 /* Defaults match the HUD placement so anything before a match is sensible. */
-static beacon_state g_beacon[2] = {
+static beacon_state g_beacon[AUDIO_PARTICIPANTS] = {
     { -0.85f, 1.0f, FALSE }, { 0.85f, 1.0f, FALSE }
 };
 
@@ -331,8 +331,9 @@ typedef struct {
     BOOL  seeded;
     int   hold;
     float level;                       /* 0..1, the gauge fill fraction */
+    float pan;
 } gauge_state;
-static gauge_state g_gauge[AUDIO_GAUGE_COUNT][2];
+static gauge_state g_gauge[AUDIO_GAUGE_COUNT][AUDIO_PARTICIPANTS];
 
 /* ⛔ The lock must exist before the FIRST caller, not only after audio_init().
  * It was originally created in audio_init() alone, so when the device failed
@@ -344,7 +345,22 @@ static gauge_state g_gauge[AUDIO_GAUGE_COUNT][2];
  *
  * InitOnceExecuteOnce, so concurrent first-callers cannot race. */
 static CRITICAL_SECTION g_lock;
+static volatile LONG g_scene_owned;
+static BOOL g_scene_running, g_scene_pending, g_scene_reset;
+static uint64_t g_scene_epoch, g_scene_sequence;
+static BOOL g_scene_has_sequence;
+static ULONGLONG g_scene_received;
+static audio_scene g_scene;
+static audio_scene_participant g_scene_previous[AUDIO_PARTICIPANTS];
+static beacon_state g_scene_beacons[AUDIO_PARTICIPANTS];
 static INIT_ONCE g_lock_once = INIT_ONCE_STATIC_INIT;
+
+#ifdef AUDIO_SCENE_TEST
+extern ULONGLONG audio_scene_test_now(void);
+#define scene_now audio_scene_test_now
+#else
+#define scene_now GetTickCount64
+#endif
 
 static BOOL CALLBACK lock_init_cb(PINIT_ONCE o, PVOID p, PVOID *c)
 {
@@ -355,6 +371,125 @@ static BOOL CALLBACK lock_init_cb(PINIT_ONCE o, PVOID p, PVOID *c)
 static void lock_ensure(void)
 {
     InitOnceExecuteOnce(&g_lock_once, lock_init_cb, NULL, NULL);
+}
+
+BOOL audio_scene_begin(uint64_t epoch)
+{
+    lock_ensure();
+    EnterCriticalSection(&g_lock);
+    BOOL accepted = epoch && epoch > g_scene_epoch;
+    if (accepted) {
+        InterlockedExchange(&g_scene_owned, 1);
+        g_scene_epoch = epoch;
+        g_scene_running = TRUE;
+        g_scene_has_sequence = FALSE;
+        g_scene_pending = FALSE;
+        g_scene_received = 0;
+        g_scene_reset = TRUE;
+    }
+    LeaveCriticalSection(&g_lock);
+    return accepted;
+}
+
+static BOOL scene_valid(const audio_scene *s)
+{
+    for (unsigned p = 0; p < AUDIO_PARTICIPANTS; p++) {
+        const audio_scene_participant *a = &s->participants[p];
+        if (!a->present) continue;
+        if (a->beacon_valid && (!isfinite(a->screen_pan) ||
+            a->screen_pan < -1 || a->screen_pan > 1 ||
+            !isfinite(a->stance) || a->stance < 0.5f || a->stance > 2)) return FALSE;
+        for (int g = 0; g < AUDIO_GAUGE_COUNT; g++) {
+            const audio_scene_gauge *v = &a->gauges[g];
+            if (v->valid && (v->maximum <= 0 || v->value < 0 ||
+                v->value > v->maximum || !isfinite(v->hud_pan) ||
+                v->hud_pan < -1 || v->hud_pan > 1)) return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+BOOL audio_scene_publish(const audio_scene *scene)
+{
+    if (!scene) return FALSE;
+    /* Caller owns immutable input for this call. Copy only bounded value data. */
+    audio_scene next = *scene;
+    if (!scene_valid(&next)) return FALSE;
+    lock_ensure();
+    if (!TryEnterCriticalSection(&g_lock)) return FALSE;
+    BOOL accepted = g_scene_running && next.epoch == g_scene_epoch &&
+        (!g_scene_has_sequence || next.sequence > g_scene_sequence);
+    if (accepted) {
+        g_scene = next;
+        g_scene_sequence = next.sequence;
+        g_scene_has_sequence = TRUE;
+        g_scene_received = scene_now();
+        g_scene_pending = TRUE;
+    }
+    LeaveCriticalSection(&g_lock);
+    return accepted;
+}
+
+void audio_scene_stop(uint64_t epoch)
+{
+    lock_ensure();
+    EnterCriticalSection(&g_lock);
+    if (epoch && epoch == g_scene_epoch) {
+        g_scene_running = FALSE;
+        g_scene_pending = FALSE;
+        g_scene_reset = TRUE;
+    }
+    LeaveCriticalSection(&g_lock);
+}
+
+/* Mixer thread only, under g_lock. A full snapshot removes absent slots;
+ * participant/resource replacement seeds gauges without a false drain. */
+static void scene_consume(void)
+{
+    if (!g_scene_owned) return;
+    BOOL expired = scene_now() - g_scene_received >= AUDIO_SCENE_TTL_MS;
+    if (g_scene_reset || !g_scene_running || !g_scene_has_sequence ||
+        expired) {
+        memset(g_gauge, 0, sizeof g_gauge);
+        memset(g_scene_previous, 0, sizeof g_scene_previous);
+        memset(g_scene_beacons, 0, sizeof g_scene_beacons);
+        /* Voice oscillators belong to this thread. Reset here, never from a
+         * producer while a block is being rendered. Expiry prevents replay. */
+        if (g_scene_reset) memset(g_voice, 0, sizeof g_voice);
+        g_scene_reset = FALSE;
+        if (!g_scene_running || !g_scene_has_sequence ||
+            expired)
+            g_scene_pending = FALSE;
+    }
+    if (!g_scene_pending) return;
+    g_scene_pending = FALSE;
+    for (unsigned p = 0; p < AUDIO_PARTICIPANTS; p++) {
+        const audio_scene_participant *a = &g_scene.participants[p];
+        audio_scene_participant *old = &g_scene_previous[p];
+        BOOL replacement = !old->present || a->incarnation != old->incarnation;
+        g_scene_beacons[p] = (beacon_state){ a->screen_pan, a->stance,
+                                              a->present && a->beacon_valid };
+        for (int g = 0; g < AUDIO_GAUGE_COUNT; g++) {
+            gauge_state *st = &g_gauge[g][p];
+            const audio_scene_gauge *v = &a->gauges[g];
+            if (!a->present || !v->valid) {
+                memset(st, 0, sizeof *st);
+                continue;
+            }
+            if (replacement || !old->gauges[g].valid ||
+                old->gauges[g].generation != v->generation ||
+                old->gauges[g].maximum != v->maximum) {
+                st->seeded = FALSE;
+                st->hold = 0;
+            }
+            st->pan = v->hud_pan;
+            st->level = (float)v->value / (float)v->maximum;
+            if (st->seeded && st->last != v->value) st->hold = HOLD_BLOCKS;
+            st->last = v->value;
+            st->seeded = TRUE;
+        }
+        *old = *a;
+    }
 }
 
 /* ---- generators --------------------------------------------------------- */
@@ -497,7 +632,9 @@ void audio_gauge_set(audio_gauge g, unsigned player, int value, int maxv)
     lock_ensure();
 
     EnterCriticalSection(&g_lock);
+    if (g_scene_owned) { LeaveCriticalSection(&g_lock); return; }
     gauge_state *st = &g_gauge[g][player];
+    st->pan = (player == 0) ? -0.85f : 0.85f;
     float lvl = (float)value / (float)maxv;
     if (lvl < 0.0f) lvl = 0.0f;
     if (lvl > 1.0f) lvl = 1.0f;
@@ -522,6 +659,7 @@ void audio_gauge_reset(audio_gauge g, unsigned player)
     if ((int)g < 0 || g >= AUDIO_GAUGE_COUNT || player > 1) return;
     lock_ensure();
     EnterCriticalSection(&g_lock);
+    if (g_scene_owned) { LeaveCriticalSection(&g_lock); return; }
     g_gauge[g][player].seeded = FALSE;
     g_gauge[g][player].hold = 0;
     LeaveCriticalSection(&g_lock);
@@ -530,7 +668,7 @@ void audio_gauge_reset(audio_gauge g, unsigned player)
 void audio_gauge_reset_all(void)
 {
     for (int g = 0; g < AUDIO_GAUGE_COUNT; g++)
-        for (unsigned p = 0; p < 2; p++)
+        for (unsigned p = 0; p < AUDIO_PARTICIPANTS; p++)
             audio_gauge_reset((audio_gauge)g, p);
 }
 
@@ -549,7 +687,7 @@ void audio_gauge_reset_all(void)
  * nothing depends on their ordering against other state. */
 void audio_beacon_set(unsigned player, float pan, float stance)
 {
-    if (player > 1) return;
+    if (player > 1 || g_scene_owned || !isfinite(pan) || !isfinite(stance)) return;
     if (pan < -1.0f) pan = -1.0f;
     if (pan >  1.0f) pan =  1.0f;
     if (stance < 0.5f) stance = 0.5f;      /* keep it a musical multiplier */
@@ -565,7 +703,7 @@ void audio_beacons_off(void)
      * outside one there are no fighters to locate, and a tone droning over
      * the menus would be noise. Placement returns to the HUD default so a
      * new match does not start from the last one's position. */
-    for (unsigned p = 0; p < 2; p++) {
+    for (unsigned p = 0; p < AUDIO_PARTICIPANTS; p++) {
         g_beacon[p].live   = FALSE;
         g_beacon[p].stance = 1.0f;
         g_beacon[p].pan    = (p == 0) ? -0.85f : 0.85f;
@@ -583,10 +721,11 @@ BOOL audio_toggle_enabled(void)
 /* ---- mixer -------------------------------------------------------------- */
 static void update_voices(void)
 {
+    scene_consume();
     for (int g = 0; g < AUDIO_GAUGE_COUNT; g++) {
-        for (unsigned p = 0; p < 2; p++) {
+        for (unsigned p = 0; p < AUDIO_PARTICIPANTS; p++) {
             gauge_state *st = &g_gauge[g][p];
-            voice *v = &g_voice[g * 2 + p];
+            voice *v = &g_voice[g * AUDIO_PARTICIPANTS + p];
             const gauge_tone *t = &g_tone[g];
 
             v->timbre = t->timbre;
@@ -594,7 +733,7 @@ static void update_voices(void)
              * P2 bars right. This is deliberate and is NOT the fighter's
              * position -- the beacons carry that. Two layers, as on screen:
              * fixed UI chrome vs the moving world. */
-            v->pan = (p == 0) ? -0.85f : 0.85f;
+            v->pan = st->pan;
             /* Pitch rises with fill. */
             v->freq = t->f_lo + (t->f_hi - t->f_lo) * st->level;
 
@@ -620,18 +759,19 @@ static void update_voices(void)
      * a match is live it sounds continuously, because that is what makes it a
      * position channel rather than an event. Its pan and pitch simply track
      * whatever the frame hook last published. */
-    for (unsigned p = 0; p < 2; p++) {
+    for (unsigned p = 0; p < AUDIO_PARTICIPANTS; p++) {
         voice *v = &g_voice[BEACON_VOICE(p)];
+        beacon_state b = g_scene_owned ? g_scene_beacons[p] : g_beacon[p];
         v->timbre = 3;                         /* pluck -- see osc()        */
-        v->pan    = g_beacon[p].pan;
+        v->pan    = b.pan;
         /* ⚠ For the pluck, `freq` is the PULSE RATE, not a pitch: the
          * envelope and the partials are both generated from one phase ramp,
          * so the ramp must run at the repeat rate. Stance therefore raises
          * the TONE pitch and the repeat rate together, which reads naturally
          * as "higher". */
-        v->freq       = g_beacon_tone[p] * g_beacon[p].stance;
-        v->pulse_rate = g_beacon_rate[p] * g_beacon[p].stance;
-        if (g_beacon[p].live) {
+        v->freq       = g_beacon_tone[p] * b.stance;
+        v->pulse_rate = g_beacon_rate[p] * b.stance;
+        if (b.live) {
             /* Both beacons share ONE level: they are the same cue heard from
              * two sides, and turning one player down would make the pan
              * readout lie about which side is which. */
@@ -664,6 +804,7 @@ static volatile LONG g_tick_next;
 
 void audio_tick(void)
 {
+    if (g_scene_owned) return;
     LONG i = InterlockedIncrement(&g_tick_next) - 1;
     tick_voice *t = &g_tick[((unsigned)i) % TICK_SLOTS];
     t->phase = 0.0f;
@@ -747,6 +888,9 @@ static void render(int16_t *out)
          * fast decay on a mid frequency. */
         for (int ti = 0; ti < TICK_SLOTS; ti++) {
             tick_voice *t = &g_tick[ti];
+            /* Once the scene router owns output, legacy ticks cannot leak
+             * across its boundary, including ticks armed before the claim. */
+            if (g_scene_owned) { InterlockedExchange(&t->armed, 0); continue; }
             if (!t->armed) continue;
             t->phase += 1200.0f / (float)AUDIO_SR;
             if (t->phase >= 1.0f) t->phase -= 1.0f;

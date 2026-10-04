@@ -188,6 +188,43 @@ void audio_tick(void);
  * same latency that shrinking each buffer buys more cheaply. */
 #define AUDIO_BLOCK 256
 #define AUDIO_SR    44100
+#define AUDIO_PARTICIPANTS 4
+#define AUDIO_SCENE_TTL_MS 250
+
+/* Optional shared presentation path. Existing CVS2 setters remain two-player.
+ * Slots are stable presentation identities, never filtered-list ordinals.
+ * The caller must establish visible ownership/projection before publication.
+ * Gauges use HUD pan; beacons use screen pan. Missing fields silence that cue.
+ * Generation changes reset comparison history (round/actor/resource changes).
+ * Extra beacon identities are provisional until four-player listening checks.
+ */
+typedef struct {
+    BOOL valid;
+    int value, maximum;
+    float hud_pan;
+    uint64_t generation;
+} audio_scene_gauge;
+typedef struct {
+    BOOL present, beacon_valid;
+    uint64_t incarnation;
+    float screen_pan, stance;
+    audio_scene_gauge gauges[AUDIO_GAUGE_COUNT];
+} audio_scene_participant;
+typedef struct {
+    uint64_t epoch, sequence;
+    audio_scene_participant participants[AUDIO_PARTICIPANTS];
+} audio_scene;
+
+/* Worker/router only: strictly increasing nonzero epochs; claims output from
+ * legacy producers, clears pending scene/history. Never called by CVS2 today.
+ * Publication is bounded and nonblocking; FALSE means not accepted (retry with
+ * a fresh complete snapshot). Duplicate/old sequence numbers never renew TTL.
+ * stop retains ownership and rejects further publication until a newer begin.
+ * No automatic fallback to legacy producers when stopped or expired.
+ */
+BOOL audio_scene_begin(uint64_t epoch);
+BOOL audio_scene_publish(const audio_scene *scene);
+void audio_scene_stop(uint64_t epoch);
 void audio_render_block_for_test(int16_t *out);
 
 #endif /* CFC2_AUDIO_H */

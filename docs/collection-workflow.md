@@ -1,5 +1,39 @@
 # Astra investigation and Opus implementation workflow
 
+Committed recovery checkpoint, 2026-10-04: ownership preparation is saved in
+cee7511; the accompanying audio checkpoint preserves the optional, unwired
+four-participant scene API and its 35 passing offline checks. The existing
+mixer suite and full DLL build/import check also passed (compiler warnings
+remain in unrelated sources). No deployment, listening test or gameplay
+integration occurred. The recovery notes below are historical; continue from
+the committed files. Redundant recovery stashes can be removed after verifying
+their contents are preserved. Next: actor/HUD ownership, stage-specific capture
+and shared session integration, with offline work preceding targeted live work.
+
+Ownership recovery, 2026-10-04: recovered the seven actor-audit, trace and
+capture files from `PWS2 ownership capture increment (uncommitted)` without
+dropping that stash. Its workflow entry is reconciled here with newer notes:
+the actor audit retains 64 spans and the [ownership capture tool](pws2-ownership-run-card.md)
+is available for preliminary read-only samples. It is not draw-stage
+synchronized and does not certify camera/HUD ownership or authorize audio.
+Both saved prototypes are now restored in the working tree. The committed
+transform-target continuation remains intact. Offline preparation comes first;
+live gameplay checks are authorized afterward.
+
+Recovery validation: seven actor-audit tests, six ownership-capture tests and
+eleven metadata-capture tests passed. Capture CLI help and `git diff --check`
+passed. These are offline checks; no process attachment or deployment occurred.
+
+Audio recovery, 2026-10-04: the earlier four-participant scene prototype and
+its two test files were located in the stash named `four-player audio scene
+layer (uncommitted, unwired)` and applied without dropping the stash. The
+current audio files had no intervening changes relative to its base. All 35
+offline scene checks and the existing audio mixer suite passed after recovery.
+The scene API remains unwired to gameplay. The separate `PWS2 ownership
+capture increment (uncommitted)` stash is also present; absence from the
+working tree did not mean those prototypes were lost. Continue from the
+recovered work rather than reimplementing it. No live validation is claimed.
+
 Latest continuation, 2026-10-04: the [transform-target trace](pws2-transform-target-trace.md)
 retains the multi-point producer and closes the resource-vector translation
 read, including the conditional matrix-stack failure path. Its separate
