@@ -8,6 +8,11 @@ from collection_lifecycle_audit import CODE_SHA256, DEFAULT_DUMP, Dump
 
 
 SPANS = (
+    ("multi-point-target-production", 0x140AEA760, 0x140AEB44D),
+    ("matrix-push-conditional-load", 0x140F331C0, 0x140F3324E),
+    ("matrix-pop", 0x140F33130, 0x140F331BD),
+    ("matrix-translation-read", 0x140F31F80, 0x140F31F99),
+    ("matrix-template-reset", 0x140F33610, 0x140F33643),
     ("mode-zero-dispatch-and-pointer-publication", 0x140AE82B0, 0x140AE8A4C),
     ("script-update-gate", 0x140AECE00, 0x140AECE17),
     ("script-vector-production", 0x140AECE20, 0x140AEE000),
@@ -18,6 +23,8 @@ SPANS = (
     ("resource-vector-wrapper", 0x1409BAD20, 0x1409BAD45),
 )
 DATA = (
+    ("multi-point-direction-vectors", 0x1410AD680, 48),
+    ("multi-point-target-separation", 0x140FE5400, 4),
     ("mode-zero-targets", 0x140AE8A4C, 56),
     ("mode-zero-remap", 0x140AE8A84, 36),
     ("initial-vector-a", 0x1410AD560, 12),

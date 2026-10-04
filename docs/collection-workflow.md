@@ -1,5 +1,14 @@
 # Astra investigation and Opus implementation workflow
 
+Latest continuation, 2026-10-04: the [transform-target trace](pws2-transform-target-trace.md)
+retains the multi-point producer and closes the resource-vector translation
+read, including the conditional matrix-stack failure path. Its separate
+manifest now contains 13 spans and 13 data ranges. The current clean starting
+baseline was 9fbe2fb; earlier uncommitted audio/capture prototypes are absent.
+The user wants offline preparation completed before targeted live sessions,
+and permits live work afterward. Camera/HUD ownership, shared integration and
+listening acceptance remain open; the campaign is not complete.
+
 Latest continuation, 2026-10-02: [PWS2-T01](port-tasks/pws2-projection-reference.md)
 is ready for bounded Opus offline-tooling implementation, with a 58-span
 evidence base and 24 synthetic acceptance cases. It evaluates supplied
