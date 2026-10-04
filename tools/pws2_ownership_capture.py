@@ -12,10 +12,13 @@ import time
 import collection_metadata_capture as metadata
 
 ACTOR_MANIFEST = Path(__file__).resolve().parents[1] / 'docs/pws2-actor-manifest.json'
+HUD_MANIFEST = Path(__file__).resolve().parents[1] / 'docs/pws2-hud-manifest.json'
 ROOT_SLOT = '0x14262f0b0'
 RANGES = (('actors', 0x40818, 4 * 0x42b8),
           ('transforms', 0x51d58, 4 * 0x308),
-          ('inputs', 0x53114, 8 * 0x28))
+          ('inputs', 0x53114, 8 * 0x28),
+          ('display_layout_gate', 0x5300e, 1),
+          ('display_gauge_state', 0x5327c, 7 * 4 * 4))
 
 
 def eligible(observation, manifest):
@@ -83,16 +86,17 @@ def main():
         parser.error('Labels must not be blank')
     if args.out.exists():
         parser.error('Output exists; choose a new path')
-    files = [metadata.MANIFEST, ACTOR_MANIFEST, Path(__file__), Path(metadata.__file__)]
+    files = [metadata.MANIFEST, ACTOR_MANIFEST, HUD_MANIFEST,
+             Path(__file__), Path(metadata.__file__)]
     contents = [p.read_bytes() for p in files]
-    lifecycle, actors = (json.loads(raw) for raw in contents[:2])
+    lifecycle, actors, hud = (json.loads(raw) for raw in contents[:3])
     reader = metadata.ProcessReader(args.pid)
     try:
         checks = {name: metadata.verify_build(reader.read, manifest)
-                  for name, manifest in (('lifecycle', lifecycle), ('actors', actors))}
+                  for name, manifest in (('lifecycle', lifecycle), ('actors', actors), ('hud', hud))}
         args.out.parent.mkdir(parents=True, exist_ok=True)
         with args.out.open('x', encoding='utf-8') as output:
-            header = dict(schema=1, kind='pws2-ownership-capture', pid=args.pid,
+            header = dict(schema=2, kind='pws2-ownership-capture', pid=args.pid,
                           created_utc=metadata.utc(), label=args.label, mode=args.mode,
                           language=args.language, requested_count=args.count,
                           interval_seconds=args.interval, checked_code_spans=checks,

@@ -1,5 +1,12 @@
 # PWS2 ownership investigation capture
 
+Schema-2 continuation, 2026-10-04: see the
+[HUD ownership evidence](pws2-hud-ownership-trace.md). The tool now retains the
+raw layout gate and seven four-owner gauge-animation arrays, with HUD code-span
+checks. Eight capture tests pass. These additions do not capture display-object
+publication or prove visible ownership. The older preparation results below
+describe schema 1.
+
 Prepared 2026-10-02. The capture tool is implemented and tested with synthetic
 memory. No live capture, HUD mapping, camera selection, listening check or
 production audio integration has been performed. This is a preliminary
@@ -23,11 +30,11 @@ python tools/pws2_ownership_capture.py 12345 --out build/pws2-idle.jsonl --label
 Use a new output path for each exercise. The tool refuses overwrites and opens
 the process with read/query rights only. It does not launch, inject, hook,
 write game memory, deploy DLLs or generate audio. Each sample is bounded to
-35 reads and 72,232 bytes when all metadata is readable and identity matches.
+37 reads and 72,345 bytes when all metadata is readable and identity matches.
 The CLI limits the nominal sampling schedule to 30 seconds and 120 samples;
 read and disk overhead add to that duration.
 
-Both lifecycle and actor code spans must match their manifests before sampling.
+Lifecycle, actor and HUD code spans must match their manifests before sampling.
 The identity gate checks session, game/ROM/region, published root and size,
 and callback addresses. Null, unknown or inconsistent identity never authorizes
 root-record reads. Neither identity checks nor matching metadata establish an
@@ -56,6 +63,10 @@ which draw pass produced it. Every sample has `audio_eligible: false`.
 - Take damage to one identified participant, then another. Record the visible
   health changes. Numeric correlation is a lead; trace the HUD consumer and
   value writers before assigning a health field or range.
+- Include a mode/layout with an omitted early actor. Compare fixed actor index
+  against compacted display position; they can differ. Record the special gauge
+  layout separately. The raw tool does not retain display objects, so actual
+  actor-to-layout publication still needs a synchronized probe.
 - Exercise elimination/rejoin, character change and round restart where
   available. Check whether record addresses are reused for new participants.
 - Capture pause/menu and game-switch controls. A passing identity gate in a

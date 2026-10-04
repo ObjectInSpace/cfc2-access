@@ -15,6 +15,9 @@ No PWS2 attachment, live capture, deployment or audible validation occurred.
 Latest continuation: transform mode callbacks and a preliminary read-only
 ownership capture tool are recorded below. See the
 [ownership run card](pws2-ownership-run-card.md) for its limits and live work.
+The separate [HUD ownership continuation](pws2-hud-ownership-trace.md) now
+traces general-pool display callback publication and distinct actor/layout
+indices. Its nine additional spans do not change this manifest's count.
 
 ## Entry and phase
 

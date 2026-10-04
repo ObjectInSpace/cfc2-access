@@ -1,5 +1,22 @@
 # Astra investigation and Opus implementation workflow
 
+Continuation, 2026-10-04, from b01dc6f: the
+[HUD ownership trace](pws2-hud-ownership-trace.md) establishes separate fixed
+actor and compacted display-layout indices, general-pool callback publication,
+and actor+0x1dc feeding gauge animation arrays. Its independent manifest retains
+nine spans and nine pinned operands. Ownership capture schema 2 adds bounded
+raw display-state reads. Four HUD tests, eight capture tests, seven actor tests
+and eleven metadata tests passed; preserved audio passed 35 scene and 44 mixer
+checks. No live or runtime integration result is claimed. Continue with publisher
+entry conditions, list-8 resource/matrix construction and gauge writers before
+the draw-stage probe and shared session integration.
+
+Actual recovery state at this continuation: the working tree began clean at
+b01dc6f, with audio and ownership recovery committed. `git stash list` returned
+no entries. This session did not apply, drop or modify stashes. Historical notes
+below about both stashes remaining are not a verified description of this tree.
+Preserve the recovered committed work regardless of stash availability.
+
 Committed recovery checkpoint, 2026-10-04: ownership preparation is saved in
 cee7511; the accompanying audio checkpoint preserves the optional, unwired
 four-participant scene API and its 35 passing offline checks. The existing

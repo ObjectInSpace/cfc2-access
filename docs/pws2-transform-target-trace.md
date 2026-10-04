@@ -1,5 +1,9 @@
 # PWS2 transform target continuation — 2026-10-02
 
+Current ownership follow-up: [actor/display join](pws2-hud-ownership-trace.md)
+establishes separate actor and layout indices. It does not resolve the audible
+camera pass or draw-stage coherence; keep those identities separate in captures.
+
 Continues [the actor trace](pws2-actor-trace.md). This is offline evidence from
 the same pinned code dump. No live attachment, camera ownership, HUD ownership
 or audible acceptance is established. Existing ownership-capture and shared

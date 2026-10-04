@@ -31,9 +31,28 @@ class OwnershipTests(unittest.TestCase):
         row = capture.capture(m.read, self.manifest)
         self.assertEqual(row['status'], 'matching_metadata_only')
         self.assertFalse(row['audio_eligible'])
-        self.assertEqual(set(row['records']), {'actors', 'transforms', 'inputs'})
-        self.assertEqual(len(m.calls), 35)
-        self.assertEqual(sum(size for _, size in m.calls), 72232)
+        self.assertEqual(set(row['records']), {'actors', 'transforms', 'inputs',
+                                              'display_layout_gate', 'display_gauge_state'})
+        self.assertEqual(len(m.calls), 37)
+        self.assertEqual(sum(size for _, size in m.calls), 72345)
+
+    def test_display_values_retained_without_promoting_ownership(self):
+        m = self.memory()
+        values = struct.pack('<28f', *range(28))
+        m.data[0x45327c] = values
+        m.data[0x45300e] = b'\x01'
+        row = capture.capture(m.read, self.manifest)
+        self.assertEqual(row['records']['display_gauge_state']['hex'], values.hex())
+        self.assertEqual(row['records']['display_layout_gate']['hex'], '01')
+        self.assertEqual(row['status'], 'matching_metadata_only')
+        self.assertFalse(row['audio_eligible'])
+
+    def test_unreadable_display_state_disqualifies_sample(self):
+        m = self.memory()
+        del m.data[0x45327c]
+        row = capture.capture(m.read, self.manifest)
+        self.assertEqual(row['status'], 'unreadable')
+        self.assertFalse(row['audio_eligible'])
 
     def test_wrong_identity_never_dereferences_root(self):
         for kind in ('game', 'rom', 'region', 'callback', 'size', 'root', 'null_session'):
