@@ -58,6 +58,16 @@ static void put_ptr(unsigned char *obj, int off, int points_to)
     memcpy(obj + off, &v, 8);
 }
 
+/* Case 56's gt_screen_texts() callback: count what it was handed. */
+static BOOL screen_text_cb(const char *text, void *ctx)
+{
+    struct { int n; int legend; int foreign; } *s = ctx;
+    s->n++;
+    if (strstr(text, "Vertical Slash")) s->legend++;
+    if (strstr(text, "Any Attack"))     s->foreign++;
+    return TRUE;
+}
+
 int main(void)
 {
     printf("cGUIObjText reader self-test\n");
@@ -652,9 +662,10 @@ int main(void)
      * prompts are not reading") while this case stayed green: the harness
      * supplied the very step that no longer happened.
      *
-     * ⭐ So: overfill with NO clear, and a NEW string must still land. The
-     * recorder evicts its oldest. "dropped > 0" alone would pass with a
-     * permanently dead recorder. */
+     * ⭐ So: overfill with NO clear, and a NEW string must still reach the
+     * speech readers. They now read one-value slots the hook fills, not the
+     * record -- the record (diagnostics only) is full here and that must not
+     * matter. "dropped > 0" alone would pass with a permanently dead channel. */
     {
         gt_test_reset();
         gt_test_focus_enable();
@@ -677,8 +688,9 @@ int main(void)
         char cap[GT_CAPTION_MAX] = { 0 };
         BOOL got = gt_take_caption(cap, (int)sizeof cap);
 
-        /* And the newest-prose reader must see it too: it once keyed on the
-         * record INDEX, which stops rising when the record is full. */
+        /* And the newest-prose reader (the hints view) must see each new one
+         * too -- it once keyed on a record INDEX, which stops rising when the
+         * record is full. */
         char nw[GT_CAPTION_MAX] = { 0 };
         gt_test_settext_body(obj, "Encounter Shin Akuma.", NULL, 0);
         BOOL got_new = gt_newest_prose_if_new(nw, (int)sizeof nw);
@@ -2281,6 +2293,43 @@ int main(void)
                   n == 7 && ok1 && strcmp(first, "Resume") == 0 &&
                   ok7 && strcmp(last, "Quit") == 0, d);
         }
+    }
+
+    /* --- case 56: THE SCREEN'S LIVE TEXT, markup intact ---------------------
+     * ⛔⛔ The move list's legend reader walked the focus record through a
+     * prose-only reader, and a legend is nothing BUT markup
+     * ("<ICON C_A>Vertical Slash<ICON C_B>..."), so it never learned a single
+     * name in shipping. gt_screen_texts() replaces it: the live objects whose
+     * parent is this screen, text untouched -- and NOT another screen's. */
+    {
+        static unsigned char obj[3][GT_CLASS_SIZE];
+        void *P = (void *)0x2C48D1C0ULL;
+        void *Q = (void *)0x2BE55550ULL;
+        static const char *const T[3] = {
+            "<SIZE 58><ICON C_A></SIZE>Vertical Slash<SIZE 58><ICON C_B></SIZE>Horizontal Slash",
+            " Hadoken",
+            "<SIZE 58><ICON C_A></SIZE>Any Attack<SIZE 58><ICON C_B></SIZE>Shot",
+        };
+        gt_test_reset();
+        gt_test_focus_enable();
+        for (int i = 0; i < 3; i++) {
+            float x = 84.f, y = 100.f + 50.f * (float)i;
+            memset(obj[i], 0, sizeof obj[i]);
+            *(ULONGLONG *)obj[i] = GT_VTABLE_ADDR;
+            memcpy(obj[i] + 0x40, &x, sizeof x);
+            memcpy(obj[i] + 0x44, &y, sizeof y);
+            void *par = (i == 2) ? Q : P;       /* index 2: another game's legend */
+            memcpy(obj[i] + 0x88, &par, sizeof(void *));
+            gt_test_settext_body(obj[i], T[i], NULL, 0);
+        }
+        struct { int n; int legend; int foreign; } seen = { 0, 0, 0 };
+        int n = gt_screen_texts(P, screen_text_cb, &seen);
+        char d[200];
+        snprintf(d, sizeof d, "returned %d, callbacks %d, saw P's legend %d, "
+                 "saw Q's legend %d (want 2, 2, 1, 0)",
+                 n, seen.n, seen.legend, seen.foreign);
+        check("56. a screen's live text, markup intact, and only that screen's",
+              n == 2 && seen.n == 2 && seen.legend == 1 && seen.foreign == 0, d);
     }
 
     mem_guard_remove();

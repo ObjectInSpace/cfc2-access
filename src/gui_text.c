@@ -164,16 +164,70 @@ typedef struct {
     void     *self;
     LONG      move_seq;     /* value of g_move_seq when this arrived */
     int       which;        /* which of the four overloads fired */
-    LONG      serial;       /* arrival number, unique per record (1, 2, ...) */
 } gt_focus_rec;
+/* ⚠ A DIAGNOSTIC TRANSCRIPT, read only by gt_focus_report(). Speech must never
+ * be decided from it: it is a bounded HISTORY, so it fills, and it keeps text
+ * from screens and dialogs that are long gone. See the speech slots below. */
 static gt_focus_rec  g_focus[GT_FOCUS_MAX];
 static volatile LONG g_focus_count;
-/* ⭐ EVICTIONS: the oldest record dropped to make room for a new one. See the
- * append in settext_body() for why the recorder must never refuse instead. */
 static volatile LONG g_focus_dropped;
-/* Last serial handed out. Written only by the render-thread append, under
- * g_focus_busy. */
-static LONG          g_focus_serial;
+
+/* ⭐⭐⭐ THE SPEECH SLOTS -- one value each, written by the hook, that CANNOT
+ * fill up.
+ *
+ * ⛔⛔ USER (2026-10-04): "we shouldn't be relying on a buffer that can fill up
+ * to determine what's currently being spoken, it will always fill, it's
+ * guaranteed to break almost immediately." The quit prompts, the hints view and
+ * per-row captions were all found by SEARCHING the 48-entry focus record above.
+ * Once speech and diagnostics were split, nothing emptied it in shipping play,
+ * and ~48 strings into a session all three went silent ("sometimes the confirm
+ * quit yes/no prompts are not reading").
+ *
+ * None of them needs a history. Each needs "the latest thing of my kind, and
+ * whether it is new" -- so each is ONE slot plus a counter:
+ *
+ *   ARRIVAL   a setText whose text differs from the previous setText. The
+ *             setter fires ~650/s, almost all re-sets of the same string;
+ *             arrivals are the changes. (This is exactly the record's old
+ *             "distinct consecutive" rule.)
+ *   PROSE     the newest arrival without markup, its move stamp and a serial.
+ *             gt_take_caption() and gt_newest_prose_if_new() read it.
+ *   MODAL     the newest arrival matching a published prompt text, plus the
+ *             next two short prose arrivals (its options -- measured order
+ *             prompt, Yes, No; 4 of 4 runs) and a serial bumped once per
+ *             opening.
+ *
+ * ⭐ CONCURRENCY. Writers (the hook) take a TRY-lock and never wait. Readers do
+ * not take it: they read a sequence counter either side of their copy and retry
+ * on a change. The seq-bracket that failed here before failed because it was
+ * bumped on EVERY call (650/s); these slots move only on an arrival, so a
+ * reader's microsecond copy virtually never collides. A reader that loses every
+ * retry returns FALSE and tries again on the next poll -- the slot still holds
+ * the value, so nothing is lost, unlike a lock the hook had to skip. */
+static volatile LONG g_slot_wlock;      /* writer try-lock                     */
+static volatile LONG g_slot_seq;        /* odd while a write is in progress    */
+static char  g_prev_text[GT_TEXT_MAX];  /* previous setText, for arrivals      */
+
+static char  g_prose_text[GT_TEXT_MAX];
+static LONG  g_prose_move_seq;
+static LONG  g_prose_serial;
+
+#define GT_MODAL_OPT_MAXLEN 24          /* an option is a short button label   */
+static char  g_modal_prompt[GT_TEXT_MAX];
+static char  g_modal_opt[2][GT_TEXT_MAX];
+static int   g_modal_nopts;
+static BOOL  g_modal_pending;           /* options still being collected       */
+static LONG  g_modal_serial;
+
+/* The prompt texts the hook matches, in the game's CURRENT language. Built on
+ * the worker (it needs the GMD table) and published by swapping a pointer
+ * between two buffers, so the hook never sees a half-written table. */
+typedef struct {
+    int  n;
+    char s[GT_MODAL_PROMPTS_MAX][GT_TEXT_MAX];
+} gt_prompt_table;
+static gt_prompt_table  g_ptab[2];
+static gt_prompt_table *volatile g_ptab_live;
 static volatile LONG g_focus_busy;
 /* Stamped by gt_note_focus_move() from the cursor hook. Never read as a
  * timestamp -- only compared for equality/order. */
@@ -345,6 +399,123 @@ static pfn_settext g_real_settext_n[GT_SETTEXT_COUNT];   /* the four reals */
  * previous run could not answer that, because only one of four was hooked. */
 static volatile LONG g_settext_each[GT_SETTEXT_COUNT];
 
+/* Is `t` one of the published prompt texts? */
+static BOOL slots_is_prompt(const char *t)
+{
+    const gt_prompt_table *tab = g_ptab_live;
+    if (!tab)
+        return FALSE;
+    for (int i = 0; i < tab->n; i++) {
+        if (tab->s[i][0] == t[0] && strcmp(tab->s[i], t) == 0)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+/* Called by the hook for every string set on one of our objects. ⚠ Runs on the
+ * game's thread: no allocation, no I/O, no waiting. A busy writer lock (another
+ * game thread mid-write) skips this one string -- it does not block. */
+static void slots_note_text(const char *buf)
+{
+    if (InterlockedCompareExchange(&g_slot_wlock, 1, 0) != 0)
+        return;
+    /* ⭐ Only an ARRIVAL -- a change from the previous string -- does anything.
+     * The common case, the same string re-set every frame, costs this one
+     * compare and nothing else. */
+    if (strcmp(g_prev_text, buf) != 0) {
+        BOOL prose = (strchr(buf, '<') == NULL);
+
+        InterlockedIncrement(&g_slot_seq);          /* odd: write in progress */
+        memcpy(g_prev_text, buf, GT_TEXT_MAX);
+
+        if (prose && slots_is_prompt(buf)) {
+            /* A prompt arriving IS an opening -- the dialog sets it once per
+             * appearance -- so it gets a new serial even if the text is the
+             * same as last time. Options are collected from what follows. */
+            memcpy(g_modal_prompt, buf, GT_TEXT_MAX);
+            g_modal_opt[0][0] = g_modal_opt[1][0] = '\0';
+            g_modal_nopts = 0;
+            g_modal_pending = TRUE;
+            g_modal_serial++;
+        } else if (g_modal_pending) {
+            /* The next two short prose arrivals are the buttons, top first.
+             * Anything else ends the collection: the options are then
+             * incomplete and the prompt is spoken alone. */
+            if (prose && strlen(buf) <= GT_MODAL_OPT_MAXLEN && buf[0]) {
+                memcpy(g_modal_opt[g_modal_nopts], buf, GT_TEXT_MAX);
+                if (++g_modal_nopts == 2)
+                    g_modal_pending = FALSE;
+            } else {
+                g_modal_pending = FALSE;
+            }
+        }
+
+        if (prose) {
+            memcpy(g_prose_text, buf, GT_TEXT_MAX);
+            g_prose_move_seq = g_move_seq;
+            g_prose_serial++;
+        }
+
+        InterlockedIncrement(&g_slot_seq);          /* even: write complete */
+    }
+    InterlockedExchange(&g_slot_wlock, 0);
+}
+
+/* Copy under the sequence bracket. Returns FALSE if every attempt collided
+ * with a write -- the caller simply tries again on its next poll. */
+#define SLOT_READ(body)                                                     \
+    do {                                                                    \
+        for (int try_ = 0; try_ < 8; try_++) {                              \
+            LONG s1_ = g_slot_seq;                                          \
+            if (s1_ & 1) { YieldProcessor(); continue; }                    \
+            MemoryBarrier();                                                \
+            body                                                            \
+            MemoryBarrier();                                                \
+            if (g_slot_seq == s1_) { slot_ok_ = TRUE; break; }              \
+        }                                                                   \
+    } while (0)
+
+void gt_set_modal_prompts(const char *const *texts, int n)
+{
+    gt_prompt_table *next = (g_ptab_live == &g_ptab[0]) ? &g_ptab[1]
+                                                        : &g_ptab[0];
+    int k = 0;
+    for (int i = 0; i < n && k < GT_MODAL_PROMPTS_MAX; i++) {
+        if (!texts[i] || !texts[i][0])
+            continue;
+        strncpy(next->s[k], texts[i], GT_TEXT_MAX - 1);
+        next->s[k][GT_TEXT_MAX - 1] = '\0';
+        k++;
+    }
+    next->n = k;
+    InterlockedExchangePointer((PVOID volatile *)&g_ptab_live, next);
+}
+
+BOOL gt_modal_latest(gt_modal_info *out)
+{
+    BOOL slot_ok_ = FALSE;
+    if (!out)
+        return FALSE;
+    memset(out, 0, sizeof(*out));
+    if (!g_installed && !g_focus_test_mode)
+        return FALSE;
+    SLOT_READ({
+        memcpy(out->prompt, g_modal_prompt, GT_TEXT_MAX);
+        memcpy(out->opt[0], g_modal_opt[0], GT_TEXT_MAX);
+        memcpy(out->opt[1], g_modal_opt[1], GT_TEXT_MAX);
+        out->nopts   = g_modal_nopts;
+        out->pending = g_modal_pending;
+        out->serial  = g_modal_serial;
+    });
+    if (!slot_ok_ || out->serial == 0) {
+        memset(out, 0, sizeof(*out));
+        return FALSE;
+    }
+    out->prompt[GT_TEXT_MAX - 1] = '\0';
+    out->opt[0][GT_TEXT_MAX - 1] = out->opt[1][GT_TEXT_MAX - 1] = '\0';
+    return TRUE;
+}
+
 static void *settext_body(int which, pfn_settext real, void *self,
                           const char *s, int a, int b, int c, int d)
 {
@@ -409,6 +580,9 @@ static void *settext_body(int which, pfn_settext real, void *self,
                     InterlockedExchange(&g_text_busy, 0);
                 }
                 InterlockedIncrement(&g_with_text);
+
+                /* ⭐⭐⭐ The speech slots. See their declaration. */
+                slots_note_text(buf);
 
                 /* ⭐⭐ THE INSTANCE SET: one entry per OBJECT, latest text.
                  *
@@ -524,41 +698,21 @@ static void *settext_body(int which, pfn_settext real, void *self,
                     BOOL dup = (n > 0 &&
                                 strcmp(g_focus[n - 1].text, buf) == 0);
                     if (!dup) {
-                        /* ⛔⛔ WHEN FULL, EVICT THE OLDEST -- never refuse the
-                         * newest.
-                         *
-                         * USER-REPORTED: "sometimes the confirm quit yes/no
-                         * prompts are not reading." This used to drop every
-                         * string once 48 were held, and the ONLY thing that
-                         * emptied the record was gt_focus_report(), which runs
-                         * only under cfc2_guitext_diag.on. Splitting speech
-                         * from diagnostics (2026-10-02) left shipping play with
-                         * nothing to empty it: ~48 distinct strings into a
-                         * session the record went blind for good, and the quit
-                         * prompt, the hints view and per-row captions with it.
-                         *
-                         * ⭐ Readers want the NEWEST strings, so the oldest is
-                         * what goes. ~13 KB moved per NEW distinct string,
-                         * which arrive at human speed, not per frame. */
-                        if (n >= GT_FOCUS_MAX) {
-                            memmove(&g_focus[0], &g_focus[1],
-                                    sizeof(g_focus[0]) * (GT_FOCUS_MAX - 1));
-                            n = GT_FOCUS_MAX - 1;
+                        /* ⚠ DIAGNOSTICS ONLY. Nothing spoken reads this record
+                         * any more -- see the speech slots above. When full it
+                         * drops, and gt_focus_report() (cfc2_guitext_diag.on)
+                         * empties it each report. */
+                        if (n < GT_FOCUS_MAX) {
+                            memcpy(g_focus[n].text, buf, GT_TEXT_MAX - 1);
+                            g_focus[n].text[GT_TEXT_MAX - 1] = 0;
+                            g_focus[n].self = self;
+                            g_focus[n].move_seq = g_move_seq;
+                            g_focus[n].which = which;
+                            /* Publish the count last. */
+                            InterlockedExchange(&g_focus_count, n + 1);
+                        } else {
                             InterlockedIncrement(&g_focus_dropped);
                         }
-                        /* memcpy + explicit terminator: `buf` is already
-                         * NUL-terminated and the same size, so strncpy's
-                         * truncation warning is about a case that cannot
-                         * arise -- but silencing a warning by ignoring it
-                         * is how a real one gets missed later. */
-                        memcpy(g_focus[n].text, buf, GT_TEXT_MAX - 1);
-                        g_focus[n].text[GT_TEXT_MAX - 1] = 0;
-                        g_focus[n].self = self;
-                        g_focus[n].move_seq = g_move_seq;
-                        g_focus[n].which = which;
-                        g_focus[n].serial = ++g_focus_serial;
-                        /* Publish the count last. */
-                        InterlockedExchange(&g_focus_count, n + 1);
                     }
                     InterlockedExchange(&g_focus_busy, 0);
                 }
@@ -848,151 +1002,77 @@ void gt_test_focus_enable(void) { g_focus_test_mode = TRUE; }
  * the test drives the shipping behaviour rather than a copy of it. */
 void gt_test_focus_clear(void) { g_focus_count = 0; }
 
-/* ⭐⭐ The most recent PROSE string the game set, with NO movement stamp.
+/* ⭐ The CAPTION for the current movement: the newest prose the game set, if
+ * it arrived after the cursor last moved.
  *
- * ⛔⛔ THIS IS DELIBERATELY THE TIMING JOIN gt_take_caption() REFUSES, and it is
- * safe here for one reason only: the caller matches the text against a KNOWN
- * SET of strings before acting on it. A modal prompt identifies itself by its
- * own content, so "which movement did this belong to?" -- the question the
- * stamp exists to answer -- does not arise.
+ * ⛔ Deliberately NOT "the most recent string": that is the timing join the
+ * rethink note forbids. The stamp is set by the cursor hook, so "belongs to
+ * this movement" is an ordering fact, not a time window. A caption stamped
+ * with an earlier movement is the previous row's, and is refused.
  *
- * ⚠ DO NOT use this to name a menu ITEM. That is exactly the join that speaks
- * one row's caption on another row, and the stamp exists because 3 of 6 early
- * captures coincided with no cursor movement at all.
- *
- * ⚠ Needed because the quit dialogs produce ZERO cursor movements, so every
- * movement-stamped channel is structurally blind to them. */
-BOOL gt_prose_at(int nth, char *out, int outlen)
-{
-    return gt_prose_serial_at(nth, out, outlen, NULL);
-}
-
-BOOL gt_prose_serial_at(int nth, char *out, int outlen, LONG *serial)
-{
-    BOOL got = FALSE;
-    int  seen = 0;
-
-    if (serial)
-        *serial = 0;
-    if (!out || outlen <= 0 || nth < 0)
-        return FALSE;
-    out[0] = '\0';
-    if (!g_installed && !g_focus_test_mode)
-        return FALSE;
-    if (InterlockedCompareExchange(&g_focus_busy, 1, 0) != 0)
-        return FALSE;
-    /* ⛔⛔ NEWEST-FIRST, BUT ENUMERABLE. Returning ONLY the newest prose was the
-     * bug that made the modal announcer do nothing in the game: the quit dialog
-     * sets the prompt, then "Yes", then "No" -- all prose -- so "the newest" is
-     * always "No" and the prompt is never examined. The caller has to be able to
-     * look PAST the most recent string. */
-    for (LONG i = g_focus_count - 1; i >= 0; i--) {
-        /* Prose only -- a markup strip is a button hint, never a prompt. */
-        if (g_focus[i].text[0] && strchr(g_focus[i].text, '<') == NULL) {
-            if (seen++ < nth)
-                continue;
-            strncpy(out, g_focus[i].text, (size_t)outlen - 1);
-            out[outlen - 1] = '\0';
-            if (serial)
-                *serial = g_focus[i].serial;
-            got = TRUE;
-            break;
-        }
-    }
-    InterlockedExchange(&g_focus_busy, 0);
-    return got;
-}
-
+ * ⭐ Reads the PROSE slot -- one value, so nothing can fill up and nothing
+ * from an earlier screen lingers to be found. */
 BOOL gt_take_caption(char *out, int outlen)
 {
-    BOOL got = FALSE;
+    BOOL slot_ok_ = FALSE;
+    char text[GT_TEXT_MAX];
+    LONG stamp = -1;
 
     if (!out || outlen <= 0)
         return FALSE;
     out[0] = '\0';
     if (!g_installed && !g_focus_test_mode)
         return FALSE;
-
-    /* ⭐ The NEWEST record stamped with the CURRENT movement -- i.e. text the
-     * game set after the cursor last moved. A record from an earlier movement
-     * is stale by construction, and returning it is how a caption for the
-     * previous row gets spoken for this one.
-     *
-     * ⛔ This is deliberately NOT "the most recent string": that is the timing
-     * join the rethink note forbids. The stamp is set by the cursor hook, so
-     * "belongs to this movement" is an ordering fact, not a time window. */
-    if (InterlockedCompareExchange(&g_focus_busy, 1, 0) != 0)
-        return FALSE;               /* never block the caller; try again later */
-    {
-        LONG seq = g_move_seq;
-        for (LONG i = g_focus_count - 1; i >= 0; i--) {
-            if (g_focus[i].move_seq != seq)
-                break;              /* records are appended in order */
-            /* Prefer a PROSE caption over a hint strip: the strip describes the
-             * screen and does not change per row, so speaking it on every
-             * movement would be noise. A caption has no markup. */
-            if (strchr(g_focus[i].text, '<') == NULL) {
-                strncpy(out, g_focus[i].text, (size_t)outlen - 1);
-                out[outlen - 1] = '\0';
-                got = TRUE;
-                break;
-            }
-        }
-    }
-    InterlockedExchange(&g_focus_busy, 0);
-    return got;
+    SLOT_READ({
+        memcpy(text, g_prose_text, GT_TEXT_MAX);
+        stamp = g_prose_move_seq;
+    });
+    if (!slot_ok_ || !text[0] || stamp != g_move_seq)
+        return FALSE;
+    text[GT_TEXT_MAX - 1] = '\0';
+    strncpy(out, text, (size_t)outlen - 1);
+    out[outlen - 1] = '\0';
+    return TRUE;
 }
 
 /* ⭐⭐⭐ The newest prose, but ONLY IF IT IS NEW SINCE THE LAST CALL.
  *
- * ⛔⛔ THE BUG THIS EXISTS FOR. menu_speak_check_hint() scanned gt_prose_at()
- * for an achievement description and announced it. On the achievements grid
- * that read out an unlock condition on EVERY cursor movement, with the Hints
- * view never opened -- because gt_prose_at() enumerates a RETAINED HISTORY,
- * not what is on screen. A description captured on an earlier visit sat in the
- * record and re-triggered forever.
+ * ⛔⛔ THE BUG THIS EXISTS FOR. The hints announcer once scanned a retained
+ * HISTORY for an achievement description, and on the achievements grid read
+ * out an unlock condition on every cursor movement with the Hints view never
+ * opened. The test is ARRIVAL: each prose arrival is handed out once, and
+ * re-opening the view sets the text again, which is a new arrival.
  *
- * ⚠ gt_take_caption()'s movement stamp cannot serve here: the hint view
- * produces NO cursor movement at all, which is the whole reason it needs its
- * own announcer. So the test is ARRIVAL, not movement -- the caller sees a
- * given string exactly once, and only while it is the newest thing the game
- * set. Re-opening the view sets the text again, which is a new arrival.
+ * ⭐ Keyed on the PROSE slot's serial, not on a position in a buffer -- a
+ * position stops rising once a buffer is full, and the reader then calls every
+ * new string "already seen".
  *
  * ⚠ Returns FALSE when nothing has arrived since the last call, which is the
  * normal case on every poll. */
-/* ⛔ KEYED ON THE ARRIVAL SERIAL, NOT THE RECORD INDEX. The index stops rising
- * once the record is full and evicts its oldest -- every new string then lands
- * at the same last slot, and "index <= last taken" would call it seen forever.
- * File-scope so gt_test_reset() can rewind it with the serial counter. */
 static LONG g_prose_taken_serial;
 
 BOOL gt_newest_prose_if_new(char *out, int outlen)
 {
-    BOOL got = FALSE;
+    BOOL slot_ok_ = FALSE;
+    char text[GT_TEXT_MAX];
+    LONG serial = 0;
 
     if (!out || outlen <= 0)
         return FALSE;
     out[0] = '\0';
     if (!g_installed && !g_focus_test_mode)
         return FALSE;
-    if (InterlockedCompareExchange(&g_focus_busy, 1, 0) != 0)
+    SLOT_READ({
+        memcpy(text, g_prose_text, GT_TEXT_MAX);
+        serial = g_prose_serial;
+    });
+    if (!slot_ok_ || serial == 0 || serial == g_prose_taken_serial)
         return FALSE;
-    {
-        LONG n = g_focus_count;
-        for (LONG i = n - 1; i >= 0; i--) {
-            if (strchr(g_focus[i].text, '<') != NULL)
-                continue;           /* a hint strip is not the view's text */
-            if (g_focus[i].serial <= g_prose_taken_serial)
-                break;              /* already handed out; nothing new */
-            strncpy(out, g_focus[i].text, (size_t)outlen - 1);
-            out[outlen - 1] = '\0';
-            g_prose_taken_serial = g_focus[i].serial;
-            got = TRUE;
-            break;
-        }
-    }
-    InterlockedExchange(&g_focus_busy, 0);
-    return got;
+    g_prose_taken_serial = serial;
+    text[GT_TEXT_MAX - 1] = '\0';
+    strncpy(out, text, (size_t)outlen - 1);
+    out[outlen - 1] = '\0';
+    return TRUE;
 }
 
 BOOL gt_focus_conclusive(long *records, long *moves)
@@ -2707,6 +2787,32 @@ BOOL gt_widget_of(const void *screen, float x, float y, char *out, int outlen)
     return out[0] != 0;
 }
 
+int gt_screen_texts(const void *screen, gt_cand_fn fn, void *ctx)
+{
+    gt_widget w[GT_INST_MAX];
+    /* static: 16 KB is too much for the worker's frame, and only the worker
+     * thread calls this. */
+    static char copy[GT_INST_MAX][GT_TEXT_MAX];
+    int n;
+
+    if ((!g_installed && !g_focus_test_mode) || !screen || !fn)
+        return 0;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return 0;
+    n = widgets_of(screen, -1.0f, w, GT_INST_MAX);
+    /* Copy the texts out while the table is held -- the hook may overwrite an
+     * entry the moment it is released. */
+    for (int i = 0; i < n; i++) {
+        strncpy(copy[i], w[i].text, GT_TEXT_MAX - 1);
+        copy[i][GT_TEXT_MAX - 1] = 0;
+    }
+    InterlockedExchange(&g_inst_busy, 0);
+
+    for (int i = 0; i < n; i++)
+        fn(copy[i], ctx);
+    return n;
+}
+
 BOOL gt_column_y(const void *screen, float x, int position, float *out_y)
 {
     gt_widget w[GT_INST_MAX];
@@ -3627,8 +3733,21 @@ void gt_test_reset(void)
         g_inst[i].move_seq = 0; g_inst[i].sets = 0;
     }
     g_focus_count = 0; g_focus_dropped = 0; g_focus_busy = 0;
-    g_focus_serial = 0;
+    /* The speech slots. ⚠ The published prompt table is NOT cleared: it is
+     * the language's prompt set, not per-screen state, and the worker only
+     * republishes it when the language changes. */
+    g_slot_wlock = 0;
+    g_slot_seq = 0;
+    g_prev_text[0] = 0;
+    g_prose_text[0] = 0;
+    g_prose_move_seq = 0;
+    g_prose_serial = 0;
     g_prose_taken_serial = 0;
+    g_modal_prompt[0] = 0;
+    g_modal_opt[0][0] = g_modal_opt[1][0] = 0;
+    g_modal_nopts = 0;
+    g_modal_pending = FALSE;
+    g_modal_serial = 0;
     g_move_seq = 0; g_move_notifications = 0;
     for (int i = 0; i < GT_FOCUS_MAX; i++) {
         g_focus[i].text[0] = 0;

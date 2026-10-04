@@ -2555,6 +2555,14 @@ static BOOL coord_candidate(const char *text, void *ctx)
     return TRUE;
 }
 
+/* gt_screen_texts() callback for the move list: learn this game's icon names
+ * from any string on the screen that is a legend. */
+static BOOL learn_legend_cb(const char *text, void *ctx)
+{
+    *(int *)ctx += gm_icon_learn_legend(text);
+    return TRUE;
+}
+
 void menu_speak_build(const mc_move *m, mc_speech *out)
 {
     memset(out, 0, sizeof(*out));
@@ -3175,10 +3183,13 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
          * and must never redefine a token. */
         gm_icon_overrides_clear();
         {
-            char cand[GT_CAPTION_MAX];
+            /* ⛔⛔ THIS NEVER LEARNED ANYTHING IN SHIPPING. It walked the focus
+             * record through gt_prose_at(), which returns only strings WITHOUT
+             * markup -- and a legend is nothing but "<ICON C_A>Name" markup.
+             * It also read a HISTORY, not this screen. Now: the live objects
+             * whose parent is this screen, markup intact. */
             int learned = 0;
-            for (int i = 0; gt_prose_at(i, cand, (int)sizeof(cand)); i++)
-                learned += gm_icon_learn_legend(cand);
+            gt_screen_texts(m->screen, learn_legend_cb, &learned);
             if (learned)
                 log_line("mcspeak: move list -- learned %d icon name(s) from "
                          "this game's own legend.", learned);
@@ -3994,160 +4005,118 @@ void menu_speak_test_set_modal_resolver(BOOL (*fn)(int, char *, unsigned))
 
 void menu_speak_check_modal(void)
 {
-    /* ⭐⭐ WHICH APPEARANCE was last announced, and with which option.
+    /* ⭐⭐⭐ READ THE MODAL SLOT -- do not search a history.
      *
-     * ⛔ USER-REPORTED: "sometimes the confirm quit yes/no prompts are not
-     * reading." This used to key on the prompt TEXT and re-arm only when no
-     * prompt was left in the focus record. But the record is a HISTORY: a
-     * closed dialog's prompt stays in it. Open "Exit the game?", answer No,
-     * open it again (the 22:28 run did exactly this at move 12) -- the old
-     * prompt never left, the guard never re-armed, and the second appearance
-     * matched the first and was silent. It only ever worked while the
-     * diagnostic report happened to be emptying the record.
+     * ⛔⛔ USER (2026-10-04): "sometimes the confirm quit yes/no prompts are not
+     * reading", then: "we shouldn't be relying on a buffer that can fill up to
+     * determine what's currently being spoken." This used to scan the 48-entry
+     * focus record for a known prompt. The record filled ~48 strings into a
+     * session (only a diagnostics-only report ever emptied it), and it kept
+     * closed dialogs' prompts, so a dialog opened twice matched the first time
+     * and was silent.
      *
-     * ⭐ Each opening sets the prompt afresh (prompt, Yes, No -- once per
-     * opening, measured in the 22:28 and 15:17 runs), and a fresh set is a new
-     * record with a new ARRIVAL SERIAL. So a new serial is a new appearance,
-     * whether or not the text matches the last one. */
-    static LONG last_serial;
-    static int  last_sel = -2;
-    char text[GT_CAPTION_MAX];
+     * Now the hook recognises the prompt as it is SET and fills one slot (see
+     * gt_modal_latest): the prompt, its two options, and a serial bumped once
+     * per opening. A new serial is a new opening; nothing can fill or linger. */
+    static const void *published_for;   /* language the hook's table is for */
+    static ULONGLONG   next_lang_check;
+    static LONG        last_serial;
+    static int         last_sel = -2;
+    static LONG        pending_serial;
+    static ULONGLONG   pending_since;
+    gt_modal_info m;
     char flat[GT_CAPTION_MAX];
-    LONG serial = 0;
 
-    /* ⛔⛔ SCAN FOR A MATCH, DO NOT TAKE THE NEWEST.
+    /* 1. Give the hook the prompt texts in the game's CURRENT language.
      *
-     * The first version asked gt_latest_text() for the most recent prose and
-     * tested that. It never fired once in the game, because the dialog sets its
-     * text in this order:
-     *     "If you exit the application, ..."   then "Yes"   then "No"
-     * All three are prose, so "the newest" is always "No" and the prompt is
-     * never looked at. Measured in the user's run: the prompt was in the record
-     * and the mod said nothing.
-     *
-     * ⚠ My end-to-end test passed anyway because it planted ONLY the prompt --
-     * a fixture that omits the very strings that break the code. The screen's
-     * real neighbours are part of the input, not noise to be left out. */
-    int at = -1;
+     * ⚠ The hook cannot read the GMD table itself (it runs on the game's
+     * thread), so the worker resolves the indices and publishes the strings,
+     * and republishes when the language changes. Checked once a second: a
+     * language change is a human-speed event, and the check is a guarded read. */
     {
-        int i;
-        for (i = 0; gt_prose_serial_at(i, text, (int)sizeof(text), &serial);
-             i++) {
-            if (menu_speak_is_modal_prompt(text, modal_resolve)) {
-                at = i;
-                break;
+        ULONGLONG now = GetTickCount64();
+        if (g_modal_resolver || now >= next_lang_check) {
+            const void *key = g_modal_resolver
+                                  ? (const void *)g_modal_resolver
+                                  : (const void *)gmd_text_language();
+            next_lang_check = now + 1000;
+            if (key && key != published_for) {
+                enum { NP = sizeof(K_MODAL_PROMPTS) / sizeof(K_MODAL_PROMPTS[0]) };
+                static char texts[NP][GT_CAPTION_MAX];
+                const char *ptrs[NP];
+                int k = 0;
+                for (int i = 0; i < NP; i++) {
+                    if (modal_resolve(K_MODAL_PROMPTS[i], texts[k],
+                                      sizeof(texts[k])) && texts[k][0]) {
+                        ptrs[k] = texts[k];
+                        k++;
+                    }
+                }
+                gt_set_modal_prompts(ptrs, k);
+                published_for = key;
+                log_line("mcspeak: yes/no prompts: %d of %d resolved and handed "
+                         "to the text hook.", k, (int)NP);
             }
         }
-        if (at < 0) {
-            /* No prompt in the record at all (evicted, or never seen). */
-            last_serial = 0;
-            last_sel = -2;
+    }
+
+    if (!gt_modal_latest(&m))
+        return;                         /* no dialog has opened yet */
+
+    BOOL is_new = (m.serial != last_serial);
+
+    /* 2. A new opening whose options have not all arrived yet: wait a moment.
+     * The dialog sets prompt, Yes, No back to back, so this is normally one
+     * poll; ⚠ bounded, so a dialog with no options is still spoken. */
+    if (is_new && m.pending) {
+        ULONGLONG now = GetTickCount64();
+        if (pending_serial != m.serial) {
+            pending_serial = m.serial;
+            pending_since = now;
             return;
         }
+        if (now - pending_since < 300)
+            return;
     }
 
-    /* ⭐⭐ RE-ANNOUNCE WHEN THE SELECTION MOVES, not only when the prompt first
-     * appears. The guard keys on the prompt AND the index: without the index
-     * the dialog would speak once and then fall silent as the user moved
-     * between the options -- which is exactly what the user reported as "it
-     * doesn't speak the option I am on". */
-    /* ⭐⭐ AND SAY ONLY WHAT CHANGED.
-     *
-     * ⛔ USER-REPORTED: "it repeats the whole dialog, it should just say yes or
-     * no". Re-reading a two-line warning on every toggle buries the one word
-     * that changed, and the user is moving between two options several times a
-     * second. A sighted player re-reads the warning once and then watches the
-     * highlight; the spoken equivalent is the prompt ONCE, then the option.
-     *
-     * So: the prompt is spoken when the PROMPT changes (a dialog appearing, or
-     * a different dialog), and only the option name when just the INDEX moves. */
-    BOOL prompt_is_new;
-    {
-        int sel = -1;
-        BOOL have_sel = gt_modal_selection(&sel);
+    /* 3. The highlighted option, from the dialog's own state (parent+0x38c,
+     * 0 = TOP). See gt_modal_selection() for the two sources behind that. */
+    int sel = -1;
+    BOOL have_sel = gt_modal_selection(&sel) && (sel == 0 || sel == 1);
 
-        prompt_is_new = (serial != last_serial);
-        if (!prompt_is_new) {
-            /* ⚠ The same appearance: speak only a READABLE change of option.
-             * An unreadable selection here is most likely the dialog having
-             * closed (its "Yes" object gone) with the prompt still in the
-             * history -- announcing "Yes or No" then would talk about a dialog
-             * that is no longer there. */
-            if (!have_sel || sel == last_sel)
-                return;
-        }
-        last_serial = serial;
-        last_sel = sel;
+    if (!is_new) {
+        /* ⭐ The same opening: speak only a READABLE change of option.
+         * ⚠ An unreadable selection is most likely the dialog having closed --
+         * the slot keeps its last opening. Speaking then would describe a
+         * dialog that is no longer there. */
+        if (!have_sel || sel == last_sel)
+            return;
     }
+    last_serial = m.serial;
+    last_sel = have_sel ? sel : -1;
 
-    /* ⭐ The prompt only when it is NEW; otherwise the line starts empty and
-     * carries the option alone. */
-    if (prompt_is_new)
-        menu_speak_flatten_prompt(text, flat, (int)sizeof(flat));
+    /* 4. Say it. The prompt only on a new opening; afterwards just the option
+     * -- USER: "it repeats the whole dialog, it should just say yes or no". */
+    if (is_new)
+        menu_speak_flatten_prompt(m.prompt, flat, (int)sizeof(flat));
     else
         flat[0] = '\0';
 
-    /* ⭐⭐ AND THE OPTIONS. The question alone leaves the user to guess what the
-     * buttons are; the dialog sets them as live text right after the prompt, so
-     * they can be READ rather than assumed.
-     *
-     * ⭐ THE ORDER IS MEASURED, NOT ASSUMED: across every log that captured a
-     * complete dump, the dialog sets prompt -> "Yes" -> "No", 4 of 4 with no
-     * counter-example (the other 3 sightings were truncated dumps, not a
-     * different order). Since gt_prose_at() walks NEWEST-FIRST, the prompt sits
-     * at index i and the options are at i-1 and i-2.
-     *
-     * ⛔⛔ THIS STILL CLAIMS NOTHING ABOUT WHICH IS SELECTED. The selection is
-     * not observable in these objects (measured and closed in
-     * run-2026-09-11-1322), so the options are announced as a LIST -- "Yes or
-     * No" -- which is true regardless of the highlight. Saying "Yes" alone
-     * would state a selection the mod cannot see, on a prompt that ends the
-     * game. ⚠ Do not "improve" this into naming one of them without a signal
-     * that actually tracks the highlight.
-     *
-     * ⚠ The strings are quoted from the game, so this follows its language. */
-    {
-        char a[GT_CAPTION_MAX], b[GT_CAPTION_MAX];
-        int i = at, selidx = -1;
-        if (i >= 2 &&
-            gt_prose_at(i - 1, a, (int)sizeof(a)) && a[0] &&
-            gt_prose_at(i - 2, b, (int)sizeof(b)) && b[0] &&
-            !strchr(a, '<') && !strchr(b, '<') &&
-            strlen(a) <= 24 && strlen(b) <= 24) {
-            size_t used = strlen(flat);
-            /* ⚠ No leading space when the prompt was suppressed -- the line is
-             * then just the option name, and " Yes" is not that. */
-            const char *sep = used ? " " : "";
-            /* ⚠⚠ WORK THE INDICES OUT, DO NOT REASON ABOUT THEM IN PROSE. The
-             * record holds (oldest first) prompt, TOP option, BOTTOM option;
-             * gt_prose_at walks NEWEST-FIRST, so with the prompt at index i:
-             *     a = prose_at(i-1)  ->  the TOP option
-             *     b = prose_at(i-2)  ->  the BOTTOM option
-             * My first version had these the wrong way round -- the comment
-             * said "a is the bottom" and the test caught it by speaking "Yes"
-             * where the planted index meant "No". The arithmetic above is the
-             * check; the sentence is only a record of it. */
-            if (gt_modal_selection(&selidx) && (selidx == 0 || selidx == 1)) {
-                /* ⭐⭐ NAME THE SELECTED OPTION, from the dialog's own state
-                 * (parent+0x38c), 0 = the TOP option. See gt_modal_selection()
-                 * for the two independent sources that fixed that. */
-                _snprintf(flat + used, sizeof(flat) - used - 1, "%s%s", sep,
-                          selidx == 0 ? a : b);
-            } else {
-                /* ⛔ No readable selection: LIST both rather than name one. A
-                 * wrong option stated confidently on a prompt that quits the
-                 * game is the failure this file exists to prevent. */
-                _snprintf(flat + used, sizeof(flat) - used - 1, "%s%s or %s", sep,
-                          a, b);
-            }
-            flat[sizeof(flat) - 1] = '\0';
-        }
+    if (m.nopts == 2) {
+        size_t used = strlen(flat);
+        const char *sep = used ? " " : "";
+        if (have_sel)
+            _snprintf(flat + used, sizeof(flat) - used - 1, "%s%s", sep,
+                      m.opt[sel]);
+        else
+            /* ⛔ No readable selection: LIST both rather than name one. A wrong
+             * option stated confidently on a prompt that quits the game is the
+             * failure this function exists to prevent. */
+            _snprintf(flat + used, sizeof(flat) - used - 1, "%s%s or %s", sep,
+                      m.opt[0], m.opt[1]);
+        flat[sizeof(flat) - 1] = '\0';
     }
 
-    /* ⚠ If the prompt was suppressed and no option could be read, there is
-     * nothing to say. menu_speak_line() already ignores an empty string, but
-     * being explicit here keeps the intent visible: silence is the correct
-     * outcome, not an accident of an empty buffer. */
     if (flat[0])
         menu_speak_line(flat);
 }

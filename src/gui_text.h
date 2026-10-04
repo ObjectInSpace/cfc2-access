@@ -446,28 +446,37 @@ void gt_note_focus_move(void);
  * previous row's caption". Hint strips (which carry markup) are skipped: they
  * describe the SCREEN and do not change per row, so speaking one on every
  * movement would be noise. */
-/* ⭐⭐ The nth-newest PROSE string (0 = newest), with NO movement stamp -- for MODALS that
- * produce no cursor movements at all (the quit dialogs).
+/* ⭐⭐⭐ THE MODAL SLOT -- the latest yes/no dialog, not a history search.
  *
- * ⛔ Only safe when the caller matches the text against a KNOWN SET first: a
- * modal prompt identifies itself by its content, so the "which movement?"
- * question the stamp answers does not arise. ⚠ NEVER use it to name a menu
- * item -- that is the timing join gt_take_caption() exists to refuse. */
-BOOL gt_prose_at(int nth, char *out, int outlen);
-
-/* gt_prose_at(), plus the record's ARRIVAL NUMBER (unique, increasing; 0 when
- * nothing is returned).
+ * ⛔ USER (2026-10-04): "we shouldn't be relying on a buffer that can fill up
+ * to determine what's currently being spoken." The quit prompts used to be
+ * found by searching the focus record; it filled, and they went silent.
  *
- * ⭐ The record is a HISTORY, not the screen: a closed dialog's prompt stays in
- * it until evicted. A dialog re-opened sets its prompt again, which arrives as
- * a NEW record with a NEW serial -- that is how a caller tells "opened again"
- * from "still the old one", without needing the record to be emptied. */
-BOOL gt_prose_serial_at(int nth, char *out, int outlen, LONG *serial);
+ * The worker PUBLISHES the prompt texts in the game's current language
+ * (gt_set_modal_prompts). The hook compares each CHANGED string against them;
+ * a match is an opening of that dialog, so it fills this slot and bumps
+ * `serial` once. The next two short prose strings are its options, top first
+ * (measured order: prompt, Yes, No). `pending` is TRUE until both arrive or
+ * something else interrupts -- then the options are incomplete.
+ *
+ * ⚠ This says a dialog was OPENED, not that it is still open. Whether it is
+ * still on screen comes from gt_modal_selection(), which reads the dialog's own
+ * state. Returns FALSE if no prompt has ever arrived. */
+#define GT_MODAL_PROMPTS_MAX 24
+typedef struct {
+    char prompt[GT_CAPTION_MAX];
+    char opt[2][GT_CAPTION_MAX];
+    int  nopts;
+    BOOL pending;
+    LONG serial;
+} gt_modal_info;
+void gt_set_modal_prompts(const char *const *texts, int n);
+BOOL gt_modal_latest(gt_modal_info *out);
 
 /* ⭐⭐ The newest prose, and ONLY IF IT HAS ARRIVED SINCE THE LAST CALL.
  *
  * ⛔ For a view that produces NO cursor movement, where gt_take_caption()'s
- * movement stamp cannot apply and gt_prose_at()'s retained history re-fires
+ * movement stamp cannot apply, and a retained history would re-fire
  * forever. The caller sees each string once; re-opening the view sets the text
  * again and that counts as a new arrival.
  *
@@ -616,6 +625,14 @@ BOOL gt_column_y(const void *screen, float x, int position, float *out_y);
  * VISIBLE count, which on the move list is NOT the cursor's total: the cursor
  * counts panels (reporting "of 3") while ten move names are on screen. */
 int gt_column_count(const void *screen, float x);
+
+/* Call `fn` with the current text of every LIVE object on `screen` (membership
+ * by the game's own +0x088 parent pointer, as gt_widget_of). Returns how many.
+ *
+ * ⭐ "What is on this screen now", from the live objects -- not from a history
+ * of recent strings, which fills and keeps other screens' text. Markup is
+ * passed through untouched; the caller decides what it wants. */
+int gt_screen_texts(const void *screen, gt_cand_fn fn, void *ctx);
 
 /* The Nth object (1-based, top to bottom) of `screen`'s column at `x`, with the
  * partner at `pair_x` on the same row appended after ", " when one exists.

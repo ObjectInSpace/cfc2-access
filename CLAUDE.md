@@ -317,11 +317,18 @@ Now:
   (focus record, instance dump, layout/movelist probes, stats lines, the
   live-text transcript). Absent = off.
 
-⭐⭐ **Decoupling is the SAFER default here, not merely the quieter one.**
-`gt_focus_report()` **clears the caption window** (see the ordering note at
-its call site). While it ran unconditionally it was competing with
-`menu_speak` for the same captions; with diagnostics off it cannot discard a
-caption that has not been spoken yet.
+⛔⛔ **SPEECH NEVER READS THE FOCUS RECORD (2026-10-04).** The quit prompts,
+hints view and per-row captions used to SEARCH that 48-entry history. Once
+the diagnostics report (its only clear) was switched off, it filled ~48
+strings into a session and all three went silent ("sometimes the confirm
+quit yes/no prompts are not reading"). User: "we shouldn't be relying on a
+buffer that can fill up to determine what's currently being spoken." Now the
+hook fills one-value SLOTS on each text CHANGE -- newest prose (+ move stamp,
+serial) and the modal slot (prompt matched against texts the worker
+publishes in the current language, its two options, a serial per opening).
+The record is diagnostics only. ⚠ Lesson: a diagnostic's side effect (the
+clear) was load-bearing for shipping code, and gt case 19 hid it by calling
+the clear itself.
 
 ⚠ `gt_poll_and_log()` still runs unconditionally — only the log line *inside*
 it is switched. The caption channel needs the poll; it does not need the
