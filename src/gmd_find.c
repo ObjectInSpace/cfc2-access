@@ -956,8 +956,74 @@ void gmd_test_set_expected_language(const char *code)
     g_lang_expected_override = code;
 }
 
+/* ⭐⭐ THE GAME'S OWN ANSWER: which language the message system draws from.
+ *
+ * ⛔ USER-REPORTED (2026-10-04): a player heard the main menu in "incredibly
+ * broken English". config.ini has no Language key unless the player put one
+ * there, and without it the resolver fell back to the FIRST blob it recognised
+ * -- a stale table is resident beside the live one, so that can be any
+ * language, read aloud by an English voice.
+ *
+ * So read the value the game itself uses, traced offline from .text:
+ *
+ *     app = *(void **)0x141c14f90     ; written only by the app constructor
+ *                                     ; 0x140047e5a, cleared at 0x140048635
+ *     lang = *(int *)(app + 0x40)     ; 0..13, the order of the code list
+ *                                     ; "jpn eng fre ..." at 0x140fe1954
+ *
+ * - The constructor (0x140047ed3) seeds +0x3c/+0x40 from Steam's
+ *   GetCurrentGameLanguage via a jump table whose targets are exactly this
+ *   0..13 order (latam -> 6 oth, brazilian -> 9 por, unsupported -> 1 eng).
+ * - 0x14005a715 selects the message table with [msg + lang*8 + 0x88], lang
+ *   read from app+0x40 -- the selection itself, not a correlate of it.
+ * - Shell menu code compares app+0x40 against 0xd (Arabic, the RTL language)
+ *   at a dozen sites, which is what a display language looks like.
+ *
+ * ⚠ Out of range or unreadable returns NULL, never a default: the caller then
+ * falls back to config.ini, and failing that says it has nothing to check. */
+#define APP_SLOT_LIVE  0x141c14f90ULL
+#define APP_LANG_OFF   0x40
+
+static const char *const g_lang_by_game_index[] = {
+    "jpn", "eng", "fre", "ita", "ger", "spa", "oth",
+    "kor", "pol", "por", "rus", "chT", "chS", "ara",
+};
+#define NLANG_GAME_INDEX \
+    (int)(sizeof(g_lang_by_game_index) / sizeof(g_lang_by_game_index[0]))
+
+static void *const *g_app_slot = (void *const *)APP_SLOT_LIVE;
+
+/* Where the last expected language came from, for the log. */
+static const char *g_lang_source = "config.ini";
+
+void gmd_test_set_app_slot(void *const *slot)
+{
+    g_app_slot = slot ? slot : (void *const *)APP_SLOT_LIVE;
+}
+
+static const char *gmd_live_language(void)
+{
+    void *app = NULL;
+    int   idx = -1;
+
+    if (!mem_copy(&app, g_app_slot, sizeof(app)) || !app)
+        return NULL;
+    if (!mem_copy(&idx, (const BYTE *)app + APP_LANG_OFF, sizeof(idx)))
+        return NULL;
+    if (idx < 0 || idx >= NLANG_GAME_INDEX)
+        return NULL;
+    return g_lang_by_game_index[idx];
+}
+
 static const char *gmd_expected_language(void)
 {
+    const char *live = gmd_live_language();
+    if (live) {
+        g_lang_source = "the game's language setting";
+        return live;
+    }
+    g_lang_source = "config.ini";
+
     if (g_lang_expected_override)
         return g_lang_expected_override;
 
@@ -1035,13 +1101,16 @@ BOOL gmd_text_ready(void)
      *
      * So do not take the first match. Resolve the blob at EVERY known offset,
      * ask each one which language it is, and keep the one that agrees with
-     * config.ini -- which the game demonstrably reads and writes.
+     * the game's own language setting (gmd_live_language()), or config.ini
+     * when that cannot be read.
      *
      * \u26a0 If none agrees, fall back to the first that resolved at all and say so
      * loudly. Serving the wrong language is bad; serving nothing is worse, and
      * the log has to make clear which happened.
      */
     const char *want = gmd_expected_language();
+    log_line("gmdtext: expected language \"%s\", from %s.",
+             want ? want : "(none)", want ? g_lang_source : "nowhere");
 
     int  best_off = -1;
     char best_lang[8] = { 0 };
@@ -1066,7 +1135,7 @@ BOOL gmd_text_ready(void)
         }
         log_line("gmdtext:   blob at entries+0x%llx is \"%s\"%s",
                  (unsigned long long)delta, lang,
-                 (want && strcmp(want, lang) == 0) ? "  <== matches config.ini"
+                 (want && strcmp(want, lang) == 0) ? "  <== matches the expected language"
                                                    : "");
         if (want && strcmp(want, lang) == 0) {
             best_off = (int)delta;
@@ -1079,8 +1148,8 @@ BOOL gmd_text_ready(void)
         g_text_count = GMD_LABEL_COUNT;
         text_index_free();
         log_line("gmdtext: \u2b50\u2b50 blob resolved at entries+0x%x; %d messages "
-                 "readable. Table language: %s (matches config.ini).",
-                 best_off, g_text_count, best_lang);
+                 "readable. Table language: %s (matches %s).",
+                 best_off, g_text_count, best_lang, g_lang_source);
         return TRUE;
     }
 
@@ -1118,8 +1187,8 @@ BOOL gmd_text_ready(void)
         g_text_count = GMD_LABEL_COUNT;
         text_index_free();
         log_line("gmdtext: \u2b50\u2b50 blob resolved at entries+0x%x; %d messages "
-                 "readable. Table language: %s (matches config.ini).",
-                 best_off, g_text_count, best_lang);
+                 "readable. Table language: %s (matches %s).",
+                 best_off, g_text_count, best_lang, g_lang_source);
         return TRUE;
     }
 
@@ -1128,14 +1197,16 @@ BOOL gmd_text_ready(void)
         g_text_count = GMD_LABEL_COUNT;
         text_index_free();
         if (want)
-            log_line("gmdtext: \u26d4\u26d4 NO blob matches config.ini (\"%s\"). Falling "
+            log_line("gmdtext: \u26d4\u26d4 NO blob matches %s (\"%s\"). Falling "
                      "back to entries+0x%x, which is \"%s\" -- item names will "
                      "be in the WRONG LANGUAGE. The game's current blob is at an "
-                     "offset not in the hint list.", want, first_off, first_lang);
+                     "offset not in the hint list.", g_lang_source, want, first_off,
+                     first_lang);
         else
             log_line("gmdtext: blob resolved at entries+0x%x, language \"%s\". "
-                     "config.ini has no Language key, so there is nothing to "
-                     "check it against.", first_off, first_lang);
+                     "Neither the game's setting nor config.ini could be read, "
+                     "so there is nothing to check it against.",
+                     first_off, first_lang);
         return TRUE;
     }
 
@@ -1182,7 +1253,7 @@ BOOL gmd_text_recheck_language(void)
         return FALSE;                  /* agrees, or nothing to check against */
 
     log_line("gmdtext: ⚠ LANGUAGE CHANGED -- the resolved blob is \"%s\" but "
-             "config.ini now says \"%s\". Re-resolving.", have, want);
+             "%s now says \"%s\". Re-resolving.", have, g_lang_source, want);
 
     /* Drop the resolution and let gmd_text_ready() redo the full per-language
      * search. ⚠ The index must go too: it maps indices into the OLD blob. */

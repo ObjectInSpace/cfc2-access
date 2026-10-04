@@ -63,6 +63,13 @@ int main(void)
 
     const int N = gmd_test_label_count();
 
+    /* ⚠ Every case before 7 simulates a run where the game's language setting
+     * cannot be read, so config.ini (the override seam) decides. Pin that
+     * explicitly: the real slot address may or may not be mapped in this test
+     * process, and a case must not depend on which. */
+    static void *no_app = NULL;
+    gmd_test_set_app_slot(&no_app);
+
     /* --- case 1: the blob names its own language ------------------------- */
     SIZE_T cap = (SIZE_T)N * 24 + 64;
     char *fr = (char *)VirtualAlloc(NULL, cap, MEM_COMMIT | MEM_RESERVE,
@@ -231,6 +238,96 @@ int main(void)
         check("6c. a blob that AGREES with the expected language is not "
               "re-resolved", !acted && gmd_text_count() == N,
               "returned %d, count=%d", (int)acted, gmd_text_count());
+    }
+
+    /* --- cases 7a-7e: ⭐⭐ THE GAME'S OWN LANGUAGE SETTING ------------------
+     *
+     * ⛔ USER-REPORTED (2026-10-04): "the main menu is reading in what appears
+     * to be incredibly broken English". config.ini has no Language key unless
+     * the player added one, and without it the resolver took the first blob
+     * it recognised -- any language, read by an English voice.
+     *
+     * The fix reads [app+0x40], the index the game's message system selects
+     * its table with (traced in gmd_find.c). These cases plant a stand-in app
+     * object and require that index to OUTRANK config.ini, map in the game's
+     * 0..13 order, and fall back -- never default -- when it is unusable. */
+    {
+        static BYTE fake_app[0x80];
+        static void *app_slot = fake_app;
+        gmd_test_set_app_slot(&app_slot);
+
+        /* 7a: ⭐⭐ THE DISCRIMINATING CASE. The game says English, config.ini
+         * says French, the blob is English. Live outranks config, so nothing
+         * changes. With the live read sabotaged, config wins and it acts. */
+        plant(en, cap, "Japanese [jp]", N, "en");
+        gmd_test_set_blob((BYTE *)en, N);
+        *(int *)(fake_app + 0x40) = 1;                 /* eng */
+        gmd_test_set_expected_language("fre");
+        BOOL acted = gmd_text_recheck_language();
+        check("7a. the game's live setting OUTRANKS config.ini",
+              !acted && gmd_text_count() == N,
+              "returned %d, count=%d", (int)acted, gmd_text_count());
+
+        /* 7b: and it can DISAGREE -- otherwise 7a is satisfied by a live read
+         * that never answers. Game says French, blob is English: act. */
+        gmd_test_set_blob((BYTE *)en, N);
+        *(int *)(fake_app + 0x40) = 2;                 /* fre */
+        gmd_test_set_expected_language("eng");
+        acted = gmd_text_recheck_language();
+        check("7b. a live setting that disagrees with the blob re-resolves",
+              acted, "returned %d", (int)acted);
+
+        /* 7c: ⛔ OUT OF RANGE FALLS BACK TO config.ini -- it is NOT clamped to
+         * English. Index 14 with config "fre" and an English blob must act;
+         * a resolver that defaulted to English would sit still. */
+        gmd_test_set_blob((BYTE *)en, N);
+        *(int *)(fake_app + 0x40) = 14;
+        gmd_test_set_expected_language("fre");
+        acted = gmd_text_recheck_language();
+        check("7c. an out-of-range index falls back to config.ini, not English",
+              acted, "returned %d", (int)acted);
+
+        /* 7d: a NULL app pointer (constructor not run yet) also falls back. */
+        static void *null_app = NULL;
+        gmd_test_set_app_slot(&null_app);
+        gmd_test_set_blob((BYTE *)en, N);
+        gmd_test_set_expected_language("eng");
+        acted = gmd_text_recheck_language();
+        check("7d. no app object yet -> config.ini decides (agrees: no action)",
+              !acted && gmd_text_count() == N,
+              "returned %d, count=%d", (int)acted, gmd_text_count());
+        gmd_test_set_app_slot(&app_slot);
+        gmd_test_set_expected_language(NULL);
+
+        /* 7e: ⭐ THE INDEX ORDER IS THE GAME'S, NOT ALPHABETICAL OR Steam's.
+         * Each index must name the table that identifies as that language.
+         * ita=3 / ger=4 are the pair an order mistake would swap first (Steam
+         * and nGUI both put Spanish at 3 and German at 4). */
+        static const struct { int idx; const char *idx0; const char *code; }
+        order[] = {
+            { 0,  "\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e [jp]", "jpn" },
+            { 1,  "Japanese [jp]",   "eng" },
+            { 2,  "Japonais [jp]",   "fre" },
+            { 3,  "Giapponese [jp]", "ita" },
+            { 4,  "Japanisch [jp]",  "ger" },
+            { 10, "\xd0\xaf\xd0\xbf\xd0\xbe\xd0\xbd\xd1\x81\xd0\xba\xd0\xb8\xd0\xb9 [jp]", "rus" },
+            { 13, "\xd8\xa7\xd9\x84\xd9\x8a\xd8\xa7\xd8\xa8\xd8\xa7\xd9\x86\xd9\x8a\xd8\xa9 [jp]", "ara" },
+        };
+        int bad = 0;
+        for (int i = 0; i < (int)(sizeof(order) / sizeof(order[0])); i++) {
+            plant(en, cap, order[i].idx0, N, "o");
+            gmd_test_set_blob((BYTE *)en, N);
+            *(int *)(fake_app + 0x40) = order[i].idx;
+            if (gmd_text_recheck_language()) {
+                printf("        index %d did not name %s\n",
+                       order[i].idx, order[i].code);
+                bad++;
+            }
+        }
+        check("7e. each game index names its own language's table", bad == 0,
+              "%d mismatch(es)", bad);
+
+        gmd_test_set_app_slot(&no_app);
     }
 
     VirtualFree(fr, 0, MEM_RELEASE);

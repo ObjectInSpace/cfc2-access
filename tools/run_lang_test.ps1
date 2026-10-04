@@ -16,6 +16,9 @@
 # nine non-Latin ones that previously returned NULL), the Spain/Mexico
 # tiebreaker at index 29, and the refusals -- an unrecognised table and an
 # unreadable tiebreak must both report UNKNOWN rather than guessing.
+# Cases 7a-7e (2026-10-04): the game's own language index [app+0x40] outranks
+# config.ini, maps in the game's 0..13 order, and falls back to config.ini --
+# never a default -- when it is out of range or the app object is absent.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $gcc = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\mingw64\bin\gcc.exe"

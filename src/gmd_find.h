@@ -121,6 +121,14 @@ BOOL gmd_text_recheck_language(void);
  * whatever the code under test does. */
 void gmd_test_set_expected_language(const char *code);
 
+/* Test seam: point the live-language read at a stand-in for the app singleton
+ * slot (0x141c14f90 in the game). NULL restores the real address.
+ *
+ * ⭐ The live read outranks config.ini: [app+0x40] is the index the game's
+ * message system selects its table with (traced in gmd_find.c), so it is what
+ * the screen shows. config.ini is only consulted when it cannot be read. */
+void gmd_test_set_app_slot(void *const *slot);
+
 /* Drop the cached blob and index so the next call re-resolves. Use when the
  * game may have rebuilt its table -- a language change does exactly that. */
 void gmd_text_invalidate(void);
