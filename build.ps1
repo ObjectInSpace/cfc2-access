@@ -41,9 +41,21 @@ New-Item -ItemType Directory -Force -Path "$root\build" | Out-Null
     "$root\src\collection_probe.c" `
     @minhookSrc `
     -I "$root\libs\minhook\include" `
-    -luser32 -lpsapi -lwinmm -s
+    -luser32 -lpsapi -lwinmm -s -static
 if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 Write-Host "Built build\dinput8.dll"
+
+# ⛔⛔ v0.3.0 shipped importing libgcc_s_seh-1.dll: players got "the executable
+# cannot start because libgcc_s_seh-1.dll is missing". It worked here only
+# because the WinLibs bin dir is on this machine's PATH. -static links the GCC
+# runtime in; this check refuses any import that is not part of Windows itself.
+$objdump = Join-Path (Split-Path $gcc) 'objdump.exe'
+$imports = & $objdump -p "$root\build\dinput8.dll" |
+    Select-String 'DLL Name:\s*(\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+$system = '^(kernel32|user32|winmm|psapi|advapi32|ole32|ntdll|api-ms-win-.*)\.dll$'
+$foreign = @($imports | Where-Object { $_ -notmatch $system })
+if ($foreign.Count) { throw "dinput8.dll imports non-system DLL(s): $($foreign -join ', ')" }
+Write-Host "Imports OK: $($imports -join ', ')"
 
 # nvdaControllerClient.dll is REQUIRED for NVDA output: UniversalSpeech
 # loads it by that exact (unsuffixed) name and silently falls back to SAPI5
