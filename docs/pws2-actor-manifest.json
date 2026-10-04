@@ -132,6 +132,37 @@
     "update_call": "0x140a48d9d",
     "scope": "transform records, not participant records; mode branch and visible camera ownership unassigned"
   },
+  "transform_modes": {
+    "mode_byte": "0x4",
+    "initialized_byte": "0x5",
+    "selector_byte": "0x6",
+    "mode_zero_actor_branch": {
+      "selector": 2,
+      "target_index_byte": "0x1",
+      "index_mask": 3,
+      "actor_source_offset": "0x4c",
+      "scope": "one transform submode reads an indexed actor field; no HUD/controller ownership"
+    },
+    "mode_one_script": {
+      "current_pointer": "0x2d0",
+      "base_pointer": "0x2d8",
+      "record_stride": "0x80",
+      "countdown": "0x1c",
+      "selector_fe": "reuse current script pointer",
+      "selector_ff": "inline record at +0x250"
+    },
+    "dispatch_data": [
+      {
+        "address": "0x140ae8a84",
+        "bytes": "00010d0d0d0d020d0d030d0d0d0d0d040d0d0d0d0d0d0d0d0d0d05060d07080d090a0b0c"
+      },
+      {
+        "address": "0x140ae8a4c",
+        "bytes": "ec82ae00cb83ae00fc84ae007086ae006d88ae00d687ae00f388ae002b89ae003a89ae005889ae008389ae007f86ae004989ae00b789ae00"
+      }
+    ],
+    "scope": "bounded callback bodies; transitive vector production and visible pass remain unproved"
+  },
   "projection": {
     "primitive": "0x140f37ca0",
     "homogeneous_helper": "0x140f31d10",
@@ -334,6 +365,42 @@
     "Root content and links can be rebuilt without changing root identity."
   ],
   "spans": [
+    {
+      "label": "transform-mode-zero-initialize",
+      "start": "0x140ae82a0",
+      "end_exclusive": "0x140ae82aa",
+      "sha256": "4956bec51c33f74fd20cb536e9bfa950aae70e725f06dbc3905ce0810b8a7173"
+    },
+    {
+      "label": "transform-mode-zero-dispatch",
+      "start": "0x140ae82b0",
+      "end_exclusive": "0x140ae8a4c",
+      "sha256": "b72fac3b7249825e9c3a7d0363bf816a4e99e7ccc72ad880a576fae5d060e9be"
+    },
+    {
+      "label": "transform-script-baseline",
+      "start": "0x140aebd00",
+      "end_exclusive": "0x140aebddd",
+      "sha256": "8b45fc9a28cf670b271212f876be2169214f227452e0e5d736ae24c3e075e67d"
+    },
+    {
+      "label": "transform-mode-one-initialize",
+      "start": "0x140aebde0",
+      "end_exclusive": "0x140aebe3c",
+      "sha256": "2e158c82057fe42e10018e26e79037024f23ed1b8573daa6c9589c435f8085a4"
+    },
+    {
+      "label": "transform-mode-one-update",
+      "start": "0x140aebe40",
+      "end_exclusive": "0x140aec0c1",
+      "sha256": "937b2fcb56857b9fde3fab4b3de9f4dddc9daedcaf61b8ad3826c04ea45dc4b5"
+    },
+    {
+      "label": "transform-inline-script-publication",
+      "start": "0x140aec0d0",
+      "end_exclusive": "0x140aec0e3",
+      "sha256": "f4e11d787047b694063db39cf8f20d3d4ba0fb01f0a00fadc392f08cc09ea93e"
+    },
     {
       "label": "native-update",
       "start": "0x140a47290",

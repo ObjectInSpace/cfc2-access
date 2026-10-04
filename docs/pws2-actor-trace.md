@@ -7,10 +7,14 @@ python tools/pws2_actor_audit.py --manifest-out docs/pws2-actor-manifest.json
 python tools/test_pws2_actor_audit.py
 ```
 
-The manifest retains fifty-eight instruction-aligned spans and the main code SHA-256
+The manifest retains sixty-four instruction-aligned spans and the main code SHA-256
 `9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b`.
 This is initial F06–F12/F19 acquisition evidence, not an implemented adapter.
 No PWS2 attachment, live capture, deployment or audible validation occurred.
+
+Latest continuation: transform mode callbacks and a preliminary read-only
+ownership capture tool are recorded below. See the
+[ownership run card](pws2-ownership-run-card.md) for its limits and live work.
 
 ## Entry and phase
 
@@ -536,3 +540,52 @@ Its 24 supplied cases are synthetic; it does not reconstruct cameras, validate
 sample timing or enable runtime audio. Vector-mode callbacks, transitive
 slot-3 preservation, actor/HUD ownership and stage-specific live captures
 remain Astra acquisition work.
+
+
+## Transform modes and ownership capture preparation — 2026-10-02
+
+Six additional complete callback/helper bodies bring the retained span count
+to 64. This is offline evidence from the pinned dump, not a live camera label.
+
+`0x140a5ba60` dispatches on transform byte +4, with byte +5 controlling
+initialization. Mode 0 calls `0x140ae82a0` once (increment +5, clear word +0xa),
+then `0x140ae82b0`. That update dispatches on signed byte +6 through two
+pinned tables. Selector 2 reaches `0x140ae82ec`, masks transform byte +1
+with 3, and reads the dword at R+0x40818+0x42b8*index+0x4c. This establishes
+one indexed actor-to-transform dependency. It does not assign a controller,
+HUD owner, actor position field, or visible camera to that transform.
+
+On the first selector-2 update, the body copies an indexed 0x80-byte template
+to transform+0x250, stores the actor-derived dword at +0x270, and tail-calls
+`0x140aec0d0`. Later updates adjust that dword and tail-call `0x140aece00`.
+The transitive vector semantics of that latter helper remain open. Other
+selectors dispatch to different helpers or table-driven/default paths; the
+selector-2 relationship must not be generalized to all modes.
+
+Mode 1 initializes through `0x140aebde0`. Selector byte +6 equal to 0xfe
+reuses pointer +0x2d0; 0xff selects inline storage +0x250; other values
+index a pointer table and then a second table with signed byte +7. It stores
+current/base pointers at +0x2d0/+0x2d8 and tail-calls `0x140aebd00`.
+That helper loads the first script dword into countdown +0x1c and saves
+current transform fields as interpolation baselines.
+
+`0x140aebe40` conditionally calls `0x140aece20`, decrements the countdown,
+and handles expiration. Script flags at +0x14 select save/restore of transform
+fields. Script byte +4 selects ordinary 0x80-byte advance or special behavior:
+0xfe uses a signed byte +5 index relative to the saved base, 0xfd dispatches
+through a pointer table, and 0xff either restarts the baseline or calls
+`0x140a5bee0` with -1 when byte +5 is also 0xff. Native pointer/table accesses
+are not bounded by this body; a future reader must not follow them unchecked.
+Transitive interpolation and all script-table contents remain unproved.
+
+The new `tools/pws2_ownership_capture.py` retains only bounded raw actor,
+transform and input ranges after an identity gate, with metadata brackets.
+It reuses the existing read-only process reader and live span checking. It
+never follows actor links/callbacks or script pointers and never authorizes
+audio. Its synthetic tests cover both ROM identities, wrong identity, short
+reads, unreadable records, identity changes and bounded work. These tests
+are tool behavior checks, not evidence of gameplay ownership.
+
+No runtime source, DLL, deployed files or audio behavior changed. The next
+work remains HUD/actor publication tracing and a tested draw-stage capture;
+the preliminary ownership samples do not replace that capture.

@@ -7,6 +7,12 @@ from pathlib import Path
 from collection_lifecycle_audit import CODE_SHA256, DEFAULT_DUMP, Dump
 
 SPANS = (
+    ('transform-mode-zero-initialize', 0x140AE82A0, 0x140AE82AA),
+    ('transform-mode-zero-dispatch', 0x140AE82B0, 0x140AE8A4C),
+    ('transform-script-baseline', 0x140AEBD00, 0x140AEBDDD),
+    ('transform-mode-one-initialize', 0x140AEBDE0, 0x140AEBE3C),
+    ('transform-mode-one-update', 0x140AEBE40, 0x140AEC0C1),
+    ('transform-inline-script-publication', 0x140AEC0D0, 0x140AEC0E3),
     ('native-update', 0x140A47290, 0x140A472C2),
     ('phase-dispatch', 0x140A48CC0, 0x140A48DD0),
     ('four-input-record-update', 0x140A490A0, 0x140A49132),
@@ -65,6 +71,11 @@ SPANS = (
     ('filtered-list-rebuild', 0x140A65A60, 0x140A65CC1),
     ('allocate-record-resource-a', 0x140A644A0, 0x140A64525),
     ('allocate-record-resource-b', 0x140A65330, 0x140A653B1),
+)
+
+MODE_DISPATCH_DATA = (
+    (0x140AE8A84, '00010d0d0d0d020d0d030d0d0d0d0d040d0d0d0d0d0d0d0d0d0d05060d07080d090a0b0c'),
+    (0x140AE8A4C, 'ec82ae00cb83ae00fc84ae007086ae006d88ae00d687ae00f388ae002b89ae003a89ae005889ae008389ae007f86ae004989ae00b789ae00'),
 )
 
 PROJECTION_CONSTANTS = (
@@ -126,6 +137,9 @@ ANCHORS = (
 
 def produce(directory=DEFAULT_DUMP):
     dump = Dump(directory)
+    for address, expected in MODE_DISPATCH_DATA:
+        if dump.read(address, len(bytes.fromhex(expected))).hex() != expected:
+            raise ValueError(f'Transform dispatch data differs at {address:#x}')
     for address, expected, value in PROJECTION_CONSTANTS:
         if dump.read(address, 4).hex() != expected:
             raise ValueError(f'Projection constant differs at {address:#x}')
@@ -171,6 +185,16 @@ def produce(directory=DEFAULT_DUMP):
             copy_bytes='0x308', index_bytes_rewritten=[0, 1, 2, 3],
             update_call='0x140a48d9d',
             scope='transform records, not participant records; mode branch and visible camera ownership unassigned'),
+        transform_modes=dict(
+            mode_byte='0x4', initialized_byte='0x5', selector_byte='0x6',
+            mode_zero_actor_branch=dict(selector=2, target_index_byte='0x1',
+                index_mask=3, actor_source_offset='0x4c',
+                scope='one transform submode reads an indexed actor field; no HUD/controller ownership'),
+            mode_one_script=dict(current_pointer='0x2d0', base_pointer='0x2d8',
+                record_stride='0x80', countdown='0x1c',
+                selector_fe='reuse current script pointer', selector_ff='inline record at +0x250'),
+            dispatch_data=[dict(address=hex(a), bytes=b) for a, b in MODE_DISPATCH_DATA],
+            scope='bounded callback bodies; transitive vector production and visible pass remain unproved'),
         projection=dict(primitive='0x140f37ca0', homogeneous_helper='0x140f31d10',
                         composite_offset='0x1f8200', viewport_matrix='0x141c00210',
                         composition='current * slot2 * slot3 * mutable viewport matrix',

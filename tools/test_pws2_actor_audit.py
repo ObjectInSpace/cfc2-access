@@ -9,6 +9,17 @@ import pws2_actor_audit as audit
 
 
 class ActorAuditTests(unittest.TestCase):
+    def test_changed_transform_dispatch_data_refused(self):
+        original = audit.Dump.read
+        for target, _ in audit.MODE_DISPATCH_DATA:
+            with self.subTest(address=hex(target)):
+                def changed(dump, address, size):
+                    data = original(dump, address, size)
+                    return bytes([data[0] ^ 1]) + data[1:] if address == target else data
+                with patch.object(audit.Dump, 'read', changed):
+                    with self.assertRaisesRegex(ValueError, 'Transform dispatch data differs'):
+                        audit.produce()
+
     def test_pinned_manifest_reproduces(self):
         manifest = Path(__file__).resolve().parents[1] / 'docs/pws2-actor-manifest.json'
         self.assertEqual(audit.compact(audit.produce()), json.loads(manifest.read_text()))
