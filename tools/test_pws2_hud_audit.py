@@ -112,6 +112,22 @@ class HudAuditTests(unittest.TestCase):
         self.assertEqual(sort[0x140F2EF22], 'movss xmm0, dword ptr [rsp + 0x3c]')
         self.assertFalse(any(i.startswith(('divss ', 'divps ')) for i in sort.values()))
 
+    def test_vertex_submission_is_gated_buffer_copy_with_header_advance(self):
+        gate = self.instructions('vertex-command-session-gate')
+        self.assertEqual(gate[0x1400487CB], 'cmp dword ptr [rax + 0x774], 0')
+        self.assertEqual(gate[0x1400487D2], 'je 0x140048808')
+        self.assertEqual(gate[0x140048803], 'call 0x14004ca10')
+        copy = self.instructions('vertex-command-buffer-copy')
+        self.assertEqual(copy[0x14004CA2C], 'imul edi, r9d')
+        self.assertEqual(copy[0x14004CA33], 'add r10d, edi')
+        self.assertEqual(copy[0x14004CA36], 'cmp r10d, 0x200000')
+        self.assertEqual(copy[0x14004CA3D], 'jg 0x14004caa8')
+        self.assertEqual(copy[0x14004CA41], 'je 0x14004caa8')
+        self.assertEqual(copy[0x14004CA80], 'add rcx, 0x18')
+        self.assertEqual(copy[0x14004CA84], 'call 0x140eec5a0')
+        self.assertEqual(copy[0x14004CA99], 'lea eax, [rdi + 0x18]')
+        self.assertEqual(copy[0x14004CA9C], 'add dword ptr [rsi + 0xded38], eax')
+
     def test_manifest_reproduces(self):
         path = Path(__file__).resolve().parents[1] / 'docs/pws2-hud-manifest.json'
         self.assertEqual(audit.produce(), json.loads(path.read_bytes()))

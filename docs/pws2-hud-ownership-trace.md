@@ -9,7 +9,7 @@ python tools/test_pws2_ownership_capture.py
 ```
 
 The original increment retained nine instruction-aligned spans and nine pinned
-numerical operands. The continuations below expand this to 41 spans and 24
+numerical operands. The continuations below expand this to 43 spans and 24
 data ranges. The actor and transform-target manifests are unchanged.
 This establishes a native gauge/display ownership relationship, not a live
 HUD label, controller assignment, health range contract or audio permission.
@@ -361,6 +361,35 @@ The new audit test checks segment inputs, branch structure, homogeneous call,
 pop and undivided fourth-output return. The HUD manifest now has 41 spans
 and 24 pinned data ranges; all 26 PWS2 tests pass. No native source changed
 in this continuation, and no live capture or audio acceptance is claimed.
+
+### Vertex command buffering continuation from 92f805f
+
+The vertex call at 0x140f34a7f passes a 0x28-byte stride, a data pointer
+and a count through 0x1400487c0. This wrapper returns immediately when
+session+0x774 is zero. Otherwise it forwards the arguments, inserting the
+object loaded from 0x141c14f90 as RCX, to 0x14004ca10.
+
+The latter computes stride*count using 32-bit multiplication. It rejects
+zero payload bytes or a signed used+payload comparison greater than
+0x200000. It writes a 0x18-byte header containing command, payload size,
+count and three metadata dwords, copies the payload, advances the buffer
+pointer and used-byte field by payload+0x18, and increments command count.
+A negative first metadata argument selects the object's +0xded48 default.
+It does not perform vertex projection, clipping or a graphics draw call.
+
+The capacity comparison excludes the header later included in the advance.
+It also does not establish overflow-safe stride/count arithmetic. This is an
+exact native control-flow observation, not proof of an actual allocation
+overrun: backing allocation and caller constraints remain untraced. A mod
+reader must impose its own checked sizes and budgets. The earlier matrix
+command copier at 0x140048810 likewise compares used+payload before adding
+its header. Neither function's return gives an explicit accepted-command
+result. The command-buffer consumer remains the next renderer boundary.
+
+The two full functions are retained in the HUD manifest, now 43 spans and
+24 data ranges. A new offline test pins the session gate, payload arithmetic,
+signed capacity branch, copy call and header-inclusive advance. All 27 PWS2
+tests pass. No runtime source, live capture or audio wiring changed.
 
 ### Further actor-value writers
 

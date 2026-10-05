@@ -1,5 +1,13 @@
 # Astra investigation and Opus implementation workflow
 
+Continuation, 2026-10-05, from 92f805f: the vertex submission wrapper and
+0x14004ca10 copy into another command buffer after the session gate. The
+native payload capacity comparison excludes the subsequently added header;
+it is not a safe-reader bound or proof of final pixels. The HUD manifest now
+has 43 spans and 24 data ranges; all 27 PWS2 tests pass. Next: command-buffer
+consumption and matrix-command handling, alongside the bounded capture
+contract. No runtime source, audio/ownership recovery or live state changed.
+
 Continuation from c801b79: the types-2/3 queue helper returns a sorting scalar,
 with fixed, sign-flipped and transformed-W branches. It does not calculate a
 screen position. The HUD manifest now retains 41 spans and 24 data ranges;

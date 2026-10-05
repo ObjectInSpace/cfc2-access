@@ -49,6 +49,8 @@ SPANS = (
     ('indexed-actor-subtraction-caller', 0x140AD1296, 0x140AD12D9),
     ('descriptor-driven-actor-subtraction', 0x140AD17B0, 0x140AD1B9E),
     ('render-queue-sort-value', 0x140F2EE80, 0x140F2EF2D),
+    ('vertex-command-session-gate', 0x1400487C0, 0x14004880D),
+    ('vertex-command-buffer-copy', 0x14004CA10, 0x14004CAB3),
 )
 
 # Pin numerical operands outside .text independently. These are rendering

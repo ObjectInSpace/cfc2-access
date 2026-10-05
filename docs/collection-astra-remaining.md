@@ -9,8 +9,10 @@ collection campaign is not yet ready for an implementation-only handoff.
 
 ## PWS2 renderer and gameplay meaning
 
-Astra should finish the relevant vertex path from 0x140f340b0 through
-0x1400487c0 and the consumers of queued matrix commands 4 and 7. Establish
+Astra should finish the relevant vertex path and the consumers of queued
+matrix commands 4 and 7. The 2026-10-05 continuation traces 0x1400487c0
+through 0x14004ca10 as gated command-buffer copying; final consumption
+remains open. Establish
 projection, clipping and the particular pass suitable for accessible spatial
 cues. The queue sorting scalar is not screen position. Close the remaining
 health range/mode writer questions before publishing normalized health.
