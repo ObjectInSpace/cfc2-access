@@ -1,5 +1,10 @@
 # PWS2 draw-stage capture research
 
+Checkpoint from 904b955: unwired native reader and batch primitives now pass
+234 and 70 checks respectively; see the native component checkpoint in the
+[capture contract](../pws2-draw-capture-contract.md). Full transport, enclosure,
+admission, lifecycle and installer acceptance remain open. No live installation.
+
 - Task ID: PWS2-R02. Kind: ABI and acquisition research.
 - Status: concrete v1 offline acquisition contract with tested reference
   reader/parser and unwired entry ABI component; native implementation and

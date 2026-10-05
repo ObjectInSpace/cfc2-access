@@ -4,7 +4,43 @@ Baseline: 5f9e3fc. This contract is for copied raw diagnostic evidence,
 not production session authority, accepted rendering, visible pixels or audio.
 The offline reference is tools/pws2_draw_contract.py; its synthetic tests
 exercise acquisition bounds and copied command parsing. There is no native
-reader, invocation wrapper, transport integration or installer yet.
+invocation wrapper, transport integration or installer yet. The continuation
+from 904b955 adds unwired native reader and batch-storage components below.
+
+## Native component checkpoint, 2026-10-05
+
+`src/pws2_draw_reader.{h,c}` implements the exact acquisition sequence with
+explicit errors, issue bits, valid-copy mask and charged attempts/bytes/queries.
+Failed or short copies are zeroed, not retained as successful raw evidence.
+The native backend uses at most two VirtualQuery calls followed by the existing
+TLS fault guard. It rejects an already armed guard without altering it. The
+worker must first pass mem_guard_install and the page-size check; installation
+is not performed in the reader. The caller supplies a checked identity and QPC
+deadline. Neither the API nor matching brackets grant invocation admission.
+
+`src/pws2_draw_batches.{h,c}` supplies eight fixed batches, 32 event slots each,
+and FREE/WRITING/READY/READING transitions using full-barrier interlocked
+operations. Only the owning producer calls event/publish; every returned slot
+must be filled by the reader before publication. The worker releases its own
+READING batch. Stale acquisition increments a loss counter and drops the batch.
+The worker still needs to recheck the diagnostic revision before output. No
+timeout path can seize WRITING storage. Components remain excluded from the
+production DLL and have no sinks, arming or teardown integration.
+
+`tools/run_pws2_draw_reader_test.ps1` passed 234 reader checks and 70 batch
+checks with the installed compiler. Native tests exercise readable boundaries,
+NOACCESS and unconsumed GUARD pages, guard contention, injected short/faulted
+reads, all ten deadline boundaries, exhaustion, stale publication/consumption,
+two simultaneous producers and return after a paused producer interval. The
+initial fixture reused its call counter and missed its injected identity change;
+resetting that fixture counter corrected the failing test. These tests do not
+prove concurrent protection changes safe: the existing guard deliberately does
+not catch a guard-page exception introduced between query and copy.
+
+Still required: invocation admission and enclosure ABI, revision/lifecycle
+integration, worker output/footer and timeout races, full installation signature
+and rollback tests, hook timing, and the prepared live exercise. Batch tests
+alone do not constitute full transport or timeout/shutdown acceptance.
 
 ## Stage and association
 

@@ -58,11 +58,17 @@ SPANS = (
     ('command-consumer-dispatch-through-four', 0x140074785, 0x140074950),
     ('command-seven-transpose-upload', 0x140074C1C, 0x140074DFA),
     ('command-four-setup-helper', 0x1402E1B90, 0x1402E3C66),
+    ('command-four-rectangle-helper', 0x1402E0AA0, 0x1402E0E45),
+    ('queued-render-vertex-complete', 0x140F340B0, 0x140F34AE5),
+    ('renderer-derived-position-consumer', 0x1402DE450, 0x1402DE53F),
 )
 
 # Pin numerical operands outside .text independently. These are rendering
 # operands, not an assertion of screen coordinates or an allowed health range.
 DATA = (
+    ('rectangle-negative-unit', 0x140FE52CC, '000080bf'),
+    ('depth-derived-multiplier', 0x141054BE4, '3baab83f'),
+    ('renderer-position-minimum-w', 0x140FE4230, '00000034'),
     ('gauge-divisor', 0x141017210, '00007a44'),
     ('gauge-multiplier', 0x1410DDF80, '00008e42'),
     ('gauge-percent-divisor', 0x140FE5400, '0000c842'),

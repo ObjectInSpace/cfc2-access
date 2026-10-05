@@ -11,6 +11,50 @@ import pws2_hud_audit as audit
 
 
 class HudAuditTests(unittest.TestCase):
+    def test_rectangle_halving_selection_and_original_reciprocals(self):
+        body = self.instructions('command-four-rectangle-helper')
+        for address, instruction in (
+            (0x1402E0AD6, 'je 0x1402e0e3e'),
+            (0x1402E0BB6, 'cdq'),
+            (0x1402E0BB7, 'sub eax, edx'),
+            (0x1402E0BBF, 'sar eax, 1'),
+            (0x1402E0C59, 'bt ecx, 9'),
+            (0x1402E0C5D, 'jae 0x1402e0c7b'),
+            (0x1402E0DAB, 'mov qword ptr [rbx + 0x1a08], rdi'),
+            (0x1402E0DEF, 'mov eax, dword ptr [rsi + 8]'),
+            (0x1402E0DF2, 'sub eax, dword ptr [rsi]'),
+            (0x1402E0E0C, 'movss dword ptr [rdi + 0x20], xmm1'),
+            (0x1402E0E15, 'movss dword ptr [rdi + 0x24], xmm6'),
+        ):
+            self.assertEqual(body[address].strip(), instruction)
+
+    def test_strip_expansion_alternates_order_and_replicates_attributes(self):
+        body = self.instructions('queued-render-vertex-complete')
+        for address, instruction in (
+            (0x140F345FD, 'test bpl, 0x40'),
+            (0x140F34607, 'test r14d, r14d'),
+            (0x140F34610, 'lea r9d, [rcx - 2]'),
+            (0x140F34636, 'test r8b, 1'),
+            (0x140F346D4, 'movsd xmm0, qword ptr [rdx + 0xc]'),
+            (0x140F34701, 'add rdx, 0x28'),
+            (0x140F34708, 'add rcx, 0x78'),
+            (0x140F34717, 'lea ecx, [r9 + r9*2]'),
+            (0x140F34744, 'cmp r10d, -3'),
+            (0x140F34762, 'test byte ptr [rax + 0x44f4], 0x10'),
+            (0x140F34847, 'test byte ptr [rax + 0x44f4], 0x20'),
+        ):
+            self.assertEqual(body[address], instruction)
+
+    def test_derived_position_consumer_clamps_w_without_rectangle_origin(self):
+        body = self.instructions('renderer-derived-position-consumer')
+        self.assertEqual(body[0x1402DE454], 'mov rax, qword ptr [rcx + 0x19f8]')
+        self.assertEqual(body[0x1402DE461], 'and rax, 0xfffffffffffffff0')
+        self.assertEqual(body[0x1402DE4AD], 'jae 0x1402de4b2')
+        self.assertEqual(body[0x1402DE4AF], 'movaps xmm2, xmm0')
+        self.assertEqual(body[0x1402DE4C9], 'sub eax, dword ptr [rcx + 0x134]')
+        self.assertEqual(body[0x1402DE4DD], 'sub eax, dword ptr [rcx + 0x138]')
+        self.assertEqual(body[0x1402DE4F8], 'movss dword ptr [rdx + 0xc], xmm2')
+
     @classmethod
     def setUpClass(cls):
         cls.evidence = audit.produce()

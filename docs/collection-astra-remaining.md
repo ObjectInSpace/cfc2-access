@@ -1,5 +1,15 @@
 # Remaining Astra work after the 5f9e3fc continuation
 
+Checkpoint from 904b955: native bounded reader and fixed batch storage now
+exist, unwired, with 234 reader and 70 batch checks passing. The expanded HUD
+trace records rectangle constants, derived-storage destinations and strip
+expansion; 48 PWS2 Python tests pass. Remaining native work is admission/list
+enclosure, worker/footer and lifecycle revision integration, signature/rollback
+installation and measured live acceptance. Command 7's final shader binding,
+full inverse/product interpretation and remaining vertex helper semantics are
+still open. Older implementation assignments below describe the preceding
+baseline where they call the reader and batch primitives unimplemented.
+
 This is a work allocation, not a model or approval requirement. The publisher,
 list-8 resource lifecycle, matrix construction and queue submission conditions
 are traced. The recovered audio and ownership implementations are preserved.

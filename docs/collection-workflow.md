@@ -1,5 +1,17 @@
 # Astra investigation and Opus implementation workflow
 
+Continuation, 2026-10-05, from clean 904b955: added unwired native bounded
+reader and fixed batch storage; 234 native reader and 70 batch checks pass.
+The HUD manifest now retains 53 spans and 27 operands, including the complete
+rectangle helper, complete vertex routine and a derived-position consumer.
+All 48 PWS2 Python tests pass. See the HUD trace for rectangle halving,
+derived constant destinations and alternating strip expansion. Command 7's
+shader consumer remains unresolved. Enclosure/admission, worker/footer,
+installer and live acceptance remain open; nothing was installed or deployed.
+Next: implement the list enclosure and arm lifecycle against the v1 contract,
+then worker integration/rollback tests; continue generic binding-array/shader
+tracing and remaining matrix algebra independently.
+
 Continuation, 2026-10-05, from clean 5f9e3fc: traced command-buffer reset and
 count-based consumption, command 4's matrix argument order/setup helper, and
 command 7's three-row transpose upload. The HUD manifest retains 50 spans

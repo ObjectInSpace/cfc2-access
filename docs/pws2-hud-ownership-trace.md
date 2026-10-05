@@ -423,10 +423,93 @@ specifies ten reads / 904 bytes per event and has a working offline reference.
 Native reader, invocation enclosure, transport and installer tests remain
 unperformed; nothing was attached, installed or deployed.
 
-Next renderer work: decode the retained 0x1402e1b90 derived constants and
+Next renderer work at that checkpoint: decode the retained 0x1402e1b90 derived constants and
 0x1402e0aa0 rectangle behavior, follow the command-7 binding to its shader,
 and close the intervening 0x140f340b0 vertex branches. The actor two-point
 projection is still not an established HUD or accessible-camera formula.
+
+### Rectangle, derived storage and vertex continuation from 904b955
+
+The complete rectangle helper 0x1402e0aa0..0x1402e0e45 is now retained.
+It compares all four incoming signed dwords with context+0x134..+0x140
+and returns without updating when equal. A changed rectangle is copied there
+and to +0x178..+0x184; the latter four values are each divided by two with
+truncation toward zero (`cdq; sub eax,edx; sar eax,1`). This is not a width/
+height-only halving. The routine sets context+0x130 bit 3. It stops before
+constant allocation if either unsigned halfword of context+0x1dc is zero.
+Bit 9 of +0x130 chooses the halved rectangle; otherwise it uses the original.
+
+For selected coordinates L,T,R,B and those halfwords W,H, let
+sx = float(R-L)/W * 0.5 and sy = float(B-T)/H * 0.5, respecting the actual
+float32 operation order. The binding at context+0x1a08 receives:
+
+- +0: (float(L)/W)/sx + 1.
+- +4: -1 - (float(T)/H)/sy.
+- +8: sx; +0xc: sign-flipped sy.
+- +0x20: 1/float(original R-original L).
+- +0x24: 1/float(original B-original T).
+
+This binding is allocated from descriptor context+0x10 -> +0xb58. The
+previous descriptor-sized contents are copied before these fields change.
+The negative unit operand is pinned. Integer subtractions are native 32-bit
+operations, and no zero-extent/finite guard is established here. Do not replace
+the original-coordinate reciprocals with reciprocals of the selected rectangle.
+Equality returns before dimension checks; this function alone does not prove
+that changing target dimensions refreshes an unchanged rectangle elsewhere.
+
+Command 4's setup continuation now has a concrete destination map. Its
+context+0x1a28 allocation, from descriptor +0xb68, receives six four-float
+vectors at +0..+0x5c. Their source uses the four columns of the computed
+stack matrix at rbp+0x30: column 3 minus/plus column 0, column 3 minus/plus
+column 1, column 3 minus column 2, then column 2. Each four-vector is scaled
+by the reciprocal length of its first three components. This is the arithmetic
+shape of normalized frustum planes, not evidence of which shader applies them
+or that a particular HUD resource survives clipping. Degenerate lengths are
+not rejected in the retained arithmetic.
+
+The larger binding at context+0x19f8, descriptor +0xb50, copies four rows
+from rbp+0x30 to +0; incoming RDX's matrix to +0x70; rbp+0xb0 to +0xb0;
+incoming R8's matrix to +0xf0; rbp+0x70 to +0x130; and rbp-0x10 to +0x170.
+All six loops copy sixteen words. Complete symbolic identification of the
+stack products/inverses remains open; these offsets are observed copy dataflow.
+
+Some derived scalars are now isolated without guessing the math-library call:
+with a=R8[0x28] and b=R8[0x38], +0x4c receives b/a. The scalar supplied to
+0x140effe50 is max(a*(b/a)/(a+1),1)+1, with native SSE comparison semantics.
+Its result is multiplied by pinned float32 bits 0x3fb8aa3b, approximately
+1.442695, and written at +0x60; its reciprocal is written at +0x64.
+The helper's exact exceptional-input/library semantics remain unproved. The
+fifth input argument is retained separately at +0x5c; the local XMM15 used
+in these formulas was reloaded with 1.0, not the caller's 100.0 argument.
+
+A separate complete consumer, 0x1402de450..0x1402de53f, loads and masks the
+low four bits of context+0x19f8, then computes a homogeneous point from its
+first four rows. It clamps W below pinned 2^-23 before division, returns
+Z/W and clamped W, and scales (X/W+1) and (1-Y/W) by half the original
+rectangle extents. It does not add rectangle left/top origins. This closes a
+CPU reader of derived storage, not its use for this HUD or command 7's shader.
+
+The full 0x140f340b0 vertex routine is retained instead of just its entry/tail.
+One intervening branch, gated by BPL bit 0x40 clear and R14D zero, expands
+N source records of stride 0x28 into 3*(N-2) records. Triangle i uses source
+(i,i+1,i+2) for even i, and (i+2,i+1,i) for odd i. After copying each triple,
+the routine overwrites all three records' bytes +0xc..+0x17 from source i+2.
+It advances the source by 0x28 and destination by 0x78. This preserves
+alternating strip winding while replicating an attribute group; it is not a
+homogeneous divide. Other branches distinguish selector -3, skip -2/-1, and
+gate helper-based attribute arithmetic on context+0x44f4 bits 0x10/0x20.
+The meaning of all attributes and helper branches remains open.
+
+Command 7 downstream work remains unresolved: direct displacement searches
+find many writers of +0x1a38 but do not identify its shader reader. Generic
+indexed binding-array consumers must be traced from the dirty +0x248 path;
+a missing direct +0x1a38 load is not evidence that the upload is unused.
+
+The manifest now retains 53 spans and 27 pinned operands; all 48 PWS2 Python
+tests pass. The new native reader and batch suites pass 234 and 70 checks.
+They remain unwired and excluded from the DLL. Enclosure, full transport,
+installation and live acceptance are still required; no final pixels, camera
+ownership or audio eligibility follow from this checkpoint.
 
 ### Vertex command buffering continuation from 92f805f
 
