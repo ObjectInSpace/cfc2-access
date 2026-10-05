@@ -1,5 +1,30 @@
 # Astra investigation and Opus implementation workflow
 
+Continuation, 2026-10-04, from clean e308e64: the
+[HUD trace](pws2-hud-ownership-trace.md#publisher-and-resource-continuation-from-e308e64)
+corrects the publisher's enclosing entry to 0x140a6e250, establishes outer
+state 2 / inner state 2 publication with the +0x52bd9 exclusion, and follows
+type-zero resources through allocation, binding, release, matrix construction
+and list-8 submission gates. The HUD manifest now retains 40 spans and 21
+data ranges. Object and resource transforms are built after callbacks; local
+layout offsets remain unsuitable for direct audio pan. A further actor-value
+writer and descriptor-driven subtraction establish conditional zero/one
+floors, not a complete health range. Renderer types 0/1 and 2/3 copy different
+second matrices; segment and queue rejection mean a matrix load is not an
+accepted draw command.
+
+All 25 PWS2 Python tests and eleven metadata tests passed. Recovered audio
+passed 35 scene and 44 mixer checks, with compiler access on retry. Audio and
+ownership recovery are preserved. An unwired assembly entry prototype now
+passes synthetic active, inactive, nested and unrelated-caller ABI checks;
+the production filter also compiles. It is excluded from the DLL build and
+has no installer, capture reader or audio calls. No deployment or live result
+is claimed. [PWS2-R02](port-tasks/pws2-draw-stage-capture.md) records this
+component and the remaining bounded capture, final renderer and gauge writer
+work. Shared production session/audio integration still needs lifecycle
+thread/order evidence and accepted gameplay semantics. Continue useful offline
+work before the targeted live exercises described in the packet.
+
 Continuation, 2026-10-04, from b01dc6f: the
 [HUD ownership trace](pws2-hud-ownership-trace.md) establishes separate fixed
 actor and compacted display-layout indices, general-pool callback publication,

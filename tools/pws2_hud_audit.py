@@ -17,6 +17,37 @@ SPANS = (
     ('included-actor-setup-loop', 0x140A667F0, 0x140A6683E),
     ('actor-resource-setup', 0x140A66020, 0x140A667E9),
     ('actor-reset-through-gauge-initialization-prefix', 0x140A669B0, 0x140A66AA8),
+    ('display-outer-state-dispatch-prefix', 0x140A6ED60, 0x140A6EE80),
+    ('display-publisher-state-machine', 0x140A6E250, 0x140A6E7D7),
+    ('display-resource-allocation', 0x140A63CA0, 0x140A63D25),
+    ('display-resource-pool-initialize', 0x140A643D0, 0x140A64498),
+    ('display-resource-release', 0x140A64D20, 0x140A64D8E),
+    ('display-object-release', 0x140A4BA80, 0x140A4BBF9),
+    ('display-resource-binding', 0x140A60AA0, 0x140A60B01),
+    ('list-eight-update-before-matrix-build', 0x140A4C710, 0x140A4C7D6),
+    ('list-resource-matrix-build', 0x140A7C600, 0x140A7C8FF),
+    ('list-eight-draw', 0x140A5DE70, 0x140A5E05D),
+    ('later-list-projection-setup', 0x140A5D821, 0x140A5D86B),
+    ('resource-conditional-geometry-update', 0x140AEE2E0, 0x140AEE5A5),
+    ('component-rotation-a', 0x140F33250, 0x140F332D5),
+    ('component-rotation-b', 0x140F332E0, 0x140F33365),
+    ('component-rotation-c', 0x140F33370, 0x140F333F5),
+    ('component-scale-premultiply', 0x140F33450, 0x140F334AE),
+    ('component-translation-replace', 0x140F334B0, 0x140F334C9),
+    ('component-translation-premultiply', 0x140F33520, 0x140F3357E),
+    ('fixed-actor-value-reset-call-loop', 0x140A6DFD0, 0x140A6DFF5),
+    ('actor-value-zero-or-one-writer', 0x140AD44F0, 0x140AD4577),
+    ('render-submit-default-scalar', 0x140F35EF0, 0x140F35F15),
+    ('render-submit-explicit-scalar', 0x140F36410, 0x140F36435),
+    ('render-packet-segment-submission', 0x140F34CF0, 0x140F34E34),
+    ('render-queue-build', 0x140F2F390, 0x140F2FB39),
+    ('render-queue-drain', 0x140F2E990, 0x140F2ED7E),
+    ('render-command-copy', 0x140048810, 0x1400488AD),
+    ('queued-render-matrix-entry-prefix', 0x140F340B0, 0x140F34106),
+    ('queued-render-vertex-submission-tail', 0x140F34A4B, 0x140F34AE5),
+    ('matrix-copy-entry-abi', 0x140F32440, 0x140F32487),
+    ('indexed-actor-subtraction-caller', 0x140AD1296, 0x140AD12D9),
+    ('descriptor-driven-actor-subtraction', 0x140AD17B0, 0x140AD1B9E),
 )
 
 # Pin numerical operands outside .text independently. These are rendering
@@ -31,6 +62,27 @@ DATA = (
     ('layout-sixth-origin', 0x14106E870, '00007043'),
     ('special-gauge-multiplier', 0x1410DDF7C, '5c8f623f'),
     ('special-gauge-offset', 0x1410DDF78, '1f85eb3d'),
+    ('publisher-state-targets', 0x140A6E7D8,
+     '88e2a600f8e3a60055e5a600e7e6a60049e7a60089e7a600'),
+    ('publisher-outer-state-targets', 0x140A6F458,
+     '58eea60062eea6006ceea60076eea60080eea6008aeea60094eea600'
+     '93f0a6009df0a600a7f0a600dff1a600'),
+    ('resource-type-zero-initializer', 0x141745700, 'a03ca64001000000'),
+    ('resource-type-zero-release', 0x14172AF48, '204da64001000000'),
+    ('resource-default-scale', 0x1410A8378, '0000803f0000803f0000803f'),
+    ('render-queue-type-targets', 0x140F2FB3C,
+     '06f4f20006f4f2009bf6f2009bf6f2009bf6f2009bf6f20006f4f20006f4f200'
+     '33f8f2003af8f20033f8f2004ff8f20071f8f20092f8f20092f8f20092f8f200'
+     '92f8f20092f8f20092f8f200e2f8f200e2f8f20033f8f200e2f8f200f9f8f20076f9f200'),
+    ('render-queue-drain-targets', 0x140F2EDDC,
+     '29ebf20029ebf20029ebf20029ebf20061ebf20061ebf20099ebf20099ebf200'
+     'ceebf200ceebf200d9ebf200d9ebf200e4ebf200eeebf200eeebf200f8ebf200'
+     'f8ebf20002ecf20002ecf2000cecf20016ecf20020ecf2002aecf20034ecf2003eecf200'),
+    ('render-unit-scalar', 0x140FDE828, '0000803f'),
+    ('actor-subtraction-mode-multiplier', 0x14105BC24, '9a99193f'),
+    ('actor-subtraction-flag-multiplier', 0x140FE4244, '0000003f'),
+    ('actor-subtraction-table-threshold', 0x140FE4788, '00004040'),
+    ('actor-subtraction-context-multiplier', 0x141018AAC, '0000803e'),
 )
 
 
