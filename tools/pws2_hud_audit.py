@@ -48,6 +48,7 @@ SPANS = (
     ('matrix-copy-entry-abi', 0x140F32440, 0x140F32487),
     ('indexed-actor-subtraction-caller', 0x140AD1296, 0x140AD12D9),
     ('descriptor-driven-actor-subtraction', 0x140AD17B0, 0x140AD1B9E),
+    ('render-queue-sort-value', 0x140F2EE80, 0x140F2EF2D),
 )
 
 # Pin numerical operands outside .text independently. These are rendering
@@ -83,6 +84,9 @@ DATA = (
     ('actor-subtraction-flag-multiplier', 0x140FE4244, '0000003f'),
     ('actor-subtraction-table-threshold', 0x140FE4788, '00004040'),
     ('actor-subtraction-context-multiplier', 0x141018AAC, '0000803e'),
+    ('queue-sort-special-threshold', 0x1410DD838, '00c0da45'),
+    ('queue-sort-special-result', 0x14105BC40, '00401c46'),
+    ('queue-sort-sign-mask', 0x140FE42C0, '00000080000000800000008000000080'),
 )
 
 

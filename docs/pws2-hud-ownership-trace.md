@@ -9,7 +9,7 @@ python tools/test_pws2_ownership_capture.py
 ```
 
 The original increment retained nine instruction-aligned spans and nine pinned
-numerical operands. The continuation below expands this to 40 spans and 21
+numerical operands. The continuations below expand this to 41 spans and 24
 data ranges. The actor and transform-target manifests are unchanged.
 This establishes a native gauge/display ownership relationship, not a live
 HUD label, controller assignment, health range contract or audio permission.
@@ -317,8 +317,8 @@ Thus a slot-1-only record omits two matrices used by this renderer. The
 accepted path copies the payload into context+0x100030+used, writes a
 32-byte descriptor containing type, payload pointer, size and sorting data,
 then advances bucket/group counts and byte use. The function has no explicit
-success-result contract. Depth classification, including the types-2/3 helper
-0x140f2ee80, still needs review; it is not a validated screen projection.
+success-result contract. The types-2/3 sorting helper is traced below;
+it is not a screen-position or visibility function.
 
 The queue drain's pinned table sends all four types to 0x140f2eb29.
 It submits command 4 for 128 bytes starting at payload+8, command 7 for
@@ -330,6 +330,37 @@ Command copying through 0x140048810 is itself conditional on session+0x774,
 nonzero size and a two-megabyte buffer bound. None of these stages proves
 visible pixels. Keep matrix-load, segment-attempt, accepted-queue and drain
 events distinct; do not label the first as a completed draw.
+
+### Queue sorting continuation from c801b79
+
+The complete helper 0x140f2ee80..0x140f2ef2d takes four scalar inputs
+in XMM0..3. The conditional types-2/3 call at 0x140f2f725 supplies
+segment+0x10/+0x14/+0x18/+0x1c. Its branches are:
+
+- When the common session's +0x48 equals 8 and the fourth input is ordered
+  greater than the pinned 7000.0, return the pinned 10000.0. This local
+  comparison does not establish a named gameplay mode or a coordinate range.
+- Otherwise, if the fourth input is ordered negative, flip its sign bit
+  and return it. The pinned XOR mask changes signs; it is not a divide.
+- Otherwise, save the current matrix with a null-argument push, postmultiply
+  by slot 2, slot 3 and the mutable viewport matrix at 0x141c00210,
+  transform the first three inputs through 0x140f31d10, pop one matrix,
+  and return the fourth output (W) without a perspective divide.
+
+The existing actor manifest retains the complete postmultiply, homogeneous
+transform and push/pop helpers. With sufficient stack capacity and distinct
+source slots, this branch uses current * slot2 * slot3 * viewport. The caller
+does not inspect push success; a failed push can leave modified matrix state
+and a subsequent pop can restore an older entry. Aliasing a source slot also
+prevents treating the composition as four independent snapshot matrices.
+NaN comparisons do not supply a finite-input contract.
+
+The returned scalar becomes the queue's sorting value in XMM6. This trace
+closes the helper's dataflow, not final vertex projection or clipping.
+The new audit test checks segment inputs, branch structure, homogeneous call,
+pop and undivided fourth-output return. The HUD manifest now has 41 spans
+and 24 pinned data ranges; all 26 PWS2 tests pass. No native source changed
+in this continuation, and no live capture or audio acceptance is claimed.
 
 ### Further actor-value writers
 

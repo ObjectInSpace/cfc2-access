@@ -103,7 +103,9 @@ object/resource counts and asset indices are not already validated limits.
    types-0/1 versus types-2/3 queue matrix copies are now retained in the HUD
    trace, along with capacity rejection. A matrix load proves neither queue
    acceptance nor visible pixels or normalized HUD pan. The renderer's
-   intervening vertex pipeline and depth helper remain open.
+   intervening vertex pipeline remains open. The depth helper is now traced:
+   it returns a queue sorting scalar, including an undivided-W path, and does
+   not establish screen position or visibility.
 3. Complete actor-value damage/range and publication-mode writer review.
    An initializer of 1000.0 does not certify the maximum in every mode.
 4. Connect diagnostic revision labels to the existing lifecycle probe without

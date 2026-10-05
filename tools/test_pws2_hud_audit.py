@@ -96,6 +96,22 @@ class HudAuditTests(unittest.TestCase):
         self.assertEqual(writer[0x140AD1ABE], 'mov dword ptr [rbx + 0x1dc], edi')
         self.assertEqual(writer[0x140AD1B8F], 'mov dword ptr [rbx + 0x1dc], 0x3f800000')
 
+    def test_queue_sort_uses_segment_fields_and_returns_undivided_w(self):
+        queue = self.instructions('render-queue-build')
+        self.assertEqual(queue[0x140F2F711], 'movss xmm3, dword ptr [rcx + 0x1c]')
+        self.assertEqual(queue[0x140F2F720], 'movss xmm0, dword ptr [rcx + 0x10]')
+        self.assertEqual(queue[0x140F2F725], 'call 0x140f2ee80')
+        sort = self.instructions('render-queue-sort-value')
+        self.assertEqual(sort[0x140F2EE8E], 'cmp dword ptr [rax + 0x48], 8')
+        self.assertEqual(sort[0x140F2EE9B], 'jbe 0x140f2eeaa')
+        self.assertEqual(sort[0x140F2EEB0], 'jbe 0x140f2eec1')
+        self.assertEqual(sort[0x140F2EED5], 'call 0x140f331c0')
+        self.assertEqual(sort[0x140F2EEF4], 'add rcx, 0x1f816c')
+        self.assertEqual(sort[0x140F2EF16], 'call 0x140f31d10')
+        self.assertEqual(sort[0x140F2EF1D], 'call 0x140f33130')
+        self.assertEqual(sort[0x140F2EF22], 'movss xmm0, dword ptr [rsp + 0x3c]')
+        self.assertFalse(any(i.startswith(('divss ', 'divps ')) for i in sort.values()))
+
     def test_manifest_reproduces(self):
         path = Path(__file__).resolve().parents[1] / 'docs/pws2-hud-manifest.json'
         self.assertEqual(audit.produce(), json.loads(path.read_bytes()))

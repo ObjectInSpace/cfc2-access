@@ -1,5 +1,16 @@
 # Astra investigation and Opus implementation workflow
 
+Continuation from c801b79: the types-2/3 queue helper returns a sorting scalar,
+with fixed, sign-flipped and transformed-W branches. It does not calculate a
+screen position. The HUD manifest now retains 41 spans and 24 data ranges;
+all 26 PWS2 tests pass. No native source, deployment or live result changed.
+The [remaining Astra work](collection-astra-remaining.md) separates unresolved
+renderer/capture/session/audio decisions from bounded implementation work and
+records the wider cross-game pilot and feature-packet obligations. Next trace:
+the vertex submission and matrix-command consumers. Also make the raw
+diagnostic's bounded read and lifetime contract concrete; it need not wait
+for a universal health maximum.
+
 Continuation, 2026-10-04, from clean e308e64: the
 [HUD trace](pws2-hud-ownership-trace.md#publisher-and-resource-continuation-from-e308e64)
 corrects the publisher's enclosing entry to 0x140a6e250, establishes outer
