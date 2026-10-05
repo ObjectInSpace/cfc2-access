@@ -51,6 +51,13 @@ SPANS = (
     ('render-queue-sort-value', 0x140F2EE80, 0x140F2EF2D),
     ('vertex-command-session-gate', 0x1400487C0, 0x14004880D),
     ('vertex-command-buffer-copy', 0x14004CA10, 0x14004CAB3),
+    ('command-buffer-reset', 0x140048E90, 0x140048ECB),
+    ('command-consumer-entry', 0x140073AC0, 0x140073B38),
+    ('command-consumer-walk', 0x14007421D, 0x1400742DC),
+    ('command-consumer-loop-back', 0x14007433D, 0x140074379),
+    ('command-consumer-dispatch-through-four', 0x140074785, 0x140074950),
+    ('command-seven-transpose-upload', 0x140074C1C, 0x140074DFA),
+    ('command-four-setup-helper', 0x1402E1B90, 0x1402E3C66),
 )
 
 # Pin numerical operands outside .text independently. These are rendering

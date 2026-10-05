@@ -1,5 +1,17 @@
 # Astra investigation and Opus implementation workflow
 
+Continuation, 2026-10-05, from clean 5f9e3fc: traced command-buffer reset and
+count-based consumption, command 4's matrix argument order/setup helper, and
+command 7's three-row transpose upload. The HUD manifest retains 50 spans
+and 24 data ranges; all 45 PWS2 Python tests pass. The
+[v1 draw-capture contract](pws2-draw-capture-contract.md) now specifies stage,
+association, ten-read/904-byte event bounds, invocation/batch limits and
+lifetime/loss rules, with fifteen synthetic reader/parser tests. Native
+enclosure/reader/transport/installer acceptance is still open. No runtime
+source, deployment, audio wiring or live state changed. Next: implement that
+bounded offline contract and decode the retained matrix-setup helper's
+derived constants, rectangle helper, shader bindings and remaining vertices.
+
 Continuation, 2026-10-05, from 92f805f: the vertex submission wrapper and
 0x14004ca10 copy into another command buffer after the session gate. The
 native payload capacity comparison excludes the subsequently added header;

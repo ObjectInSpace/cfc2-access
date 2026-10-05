@@ -1,4 +1,4 @@
-# Remaining Astra work after c801b79
+# Remaining Astra work after the 5f9e3fc continuation
 
 This is a work allocation, not a model or approval requirement. The publisher,
 list-8 resource lifecycle, matrix construction and queue submission conditions
@@ -9,10 +9,11 @@ collection campaign is not yet ready for an implementation-only handoff.
 
 ## PWS2 renderer and gameplay meaning
 
-Astra should finish the relevant vertex path and the consumers of queued
-matrix commands 4 and 7. The 2026-10-05 continuation traces 0x1400487c0
-through 0x14004ca10 as gated command-buffer copying; final consumption
-remains open. Establish
+Astra should finish the relevant vertex path and downstream matrix meaning.
+The 2026-10-05 continuation now traces the count-based command-buffer walk,
+command 4's setup call and command 7's three-row transpose upload. The full
+0x1402e1b90 helper is retained; its derived constants, rectangle helper and
+shader consumers remain to be decoded. Establish
 projection, clipping and the particular pass suitable for accessible spatial
 cues. The queue sorting scalar is not screen position. Close the remaining
 health range/mode writer questions before publishing normalized health.
@@ -30,9 +31,12 @@ can implement that decoder and its specified invalid-input cases.
 
 ## Draw capture safety and installation
 
-Astra should choose and review the installer and capture contract around the
-tested entry component: signature/relocation coverage, resource association,
-bounded guarded reads, per-invocation completion, reentrancy and lifetime.
+The [v1 capture contract](pws2-draw-capture-contract.md) now chooses the stages,
+direct resource association, ten-read/904-byte event budget, invocation limits,
+batch ownership and lifetime/loss labels. Its offline reader/parser has fifteen
+synthetic tests. Astra should review the native implementation around the
+tested entry component: signature/relocation coverage, fault-guard behavior,
+invocation enclosure, completion races, reentrancy and lifetime.
 The filter proves a local matrix-load caller, not queue acceptance. Decide
 which stages the diagnostic actually needs and name its records accordingly.
 
@@ -42,9 +46,11 @@ tests, and a run card. Diagnostic capture does not need a certified health
 maximum or final spatial cue policy; those unknowns must not become artificial
 blockers to collecting bounded raw evidence.
 
-Opus can implement the bounded reader, transport and installer once this
-contract is concrete. Astra reviews the ABI/lifetime edges and any evidence
-conflicts. The existing entry test alone is insufficient acceptance.
+Opus can now implement the bounded reader and diagnostic batches against the
+v1 contract and executable reference. The enclosure and installer must pass
+their listed ABI/rollback tests before live installation. Astra reviews the
+ABI/lifetime edges and any evidence conflicts; passing Python tests and the
+existing helper entry test are insufficient native acceptance.
 
 ## Shared session and output invalidation
 
@@ -91,8 +97,9 @@ Astra reviews ambiguous behavior and acceptance failures.
 
 ## Immediate sequence
 
-1. Continue the renderer vertex/command consumer trace while making the
-   bounded diagnostic capture contract concrete.
+1. Decode command 4's derived constants and rectangle behavior, command 7's
+   downstream binding and the remaining vertex branches. Implement the now
+   concrete bounded diagnostic contract independently of those semantics.
 2. Implement and test the diagnostic with a prepared live run card. Run the
    existing lifecycle exercise after its required regressions/build; useful
    raw acquisition need not wait for every gameplay decoding question.

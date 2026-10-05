@@ -132,6 +132,52 @@ class HudAuditTests(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / 'docs/pws2-hud-manifest.json'
         self.assertEqual(audit.produce(), json.loads(path.read_bytes()))
 
+    def test_command_walk_uses_count_and_signed_header_length(self):
+        reset = self.instructions('command-buffer-reset')
+        self.assertEqual(reset[0x140048E9E], 'mov qword ptr [rdx + 0xded30], rax')
+        self.assertEqual(reset[0x140048EAE], 'mov qword ptr [rdx + 0xded38], rax')
+        walk = self.instructions('command-consumer-walk')
+        self.assertEqual(walk[0x140074224], 'mov eax, dword ptr [rcx + 0xded3c]')
+        self.assertEqual(walk[0x14007422A], 'mov rdx, qword ptr [rcx + 0xded18]')
+        self.assertEqual(walk[0x1400742C0], 'movsxd rax, dword ptr [rdx + 4]')
+        self.assertEqual(walk[0x1400742C7], 'add rdx, 0x18')
+        self.assertEqual(walk[0x1400742CB], 'add rdx, rax')
+        loop = self.instructions('command-consumer-loop-back')
+        self.assertEqual(loop[0x14007436D], 'cmp ecx, dword ptr [rbp + 0x128]')
+        self.assertEqual(loop[0x140074373], 'jl 0x1400742c0')
+
+    def test_command_four_argument_order_and_derived_storage(self):
+        dispatch = self.instructions('command-consumer-dispatch-through-four')
+        self.assertEqual(dispatch[0x140074906], 'cmp eax, 4')
+        self.assertEqual(dispatch[0x14007490F], 'lea rdx, [rbx + 0x58]')
+        self.assertEqual(dispatch[0x140074926], 'lea r8, [rsp + 0x40]')
+        self.assertEqual(dispatch[0x140074946], 'call 0x1402e1b90')
+        setup = self.instructions('command-four-setup-helper')
+        self.assertEqual(setup[0x1402E353E], 'mov qword ptr [rdi + 0x1a28], rbx')
+        self.assertEqual(setup[0x1402E3934], 'mov qword ptr [rdi + 0x19f8], rbx')
+
+    def test_command_seven_transposes_but_uploads_only_twelve_words(self):
+        instructions = self.instructions('command-seven-transpose-upload')
+        self.assertEqual(instructions[0x140074C1C], 'cmp eax, 7')
+        self.assertEqual(instructions[0x140074CD3], 'mov qword ptr [r14 + 0x1a38], r9')
+        self.assertEqual(instructions[0x140074CE5], 'je 0x14007433d')
+        # Recover the source->scratch mapping from the actual scalar moves.
+        registers, scratch = {}, {}
+        import re
+        for address, instruction in instructions.items():
+            if not 0x140074CEB <= address < 0x140074DA5:
+                continue
+            load = re.fullmatch(r'movss (xmm\d), dword ptr \[rbx \+ (0x[0-9a-f]+)\]', instruction)
+            store = re.fullmatch(r'movss dword ptr \[rsp \+ (0x[0-9a-f]+)\], (xmm\d)', instruction)
+            if load:
+                registers[load[1]] = (int(load[2], 16) - 0x18) // 4
+            if store:
+                scratch[(int(store[1], 16) - 0x40) // 4] = registers[store[2]]
+        self.assertEqual([scratch[i] for i in range(16)],
+                         [0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15])
+        self.assertEqual(instructions[0x140074DE7], 'cmp r10d, 2')
+        self.assertEqual(instructions[0x140074DEB], 'jbe 0x140074db0')
+
     def test_changed_layout_and_gauge_operands_rejected(self):
         original = audit.Dump.read
         for _, target, _ in audit.DATA:

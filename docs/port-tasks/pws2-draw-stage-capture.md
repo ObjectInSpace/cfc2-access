@@ -1,8 +1,9 @@
 # PWS2 draw-stage capture research
 
 - Task ID: PWS2-R02. Kind: ABI and acquisition research.
-- Status: research with tested, unwired entry ABI component; not ready for
-  runtime installation or deployment.
+- Status: concrete v1 offline acquisition contract with tested reference
+  reader/parser and unwired entry ABI component; native implementation and
+  installer/transport acceptance remain open. Not ready for deployment.
 - Baseline: e308e64 plus the publisher/resource continuation containing this
   packet. Preserve the audio checkpoint b01dc6f and ownership checkpoint
   cee7511 and subsequent work.
@@ -13,6 +14,21 @@
 - Deliverable: a reviewed, bounded diagnostic capture contract and tested
   implementation that joins submitted HUD resources to fixed actor owners.
   No production audio eligibility follows from a diagnostic capture.
+
+Continuation from 5f9e3fc: [the version-1 capture contract](../pws2-draw-capture-contract.md)
+now chooses helper-entry observation plus a list-8 invocation enclosure,
+specifies the direct association check and exact ten-read/904-byte budget,
+and defines arm/invocation limits, batch ownership, losses and stale revisions.
+tools/pws2_draw_contract.py and its fifteen synthetic tests are an executable
+offline reference for bounded reads and copied command snapshots. Native
+guard behavior, enclosure ABI, concurrency and installer rollback are not
+proved by these tests. This bounded implementation can proceed without health
+maxima or final projection semantics. Use the v1 contract where the older
+research alternatives and proposed record inventory below are broader.
+
+The command consumer and handlers 4/7 are now retained in the HUD trace.
+Command 4 invokes a derived-state setup helper; command 7 uploads twelve
+words from the matrix transpose. Neither establishes final visibility.
 
 ## Established candidate sites
 

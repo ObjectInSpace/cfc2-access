@@ -362,6 +362,72 @@ pop and undivided fourth-output return. The HUD manifest now has 41 spans
 and 24 pinned data ranges; all 26 PWS2 tests pass. No native source changed
 in this continuation, and no live capture or audio acceptance is claimed.
 
+### Command consumption and matrix continuation from 5f9e3fc
+
+The command-buffer consumer is inside 0x140073ac0..0x140076dea.
+Its entry retains RDX as R14, the renderer context used below. The consumer
+at 0x14007421d loads the same shell singleton 0x141c14f90 used by the
+writers. It reads command count at +0xded3c and buffer base at +0xded18.
+The reset helper 0x140048e90 restores the write pointer from this base,
+zeros used bytes and command count with one qword store at +0xded38,
+and writes the caller's enable value to session+0x774.
+
+At 0x1400742c0 the consumer sign-extends header+4, advances the next pointer
+by that payload length plus 0x18, then dispatches on header+0. The common
+back edge compares an incremented iteration count with the saved command
+count, not with an end pointer or used-byte bound. These instructions trust
+the producer's record shape. This is not a safe parsing algorithm for a mod.
+The new offline snapshot decoder checks header-inclusive bounds independently.
+
+Command 4 at 0x140074906 consumes the two 64-byte matrices previously
+copied from queue payload+8/+0x48. It copies command payload+0 into stack
+storage and passes that as R8; RDX is command payload+0x40. RCX is renderer
+context R14, R9 points to the caller's local rectangle, and the fifth argument
+is XMM15, initialized from the already pinned 100.0 operand. It calls
+0x1402e1b90. Thus types 0/1 send the mutable template as RDX and slot 3 as
+R8; types 2/3 send slot 2 as RDX and slot 3 as R8. Input argument order must
+not be inferred from the order of the two queued matrices.
+
+The complete setup helper is retained, through return at 0x1402e3c65.
+Its prefix performs matrix-product arithmetic on those inputs; it later calls
+0x1402e0aa0 with the rectangle and builds derived renderer storage, including
+pointers at context+0x1a28 and +0x19f8. This is not a simple matrix memcpy.
+The exact full derived-constant layout, depth conversions, rectangle helper
+and downstream shader consumption remain to be decoded before claiming a
+final HUD projection formula. Retaining the complete helper is evidence
+availability, not a claim that all of its mathematics has been interpreted.
+
+Command 7 at 0x140074c1c is now traced through its complete handler:
+
+- It marks renderer state, optionally records the previous +0x1a38 binding
+  in the renderer's own state queue, and obtains aligned storage sized from
+  a descriptor reached through context+0x10, then +0xb70, then word +0x28.
+  The descriptor count is multiplied by four and rounded to sixteen bytes.
+  The growth helper 0x1402df1d0 remains an allocator boundary, not a matrix
+  transformation.
+- It publishes the new pointer at context+0x1a38 and sets context+0x248
+  bit 0. A null pointer skips the upload. It reads the sixteen float words
+  from command payload+0..+0x3c and lays out their transpose on the stack.
+- The upload loop initializes R10D=0, copies four words per iteration,
+  increments R10D and repeats while it is <=2. Therefore it writes only
+  twelve words: input indices 0,4,8,12; 1,5,9,13; 2,6,10,14. The fourth
+  transposed row is prepared but not uploaded here. This is a three-row
+  transform binding, not a homogeneous divide or clipping result.
+
+The new tests reconstruct the transposition from the retained scalar
+instructions and pin the loop bound, argument order, storage destinations,
+buffer reset and count-based walk. The manifest now retains 50 spans and
+24 data ranges. All 45 PWS2 Python tests pass, including fifteen synthetic
+draw-contract tests. The new [bounded capture contract](pws2-draw-capture-contract.md)
+specifies ten reads / 904 bytes per event and has a working offline reference.
+Native reader, invocation enclosure, transport and installer tests remain
+unperformed; nothing was attached, installed or deployed.
+
+Next renderer work: decode the retained 0x1402e1b90 derived constants and
+0x1402e0aa0 rectangle behavior, follow the command-7 binding to its shader,
+and close the intervening 0x140f340b0 vertex branches. The actor two-point
+projection is still not an established HUD or accessible-camera formula.
+
 ### Vertex command buffering continuation from 92f805f
 
 The vertex call at 0x140f34a7f passes a 0x28-byte stride, a data pointer
