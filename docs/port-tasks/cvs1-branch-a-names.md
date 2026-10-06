@@ -125,11 +125,15 @@ unrelated association is unresolved; never fill the gap with a guessed name.
 
 ## Completion record
 
-- Result commits: none; packet prepared, research not executed.
+- Research checkpoint: continuation from 29c5771, recorded in
+  [the visit and resource trace](../cvs1-selection-visits.md).
 - Delivered behavior: none; no names mapped and no runtime change.
-- Validation: evidence paths and retained fixture hashes checked during packet
-  preparation. Execution commands above are requirements, not new test claims.
-- Offline status: ready for bounded research.
+- Validation: audit regenerated with 67 spans and 19 explicit dispatch edges;
+  all 28 CVS1 Python tests pass, including slot reset/advance and type-2 draw
+  route checks. These are extraction checks, not name-semantic acceptance.
+- Offline status: partially investigated; no association meets acceptance.
 - Live status: existing native selection capture only; names unvalidated.
-- Next action: Opus reproduces the audit and follows the retained resource
-  consumers under the stated scope.
+- Next action: follow later resource-pointer writes and other ID-dependent
+  asset consumers under the stated scope. The constructor's fixed resource-1
+  lookup and type-2 draw helper alone do not establish names. The pinned image
+  has null root/common-context slots, so populated runtime assets remain absent.

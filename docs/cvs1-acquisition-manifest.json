@@ -172,6 +172,24 @@
       "sha256": "1ac4adea477dd3831e91b704616b82a803d633cef5663353e75dbfe0775362ae"
     },
     {
+      "label": "mode-branch-A-choice-commit-continuation",
+      "start": "0x1405da3bc",
+      "end_exclusive": "0x1405daf03",
+      "sha256": "b8a23327e0cc856bfecaa66eab19bf95d073ab05612573ecd470c08bce1d8011"
+    },
+    {
+      "label": "mode-branch-A-owner-selection-reset",
+      "start": "0x1405d9ba0",
+      "end_exclusive": "0x1405d9d37",
+      "sha256": "a74576d57a7da94044c3e84a5e7e05d96861676e7daceec1fecc6df730d4cc89"
+    },
+    {
+      "label": "mode-branch-A-catalog-selection-transition",
+      "start": "0x1405d9d40",
+      "end_exclusive": "0x1405d9e61",
+      "sha256": "0ee1b1f3ed2a5a5989f3140223648eb724beb87d5baae285fc912d02b3b33dec"
+    },
+    {
       "label": "mode-branch-A-object-state-dispatch",
       "start": "0x14060b500",
       "end_exclusive": "0x14060b50f",
@@ -302,6 +320,12 @@
       "start": "0x1405e1980",
       "end_exclusive": "0x1405e1ead",
       "sha256": "ca8770bf01a9a54dd9b2132d8683ca860d94d1f8476f011e383d8d231dfdd270"
+    },
+    {
+      "label": "selection-render-type-2",
+      "start": "0x1405dfb70",
+      "end_exclusive": "0x1405dfe59",
+      "sha256": "4e96eea4c41c2791aa0151eae3f4129b90f9431e98d448db78cb5a89b26d9785"
     },
     {
       "label": "selection-render-type-10",
@@ -460,6 +484,24 @@
       "slot": "0x141237de0",
       "bytes": "709e5d4001000000",
       "target": "0x1405d9e70"
+    },
+    {
+      "owner": "mode-branch-A-owner-reset",
+      "selector": "actor+4 unsigned byte",
+      "table": "0x141237dc0",
+      "index": 2,
+      "slot": "0x141237dd0",
+      "bytes": "a09b5d4001000000",
+      "target": "0x1405d9ba0"
+    },
+    {
+      "owner": "mode-branch-A-catalog-transition",
+      "selector": "actor+4 unsigned byte",
+      "table": "0x141237dc0",
+      "index": 3,
+      "slot": "0x141237dd8",
+      "bytes": "409d5d4001000000",
+      "target": "0x1405d9d40"
     },
     {
       "owner": "mode-branch-A-object",

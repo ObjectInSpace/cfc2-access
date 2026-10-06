@@ -16,6 +16,39 @@ class AcquisitionAuditTests(unittest.TestCase):
         manifest = Path(__file__).resolve().parents[1] / 'docs/cvs1-acquisition-manifest.json'
         self.assertEqual(audit.compact(self.report), json.loads(manifest.read_bytes()))
 
+    def test_commit_advances_slot_but_owner_reset_reuses_zero(self):
+        def instructions(label):
+            span = next(s for s in self.report['spans'] if s['label'] == label)
+            return {int(i['address'], 16): i['instruction'] for i in span['instructions']}
+        commit = instructions('mode-branch-A-choice-commit-continuation')
+        self.assertEqual(commit[0x1405DA3C5], 'test word ptr [rax + r8 + 0x3c7a], cx')
+        self.assertEqual(commit[0x1405DA45F], 'mov byte ptr [rcx + rdx*4 + 0x78], bpl')
+        self.assertEqual(commit[0x1405DAB90], 'inc byte ptr [rcx + rax + 0xa0]')
+        self.assertEqual(commit[0x1405DAD3E], 'cmp byte ptr [rax + rcx + 0x32812], sil')
+        reset = instructions('mode-branch-A-owner-selection-reset')
+        self.assertEqual(reset[0x1405D9C22], 'mov byte ptr [rcx + rax + 0x32812], 4')
+        self.assertEqual(reset[0x1405D9C39], 'mov byte ptr [rcx + rax + 0xa0], 0')
+        self.assertEqual(reset[0x1405D9CB3], 'mov byte ptr [rcx + rax + 0xa2], dl')
+        transition = instructions('mode-branch-A-catalog-selection-transition')
+        self.assertEqual(transition[0x1405D9DCD], 'xor byte ptr [rcx + rax + 0x76], 1')
+        self.assertEqual(transition[0x1405D9DF3], 'inc byte ptr [rbx + 4]')
+        self.assertEqual(transition[0x1405D9E51], 'call 0x1405d9900')
+
+    def test_catalog_resource_reaches_type_2_draw(self):
+        def instructions(label):
+            span = next(s for s in self.report['spans'] if s['label'] == label)
+            return {int(i['address'], 16): i['instruction'] for i in span['instructions']}
+        constructor = instructions('mode-branch-A-choice-object-creation')
+        self.assertEqual(constructor[0x140610E8C], 'call 0x1405c3170')
+        self.assertEqual(constructor[0x140610E91], 'mov qword ptr [rbx + 0x90], rax')
+        self.assertEqual(constructor[0x140610EA2], 'mov dword ptr [rbx + 0x9c], 2')
+        renderer = instructions('selection-list-renderer')
+        self.assertEqual(renderer[0x1405E1BB2], 'call 0x1405dfb70')
+        draw = instructions('selection-render-type-2')
+        self.assertEqual(draw[0x1405DFE21], 'mov rcx, qword ptr [rbx + 0x90]')
+        self.assertEqual(draw[0x1405DFE2F], 'call 0x140f36220')
+        self.assertEqual(draw[0x1405DFE44], 'call 0x140f36200')
+
     def test_catalog_mutations_refused(self):
         original = audit.Dump.read
         for target in (0x141237C78, 0x141237BE0):

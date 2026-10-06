@@ -122,6 +122,13 @@ This supersedes the earlier preflight hash below for any future staging.
 
 ### Native lifecycle and adapter work still required
 
+The offline [output invalidation review](../shared-output-invalidation-review.md)
+records the remaining queue, copied-frame, backend and audio ownership gaps.
+Preserve the recovered scene ownership guards: legacy reset/tick paths already
+respect them. Revision invalidation and clock delivery still need integration.
+The [CVS1 visit trace](../cvs1-selection-visits.md) proves slot advance and
+reset, but does not certify cancellation/re-entry or any character names.
+
 Use the existing boundary diagnostic to resolve actual update, cleanup and
 release ordering during a CVS2-to-CVS1 transition. Use a separately labelled
 restore/replay exercise for the snapshot path. Missing snapshot events in an
