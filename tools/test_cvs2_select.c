@@ -1,6 +1,7 @@
 /* Replays real captures through the shipping decoder and speech decisions.
  * No game writes or audible output. Run from the repository root. */
 #include "../src/cvs2_select.h"
+#include "../src/text_channel.h"
 /* The generated quote table, so cases 7f/7g can assert that the string spoken
  * is exactly the entry the capture's own index selects. */
 #include "../src/quote_table.h"
@@ -45,6 +46,64 @@ static void load(const char *name, BYTE *out)
     assert(fgetc(f)==EOF); fclose(f);
 }
 static void observe(const BYTE *s) { cvs2_select_observe(s,CVS2_STATE_SIZE,1); }
+static bool shared_emit(void *context, const wchar_t *text)
+{ (void)context; return tc_say(text, TRUE, "shared-selection-replay"); }
+static unsigned shared_sample(game_session *session, game_selection *presenter,
+                              const BYTE *state)
+{
+    game_selection_observation o = {0};
+    assert(game_session_capture(session, &o.token));
+    o.captured_ms = 1000;
+    o.complete = true;
+    cvs2_selection_copy(state, CVS2_STATE_SIZE, o.owner);
+    assert(game_session_publish(session, &o.token));
+    assert(game_selection_offer(presenter, session, &o, 1000));
+    return game_selection_drain(presenter, session, 1000, shared_emit, NULL);
+}
+static void shared_replay(void)
+{
+    /* Real copied state fixtures, synthetic session labels and timestamps.
+     * This uses the existing tc_say -> fake speech backend, not a second queue. */
+    game_session session = {0};
+    game_selection presenter = {0};
+    game_selection_choice choices[GAME_SELECTION_OWNERS];
+    assert(game_session_begin(&session, 1, 3));
+    assert(game_session_resume(&session, session.issued.generation, session.issued.revision));
+    cvs2_selection_copy(ryu, sizeof ryu, choices);
+    assert(choices[0].status == GAME_SELECTION_VALID && choices[0].value == 0);
+    assert(!wcscmp(choices[0].label, L"Ryu"));
+    assert(choices[2].status == GAME_SELECTION_INACTIVE);
+    assert(choices[3].status == GAME_SELECTION_INACTIVE);
+    int before = calls;
+    speech_accepts = 1;
+    assert(!shared_sample(&session, &presenter, ryu));
+    assert(shared_sample(&session, &presenter, ryu) == 1);
+    assert(calls == before + 1 && !wcscmp(last, L"Ryu"));
+    assert(!shared_sample(&session, &presenter, ryu));
+    assert(!shared_sample(&session, &presenter, sagat));
+    speech_accepts = 0;
+    assert(!shared_sample(&session, &presenter, sagat));
+    speech_accepts = 1;
+    assert(shared_sample(&session, &presenter, sagat) == 1);
+    assert(!wcscmp(last, L"Sagat"));
+    game_session_suspend(&session);
+    assert(game_session_resume(&session, session.issued.generation, session.issued.revision));
+    before = calls;
+    assert(!shared_sample(&session, &presenter, sagat));
+    assert(!shared_sample(&session, &presenter, sagat));
+    assert(calls == before); /* Restore alone does not rearm the accepted name. */
+    assert(!shared_sample(&session, &presenter, inactive));
+    assert(!shared_sample(&session, &presenter, sagat));
+    assert(shared_sample(&session, &presenter, sagat) == 1);
+    assert(!shared_sample(&session, &presenter, yun));
+    assert(shared_sample(&session, &presenter, yun) == 1);
+    assert(!wcscmp(last, L"Yun"));
+    cvs2_selection_copy(NULL, 0, choices);
+    assert(choices[0].status == GAME_SELECTION_INACTIVE);
+    cvs2_selection_copy(ryu, sizeof ryu - 1, choices);
+    assert(choices[0].status == GAME_SELECTION_INACTIVE);
+    puts("PASS: copied CVS2 selections through shared session/presenter and tc_say");
+}
 int main(void)
 {
     load("ryu-return-08",ryu); load("sagat-07",sagat);
@@ -631,6 +690,7 @@ int main(void)
         assert(calls==before);
     }
 
+    shared_replay();
     puts("PASS: Arcade and alternate character/groove, team/P2, ratio/stage, transitions, speech without prefixes, gauge feed + KO sentinel, super meter per-groove caps, match/round speech");
     return 0;
 }

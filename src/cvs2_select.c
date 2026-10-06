@@ -150,18 +150,14 @@ int cvs2_select_decode(const BYTE *s, SIZE_T size, unsigned p)
     return (int)id;
 }
 
-void cvs2_select_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
+void cvs2_selection_copy(const BYTE *s, SIZE_T size,
+                         game_selection_choice out[GAME_SELECTION_OWNERS])
 {
-    static ULONGLONG previous_root;
-    static int pending[2] = {-1,-1}, spoken[2] = {-1,-1};
-    static int previous_step[2] = {-1,-1};
-    int ids[2], changed[2] = {0,0}, p;
-    wchar_t message[600] = L"", part[256];
-    if (root != previous_root) {
-        pending[0] = pending[1] = spoken[0] = spoken[1] = -1;
-        previous_step[0] = previous_step[1] = -1;
-        previous_root = root;
-    }
+    int ids[2], p;
+    if (!out) return;
+    memset(out, 0, sizeof(*out) * GAME_SELECTION_OWNERS);
+    for (unsigned i = 0; i < GAME_SELECTION_OWNERS; ++i)
+        out[i].status = GAME_SELECTION_INACTIVE;
     for (p=0; p<2; p++) {
         int groove;
         ids[p] = cvs2_select_decode(s,size,(unsigned)p);
@@ -181,23 +177,19 @@ void cvs2_select_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
     }
     for (p=0; p<2; p++) {
         int id = ids[p];
-        int selection_step;
         if (id < 0) {
-            pending[p] = -1;
-            if (id == -1) spoken[p] = -1;
+            out[p].status = id == -1 ? GAME_SELECTION_INACTIVE : GAME_SELECTION_UNAVAILABLE;
             continue;
         }
         /* A new team slot is a new selection even if the intervening
          * confirmation animation was missed or its highlight is unchanged. */
-        selection_step=s[0x1ffd4+p];
+        out[p].status = GAME_SELECTION_VALID;
+        out[p].value = (unsigned)id;
+        out[p].kind = id < 48 ? 0 : id < 54 ? 1 : id < 60 ? 2 : id < 72 ? 3 : 4;
+        out[p].visit=s[0x1ffd4+p];
         if (s[0x1a0] && id < 48)
-            selection_step += 256*s[0x1eba8+p*0x678+0x5d1];
-        if (previous_step[p] != selection_step) {
-            pending[p] = spoken[p] = -1;
-            previous_step[p] = selection_step;
-        }
-        if (pending[p] != id) { pending[p] = id; continue; }
-        if (spoken[p] == id) continue;
+            out[p].visit += 256*s[0x1eba8+p*0x678+0x5d1];
+        wchar_t *part = out[p].label;
         if (id >= 72) {
             /* The user identifies this as handicap. The native storage is
              * shared with ratios, but the visible heading is not verified. */
@@ -214,6 +206,40 @@ void cvs2_select_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
                 wcscat(part,entry);
             }
         } else swprintf(part,256,L"%ls",names[id]);
+    }
+}
+
+void cvs2_select_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
+{
+    static ULONGLONG previous_root;
+    static int pending[2] = {-1,-1}, spoken[2] = {-1,-1};
+    static int previous_step[2] = {-1,-1};
+    int ids[2], changed[2] = {0,0}, p;
+    wchar_t message[600] = L"";
+    game_selection_choice choices[GAME_SELECTION_OWNERS];
+    cvs2_selection_copy(s, size, choices);
+    if (root != previous_root) {
+        pending[0] = pending[1] = spoken[0] = spoken[1] = -1;
+        previous_step[0] = previous_step[1] = -1;
+        previous_root = root;
+    }
+    for (p=0; p<2; p++) {
+        ids[p] = choices[p].status == GAME_SELECTION_VALID ? (int)choices[p].value :
+            choices[p].status == GAME_SELECTION_INACTIVE ? -1 : -2;
+        int id = ids[p];
+        if (id < 0) {
+            pending[p] = -1;
+            if (id == -1) spoken[p] = -1;
+            continue;
+        }
+        int selection_step = (int)choices[p].visit;
+        if (previous_step[p] != selection_step) {
+            pending[p] = spoken[p] = -1;
+            previous_step[p] = selection_step;
+        }
+        if (pending[p] != id) { pending[p] = id; continue; }
+        if (spoken[p] == id) continue;
+        const wchar_t *part = choices[p].label;
         if (message[0]) wcscat(message,L". ");
         wcscat(message,part);
         changed[p] = 1;

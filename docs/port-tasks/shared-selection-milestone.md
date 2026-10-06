@@ -4,6 +4,14 @@ Selected 2026-10-05 at 6cc26c8, following the shared-first priority in
 collection-workflow.md. Feature: F02 character-highlight speech. This packet
 does not redefine the full F01–F19 collection delivery objective.
 
+Offline continuation from 9dbf135: src/game_selection.{h,c} now implements
+bounded copied-selection settling and presentation. Real CVS2 capture replay
+passes through it, game_session and the existing tc_say with a fake backend.
+The shipping CVS2 observer uses the extracted copied-label/visit decoder but
+retains its existing output policy. Native lifecycle wiring and the CVS1
+adapter remain unimplemented. The user deferred the manual lifecycle exercise;
+no live staging or deployment occurred.
+
 ## Delivered behavior and boundaries
 
 Target behavior: CVS2 retains its current character announcements, settling,
@@ -60,6 +68,59 @@ an utterance already accepted by NVDA. Backend interruption and shell/game
 ownership arbitration remain explicit integration work.
 
 ## Required shared integration
+
+### Copied selection and presentation component
+
+game_selection accepts four fixed owner slots, each with an explicit
+VALID/INACTIVE/UNAVAILABLE status, visit, adapter-local kind/value and a copied
+256-wchar label. It contains no native field offsets or character-name table.
+One observation carries the session token, completeness and capture time.
+The proposed worker policy refuses incomplete, future-dated or more than
+500-ms-old observations. This age limit is explicit offline policy, not a
+measured guarantee of live selection latency.
+
+Two distinct published observation sequences with equal visit/kind/value/label
+are required to settle. Re-offering the same sequence cannot count twice.
+UNAVAILABLE breaks pending settling but keeps accepted history; INACTIVE
+also rearms the owner. New generations clear both; a new revision clears only
+pending settling. History is the last accepted choice per owner, not an
+unbounded ledger of all historical visits.
+
+Changed owners produce one bounded utterance in slot order. Backend rejection
+keeps it retryable; a newer observation replaces obsolete pending choices.
+The component rechecks the session after the backend call before marking
+acceptance. Reentrant offers/drains are refused. This does not solve concurrent
+revocation or cancel speech already accepted; external serialization and
+backend interruption remain required. There is no new speech queue. Production
+binding is tc_say; the test callback also uses tc_say for the CVS2 replay.
+
+cvs2_selection_copy now owns the existing CVS2 decoding and label formatting,
+including character/groove/ratio/stage/level and selection-step information.
+Both the shipping legacy observer and the shared offline replay consume this
+same copied format. Native sampling, root-keyed legacy output and audible
+wording remain the existing path. Four fixed slots do not imply four CVS2
+players: its unused two slots are explicitly inactive. CVS1 supplies no data
+to this component until its native name/visit contract is established.
+
+Validation: 209 shared presenter/session checks pass with -O2 -Wall -Wextra
+-Werror. Four compiled sabotage copies are rejected for single-sample settling,
+erased accepted history after restore, advancing on backend rejection, and
+allowing a stale token to call the backend. Changed source copies live under
+build/test only; compilation failure does not count as a behavioral rejection.
+The existing CVS2 suite passes, including real Ryu/Sagat/Yun state captures
+through the shared presenter, retry and restore controls, and the original
+character/groove/ratio/stage/gauge/quote regression cases. All 34 current
+native runners pass; results are in build/test/shared-selection-regression.json.
+The final test-only stale-backend assertion also passed in the sabotage
+runner's unmodified control. Build output is in build/shared-selection-build.log.
+
+The session and presenter implementations remain outside build.ps1. The
+extracted CVS2 copy function is part of the DLL. Its current build and import
+check pass with existing unrelated warnings. DLL SHA-256:
+c4b916da66edc95cfe08db40f12b8d0be6705852726d62cb80ad679803d2a36f.
+This supersedes the earlier preflight hash below for any future staging.
+
+### Native lifecycle and adapter work still required
 
 Use the existing boundary diagnostic to resolve actual update, cleanup and
 release ordering during a CVS2-to-CVS1 transition. Use a separately labelled

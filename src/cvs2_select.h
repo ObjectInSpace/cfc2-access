@@ -1,6 +1,7 @@
 #ifndef CFC2_CVS2_SELECT_H
 #define CFC2_CVS2_SELECT_H
 #include <windows.h>
+#include "game_selection.h"
 #define CVS2_STATE_SIZE 0x216B0u
 /* -1 inactive, -2 inconsistent/special; otherwise an ordinary character ID. */
 int cvs2_select_decode(const BYTE *state, SIZE_T size, unsigned player);
@@ -11,6 +12,12 @@ int cvs2_groove_decode(const BYTE *state, SIZE_T size, unsigned player);
 int cvs2_ratio_decode(const BYTE *state, SIZE_T size, unsigned player);
 /* Shared stage ID 0..10, 11 random; only the traced custom-menu path. */
 int cvs2_stage_decode(const BYTE *state, SIZE_T size);
+/* Copy adapter-owned labels/visits for shared presentation. No native reads,
+ * speech or lifecycle claims. value preserves the legacy combined selection
+ * key; kind is character/groove/ratio/stage/level (0..4), local to this adapter.
+ * Unused owner slots are explicitly inactive. */
+void cvs2_selection_copy(const BYTE *state, SIZE_T size,
+                         game_selection_choice out[GAME_SELECTION_OWNERS]);
 void cvs2_select_observe(const BYTE *state, SIZE_T size, ULONGLONG root);
 void cvs2_select_tick(void);
 #endif
