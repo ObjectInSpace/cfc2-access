@@ -1,4 +1,7 @@
 import unittest
+import gzip
+import hashlib
+from pathlib import Path
 import collection_probe_report as report
 
 
@@ -13,6 +16,25 @@ def capture(rows, footer='# complete,dropped,0'):
 
 
 class ProbeReportTests(unittest.TestCase):
+    def test_live_switch_fixture_is_complete_but_has_no_restore_evidence(self):
+        packed = (Path(__file__).parent / 'fixtures/collection-boundary-switch-20261006.csv.gz').read_bytes()
+        self.assertEqual(hashlib.sha256(packed).hexdigest(),
+                         '7ee75d22bd3d2acdef9c0c2064590bff9d58f3ca3339e1d6685937218b1c74ea')
+        raw = gzip.decompress(packed)
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),
+                         '3a6cacc5849883236398d346165642a04f7b99f829dd32b22e768457c8264432')
+        result = report.analyze(raw.decode('utf-8'))
+        self.assertTrue(result['complete'])
+        self.assertEqual((result['dropped'], result['unreadable']), (0, 0))
+        self.assertEqual(result['event_count'], 6738)
+        self.assertEqual(len(result['pairs']), 3369)
+        self.assertEqual(result['unmatched_entries'], [])
+        self.assertEqual(result['unmatched_exits'], [])
+        self.assertEqual(result['observed_identities'],
+                         [dict(game=0, rom=1), dict(game=1, rom=3)])
+        self.assertEqual(result['threads'], [dict(thread=10284,
+                         sites=['game_cleanup', 'outer_update', 'screen_release'])])
+
     def test_nested_load_pairs_inside_update(self):
         result = report.analyze(capture([event(1), event(2,1), event(3,1,1), event(4,0,1)]))
         self.assertEqual([p['site'] for p in result['pairs']], ['snapshot_load','outer_update'])

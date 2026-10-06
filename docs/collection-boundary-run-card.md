@@ -1,6 +1,9 @@
 # Collection boundary event probe
 
-Status: implemented and tested offline; not deployed or live-validated.
+Status: first switch capture completed; see
+[the 2026-10-06 live evidence](collection-boundary-live-20261006.md).
+Snapshot-load/registration exercise remains outstanding. The original
+preflight record below is historical; the live evidence records the staged build.
 This is a diagnostic step toward the shared router, not an installed router.
 
 ## What the next run resolves
