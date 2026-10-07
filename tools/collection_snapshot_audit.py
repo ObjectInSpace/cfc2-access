@@ -7,6 +7,14 @@ from collection_lifecycle_audit import Dump, DEFAULT_DUMP, CODE_SHA256, rip_targ
 from collection_restore_audit import require, compact
 
 SPANS = (
+    ('join-match-type-registration', 0x1400282B0, 0x140028300),
+    ('join-match-constructor', 0x14008F220, 0x14008F28F),
+    ('join-match-type-getter', 0x14008F380, 0x14008F388),
+    ('join-match-update', 0x14008F390, 0x14009027B),
+    ('callback-request-type-registration', 0x140027010, 0x14002705E),
+    ('callback-request-constructor', 0x14003C640, 0x14003C695),
+    ('callback-request-type-getter', 0x14003C7E0, 0x14003C7E8),
+    ('callback-enable-and-game-request', 0x14003C800, 0x14003C97A),
     ('shell-update-batch', 0x14003A290, 0x14003A79D),
     ('register-root', 0x1400B6570, 0x1400B65DE),
     ('load-scatter', 0x1400B65E0, 0x1400B6663),
@@ -41,6 +49,12 @@ SPANS = (
 )
 
 VIRTUAL_SLOTS = (
+    (0x140FE9F70, 0x14008F220),
+    (0x140FE9FE8, 0x14008F380),
+    (0x140FEA008, 0x14008F390),
+    (0x140FDE940, 0x14003C640),
+    (0x140FDE978, 0x14003C7E0),
+    (0x140FDE988, 0x14003C800),
     (0x140FF02D8, 0x1400B9020),
     (0x140FF02F0, 0x1400B99C0),
     (0x140FF02F8, 0x1400B9520),
@@ -51,6 +65,17 @@ VIRTUAL_SLOTS = (
 
 # Exact local contracts supplement span hashes and catch plausible misreadings.
 OPERATIONS = (
+    (0x140090079, 'test', 'dl, dl'),
+    (0x1400900A9, 'call', '0x14004c810'),
+    (0x1400900B0, 'jne', '0x14009026b'),
+    (0x14009013E, 'jmp', '0x140090181'),
+    (0x14009018B, 'call', 'qword ptr [rax + 0x50]'),
+    (0x14003C925, 'mov', 'dl, 1'),
+    (0x14003C93C, 'call', '0x1400520b0'),
+    (0x14003C976, 'jmp', 'qword ptr [rax + 0x50]'),
+    (0x1400520C2, 'jne', '0x1400520df'),
+    (0x1400520DF, 'mov', 'byte ptr [rcx + 0x1cd], bl'),
+    (0x14003A305, 'cmp', 'byte ptr [r8 + 0x1cd], r12b'),
     (0x14003A2A0, 'xor', 'r12d, r12d'),
     (0x14003A671, 'cmp', 'edx, 1'),
     (0x14003A674, 'setg', 'al'),
@@ -126,6 +151,23 @@ OPERATIONS = (
 )
 
 REFERENCES = (
+    (0x1400282C1, 0x140FE9FB8),
+    (0x1400282CC, 0x141D1C098),
+    (0x1400282E2, 0x140FE9F68),
+    (0x14008F25E, 0x140FE9FC8),
+    (0x14008F380, 0x141D1C098),
+    (0x140090137, 0x141C14BE8),
+    (0x140090181, 0x1422C8358),
+    (0x140027021, 0x140FDE918),
+    (0x14002702C, 0x141C14BE8),
+    (0x140027040, 0x140FDE938),
+    (0x14002704E, 0x141C14BE8),
+    (0x14003C67C, 0x140FDE958),
+    (0x14003C7E0, 0x141C14BE8),
+    (0x14003C935, 0x141C14F90),
+    (0x14003C948, 0x141C049D0),
+    (0x14003C967, 0x1422C8358),
+    (0x14003A2FE, 0x141C14F90),
     (0x14003A64A, 0x141C14F98),
     (0x14003A70D, 0x141C14F98),
     (0x14003A745, 0x141C14F98),
@@ -173,8 +215,27 @@ def produce(directory):
                 f'{address:#x}: snapshot reference differs')
     for address, target in VIRTUAL_SLOTS:
         require(dump.pointer(address) == target, f'{address:#x}: snapshot virtual slot differs')
-    return dict(schema=2, code_sha256=CODE_SHA256,
+    require(dump.read(0x140FDE918, 12) == b'aGame2Match\0',
+            'snapshot request type name differs')
+    require(dump.read(0x140FE9FB8, 13) == b'uUiJoinMatch\0',
+            'snapshot join type name differs')
+    require(int.from_bytes(dump.read(0x14009027C + 12*4, 4), 'little') == 0x90079,
+            'snapshot join state target differs')
+    return dict(schema=3, code_sha256=CODE_SHA256,
                 evidence='offline instruction trace; no live callback ordering proof',
+                join_match_request=dict(type_name='uUiJoinMatch',
+                    name_address='0x140fe9fb8', descriptor='0x141d1c098',
+                    object_vtable='0x140fe9fc8', update='0x14008f390',
+                    state_table='0x14009027c', state=12, target='0x140090079',
+                    requested_descriptor='0x141c14be8',
+                    limitation='Match entry is a capture candidate; it does not guarantee snapshot load.'),
+                callback_enable_request=dict(type_name='aGame2Match',
+                    name_address='0x140fde918', descriptor='0x141c14be8',
+                    constructor='0x14003c640', object_vtable='0x140fde958',
+                    initialize_slot='0x30', initialize='0x14003c800',
+                    shell_owner_slot='0x141c14f90', mode_offset='0x1cd',
+                    requested_descriptor='0x141c049d0',
+                    limitation='Internal type name is not a verified user-facing action.'),
                 root_registration=dict(pointer_offset='0x1b0', size_offset='0x1b8',
                                        pointer_table='0x14211ca90', size_table='0x14211cb90',
                                        count='0x14211cc10', scratch='0x14211ce50'),

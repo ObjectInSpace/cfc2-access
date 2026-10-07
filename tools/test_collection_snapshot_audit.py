@@ -16,6 +16,33 @@ class SnapshotAuditTests(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / 'docs/collection-snapshot-manifest.json'
         self.assertEqual(audit.compact(self.report), json.loads(path.read_bytes()))
 
+    def test_request_enables_callback_mode(self):
+        self.assert_mutation_refused(0x14003C926, 0)
+
+    def test_request_constructor_cannot_use_adjacent_type(self):
+        self.assert_mutation_refused(0x140FDE940, 0xa0)
+
+    def test_internal_type_label_must_match_dump(self):
+        original = audit.Dump.read
+        def changed(dump, address, size):
+            raw = original(dump, address, size)
+            return b'X' + raw[1:] if address == 0x140FDE918 else raw
+        with patch.object(audit.Dump, 'read', changed):
+            with self.assertRaisesRegex(ValueError, 'snapshot request type name differs'):
+                audit.produce(audit.DEFAULT_DUMP)
+
+    def test_join_match_state_cannot_point_to_adjacent_case(self):
+        original = audit.Dump.read
+        def changed(dump, address, size):
+            raw = original(dump, address, size)
+            return (0x90062).to_bytes(4, 'little') if address == 0x1400902AC else raw
+        with patch.object(audit.Dump, 'read', changed):
+            with self.assertRaisesRegex(ValueError, 'snapshot join state target differs'):
+                audit.produce(audit.DEFAULT_DUMP)
+
+    def test_join_match_request_cannot_select_other_descriptor(self):
+        self.assert_mutation_refused(0x14009013A, 0xab)
+
     def assert_mutation_refused(self, address, replacement):
         original = audit.Dump.read
 

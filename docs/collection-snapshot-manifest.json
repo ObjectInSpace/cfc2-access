@@ -1,7 +1,32 @@
 {
-  "schema": 2,
+  "schema": 3,
   "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
   "evidence": "offline instruction trace; no live callback ordering proof",
+  "join_match_request": {
+    "type_name": "uUiJoinMatch",
+    "name_address": "0x140fe9fb8",
+    "descriptor": "0x141d1c098",
+    "object_vtable": "0x140fe9fc8",
+    "update": "0x14008f390",
+    "state_table": "0x14009027c",
+    "state": 12,
+    "target": "0x140090079",
+    "requested_descriptor": "0x141c14be8",
+    "limitation": "Match entry is a capture candidate; it does not guarantee snapshot load."
+  },
+  "callback_enable_request": {
+    "type_name": "aGame2Match",
+    "name_address": "0x140fde918",
+    "descriptor": "0x141c14be8",
+    "constructor": "0x14003c640",
+    "object_vtable": "0x140fde958",
+    "initialize_slot": "0x30",
+    "initialize": "0x14003c800",
+    "shell_owner_slot": "0x141c14f90",
+    "mode_offset": "0x1cd",
+    "requested_descriptor": "0x141c049d0",
+    "limitation": "Internal type name is not a verified user-facing action."
+  },
   "root_registration": {
     "pointer_offset": "0x1b0",
     "size_offset": "0x1b8",
@@ -18,6 +43,30 @@
   "load_completion_counter_offset": "0x76c",
   "intermediate_update_flag_offset": "0x770",
   "virtual_slots": [
+    {
+      "address": "0x140fe9f70",
+      "target": "0x14008f220"
+    },
+    {
+      "address": "0x140fe9fe8",
+      "target": "0x14008f380"
+    },
+    {
+      "address": "0x140fea008",
+      "target": "0x14008f390"
+    },
+    {
+      "address": "0x140fde940",
+      "target": "0x14003c640"
+    },
+    {
+      "address": "0x140fde978",
+      "target": "0x14003c7e0"
+    },
+    {
+      "address": "0x140fde988",
+      "target": "0x14003c800"
+    },
     {
       "address": "0x140ff02d8",
       "target": "0x1400b9020"
@@ -55,6 +104,54 @@
     "Span alignment is not a complete control-flow or write inventory."
   ],
   "spans": [
+    {
+      "label": "join-match-type-registration",
+      "start": "0x1400282b0",
+      "end_exclusive": "0x140028300",
+      "sha256": "8c93f666727db239394032d9d43b0e7754f35e8896542f0e1fadc1ca44105b60"
+    },
+    {
+      "label": "join-match-constructor",
+      "start": "0x14008f220",
+      "end_exclusive": "0x14008f28f",
+      "sha256": "ce77a4cabc5f3eb1746709a99e76900a100915c0692e1808b7cf58da344c7950"
+    },
+    {
+      "label": "join-match-type-getter",
+      "start": "0x14008f380",
+      "end_exclusive": "0x14008f388",
+      "sha256": "127774d46bf4f388b9ef3e7040f2309589f47471cb8d84f18443ed6ce8f7e6e5"
+    },
+    {
+      "label": "join-match-update",
+      "start": "0x14008f390",
+      "end_exclusive": "0x14009027b",
+      "sha256": "611ce9ae04a2eee9c90e684b55fbada7dd2660d28a95a06ff1cd0e24cb3efd43"
+    },
+    {
+      "label": "callback-request-type-registration",
+      "start": "0x140027010",
+      "end_exclusive": "0x14002705e",
+      "sha256": "b8949eb3cce9da2dfbc90fd437411331137e7a6e651d0430e78ac21600dde5d4"
+    },
+    {
+      "label": "callback-request-constructor",
+      "start": "0x14003c640",
+      "end_exclusive": "0x14003c695",
+      "sha256": "1798dbd6711c4d612ee0cb177bab477d98664f25789f80f91ccefe0f4721230e"
+    },
+    {
+      "label": "callback-request-type-getter",
+      "start": "0x14003c7e0",
+      "end_exclusive": "0x14003c7e8",
+      "sha256": "dcd2d6cbbc7c6e07e1bd8ec1540fbfa66ce12efcf35eab3095457a6c9100b015"
+    },
+    {
+      "label": "callback-enable-and-game-request",
+      "start": "0x14003c800",
+      "end_exclusive": "0x14003c97a",
+      "sha256": "be6b707d321a07e64974c78c5f2009daf9e24ad129d10c6ef64fde87fd32f7f3"
+    },
     {
       "label": "shell-update-batch",
       "start": "0x14003a290",

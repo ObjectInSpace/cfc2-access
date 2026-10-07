@@ -143,7 +143,49 @@ completion versus actual presentation, teardown ordering, thread identity and
 hook ABI. These are integration prerequisites, not reasons to treat polling
 or a copy-hook return as sufficient. No deployment is justified by this audit.
 
-## Verification
+## Callback-mode entry continuation, 2026-10-07
+
+The audit now retains 39 spans. The shell mode byte is owner+0x1cd,
+where the owner comes from 0x141c14f90, distinct from S at 0x141c14f98.
+The outer update tests this byte at 0x14003a305. Setter 0x1400520b0
+with DL=1 writes it; DL=0 takes the already-traced close path first.
+
+Type registration 0x140027010 binds literal aGame2Match at 0x140fde918
+to descriptor 0x141c14be8 and factory 0x140fde938. Factory+8 creates
+an object with table 0x140fde958. Its +0x20 getter returns that descriptor;
+its +0x30 initializer is 0x14003c800. The initializer passes DL=1 to
+the setter at 0x14003c93c, then requests aGame descriptor 0x141c049d0
+through screen-manager virtual +0x50. That request is deferred.
+
+The upstream type is uUiJoinMatch, literal 0x140fe9fb8. Registration
+0x1400282b0 binds descriptor 0x141d1c098 and factory 0x140fe9f68.
+Constructor 0x14008f220 installs table 0x140fe9fc8; its +0x40 method
+is 0x14008f390. This body dispatches on object+8 through the RVA table
+0x14009027c. Entry 12 targets 0x140090079. After a timing/preparation
+path and a zero result from 0x14004c810, it requests descriptor
+0x141c14be8 at 0x140090137 through manager+0x50 at 0x14009018b.
+The intervening owner+0xd0380 branch affects copied settings; both branches
+reach the same request. These names are literal native type identities,
+not reconstructed visible menu labels.
+
+This establishes a join-match route into callback mode. It does not prove
+which visible menu action reaches state 12, that every match uses this route,
+which callback implementation is selected, or that a match necessarily loads
+a snapshot. The bounded next capture candidate is controlled match entry to
+observe registration; load/replay needs its own positive callback evidence.
+Quick Load and training reset are not established substitutes.
+
+The [handoff contract](collection-handoff-contract.md) combines these limits
+with the observed release/cleanup order. No runtime integration is enabled.
+
+## Current verification
+
+The expanded extraction includes negative controls for callback enable,
+constructor identity, the native type literal, join-state dispatch and the
+requested descriptor. The full collection group passes 58 tests. No DLL source
+changed in this continuation, so no new build or deployment was performed.
+
+## Historical verification
 
 Nine tests reproduce the manifest and reject mutations to copy direction,
 payload offset, registered callback address, replay flag, load callback slot

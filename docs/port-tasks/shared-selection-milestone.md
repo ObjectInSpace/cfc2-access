@@ -122,6 +122,12 @@ This supersedes the earlier preflight hash below for any future staging.
 
 ### Native lifecycle and adapter work still required
 
+The first [live switch trace](../collection-boundary-live-20261006.md) is
+complete with zero dropped events. Apply the revised
+[handoff contract](../collection-handoff-contract.md): departure is explicit,
+retained roots are not eligibility, and nested cleanup return cannot resume.
+Callback restore coverage and safe acquisition remain open.
+
 The offline [output invalidation review](../shared-output-invalidation-review.md)
 records the remaining queue, copied-frame, backend and audio ownership gaps.
 Preserve the recovered scene ownership guards: legacy reset/tick paths already
