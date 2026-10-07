@@ -16,6 +16,21 @@ def capture(rows, footer='# complete,dropped,0'):
 
 
 class ProbeReportTests(unittest.TestCase):
+    def test_quick_load_schema_2_preserves_full_result(self):
+        rows = [event(1, site=5), event(2, site=5, exiting=1)]
+        rows[1] = rows[1].rsplit(',', 1)[0] + ',-1234567'
+        text = capture(rows).replace('boundary_probe,1,', 'boundary_probe,2,')
+        result = report.analyze(text)
+        self.assertEqual(result['capture_schema'], 2)
+        self.assertEqual([p['site'] for p in result['pairs']], ['quick_load'])
+        with self.assertRaisesRegex(ValueError, 'Invalid site'):
+            report.analyze(capture(rows))
+
+    def test_quick_load_result_overflow_refused(self):
+        row = event(1, site=5, exiting=1).rsplit(',', 1)[0] + ',2147483648'
+        with self.assertRaisesRegex(ValueError, 'Out-of-range argument or result'):
+            report.analyze(capture([row]).replace('boundary_probe,1,', 'boundary_probe,2,'))
+
     def test_live_switch_fixture_is_complete_but_has_no_restore_evidence(self):
         packed = (Path(__file__).parent / 'fixtures/collection-boundary-switch-20261006.csv.gz').read_bytes()
         self.assertEqual(hashlib.sha256(packed).hexdigest(),

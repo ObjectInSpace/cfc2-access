@@ -11,6 +11,7 @@ SITES = (
     ('root_registration', 0x1400B6570, 0x1400B65DE),
     ('game_cleanup', 0x14004ADC0, 0x14004ADE9),
     ('screen_release', 0x140037140, 0x140037292),
+    ('quick_load', 0x14004FFD0, 0x14005007B),
 )
 
 

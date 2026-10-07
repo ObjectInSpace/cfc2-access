@@ -5,4 +5,5 @@ static const probe_site g_sites[] = {
     {"root_registration", UINT64_C(0x1400b6570), 110, UINT64_C(0xc3e7247f657a1f1)},
     {"game_cleanup", UINT64_C(0x14004adc0), 41, UINT64_C(0x27eb594f28fe0314)},
     {"screen_release", UINT64_C(0x140037140), 338, UINT64_C(0x976673c592b32c16)},
+    {"quick_load", UINT64_C(0x14004ffd0), 171, UINT64_C(0x75da97dd559178f1)},
 };

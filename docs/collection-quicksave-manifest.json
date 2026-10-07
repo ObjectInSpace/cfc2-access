@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
+  "evidence": "offline command-path trace; no live Quick Load capture",
+  "message_indices": {
+    "load_confirmation": 269,
+    "load_success": 272,
+    "save_overwrite": 271
+  },
+  "quick_load": {
+    "ui": "0x1400a70c0",
+    "operation": "0x14004ffd0",
+    "cleanup_call": "0x140050049",
+    "initializer": "0x14004c540",
+    "restore_secondary": "0x1400b5f90"
+  },
+  "quick_save": {
+    "ui": "0x1400a8140",
+    "operation": "0x140051130",
+    "collect_secondary": "0x1400b60b0"
+  },
+  "limitations": [
+    "Message indices use retained shell corpus evidence, not a new live label capture.",
+    "Secondary block checkpoint timing is not proved by the save command.",
+    "Load reinitializes before secondary restore; its return is not presentation readiness.",
+    "File persistence, all callers and concurrent native access are not certified.",
+    "These functions are not externally callable APIs or approved hooks."
+  ],
+  "spans": [
+    {
+      "label": "quick-load-ui",
+      "start": "0x1400a70c0",
+      "end_exclusive": "0x1400a73a9",
+      "sha256": "2ba26b6a67581f717184b10420bd3d42970549fc81f1cf55fc1e37abafb7da68"
+    },
+    {
+      "label": "quick-save-ui",
+      "start": "0x1400a8140",
+      "end_exclusive": "0x1400a8621",
+      "sha256": "57831c9721cfe45018488490d2e0f260ee7909d3ab6e8b2b1101b8f818bd8ea8"
+    },
+    {
+      "label": "quick-load-reinitialize",
+      "start": "0x14004ffd0",
+      "end_exclusive": "0x14005007b",
+      "sha256": "8583e37a479e1b151320c298300cc01e2cf7246d080a21248da817535c981de6"
+    },
+    {
+      "label": "quick-save-package",
+      "start": "0x140051130",
+      "end_exclusive": "0x1400511ed",
+      "sha256": "3d7e652c8103712b6767c5676fd2401596461954bf59ee16e123779d04b1b6ff"
+    },
+    {
+      "label": "save-record-to-buffer",
+      "start": "0x14003fd60",
+      "end_exclusive": "0x14003ff31",
+      "sha256": "e7040947edaa34c515f03b50a8385f790f57200ad26d760357ab068d53d6fee9"
+    },
+    {
+      "label": "buffer-to-save-record",
+      "start": "0x140041120",
+      "end_exclusive": "0x1400412d3",
+      "sha256": "1be0b6a8d59eaf7a6eb39e096b5c6f81e2dd8f760aff9dbe4f2ba86ecbf5d532"
+    },
+    {
+      "label": "buffer-to-secondary",
+      "start": "0x1400b5f90",
+      "end_exclusive": "0x1400b60a8",
+      "sha256": "02b229e06d0c074623e66f4bd9dac21d467caada4ec69afbca68a9ad1a87fa70"
+    },
+    {
+      "label": "secondary-to-buffer",
+      "start": "0x1400b60b0",
+      "end_exclusive": "0x1400b618d",
+      "sha256": "52fb3d8865f75216966aae5383046cfd0addcf13cf86041480fd0cd050571748"
+    },
+    {
+      "label": "buffer-address",
+      "start": "0x1400b6360",
+      "end_exclusive": "0x1400b637a",
+      "sha256": "757fab56aa2c054dcc8a2238e17240f6e7a28f3cc7dbb845c9cb39ea24ba1c84"
+    },
+    {
+      "label": "buffer-length-publication",
+      "start": "0x1400b6530",
+      "end_exclusive": "0x1400b6543",
+      "sha256": "c3cf7db7b1ea3cb44286f2c2028f65de86023cd5655e53c963d7adef56728795"
+    }
+  ]
+}

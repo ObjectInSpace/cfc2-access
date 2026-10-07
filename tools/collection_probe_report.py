@@ -6,7 +6,7 @@ from pathlib import Path
 
 FIELDS = ('sequence,ticks,thread,site,exit,depth,readable,session,root,game,rom,bytes,'
           'load_count,intermediate,transfer,argument,length,result').split(',')
-SITE_NAMES = ('outer_update', 'snapshot_load', 'root_registration', 'game_cleanup', 'screen_release')
+SITE_NAMES = ('outer_update', 'snapshot_load', 'root_registration', 'game_cleanup', 'screen_release', 'quick_load')
 
 
 def analyze(text):
@@ -14,9 +14,11 @@ def analyze(text):
     if len(lines) < 2:
         raise ValueError('Missing capture header')
     header = lines[0].split(',')
-    if (len(header) != 6 or header[:3] != ['# boundary_probe', '1', 'qpc_frequency']
+    if (len(header) != 6 or header[0] != '# boundary_probe' or header[1] not in ('1', '2')
+            or header[2] != 'qpc_frequency'
             or header[4:] != ['duration_ms', '120000'] or int(header[3]) <= 0):
         raise ValueError('Unsupported capture header')
+    capture_schema = int(header[1])
     if lines[1].split(',') != FIELDS:
         raise ValueError('Unexpected event columns')
     rows, dropped, complete = [], None, False
@@ -39,7 +41,7 @@ def analyze(text):
                for key,value in zip(FIELDS,cells)}
         if row['sequence'] != len(rows)+1 or row['thread'] <= 0 or row['ticks'] < 0:
             raise ValueError('Invalid sequence, thread or timestamp')
-        if row['site'] not in range(len(SITE_NAMES)) or row['exit'] not in (0,1) or row['readable'] not in (0,1):
+        if row['site'] not in range(5 if capture_schema == 1 else 6) or row['exit'] not in (0,1) or row['readable'] not in (0,1):
             raise ValueError('Invalid site or event flags')
         if not 0 <= row['depth'] <= 0xffffffff:
             raise ValueError('Invalid nesting depth')
@@ -49,7 +51,9 @@ def analyze(text):
         for key in ('session','root','argument','ticks'):
             if not 0 <= row[key] <= 0xffffffffffffffff:
                 raise ValueError('Out-of-range pointer or clock field')
-        if not -(2**31) <= row['length'] < 2**31 or not -1 <= row['result'] <= 255:
+        result_valid = (-(2**31) <= row['result'] < 2**31 if row['site'] == 5
+                        else -1 <= row['result'] <= 255)
+        if not -(2**31) <= row['length'] < 2**31 or not result_valid:
             raise ValueError('Out-of-range argument or result')
         rows.append(row)
 
@@ -80,7 +84,7 @@ def analyze(text):
     identities = sorted({(row['game'],row['rom']) for row in rows
                          if row['readable'] and row['session'] and row['root'] and row['bytes']})
     cautions = ['Observed ordering is not proof of future ordering or native memory synchronization.',
-                'The five sites do not observe every reset, native write or presentation event.',
+                'The observed sites do not cover every reset, native write or presentation event.',
                 'Entry/exit durations include native work and diagnostic overhead.']
     if not complete:
         cautions.append('No completion footer: interrupted or failed write; dropped count is unknown.')
@@ -92,6 +96,7 @@ def analyze(text):
     if unmatched_entries or unmatched_exits:
         cautions.append('Unmatched boundaries can reflect window edges, event loss or abnormal return; do not infer completion.')
     return dict(schema=1, evidence='diagnostic call records; not an atomic snapshot or readiness proof',
+                capture_schema=capture_schema,
                 complete=complete, dropped=dropped, event_count=len(rows),
                 qpc_frequency=int(header[3]), unreadable=unreadable,
                 observed_identities=[dict(game=g, rom=r) for g,r in identities],

@@ -108,6 +108,35 @@ static void test_nested_call_forwarding(void)
     puts("ok: nested original calls, signed argument, byte result and passive forwarding");
 }
 
+static int original_quick_load(void *owner)
+{
+    assert(GetLastError() == 123);
+    last_argument = owner;
+    ++calls;
+    SetLastError(777);
+    return -1234567; /* Detect truncation to the snapshot callback's AL. */
+}
+
+static void test_quick_load_forwarding(void)
+{
+    probe_event events[PROBE_BATCH];
+    reset();
+    g_real_quick_load = original_quick_load;
+    SetLastError(123);
+    assert(quick_load_detour((void *)0x1234) == -1234567);
+    assert(GetLastError() == 777 && calls == 1 && last_argument == (void *)0x1234);
+    assert(take_events(events) == 2);
+    assert(events[0].site == SITE_QUICK_LOAD && !events[0].exiting);
+    assert(events[1].site == SITE_QUICK_LOAD && events[1].exiting);
+    assert(events[1].result == -1234567 && events[1].argument == 0x1234);
+    InterlockedExchange(&g_active, 0);
+    SetLastError(123);
+    assert(quick_load_detour((void *)0x5678) == -1234567);
+    assert(GetLastError() == 777 && calls == 2 && last_argument == (void *)0x5678);
+    assert(take_events(events) == 0);
+    puts("ok: Quick Load argument, signed 32-bit result, last-error and passive forwarding");
+}
+
 static void test_loss_is_explicit(void)
 {
     probe_event events[PROBE_BATCH];
@@ -221,6 +250,7 @@ static void test_footer_waits_for_in_flight_producer(void)
 int main(void)
 {
     test_nested_call_forwarding();
+    test_quick_load_forwarding();
     test_loss_is_explicit();
     test_guard_nesting();
     test_install_refusal_and_rollback();

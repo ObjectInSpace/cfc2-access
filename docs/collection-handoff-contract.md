@@ -29,6 +29,12 @@ No return from the old owner may resume the new owner.
 
 ## Capture and mutation
 
+The [Quick Load command trace](collection-quick-save-followup.md) establishes
+cleanup and initialization inside 0x14004ffd0, followed by secondary-buffer
+restoration. This transaction needs departure/new-generation semantics even
+for identical game/ROM/root addresses. Its direct cleanup call bypasses the
+old monitored wrapper. Return is not yet secondary-to-primary restore completion.
+
 Native memory must be copied at an evidenced lifetime-safe point. Checking
 labels before and after an arbitrary worker read can reject stale data but
 does not protect a freed allocation during that read. Keep native pointers

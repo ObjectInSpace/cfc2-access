@@ -11,7 +11,8 @@
 
 typedef struct { const char *name; uint64_t address; size_t size; uint64_t hash; } probe_site;
 #include "collection_probe_sites.inc"
-enum { SITE_UPDATE, SITE_LOAD, SITE_REGISTER, SITE_CLEANUP, SITE_RELEASE, SITE_COUNT };
+enum { SITE_UPDATE, SITE_LOAD, SITE_REGISTER, SITE_CLEANUP, SITE_RELEASE,
+       SITE_QUICK_LOAD, SITE_COUNT };
 enum { PROBE_CAP = 4096, PROBE_BATCH = 128 };
 typedef struct {
     uint64_t sequence, ticks, session, root, argument;
@@ -34,6 +35,9 @@ typedef void (*one_argument)(void *);
 typedef unsigned char (*load_callback)(void *, int);
 static one_argument g_real_update, g_real_register, g_real_cleanup, g_real_release;
 static load_callback g_real_load;
+/* Reviewed caller sign-extends EAX into a slot index. Preserve all 32 bits. */
+typedef int (*quick_load_callback)(void *);
+static quick_load_callback g_real_quick_load;
 
 /* No VirtualQuery in the detour. A nested foreign-memory guard cannot safely
  * replace the existing TLS jump buffer, so report that sample as unreadable.
@@ -147,6 +151,15 @@ static void release_detour(void *object)
     record_event(SITE_RELEASE, 1, object, 0, -1);
 }
 
+static int quick_load_detour(void *owner)
+{
+    int result;
+    record_event(SITE_QUICK_LOAD, 0, owner, 0, -1);
+    result = g_real_quick_load(owner);
+    record_event(SITE_QUICK_LOAD, 1, owner, 0, result);
+    return result;
+}
+
 static uint64_t fingerprint(const unsigned char *bytes, size_t size)
 {
     uint64_t value = UINT64_C(0xcbf29ce484222325);
@@ -188,9 +201,11 @@ BOOL collection_probe_install(void)
     MH_STATUS status;
     unsigned created = 0;
     void *detours[SITE_COUNT] = {(void *)update_detour, (void *)load_detour,
-        (void *)register_detour, (void *)cleanup_detour, (void *)release_detour};
+        (void *)register_detour, (void *)cleanup_detour, (void *)release_detour,
+        (void *)quick_load_detour};
     void **originals[SITE_COUNT] = {(void **)&g_real_update, (void **)&g_real_load,
-        (void **)&g_real_register, (void **)&g_real_cleanup, (void **)&g_real_release};
+        (void **)&g_real_register, (void **)&g_real_cleanup, (void **)&g_real_release,
+        (void **)&g_real_quick_load};
     if (g_attempted) return InterlockedCompareExchange(&g_active, 0, 0) != 0;
     g_attempted = TRUE;
     if (!mem_guard_install() || !verify_sites()) return FALSE;
@@ -203,7 +218,7 @@ BOOL collection_probe_install(void)
     g_file = _wfopen(path, L"wb");
     if (!g_file) { log_line("collection-probe: cannot create capture file"); return FALSE; }
     QueryPerformanceFrequency(&frequency);
-    fprintf(g_file, "# boundary_probe,1,qpc_frequency,%llu,duration_ms,120000\n",
+    fprintf(g_file, "# boundary_probe,2,qpc_frequency,%llu,duration_ms,120000\n",
             (unsigned long long)frequency.QuadPart);
     fputs("sequence,ticks,thread,site,exit,depth,readable,session,root,game,rom,bytes,"
           "load_count,intermediate,transfer,argument,length,result\n", g_file);

@@ -6,6 +6,12 @@ Snapshot-load/registration exercise remains outstanding. The original
 preflight record below is historical; the live evidence records the staged build.
 This is a diagnostic step toward the shared router, not an installed router.
 
+The next-build extension adds a sixth site for
+[Quick Load](collection-quick-save-followup.md). It emits schema 2 and preserves
+the operation's signed 32-bit result. The first switch capture used the
+original five-site schema 1. The extension is not yet deployed or live-validated;
+use the linked load-only exercise rather than repeating the switch.
+
 ## What the next run resolves
 
 The first run measures which threads execute the common outer update, game
@@ -14,7 +20,7 @@ identity at those boundaries. A later run must exercise the shared snapshot
 callback path to measure registration/load nesting. No snapshot-load event in
 an ordinary offline run means that path was not exercised, not that it is safe.
 
-The probe records five complete, reviewed bodies:
+The current probe records six complete, reviewed bodies:
 
 - Outer update `0x14003a290`, one incoming object pointer, no used return value
   at its reviewed direct caller `0x140039430`.
@@ -26,10 +32,13 @@ The probe records five complete, reviewed bodies:
   dispatches cleanup and may tail-transfer to another helper.
 - Screen release `0x140037140`, incoming screen-object pointer, whose
   conditional branch closes the callback object before game cleanup.
+- Quick Load `0x14004ffd0..0x14005007b`, incoming shell-owner pointer,
+  signed 32-bit result. Its direct cleanup, initialization and secondary restore
+  are distinct from the snapshot-load callback. End address is exclusive.
 
 The observer calls each original exactly once and preserves its incoming
-arguments, the load callback's result byte and thread last-error state.
-The other bodies have no deliberate result construction; their wrappers use
+arguments, the snapshot-load result byte, Quick Load's signed result and thread
+last-error state. The remaining bodies have no deliberate result construction; their wrappers use
 the void method contract inferred from the reviewed code. Live behavior and
 all transitive callers are still unverified. Do not add sites using a guessed
 calling convention or treat this probe as a general instrumentation framework.
@@ -41,7 +50,7 @@ launch. `cfc2_hook.off` takes precedence. Absent the opt-in file, no probe hook
 is installed and the worker tick does no work. Existing audio and speech
 settings retain their meanings.
 
-Install checks fingerprints of all five complete bodies before any hook is
+Install checks fingerprints of all six complete bodies before any hook is
 created. The fingerprints detect an unexpected build or prior patch; they are
 not cryptographic attestation. Failure disables capture and attempts to remove
 the created hooks. If disabling a hook is refused, its passive forwarder and
