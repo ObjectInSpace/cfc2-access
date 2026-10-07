@@ -127,6 +127,11 @@ complete with zero dropped events. Apply the revised
 [handoff contract](../collection-handoff-contract.md): departure is explicit,
 retained roots are not eligibility, and nested cleanup return cannot resume.
 Callback restore coverage and safe acquisition remain open.
+For the limited offline pilot, prioritize the
+[quick-save follow-up](../collection-quick-save-followup.md). Unverified
+online callback modes may remain unsupported; exhaustive replay coverage
+must not silently expand the milestone. A reliable exclusion gate still
+requires implementation and evidence.
 
 The offline [output invalidation review](../shared-output-invalidation-review.md)
 records the remaining queue, copied-frame, backend and audio ownership gaps.

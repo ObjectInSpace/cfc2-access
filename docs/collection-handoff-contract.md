@@ -79,6 +79,12 @@ presenter tests do not establish native concurrency or lifetime protection.
 
 ## Next live evidence
 
+Priority correction after the user's Vs. screen checkpoint observation:
+follow [user-facing quick save/load](collection-quick-save-followup.md) for
+the offline pilot. The join-match candidate below remains a separate future
+callback investigation, not the next requested live exercise or a prerequisite
+for every supported offline mode.
+
 The callback-mode trace now connects uUiJoinMatch state 12 to aGame2Match,
 then to mode enable and a deferred aGame request. A controlled match-entry
 capture is the next candidate for observing registration. The visible menu route
