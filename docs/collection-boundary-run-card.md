@@ -1,5 +1,12 @@
 # Collection boundary event probe
 
+Latest attempt, 2026-10-08: [Quick Load exercise](collection-quicksave-live-20261008.md)
+retained an incomplete trace with no Quick Load event. The user reached their
+saved post-victory checkpoint. Repeated eight-second GMD scans delayed output
+and capture draining. The game is closed and the probe marker is removed.
+Fix bounded message discovery before requesting another capture. Instructions
+below describe the intended load-only exercise, not an instruction to repeat it now.
+
 Status: first switch capture completed; see
 [the 2026-10-06 live evidence](collection-boundary-live-20261006.md).
 The next exercise is the load-only CVS2 Quick Load capture below.

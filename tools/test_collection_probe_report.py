@@ -16,6 +16,22 @@ def capture(rows, footer='# complete,dropped,0'):
 
 
 class ProbeReportTests(unittest.TestCase):
+    def test_live_quick_load_attempt_remains_incomplete_despite_paired_rows(self):
+        packed = (Path(__file__).parent / 'fixtures/collection-boundary-quicksave-20261008-incomplete.csv.gz').read_bytes()
+        raw = gzip.decompress(packed)
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),
+                         'c9878ceaae27f43a059b939dc37b808fcd0ef5faa80add619a3a5fbae9382a2b')
+        result = report.analyze(raw.decode('utf-8'))
+        self.assertEqual(result['capture_schema'], 2)
+        self.assertEqual(result['event_count'], 2560)
+        self.assertEqual(len(result['pairs']), 1280)
+        self.assertEqual(result['unmatched_entries'], [])
+        self.assertEqual(result['unmatched_exits'], [])
+        self.assertFalse(result['complete'])
+        self.assertFalse(result['pairing_reliable'])
+        self.assertIsNone(result['dropped'])
+        self.assertNotIn('quick_load', [p['site'] for p in result['pairs']])
+
     def test_quick_load_schema_2_preserves_full_result(self):
         rows = [event(1, site=5), event(2, site=5, exiting=1)]
         rows[1] = rows[1].rsplit(',', 1)[0] + ',-1234567'

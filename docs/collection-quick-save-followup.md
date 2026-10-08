@@ -1,5 +1,12 @@
 # User-facing quick-save follow-up
 
+Update 2026-10-08: the [live attempt](collection-quicksave-live-20261008.md)
+returned the user to the menu and then, on exiting it, to the saved point after
+the last-boss victory. The earlier Vs. screen expectation does not describe
+this save. The trace is incomplete and does not contain Quick Load events;
+worker-stalling message discovery must be addressed before another capture.
+The probe marker is now removed.
+
 2026-10-07. The user reports that saving/loading generally records at the
 start of the match, specifically the Vs. screen showing the teams. This is
 user evidence about the checkpoint. It is not yet a measured callback timeline,
