@@ -2136,7 +2136,8 @@ static DWORD WINAPI worker(LPVOID param)
              * (announcing every skipped item would lag badly behind the user),
              * but it means the log is not a complete movement history. Said
              * plainly here so a gap in the log is not read as a missed hook. */
-            /* ⭐ Resolve the message blob lazily, once. It cannot be done at
+            /* Resolve the message blob incrementally, with bounded work per
+             * poll so speech and probe draining keep running. It cannot be done at
              * startup: the table is built during load, and the blob's offset
              * MOVES between runs, so it must be found in this process. Until
              * it resolves, movements still speak POSITION, never a guess. */
@@ -2507,8 +2508,8 @@ static DWORD WINAPI worker(LPVOID param)
          * that reads like a finding. */
 
         /* ⛔ THE SEPARATE RESCAN IS GONE. It cost EIGHT SECONDS scanning
-         * 1.3 GB, and it duplicated work: gmd_text_ready() already calls
-         * gmd_find(), caches the resolved table, and is itself retried by this
+         * 1.3 GB, and it duplicated work. gmd_text_ready() now advances a
+         * bounded, resumable scan, caches the table, and is retried by this
          * poll loop until it succeeds. Two independent retry schedules over the
          * same expensive scan is one too many.
          *

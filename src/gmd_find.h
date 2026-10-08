@@ -43,7 +43,8 @@ typedef struct {
     SIZE_T    region_size;
 } gmd_result;
 
-/* Scan for the table. Returns TRUE only if a candidate was found AND its
+/* Synchronous OFFLINE diagnostic; do not call on the output worker.
+ * Scan for the table. Returns TRUE only if a candidate was found AND its
  * label chain verified -- "found something shaped right" is not success.
  * Logs its reasoning either way, distinguishing a complete scan that found
  * nothing from a truncated or fault-interrupted one. */
@@ -65,7 +66,10 @@ BOOL gmd_find(gmd_result *out);
  * table.
  *
  * gmd_text_ready() must succeed before gmd_text_by_index() will return
- * anything. It is idempotent and cheap after the first call. */
+ * anything. Call repeatedly from the serialized worker: unresolved calls
+ * retain progress, copy at most four 64-KB chunks or inspect one language
+ * candidate, and return FALSE while pending. Completed unsuccessful passes
+ * retry after one second. It is idempotent and cheap once resolved. */
 BOOL gmd_text_ready(void);
 
 /* Copy message `index` into `out`. Returns FALSE if the table or the blob has

@@ -27,10 +27,9 @@
 #define GMD_PAD      0xCDCDCDCDu
 
 #define SCAN_CHUNK      (64 * 1024)
-/* The game commits ~550 MB of private memory. A byte-stride pass over that
- * needs a few seconds even with the filter, and this runs on our own worker
- * thread (never a game thread), so a larger budget costs the player nothing.
- * Truncation is still reported loudly rather than passed off as a negative. */
+/* Synchronous offline diagnostic only. Never use this budget on the speech
+ * worker: the live 2026-10-08 run demonstrated repeated eight-second stalls.
+ * Production discovery below retains progress and bounds work per poll. */
 #define SCAN_BUDGET_MS  8000
 #define MAX_CANDIDATES  8
 
@@ -345,16 +344,21 @@ static const SIZE_T g_strings_hints[] = {
 /* Walk `count` NUL-terminated strings forward from `p`. */
 static const BYTE *skip_strings(const BYTE *p, int count)
 {
-    for (int i = 0; i < count; i++) {
-        unsigned guard = 0;
-        char ch;
-        do {
-            if (!mem_copy(&ch, p, 1))
-                return NULL;
-            p++;
-            if (++guard > 8192)
-                return NULL;
-        } while (ch);
+    BYTE block[1024];
+    unsigned length = 0;
+    /* The Spanish tie-break skips 29 strings. Reading each byte with its own
+     * VirtualQuery would reintroduce the worker stall during verification. */
+    while (count > 0) {
+        SIZE_T n = mem_readable_run(p, sizeof(block));
+        if (!n || !mem_copy(block, p, n)) return NULL;
+        for (SIZE_T i = 0; i < n; ++i) {
+            if (++length > 8192) return NULL;
+            if (!block[i]) {
+                length = 0;
+                if (!--count) return p + i + 1;
+            }
+        }
+        p += n;
     }
     return p;
 }
@@ -1069,152 +1073,229 @@ static const char *gmd_expected_language(void)
     return code[0] ? code : NULL;
 }
 
-BOOL gmd_text_ready(void)
+/* Worker-only discovery. The synchronous gmd_find above is retained for
+ * offline diagnostics; it must never be called by the output worker.
+ * Per poll: at most four 64-KB copies and eight address-space queries,
+ * or one candidate/blob check. A 2-ms elapsed budget also yields between
+ * chunks (not a hard real-time guarantee for an OS call). */
+#define DISCOVERY_CHUNKS 4
+#define DISCOVERY_QUERIES 8
+typedef struct {
+    BOOL initialized;
+    uintptr_t cursor, limit, minimum, self_lo, self_hi;
+    uintptr_t region, region_end, allocation;
+    DWORD protection;
+    region_hits hits;
+    BYTE *candidate;
+    int hint;
+    SIZE_T first_delta;
+    char expected[8];
+    ULONGLONG retry_at;
+} text_discovery;
+static text_discovery g_discovery;
+
+static const gmd_probe *discovery_label(void)
 {
-    if (g_text_blob)
-        return TRUE;
+    for (int i = 0; i < GMD_NPROBES; ++i)
+        if (g_gmd_probes[i].index == 0) return &g_gmd_probes[i];
+    return NULL;
+}
 
-    gmd_result r;
-    if (!gmd_find(&r))
-        return FALSE;
-    if (r.form != GMD_FORM_LIVE_TABLE || !r.text_verified) {
-        /* ⭐ Refuse rather than guess. Without a VERIFIED text resolution the
-         * blob offset is unknown, and walking from a wrong base yields
-         * plausible-looking strings from the wrong place -- which would be
-         * spoken to the user as item names. */
-        log_line("gmdtext: refusing to serve text -- the table was found but "
-                 "text did not verify (form=%d, text_verified=%d).",
-                 (int)r.form, (int)r.text_verified);
-        return FALSE;
+static BOOL discovery_label_valid(BYTE *base)
+{
+    char label[128];
+    const gmd_probe *probe = discovery_label();
+    return probe && verify_label(base, probe, GMD_FORM_LIVE_TABLE,
+                                 label, sizeof(label));
+}
+
+static void discovery_clear_region(void)
+{
+    g_discovery.region = g_discovery.region_end = g_discovery.allocation = 0;
+    memset(&g_discovery.hits, 0, sizeof(g_discovery.hits));
+}
+
+static void discovery_init(void)
+{
+    SYSTEM_INFO si;
+    HMODULE self = NULL;
+    MODULEINFO mi;
+    GetSystemInfo(&si);
+    g_discovery.minimum = (uintptr_t)si.lpMinimumApplicationAddress;
+    g_discovery.cursor = g_discovery.minimum;
+    g_discovery.limit = (uintptr_t)si.lpMaximumApplicationAddress;
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                          GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                          (LPCSTR)(void *)&g_gmd_probes, &self) &&
+        GetModuleInformation(GetCurrentProcess(), self, &mi, sizeof(mi))) {
+        g_discovery.self_lo = (uintptr_t)mi.lpBaseOfDll;
+        g_discovery.self_hi = g_discovery.self_lo + mi.SizeOfImage;
     }
+    filter_init();
+    crc_init();
+    g_discovery.initialized = TRUE;
+}
 
-    /* Re-resolve the blob with the same search gmd_find used, and keep the
-     * offset that actually worked this run. */
-    /* \u2b50\u2b50 THE STRING BLOB IS PER-LANGUAGE; THE LABEL ARRAY IS NOT.
-     *
-     * Labels are language-independent hashes, so ONE label array can be paired
-     * with several string blobs -- and after a language change the old blob is
-     * still resident. verify_text_live() accepted the FIRST offset whose text
-     * matched ANY shipped language, and offset 0x140000 (the stale French blob)
-     * is tried first. That is the whole bug: the game showed English while we
-     * read French, with every structural check passing.
-     *
-     * So do not take the first match. Resolve the blob at EVERY known offset,
-     * ask each one which language it is, and keep the one that agrees with
-     * the game's own language setting (gmd_live_language()), or config.ini
-     * when that cannot be read.
-     *
-     * \u26a0 If none agrees, fall back to the first that resolved at all and say so
-     * loudly. Serving the wrong language is bad; serving nothing is worse, and
-     * the log has to make clear which happened.
-     */
-    const char *want = gmd_expected_language();
-    log_line("gmdtext: expected language \"%s\", from %s.",
-             want ? want : "(none)", want ? g_lang_source : "nowhere");
+/* Copy into our own buffer only after a fresh VirtualQuery. No native
+ * allocation metadata is trusted across polls. The fault guard covers a
+ * concurrent unmap after that query, as in the existing scanner. */
+static BOOL discovery_copy(BYTE *dst, uintptr_t at, SIZE_T size)
+{
+    volatile BOOL fault;
+    MEM_GUARDED(fault, memcpy(dst, (const void *)at, size));
+    return !fault;
+}
 
-    int  best_off = -1;
-    char best_lang[8] = { 0 };
-    int  first_off = -1;
-    char first_lang[8] = { 0 };
+static void discovery_scan_step(void)
+{
+    static BYTE chunk[SCAN_CHUNK];
+    text_discovery *d = &g_discovery;
+    LARGE_INTEGER started, now, frequency;
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&started);
+    unsigned chunks = 0;
+    NT_TIB *tib = (NT_TIB *)NtCurrentTeb();
+    uintptr_t stack_lo = (uintptr_t)tib->StackLimit;
+    uintptr_t stack_hi = (uintptr_t)tib->StackBase;
+    MEMORY_BASIC_INFORMATION stack;
+    if (VirtualQuery((void *)stack_lo, &stack, sizeof(stack)))
+        stack_lo = (uintptr_t)stack.AllocationBase;
 
-    for (int h = 0; h < NSTRING_HINTS && best_off < 0; h++) {
-        SIZE_T delta = g_strings_hints[h];
-        /* Point the accessor at this candidate blob and ask what it is. */
-        /* ⚠ No index build here: gmd_text_language() reads string 0 straight
-         * from the base. Indexing every candidate is what made this crawl. */
-        g_text_blob  = r.array_base + delta;
-        g_text_count = GMD_LABEL_COUNT;
-
-        const char *lang = gmd_text_language();
-        if (!lang)
-            continue;                   /* not a table we recognise */
-
-        if (first_off < 0) {
-            first_off = (int)delta;
-            _snprintf(first_lang, sizeof(first_lang), "%s", lang);
+    for (unsigned q = 0; q < DISCOVERY_QUERIES && chunks < DISCOVERY_CHUNKS; ++q) {
+        QueryPerformanceCounter(&now);
+        if (q && now.QuadPart - started.QuadPart >= frequency.QuadPart / 500) return;
+        if (d->cursor >= d->limit) {
+            d->cursor = d->minimum;
+            discovery_clear_region();
+            d->retry_at = GetTickCount64() + 1000;
+            log_line("gmdtext: discovery pass ended without a resolved table; retry in 1 s");
+            return;
         }
-        log_line("gmdtext:   blob at entries+0x%llx is \"%s\"%s",
-                 (unsigned long long)delta, lang,
-                 (want && strcmp(want, lang) == 0) ? "  <== matches the expected language"
-                                                   : "");
-        if (want && strcmp(want, lang) == 0) {
-            best_off = (int)delta;
-            _snprintf(best_lang, sizeof(best_lang), "%s", lang);
+        MEMORY_BASIC_INFORMATION m;
+        if (!VirtualQuery((void *)d->cursor, &m, sizeof(m))) {
+            uintptr_t advance = d->limit - d->cursor;
+            if (advance > 0x10000) advance = 0x10000;
+            d->cursor += advance;
+            discovery_clear_region();
+            continue;
         }
-    }
-
-    if (best_off >= 0) {
-        g_text_blob  = r.array_base + (SIZE_T)best_off;
-        g_text_count = GMD_LABEL_COUNT;
-        text_index_free();
-        log_line("gmdtext: \u2b50\u2b50 blob resolved at entries+0x%x; %d messages "
-                 "readable. Table language: %s (matches %s).",
-                 best_off, g_text_count, best_lang, g_lang_source);
-        return TRUE;
-    }
-
-    /* \u2b50\u2b50 THE HINT LIST IS SIX GUESSES; THE BLOB MOVES. If none of them is the
-     * game's current language, SEARCH. The blob has always been 64 KB-aligned
-     * and within a few MB of the label array, and asking "which language is
-     * this?" is a single indexed lookup now, so a sweep is cheap.
-     *
-     * \u26a0 This exists because a fixed list already failed twice in this project:
-     * once when the blob moved between runs, and again here when a stale blob
-     * occupied the first hint while the live one sat elsewhere. A list of
-     * remembered offsets is a convenience, never the mechanism. */
-    if (best_off < 0 && want) {
-        for (SIZE_T d = 0x10000; d <= 0x400000; d += 0x10000) {
-            g_text_blob  = r.array_base + d;
-            g_text_count = GMD_LABEL_COUNT;
-            const char *lang = gmd_text_language();
-            if (lang && strcmp(lang, want) == 0) {
-                best_off = (int)d;
-                _snprintf(best_lang, sizeof(best_lang), "%s", lang);
-                log_line("gmdtext: \u2b50 found the \"%s\" blob by SEARCH at "
-                         "entries+0x%llx (not in the hint list -- add it).",
-                         want, (unsigned long long)d);
-                break;
+        uintptr_t base = (uintptr_t)m.BaseAddress;
+        uintptr_t end = base + m.RegionSize;
+        if (end <= d->cursor) { d->cursor = d->limit; continue; }
+        if (end > d->limit) end = d->limit;
+        DWORD access = m.Protect & 0xff;
+        BOOL usable = m.State == MEM_COMMIT && m.Type == MEM_PRIVATE &&
+            !(m.Protect & (PAGE_GUARD | PAGE_NOACCESS)) &&
+            (access == PAGE_READONLY || access == PAGE_READWRITE ||
+             access == PAGE_WRITECOPY || access == PAGE_EXECUTE_READ ||
+             access == PAGE_EXECUTE_READWRITE);
+        if (!usable || (base < d->self_hi && end > d->self_lo) ||
+            (base < stack_hi && end > stack_lo)) {
+            d->cursor = end;
+            discovery_clear_region();
+            continue;
+        }
+        /* VirtualQuery at an interior address describes the suffix starting
+         * at that page, not necessarily the original region base. Keep the
+         * accumulated hits while this is still the same readable suffix. */
+        if (!d->region || base < d->region || base > d->cursor || d->region_end != end ||
+            d->allocation != (uintptr_t)m.AllocationBase || d->protection != m.Protect) {
+            discovery_clear_region();
+            d->region = base;
+            d->region_end = end;
+            d->allocation = (uintptr_t)m.AllocationBase;
+            d->protection = m.Protect;
+        }
+        SIZE_T count = end - d->cursor;
+        if (count > sizeof(chunk)) count = sizeof(chunk);
+        if (count >= ENT_SIZE) {
+            ++chunks;
+            if (discovery_copy(chunk, d->cursor, count))
+                scan_chunk(chunk, count, (BYTE *)d->cursor, &d->hits);
+            else memset(&d->hits, 0, sizeof(d->hits));
+        }
+        if (end - d->cursor > sizeof(chunk)) {
+            d->cursor += sizeof(chunk) - ENT_SIZE; /* boundary overlap */
+        } else {
+            BYTE *array = NULL;
+            unsigned stride, pad = 0;
+            int agree, pairs;
+            d->cursor = end;
+            if (d->hits.found >= 2)
+                check_geometry(&d->hits, &array, &stride, &agree, &pairs);
+            if (array &&
+                classify(array, &pad) == GMD_FORM_LIVE_TABLE &&
+                discovery_label_valid(array)) {
+                d->candidate = array;
+                d->hint = 0;
+                d->first_delta = 0;
+                d->expected[0] = '\0';
             }
-            if (lang && first_off < 0) {
-                first_off = (int)d;
-                _snprintf(first_lang, sizeof(first_lang), "%s", lang);
-            }
+            discovery_clear_region();
+            return; /* candidate processing has its own subsequent poll */
         }
     }
+}
 
-    if (best_off >= 0) {
-        g_text_blob  = r.array_base + (SIZE_T)best_off;
-        g_text_count = GMD_LABEL_COUNT;
-        text_index_free();
-        log_line("gmdtext: \u2b50\u2b50 blob resolved at entries+0x%x; %d messages "
-                 "readable. Table language: %s (matches %s).",
-                 best_off, g_text_count, best_lang, g_lang_source);
-        return TRUE;
-    }
-
-    if (first_off >= 0) {
-        g_text_blob  = r.array_base + (SIZE_T)first_off;
-        g_text_count = GMD_LABEL_COUNT;
-        text_index_free();
-        if (want)
-            log_line("gmdtext: \u26d4\u26d4 NO blob matches %s (\"%s\"). Falling "
-                     "back to entries+0x%x, which is \"%s\" -- item names will "
-                     "be in the WRONG LANGUAGE. The game's current blob is at an "
-                     "offset not in the hint list.", g_lang_source, want, first_off,
-                     first_lang);
-        else
-            log_line("gmdtext: blob resolved at entries+0x%x, language \"%s\". "
-                     "Neither the game's setting nor config.ini could be read, "
-                     "so there is nothing to check it against.",
-                     first_off, first_lang);
-        return TRUE;
-    }
-
+static const char *discovery_blob_language(BYTE *blob)
+{
+    /* The existing language reader validates shipped index-0 strings and
+     * the Spain/Mexico tie-break. Never leave a trial blob publicly readable. */
+    g_text_blob = blob;
+    g_text_count = GMD_LABEL_COUNT;
+    const char *lang = gmd_text_language();
     g_text_blob = NULL;
     g_text_count = 0;
-    log_line("gmdtext: could not resolve the string blob this run.");
-    return FALSE;
+    return lang;
 }
+
+BOOL gmd_text_ready(void)
+{
+    text_discovery *d = &g_discovery;
+    if (g_text_blob) return TRUE;
+    if (!mem_guard_install()) return FALSE;
+    if (!d->initialized) discovery_init();
+    if (GetTickCount64() < d->retry_at) return FALSE;
+    if (!d->candidate) { discovery_scan_step(); return FALSE; }
+    if (!discovery_label_valid(d->candidate)) {
+        d->candidate = NULL;
+        return FALSE;
+    }
+    const char *want = gmd_expected_language();
+    if (strcmp(d->expected, want ? want : "") != 0) {
+        _snprintf(d->expected, sizeof(d->expected), "%s", want ? want : "");
+        d->hint = 0;
+        d->first_delta = 0;
+    }
+    int limit = NSTRING_HINTS + (want ? 64 : 0);
+    SIZE_T selected = 0;
+    if (d->hint < limit) {
+        SIZE_T delta = d->hint < NSTRING_HINTS ? g_strings_hints[d->hint] :
+            (SIZE_T)(d->hint - NSTRING_HINTS + 1) * 0x10000;
+        ++d->hint;
+        const char *lang = discovery_blob_language(d->candidate + delta);
+        if (lang) {
+            if (!d->first_delta) d->first_delta = delta;
+            if (want && strcmp(want, lang) == 0) selected = delta;
+        }
+        if (!selected) return FALSE;
+    } else {
+        /* Preserve the existing unknown/missing-language fallback, but
+         * revalidate its content: it may have changed between polls. */
+        if (d->first_delta && discovery_blob_language(d->candidate + d->first_delta))
+            selected = d->first_delta;
+        else { d->candidate = NULL; return FALSE; }
+        log_line("gmdtext: no matching expected-language blob; using a verified fallback");
+    }
+    g_text_blob = d->candidate + selected;
+    g_text_count = GMD_LABEL_COUNT;
+    text_index_free();
+    d->candidate = NULL;
+    log_line("gmdtext: blob resolved incrementally at delta 0x%llx, language %s",
+             (unsigned long long)selected, gmd_text_language());
+    return TRUE;
+}
+
 
 /* ⭐⭐ FOLLOW A LANGUAGE CHANGED IN OPTIONS > SYSTEM.
  *
@@ -1255,6 +1336,7 @@ BOOL gmd_text_recheck_language(void)
     log_line("gmdtext: ⚠ LANGUAGE CHANGED -- the resolved blob is \"%s\" but "
              "%s now says \"%s\". Re-resolving.", have, g_lang_source, want);
 
+    memset(&g_discovery, 0, sizeof(g_discovery));
     /* Drop the resolution and let gmd_text_ready() redo the full per-language
      * search. ⚠ The index must go too: it maps indices into the OLD blob. */
     text_index_free();
@@ -1267,8 +1349,7 @@ BOOL gmd_text_recheck_language(void)
                  now ? now : "(unreadable)");
         return TRUE;
     }
-    log_line("gmdtext: ⛔ re-resolve FAILED -- no table is being served. Item "
-             "names will be silent until one resolves.");
+    log_line("gmdtext: incremental re-resolution pending; no old-language table is served");
     return TRUE;
 }
 
@@ -1694,6 +1775,7 @@ const char *gmd_text_language(void)
 
 void gmd_text_invalidate(void)
 {
+    memset(&g_discovery, 0, sizeof(g_discovery));
     text_index_free();
     g_text_blob = NULL;
     g_text_count = 0;

@@ -1,11 +1,17 @@
 # Collection boundary event probe
 
-Latest attempt, 2026-10-08: [Quick Load exercise](collection-quicksave-live-20261008.md)
+Current continuation, 2026-10-08: the [bounded message-discovery fix](gmd-discovery-worker-fix.md)
+passes 35 native runners, 67 collection Python tests and build/import checks.
+It is staged with the game closed and the probe enabled for a repeat load-only
+run. Current DLL SHA-256:
+`cc259d9d107d2ced154322bd09bbb62286b1423fae4f26980342f88dda3ef63f`.
+Leave the game open until the assistant confirms the completion footer.
+
+Previous attempt, 2026-10-08: [Quick Load exercise](collection-quicksave-live-20261008.md)
 retained an incomplete trace with no Quick Load event. The user reached their
 saved post-victory checkpoint. Repeated eight-second GMD scans delayed output
-and capture draining. The game is closed and the probe marker is removed.
-Fix bounded message discovery before requesting another capture. Instructions
-below describe the intended load-only exercise, not an instruction to repeat it now.
+and capture draining. The probe marker was removed after that attempt.
+The subsequent fix and staging above supersede that deployment state.
 
 Status: first switch capture completed; see
 [the 2026-10-06 live evidence](collection-boundary-live-20261006.md).
@@ -51,9 +57,9 @@ the opt-in marker after collecting the next run, before a subsequent launch.
 3. Open the pause menu, choose the spoken **Load Quick Save** caption, and
    confirm loading. Do not substitute Change Character or a numbered row.
 4. Report the success or failure message, the screen reached, and any change
-   in speech, audio or controls. The reported Vs. screen checkpoint is the
-   comparison to make, not an assumed result.
-5. Leave the game open until capture completes. The assistant collects the
+   in speech, audio or controls. For this save the reported checkpoint is
+   after victory in the last-boss match, visible after exiting the menu.
+5. Leave the game open until the assistant confirms capture completion. The assistant collects the
    CSV and log and removes the opt-in marker before the next launch.
 
 If no suitable save exists, stop the load-only exercise rather than making

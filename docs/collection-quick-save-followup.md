@@ -4,8 +4,10 @@ Update 2026-10-08: the [live attempt](collection-quicksave-live-20261008.md)
 returned the user to the menu and then, on exiting it, to the saved point after
 the last-boss victory. The earlier Vs. screen expectation does not describe
 this save. The trace is incomplete and does not contain Quick Load events;
-worker-stalling message discovery must be addressed before another capture.
-The probe marker is now removed.
+worker-stalling message discovery was identified as the next prerequisite.
+The subsequent [bounded discovery fix](gmd-discovery-worker-fix.md) is tested
+offline and staged, with the probe re-enabled for the next load-only check.
+Its live responsiveness and capture completion remain to be verified.
 
 2026-10-07. The user reports that saving/loading generally records at the
 start of the match, specifically the Vs. screen showing the teams. This is
