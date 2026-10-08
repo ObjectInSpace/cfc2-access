@@ -141,4 +141,7 @@ whole-body rejection and rollback at every site. The old live switch fixture
 still parses. Build/import checks pass with pre-existing unrelated warnings.
 Results: build/test/quicksave-regression.json and build/quicksave-build.log.
 DLL SHA-256: 76596752567f14f636b6eb547c3d0650a76a4f2aa31cc9b6b1e071fb38942896.
-This is the tested build for a future Quick Load capture; it has not been staged.
+This tested build was staged on 2026-10-08 with the game closed and its hash
+verified after copying. The previous DLL is backed up and the probe marker is
+enabled for the next launch. See the [current run card](collection-boundary-run-card.md).
+No Quick Load live capture or presentation-readiness result is claimed yet.

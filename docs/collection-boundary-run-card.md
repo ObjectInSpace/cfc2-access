@@ -28,7 +28,14 @@ The local DLL hash was rechecked on 2026-10-08. The session runner passed 73
 checks, selection passed 209, the probe runner passed, and all 66 collection
 Python tests passed. Full build/regression evidence is in the
 [Quick Load follow-up](collection-quick-save-followup.md#verification-of-the-six-site-diagnostic-build).
-This continuation has not staged the DLL or enabled the probe.
+Staged on 2026-10-08 after the user's resume instruction, with the game closed.
+The installed DLL hash matches the tested hash above; the opt-in marker is
+present and `cfc2_hook.off` is absent. Speech dependency DLLs are present.
+The prior DLL (SHA-256
+`c4b916da66edc95cfe08db40f12b8d0be6705852726d62cb80ad679803d2a36f`)
+is backed up under `build/deployment-backups/dinput8-<SHA256>.dll`.
+The game has not been launched and no Quick Load capture is claimed. Remove
+the opt-in marker after collecting the next run, before a subsequent launch.
 
 1. Use an existing CVS2 quick save in its relevant offline mode. Record the
    mode and ROM; do not create or overwrite a save for this exercise.
