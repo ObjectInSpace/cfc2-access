@@ -23,6 +23,12 @@ typedef struct {
  * acquisition creates a new generation, even for identical IDs/addresses.
  * Leaves capture disabled until an evidenced completion boundary resumes it. */
 bool game_session_begin(game_session *s, unsigned adapter, unsigned rom);
+/* A queued acquisition must name the generation/revision at which it was
+ * authorized. Refuse it without changing state if another invalidation or
+ * acquisition intervened. As with begin, identity/readiness evidence and
+ * serialization belong to the caller; success still leaves output disabled. */
+bool game_session_begin_if_current(game_session *s, uint64_t generation,
+                                   uint64_t revision, unsigned adapter, unsigned rom);
 /* Both invalidate all pending observations. Suspend retains owner identity;
  * departure also relinquishes ownership. Neither implies speech re-arming. */
 void game_session_suspend(game_session *s);

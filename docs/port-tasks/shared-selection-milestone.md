@@ -40,6 +40,9 @@ and installs no hooks. Its transitions are:
 - Begin an owner: increment generation and revision, discard pending
   publication, and leave capture disabled. Reacquiring identical adapter/ROM
   IDs still changes generation. Build/ROM validation belongs to its caller.
+- Queued acquisition: use game_session_begin_if_current with the expected
+  generation/revision. A later invalidation or acquisition defeats stale
+  completion without changing the current state. It does not infer readiness.
 - Suspend: increment revision and disable capture/publication/output while
   retaining the owner. Departure additionally relinquishes ownership.
 - Resume: require the expected generation/revision. A stale completion after

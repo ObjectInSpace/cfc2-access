@@ -29,6 +29,14 @@ void game_session_suspend(game_session *s)
     if (s) invalidate(s);
 }
 
+bool game_session_begin_if_current(game_session *s, uint64_t generation,
+                                   uint64_t revision, unsigned adapter, unsigned rom)
+{
+    if (!s || s->issued.generation != generation || s->issued.revision != revision)
+        return false;
+    return game_session_begin(s, adapter, rom);
+}
+
 void game_session_depart(game_session *s)
 {
     if (!s) return;

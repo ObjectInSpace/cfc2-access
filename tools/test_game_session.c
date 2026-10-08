@@ -11,6 +11,36 @@ static void ready(game_session *s, unsigned adapter, unsigned rom)
 }
 int main(void)
 {
+    /* Synthetic Quick Load/switch ordering: an old completion must never
+     * reacquire an owner after a later departure. No native timing is implied. */
+    game_session load = {0};
+    game_session_token before_load, acquisition, after_depart;
+    ready(&load, 1, 3);
+    CHECK(game_session_capture(&load, &before_load));
+    CHECK(game_session_publish(&load, &before_load));
+    game_session_depart(&load); /* Quick Load entry revokes before initialization. */
+    acquisition = load.issued;
+    CHECK(!game_session_can_output(&load, &before_load));
+    CHECK(!game_session_resume(&load, acquisition.generation, acquisition.revision));
+    game_session_depart(&load); /* A later departure invalidates queued acquisition. */
+    after_depart = load.issued;
+    CHECK(!game_session_begin_if_current(&load, acquisition.generation,
+                                        acquisition.revision, 1, 3));
+    CHECK(!load.owned && !load.eligible);
+    CHECK(load.issued.generation == after_depart.generation);
+    CHECK(load.issued.revision == after_depart.revision);
+    CHECK(game_session_begin_if_current(&load, after_depart.generation,
+                                       after_depart.revision, 1, 3));
+    CHECK(load.issued.generation > before_load.generation && !load.eligible);
+    CHECK(!game_session_publish(&load, &before_load));
+    /* Replaying the accepted acquisition cannot create yet another owner. */
+    acquisition = load.issued;
+    CHECK(!game_session_begin_if_current(&load, after_depart.generation,
+                                        after_depart.revision, 0, 1));
+    CHECK(load.issued.generation == acquisition.generation);
+    CHECK(load.issued.adapter == 1 && load.issued.rom == 3);
+    CHECK(game_session_resume(&load, acquisition.generation, acquisition.revision));
+    CHECK(!game_session_begin_if_current(NULL, 0, 0, 1, 3));
     game_session s = {0};
     game_session_token old = {0}, a, b, altered;
     CHECK(!game_session_capture(&s, &old));

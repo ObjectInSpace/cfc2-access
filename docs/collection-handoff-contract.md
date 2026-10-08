@@ -27,6 +27,16 @@ dispose a screen after its update returns. An acquisition request must carry
 the revocation label it observed; a later departure invalidates that request.
 No return from the old owner may resume the new owner.
 
+Offline implementation, 2026-10-08: game_session_begin_if_current now checks
+the acquisition request's expected generation and revision before beginning
+an owner. A later invalidation or acquisition rejects the request without
+changing state. Replaying a successful request is also rejected. Success
+still leaves eligibility false. This is a serialized component guard, not a
+native callback synchronization mechanism or proof of initialization readiness.
+The session runner passes 73 checks, including stale Quick Load acquisition,
+same-identity replacement and rejection of an old published observation; the
+selection runner passes its existing 209 checks.
+
 ## Capture and mutation
 
 The [Quick Load command trace](collection-quick-save-followup.md) establishes
