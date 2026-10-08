@@ -2,7 +2,8 @@
 
 Status: first switch capture completed; see
 [the 2026-10-06 live evidence](collection-boundary-live-20261006.md).
-Snapshot-load/registration exercise remains outstanding. The original
+The next exercise is the load-only CVS2 Quick Load capture below.
+Snapshot-load/registration remains separate future callback work. The original
 preflight record below is historical; the live evidence records the staged build.
 This is a diagnostic step toward the shared router, not an installed router.
 
@@ -12,7 +13,47 @@ the operation's signed 32-bit result. The first switch capture used the
 original five-site schema 1. The extension is not yet deployed or live-validated;
 use the linked load-only exercise rather than repeating the switch.
 
-## What the next run resolves
+## Next exercise: load an existing CVS2 quick save
+
+Continuation from 6dc8a5e, 2026-10-08. The session and selection components
+remain unwired; CVS1 names and cancellation/re-entry remain unresolved.
+This exercise measures Quick Load transaction order, thread and address reuse.
+It does not establish the later secondary-to-primary repair completion or
+authorize capture at Quick Load return.
+
+Before launch, stage the tested six-site DLL and opt-in marker while the game
+is closed. The retained build SHA-256 is
+`76596752567f14f636b6eb547c3d0650a76a4f2aa31cc9b6b1e071fb38942896`.
+The local DLL hash was rechecked on 2026-10-08. The session runner passed 73
+checks, selection passed 209, the probe runner passed, and all 66 collection
+Python tests passed. Full build/regression evidence is in the
+[Quick Load follow-up](collection-quick-save-followup.md#verification-of-the-six-site-diagnostic-build).
+This continuation has not staged the DLL or enabled the probe.
+
+1. Use an existing CVS2 quick save in its relevant offline mode. Record the
+   mode and ROM; do not create or overwrite a save for this exercise.
+2. Launch normally through Steam and enter that mode within the probe's
+   120-second capture window.
+3. Open the pause menu, choose the spoken **Load Quick Save** caption, and
+   confirm loading. Do not substitute Change Character or a numbered row.
+4. Report the success or failure message, the screen reached, and any change
+   in speech, audio or controls. The reported Vs. screen checkpoint is the
+   comparison to make, not an assumed result.
+5. Leave the game open until capture completes. The assistant collects the
+   CSV and log and removes the opt-in marker before the next launch.
+
+If no suitable save exists, stop the load-only exercise rather than making
+one incidentally. If the action falls outside the capture window, report that
+limit; absence of an event is not evidence that loading avoided mutation.
+
+Require a schema-2 `quick_load` entry/exit pair, its signed result, readable
+game/ROM/root metadata where available, surrounding outer updates, and the
+footer's loss/completion status. Preserve the user's actual action labels.
+Missing snapshot-load or cleanup-wrapper events do not establish safety:
+Quick Load calls cleanup directly. Do not resume ownership at transaction
+return or infer readiness from an unchanged root address.
+
+## Historical first-run question
 
 The first run measures which threads execute the common outer update, game
 cleanup and screen release during a CVS2-to-CVS1 switch. It records root
@@ -60,7 +101,7 @@ Any installation failure is logged as a failure.
 Callbacks use guarded, shallow metadata reads and a 4096-event buffer with
 nonblocking acquisition. They do no file I/O, logging, speech or allocation.
 Overflow and contention are counted. They do not copy the game state block,
-call game commands or change input. Hooking necessarily patches the five
+call game commands or change input. Hooking necessarily patches the six
 function entries; this is not the earlier external read-only metadata tool.
 
 Recording stops after 120 seconds. The worker drains up to 128 events per
@@ -83,7 +124,7 @@ failure can leave a file without a footer. Missing events must not be filled
 in from assumptions. Per-thread order is useful; cross-thread record order
 alone does not establish synchronization of native state.
 
-## First user exercise
+## Completed first user exercise (historical)
 
 After the assistant stages the tested DLL and opt-in marker while the game
 is closed:
@@ -120,7 +161,7 @@ unfinished captures mark call pairing unreliable. Separate parser tests cover
 thread separation, partial identities and missing boundaries. Synthetic CSVs
 under `build/test` are test artifacts, never live evidence.
 
-Before staging: all 29 PowerShell runners, the 50 collection Python tests and
+Original five-site preflight: all 29 PowerShell runners, the 50 collection Python tests and
 the DLL build must pass on the final source. Save the DLL hash with the run.
 The existing unrelated DLL warnings remain visible in the build log.
 
