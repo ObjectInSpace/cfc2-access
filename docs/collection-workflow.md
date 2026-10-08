@@ -1,5 +1,62 @@
 # Astra investigation and Opus implementation workflow
 
+## Current priority — shared delivery first, 2026-10-05
+
+Delivery objective: port the applicable CVS2 accessibility features to the
+other seven collection games, using F01–F19 in the feature inventory as the
+acceptance scope. Shared infrastructure is a means to deliver those ports,
+not a separate substitute for them. Validate reuse by delivering the same
+feature behavior in other games, with their actual rules and content, and
+preserving CVS2. Isolated common-system tests are necessary but insufficient.
+Track progress per feature and game through implementation, offline checks
+and labelled live acceptance. A CVS1 pilot is the first delivery milestone,
+not the end of the porting objective. Unsupported or unresolved features must
+remain explicit; only evidenced inapplicability removes a feature from scope.
+
+User-approved direction after 6cc26c8: do the shared work first, then resolve
+game-specific problems within each game's delivery work. This supersedes the
+PWS2-first next actions in the historical continuations below. Preserve the
+PWS2 reader, batches and renderer evidence at 6cc26c8; do not resume that
+research by default or make its completion a collection-wide dependency.
+
+The next milestone is a working shared session/observation/output path,
+validated through the existing CVS2 behavior and one bounded CVS1 feature.
+Start by reviewing the implemented common systems and remaining dependencies;
+reuse text_channel, audio and existing diagnostics. Implement only the shared
+interfaces needed to deliver that milestone, not a speculative framework for
+every future game feature.
+
+Execution order:
+
+1. Close the shared lifecycle/invalidation contract: identity, departure,
+   replacement and same-address restore, with revocation at capture and output.
+   Use the prepared boundary probe/run card for missing thread/order evidence;
+   do not repeat completed static investigation or substitute pointer equality.
+2. Implement the session/adapter and copied-observation boundaries, using the
+   existing shared text, presentation and audio mechanisms as applicable.
+   Test stale queued output, switching, resets and backend acceptance.
+3. Migrate a bounded existing CVS2 path and deliver one explicitly scoped CVS1
+   feature through the same interfaces. Resolve only the game-specific facts
+   needed to supply and validate that feature. Run required shared regressions
+   and targeted live checks before declaring this milestone complete.
+4. Continue per-game feature packets through the proven common path. Keep
+   native fields, names, phase rules, meter semantics and camera/shader problems
+   in their adapters and evidence packets. Shared fixes apply across adapters.
+
+Exit evidence is working shared code, preserved CVS2 behavior, one usable CVS1
+feature, passing invalidation/regression checks and labelled live acceptance.
+Choose and record the CVS1 feature and its acceptance criteria at the start of
+implementation; do not claim that the existing names research is already ready.
+Report delivered behavior and remaining acceptance gates, not just increasing
+test/span counts. Research must answer a named delivery dependency.
+
+PWS2's draw enclosure, diagnostic installer, full matrix/shader interpretation,
+health normalization and four-player spatial policy remain tracked work for
+PWS2. They do not block this shared milestone. If a game reveals a genuine
+shared-contract gap, describe the cross-game effect and address that gap in the
+common system. Shared-first does not mean solving every game's semantics before
+shipping the first adapter feature.
+
 Continuation, 2026-10-05, from clean 904b955: added unwired native bounded
 reader and fixed batch storage; 234 native reader and 70 batch checks pass.
 The HUD manifest now retains 53 spans and 27 operands, including the complete

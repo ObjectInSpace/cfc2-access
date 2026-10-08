@@ -1,5 +1,20 @@
 # Next Astra session: upfront investigation and proof
 
+Delivery objective: port CVS2's applicable F01–F19 accessibility features to
+the other seven games. Shared-first work must enable those deliveries and be
+validated by features working in other games. Do not replace the porting goal
+with an infrastructure project or regard a single CVS1 pilot as completion.
+
+Current direction, 2026-10-05, after 6cc26c8: read
+[the shared-first priority](collection-workflow.md#current-priority--shared-delivery-first-2026-10-05)
+before the historical instructions below. Review the existing shared code and
+remaining lifecycle evidence, then implement/prove the common session,
+observation and output boundaries through CVS2 and one bounded CVS1 feature.
+Record that feature's concrete acceptance criteria before expanding scope.
+Keep useful offline work moving and use the existing boundary run card for
+required live evidence. PWS2 is parked at its committed checkpoint; its renderer
+and capture completion are not prerequisites for the shared milestone.
+
 This is a ready-to-use continuation brief. It initiates the next campaign;
 it does not claim that the campaign has already been performed.
 

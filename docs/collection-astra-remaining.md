@@ -1,5 +1,14 @@
 # Remaining Astra work after the 5f9e3fc continuation
 
+Priority override, 2026-10-05, after 6cc26c8: the user approved shared work
+first, followed by game-specific delivery. Follow the current priority in
+[the workflow](collection-workflow.md#current-priority--shared-delivery-first-2026-10-05).
+The immediate sequence near the end of this document is historical and no
+longer directs the next session. Shared lifecycle/invalidation and common
+observations/output, proved through CVS2 and one bounded CVS1 feature, come
+first. Preserve PWS2 work; resume its outstanding research within its own game
+milestone. Its unresolved renderer semantics do not block other adapters.
+
 Checkpoint from 904b955: native bounded reader and fixed batch storage now
 exist, unwired, with 234 reader and 70 batch checks passing. The expanded HUD
 trace records rectangle constants, derived-storage destinations and strip

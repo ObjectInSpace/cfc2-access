@@ -19,6 +19,20 @@ differences local.
 
 ## Scope and priorities
 
+Completion means the applicable CVS2 features work in the other seven games,
+with per-feature/per-game validation and preserved CVS2 behavior. Shared-code
+completion alone does not meet this goal. The CVS1 pilot below is an initial
+proof and delivery step, followed by the remaining applicable feature ports.
+
+User-approved sequencing, 2026-10-05: shared delivery first, then game-specific
+problems within each game's feature work. The immediate milestone is the common
+session/observation/output path validated through CVS2 and one bounded CVS1
+feature. See [the current workflow priority](collection-workflow.md#current-priority--shared-delivery-first-2026-10-05)
+for its execution order and exit criteria. PWS2 renderer/capture research is
+preserved at 6cc26c8 and is not a prerequisite. Build shared interfaces from
+these concrete migration/pilot needs; later game semantics extend them only
+when an evidenced requirement arises.
+
 Deliver equivalent access to the information each title actually shows:
 selection, transitions, health/resources, position/stance, clock warnings,
 quotes/story/credits/prompts, read-current-text and common controls. Preserve
