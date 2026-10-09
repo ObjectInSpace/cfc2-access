@@ -54,6 +54,14 @@ a required control, not an observed case in this run. Next trace the following
 secondary-to-primary restoration/repair and supported-mode gate; this capture
 does not authorize acquisition at transaction return or at an arbitrary update.
 
+The [CVS2 completion continuation](collection-quickload-completion-trace.md)
+locates local restore completion after list/resource repairs at 0x1406aac2b,
+but save and bypass share that return. Later native/wrapper writes still follow.
+Neither S+0x528, S+0x774 nor a cleared secondary control certifies completion.
+Shell-owner+0x1cd excludes the known callback route; zero plus clear restore
+gates does not certify an offline mode. Require positive branch/completion
+evidence and a protected enclosing boundary before acquisition/publication.
+
 Native memory must be copied at an evidenced lifetime-safe point. Checking
 labels before and after an arbitrary worker read can reject stale data but
 does not protect a freed allocation during that read. Keep native pointers

@@ -136,6 +136,12 @@ online callback modes may remain unsupported; exhaustive replay coverage
 must not silently expand the milestone. A reliable exclusion gate still
 requires implementation and evidence.
 
+The 2026-10-09 [Quick Load completion trace](../collection-quickload-completion-trace.md)
+adds the CVS2 consumer/repair chain and necessary callback/import/restore
+exclusions. Local repair return is distinguished from enclosing completion;
+all-zero gate values are not an evidenced offline-mode allowlist. The native
+gate and lifetime-safe copy boundary remain unimplemented.
+
 The offline [output invalidation review](../shared-output-invalidation-review.md)
 records the remaining queue, copied-frame, backend and audio ownership gaps.
 Preserve the recovered scene ownership guards: legacy reset/tick paths already

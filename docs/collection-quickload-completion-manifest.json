@@ -1,0 +1,194 @@
+{
+  "schema": 1,
+  "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
+  "evidence": "offline CVS2 consumer trace; no restore-completion live capture",
+  "slots": [
+    {
+      "address": "0x141282a30",
+      "target": "0x1406ba870"
+    },
+    {
+      "address": "0x14128cd70",
+      "target": "0x1406baba0"
+    },
+    {
+      "address": "0x14128cd78",
+      "target": "0x1406babc0"
+    }
+  ],
+  "restore": {
+    "entry": "0x1406aab40",
+    "positive_branch": "0x1406aabe6",
+    "local_return": "0x1406aac2b",
+    "payload_bytes": 136880,
+    "phase_prefix": [
+      2,
+      1,
+      0
+    ],
+    "conditional_repair_controls": [
+      2,
+      3,
+      4
+    ]
+  },
+  "exclusion": {
+    "shell_owner_slot": "0x141c14f90",
+    "callback_byte": 461,
+    "session_slot": "0x141c14f98",
+    "restore_bypass_dwords": [
+      1972,
+      2088,
+      2060
+    ],
+    "secondary_import_bypass_qword": 424,
+    "zero_values_prove_supported_offline_mode": false
+  },
+  "limitations": [
+    "Local restore return includes repairs but not enclosing update completion.",
+    "S+0x528, S+0x774 and secondary control are not completion certificates.",
+    "The captured load has no mode, phase or secondary-header observations.",
+    "Callback exclusion is necessary, not a complete offline UI-mode allowlist.",
+    "No thread, lifetime, hook ABI or concurrent output protocol is certified."
+  ],
+  "spans": [
+    {
+      "label": "buffer-to-secondary",
+      "start": "0x1400b5f90",
+      "end_exclusive": "0x1400b60a8",
+      "sha256": "02b229e06d0c074623e66f4bd9dac21d467caada4ec69afbca68a9ad1a87fa70"
+    },
+    {
+      "label": "CVS2-root-and-phase-publication",
+      "start": "0x1406aa320",
+      "end_exclusive": "0x1406aa794",
+      "sha256": "de6ef5889a8c3423384dc9f146736ef54e56a7e01a33c07e4b037fbc69144b16"
+    },
+    {
+      "label": "CVS2-update-wrapper",
+      "start": "0x1406a9a10",
+      "end_exclusive": "0x1406a9a27",
+      "sha256": "261a814449b10747ff74fac3ea69281a847ed78d1e63c6af3068c8de655cd8ee"
+    },
+    {
+      "label": "CVS2-native-update",
+      "start": "0x1406aa7a0",
+      "end_exclusive": "0x1406aa957",
+      "sha256": "50d40de552d68916957d46be82be0eb916fde39a4952cfc740e2e4dc2b9d173a"
+    },
+    {
+      "label": "CVS2-phase-dispatch",
+      "start": "0x1406b1ca0",
+      "end_exclusive": "0x1406b1d03",
+      "sha256": "aaff5b46f6af0cbf943e4a3a6f7a182286ce8faac16c16ef89495ca0c5878ca5"
+    },
+    {
+      "label": "CVS2-phase-2-dispatch",
+      "start": "0x1406ba870",
+      "end_exclusive": "0x1406ba899",
+      "sha256": "1202f4d078ce77655cc66826eb1f98e3792613cec184e6465a669dea3e930b8d"
+    },
+    {
+      "label": "CVS2-preparation-dispatch",
+      "start": "0x1406baba0",
+      "end_exclusive": "0x1406babb7",
+      "sha256": "5cdd4d92e05c1d4fb48299b9f6a19d144eeadce60e4ae6efc929d62feabb30af"
+    },
+    {
+      "label": "CVS2-preparation",
+      "start": "0x1406babc0",
+      "end_exclusive": "0x1406bad46",
+      "sha256": "8aa8ac679cc4f07e29f8e59e4074c0a964819fbcde91bbc1555e5ffe243a6e95"
+    },
+    {
+      "label": "CVS2-save-restore",
+      "start": "0x1406aab40",
+      "end_exclusive": "0x1406aac2c",
+      "sha256": "070ddcf9e84912030e2e4d9c356e4aeb0cbb6d50c21b46f7acca39a4eb588875"
+    },
+    {
+      "label": "CVS2-list-repair",
+      "start": "0x1406ace60",
+      "end_exclusive": "0x1406ad0e2",
+      "sha256": "3bfa79a92fc1f94aa06302021e28cf81b65fd590916e309c38ef6a647c1a56d5"
+    },
+    {
+      "label": "CVS2-conditional-resource-repair",
+      "start": "0x1406b0520",
+      "end_exclusive": "0x1406b057f",
+      "sha256": "f507c92f8651556432553a3860314728270efaa61c2edc55154ae2d0e00759af"
+    },
+    {
+      "label": "CVS2-resource-list",
+      "start": "0x1406b0690",
+      "end_exclusive": "0x1406b088d",
+      "sha256": "fd942a5386ba086aa5a6cdb6e04f86847529b34068e8fb8f2bffe26770f271e5"
+    },
+    {
+      "label": "CVS2-resource-copy",
+      "start": "0x1406a9bf0",
+      "end_exclusive": "0x1406a9c3b",
+      "sha256": "34dfb92f5ef18e7a548c781abb6836499b5cd2f590836ee3a9ad6be0b94794c5"
+    },
+    {
+      "label": "CVS2-post-update",
+      "start": "0x1406a9de0",
+      "end_exclusive": "0x1406aa318",
+      "sha256": "b2df10223234bea997f115823e7f4ffb897bd7a1e107180482ef3f96ea778208"
+    },
+    {
+      "label": "CVS2-clear-secondary-status",
+      "start": "0x1406a9d20",
+      "end_exclusive": "0x1406a9dd8",
+      "sha256": "408d6857853be8e595d242a391e14044db3093cd0b744a6a6a0be0971d20cc19"
+    },
+    {
+      "label": "CVS2-clear-checkpoint",
+      "start": "0x1406aab20",
+      "end_exclusive": "0x1406aab39",
+      "sha256": "ac59777f323fafbebae91a039c3893988c870512772ebb75f0341b6b9da994a8"
+    },
+    {
+      "label": "CVS2-explicit-checkpoint",
+      "start": "0x1406aac30",
+      "end_exclusive": "0x1406aacc6",
+      "sha256": "7ee258e274e7af457f245bbdb5016b8243df3a80560739a0d9113d8babd8ac4a"
+    },
+    {
+      "label": "CVS2-secondary-header-consumer",
+      "start": "0x1406b20d0",
+      "end_exclusive": "0x1406b225b",
+      "sha256": "6c4bfbd250b89dabba2d2e3eca00505adc87e257e088eb648c3e2108b46a287a"
+    },
+    {
+      "label": "CVS2-start-phase",
+      "start": "0x1406b9a60",
+      "end_exclusive": "0x1406b9b9b",
+      "sha256": "c2f829dc2c4a6410476fc72a451a27007dd7dff7325381924635994eb65bf3ed"
+    },
+    {
+      "label": "outer-update",
+      "start": "0x14003a290",
+      "end_exclusive": "0x14003a79d",
+      "sha256": "5c6cf55664cedf950440d62044ca86d1a4b6a1162b8e2120dec5a45eac390adf"
+    },
+    {
+      "label": "callback-mode-setter",
+      "start": "0x1400520b0",
+      "end_exclusive": "0x1400520f0",
+      "sha256": "64fe25575cc2705137183d0ca15f75213bec8690a62c0ba824aeb36b5b02a814"
+    },
+    {
+      "label": "command-recording-gate",
+      "start": "0x1400487c0",
+      "end_exclusive": "0x14004880d",
+      "sha256": "ca8ce4f28ced392cca001433b4a5c2a9c6b18cacee50ee3a20b489c4b6f6160a"
+    },
+    {
+      "label": "command-recording-reset",
+      "start": "0x140048e90",
+      "end_exclusive": "0x140048ecb",
+      "sha256": "a45303732608ce6097fd604f07be3de7754259151787b0f105f1d4f5623d0145"
+    }
+  ]
+}

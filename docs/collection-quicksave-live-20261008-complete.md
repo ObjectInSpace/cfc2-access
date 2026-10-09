@@ -63,6 +63,11 @@ launches do not enable the probe without its marker.
 
 ## Consequences and next work
 
+Static follow-up, 2026-10-09: the [completion trace](collection-quickload-completion-trace.md)
+now identifies the CVS2 phase-dispatch consumer, both local repair paths,
+subsequent wrapper writes and callback-mode exclusion. Its 23-span audit does
+not establish the live completion update or a supported offline-mode allowlist.
+
 Quick Load can replace the root while retaining session/game/ROM identity.
 Revoke at transaction entry and require a new generation. This capture does
 not exercise same-root-address reuse, and pointer inequality must not become
