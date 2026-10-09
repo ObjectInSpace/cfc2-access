@@ -133,3 +133,23 @@ polarity, signed control, repair call/range/count, preparation slot, later
 reverse transfer and callback exclusion. They validate extraction, not native
 execution. No DLL changes, staging, probe activation or save-file operations
 were made. Shared session/selection wiring and CVS1 speech remain pending.
+
+## Offline entry continuation
+
+The [offline-mode gate trace](collection-offline-gate-trace.md) now connects
+the established Offline Play menu row to shell mode zero and explicit Arcade
+selection. It traces the Training/Versus option writers into S+0x828/+0x80c,
+the special clears of S+0x7b4, and CVS2 initialization of S+0x1a8. The narrow
+pilot requires positive entry provenance as well as current field checks.
+All-zero flags still cannot admit an owner by themselves.
+
+The continuation specifies synchronous manager-update return as the candidate
+copy placement after deferred replacement. Native lifetime protection remains
+unproved; this is not a production hook approval. Its audit brings the
+collection suite to 90 passing tests, with no DLL or live changes.
+
+User clarification, 2026-10-09: Arcade, Versus and Training must all be
+supported. The Arcade-only gate is an intermediate Quick Load research scope.
+The bypass flags describe this checkpoint consumer, not whether a mode belongs
+in the accessibility feature scope. Versus/Training readiness and mutation
+paths remain required follow-up work.

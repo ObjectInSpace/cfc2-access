@@ -4,6 +4,23 @@ Selected 2026-10-05 at 6cc26c8, following the shared-first priority in
 collection-workflow.md. Feature: F02 character-highlight speech. This packet
 does not redefine the full F01–F19 collection delivery objective.
 
+User clarification, 2026-10-09: required mode coverage includes **Arcade,
+Versus and Training**. The Arcade-only Quick Load research pilot is temporary
+and does not narrow delivery scope. Track Versus and Training integration and
+live acceptance as required work, with mode-specific lifecycle evidence.
+
+Continuation correction: reuse the existing CVS2 implementation and recorded
+research before proposing another acquisition trace. `cvs2_select_tick` in
+`src/cvs2_select.c` already polls and copies state; its decoders distinguish
+Arcade and the alternate Versus/Training selection paths, reject inactive/
+busy states, and preserve selection visits. `cvs2_selection_copy` already
+supplies the shared copied-label format and is exercised by the shared replay.
+The existing character speech is not driven by a drawing callback. A proposed
+switch to drawing callbacks is not an established prerequisite for this port.
+Preserve these decoders, labels and behavior; focus further work on the actual
+shared integration gaps. The Arcade Quick Load provenance investigation must
+not become a new mode admission requirement for existing selection speech.
+
 Offline continuation from 9dbf135: src/game_selection.{h,c} now implements
 bounded copied-selection settling and presentation. Real CVS2 capture replay
 passes through it, game_session and the existing tc_say with a fake backend.
@@ -141,6 +158,15 @@ adds the CVS2 consumer/repair chain and necessary callback/import/restore
 exclusions. Local repair return is distinguished from enclosing completion;
 all-zero gate values are not an evidenced offline-mode allowlist. The native
 gate and lifetime-safe copy boundary remain unimplemented.
+
+The subsequent [offline-mode trace](../collection-offline-gate-trace.md)
+establishes Offline Play / Arcade entry provenance and the Training/Versus
+flag writers. The proposed pilot gate requires an explicit Arcade mode code,
+correlated initialization and current consistency checks; zeros alone do not
+admit a session. Manager-update return is the candidate copy placement after
+deferred replacement, with native lifetime protection still unresolved.
+All 90 collection tests pass. This remains static evidence, not native wiring
+or an expansion of the CVS1 pilot scope.
 
 The offline [output invalidation review](../shared-output-invalidation-review.md)
 records the remaining queue, copied-frame, backend and audio ownership gaps.

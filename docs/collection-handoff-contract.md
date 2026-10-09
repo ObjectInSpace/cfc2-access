@@ -1,5 +1,11 @@
 # Shared handoff after the first live switch
 
+Required mode scope, clarified by the user on 2026-10-09: support **Arcade,
+Versus and Training**. The narrow Arcade Quick Load contract below is an
+intermediate evidence step. Versus/Training checkpoint bypasses do not justify
+excluding those modes from the shared accessibility path; establish their
+mode-specific readiness, mutation handling and protected observation paths.
+
 2026-10-07. Design requirements, not installed runtime behavior. Sources are
 the [live switch capture](collection-boundary-live-20261006.md),
 [snapshot trace](collection-snapshot-trace.md), and
@@ -61,6 +67,20 @@ Neither S+0x528, S+0x774 nor a cleared secondary control certifies completion.
 Shell-owner+0x1cd excludes the known callback route; zero plus clear restore
 gates does not certify an offline mode. Require positive branch/completion
 evidence and a protected enclosing boundary before acquisition/publication.
+
+The [offline entry/writer continuation](collection-offline-gate-trace.md)
+establishes a narrow Offline Play / Arcade provenance contract. Require an
+explicit mode-code-zero confirmation, a correlated aGame request and validated
+initialization, plus current shell/session consistency checks. Training and
+Versus writers now explain two bypass fields; special clears prevent S+0x7b4
+from serving as a universal mode flag. Quick Load retains validated route
+provenance under a fresh transaction label, never the old owner generation.
+
+Synchronous manager-update return is the candidate after enclosing updates
+and deferred replacement. Re-resolve membership and reject any intervening
+departure before copying. That ordering does not establish lifetime protection:
+the engine scheduler/destructor ownership or a shared native lifetime guard
+still needs proof. The worker must not read native memory in the meantime.
 
 Native memory must be copied at an evidenced lifetime-safe point. Checking
 labels before and after an arbitrary worker read can reject stale data but

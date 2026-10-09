@@ -1,0 +1,192 @@
+{
+  "schema": 1,
+  "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
+  "evidence": "static entry and writer trace; no protected runtime copy certified",
+  "slots": [
+    {
+      "address": "0x140098098",
+      "target": "0x140097b54",
+      "encoding": "RVA32"
+    },
+    {
+      "address": "0x14003e81c",
+      "target": "0x14003dfd7",
+      "encoding": "RVA32"
+    },
+    {
+      "address": "0x14003e7f4",
+      "target": "0x14003e010",
+      "encoding": "RVA32"
+    },
+    {
+      "address": "0x14003e818",
+      "target": "0x14003e7b4",
+      "encoding": "RVA32"
+    },
+    {
+      "address": "0x140feeda0",
+      "target": "0x1400b1490",
+      "encoding": "VA64"
+    },
+    {
+      "address": "0x140feede0",
+      "target": "0x1400b1510",
+      "encoding": "VA64"
+    },
+    {
+      "address": "0x140fef018",
+      "target": "0x1400b26a0",
+      "encoding": "VA64"
+    },
+    {
+      "address": "0x141018b90",
+      "target": "0x1401a6200",
+      "encoding": "VA64"
+    },
+    {
+      "address": "0x141018bb8",
+      "target": "0x1401a6420",
+      "encoding": "VA64"
+    }
+  ],
+  "labels": [
+    [
+      37,
+      "OFFLINE_PLAY",
+      "Offline Play"
+    ],
+    [
+      4105,
+      "MODE_ARCADE",
+      "Arcade Mode"
+    ],
+    [
+      4106,
+      "MODE_VERSUS",
+      "Versus Mode"
+    ],
+    [
+      4107,
+      "MODE_TRAINING",
+      "Training Mode"
+    ],
+    [
+      4108,
+      "MODE_TRAINING2",
+      "Training Mode (Boss)"
+    ]
+  ],
+  "mode_labels": {
+    "table": "0x1412084d8",
+    "indices": [
+      4105,
+      4106,
+      4107,
+      4108
+    ],
+    "source": "local msg.arc/menu_eng via gmd.parse_gmd"
+  },
+  "pilot": {
+    "route": "Offline Play / Arcade Mode",
+    "shell_mode": 0,
+    "shell_option_bytes": {
+      "0xd0330": 0,
+      "0xd0338": 0
+    },
+    "requires_positive_entry_record": true,
+    "runtime_support_implemented": false
+  },
+  "boundary": {
+    "candidate": "0x1401a6200 return",
+    "return_instruction": "0x1401a62a5",
+    "after_deferred_replacement": true,
+    "lifetime_protection_proven": false,
+    "worker_native_read_allowed": false
+  },
+  "spans": [
+    {
+      "label": "main-menu-selection-prefix",
+      "start": "0x1400973d0",
+      "end_exclusive": "0x140097c33",
+      "sha256": "6e8f0309b2698882e5126fba1ab56baa23f5e78c7c7e171280d392fe96d39d91"
+    },
+    {
+      "label": "offline-parent-update",
+      "start": "0x14003dbe0",
+      "end_exclusive": "0x14003e7e4",
+      "sha256": "df496f59f96edefea502c9539607b1c806ee38b0ffc18d119cd1677f5b7373e5"
+    },
+    {
+      "label": "game-select-constructor",
+      "start": "0x1400b13f0",
+      "end_exclusive": "0x1400b1441",
+      "sha256": "5d6b120f0d0fe64d80681ba7ac6634d7b86b1d63a6cbb265a5ebc3c8557dc32b"
+    },
+    {
+      "label": "game-select-update",
+      "start": "0x1400b1510",
+      "end_exclusive": "0x1400b1ae3",
+      "sha256": "68773b29306085ee5ee1019c0f2514c8c79abd908d22a39c6689a063c5fbc3ab"
+    },
+    {
+      "label": "game-select-confirm",
+      "start": "0x1400b1b10",
+      "end_exclusive": "0x1400b1db0",
+      "sha256": "d0286be711fa7e8f5501ebb3832c2c16e14269325ab7a16d1dab9aa490cab242"
+    },
+    {
+      "label": "mode-select-constructor",
+      "start": "0x1400b2530",
+      "end_exclusive": "0x1400b25d7",
+      "sha256": "f95c0378f5c033adbe28ea38e3fb63cc0d97730bb466dc59b939a5c146479393"
+    },
+    {
+      "label": "mode-select-update",
+      "start": "0x1400b26a0",
+      "end_exclusive": "0x1400b28d5",
+      "sha256": "5bdfcc5d718c5b3ec13b2f6cc24fccd284994cc719ed9159b3214082162cbda5"
+    },
+    {
+      "label": "mode-select-label",
+      "start": "0x1400b2950",
+      "end_exclusive": "0x1400b29fd",
+      "sha256": "5169bfa806c8c734d91bc81a898af92cbb24bd5ea3288996c6a2888f61bccb75"
+    },
+    {
+      "label": "session-mode-writer",
+      "start": "0x140037a60",
+      "end_exclusive": "0x140037c42",
+      "sha256": "ce104f858922696221f104531c695ee8db2f109529c2d8f548870b46830e2c4b"
+    },
+    {
+      "label": "session-option-writers",
+      "start": "0x140038280",
+      "end_exclusive": "0x140038931",
+      "sha256": "be13093c02691aa3819afa48b05103b5388a17ce5d4f359b053a6a18195389ea"
+    },
+    {
+      "label": "CVS2-import-gate-initialization",
+      "start": "0x1406a97d0",
+      "end_exclusive": "0x1406a9a0f",
+      "sha256": "ca6affb79adb124c7fad14a525318778d9aed320d923c157ae5e4aee11249b74"
+    },
+    {
+      "label": "screen-update",
+      "start": "0x140038f90",
+      "end_exclusive": "0x140039778",
+      "sha256": "b2e0baca5568cbbc779f57aab642f0d0564eee3b31857b4f8a343f9ec2028f4f"
+    },
+    {
+      "label": "manager-update",
+      "start": "0x1401a6200",
+      "end_exclusive": "0x1401a62a6",
+      "sha256": "8c0ae503d90ad4e7fa2081bf12ea95364d979843e8d68955d6c71fc800540f60"
+    },
+    {
+      "label": "manager-replacement",
+      "start": "0x1401a6420",
+      "end_exclusive": "0x1401a65e7",
+      "sha256": "2725826f8fcd77ba129e8182ac88f85d6e232afb1e1a6c85e85cae7699468ecc"
+    }
+  ]
+}
