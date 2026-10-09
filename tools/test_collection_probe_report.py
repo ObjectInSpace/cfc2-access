@@ -1,6 +1,7 @@
 import unittest
 import gzip
 import hashlib
+import csv
 from pathlib import Path
 import collection_probe_report as report
 
@@ -16,6 +17,34 @@ def capture(rows, footer='# complete,dropped,0'):
 
 
 class ProbeReportTests(unittest.TestCase):
+    def test_live_quick_load_replaces_root_outside_outer_update(self):
+        packed = (Path(__file__).parent / 'fixtures/collection-boundary-quicksave-20261008.csv.gz').read_bytes()
+        self.assertEqual(hashlib.sha256(packed).hexdigest(),
+                         'ca965a778a593872d88fca4e6cc6b4f2b14815b6eacfc19ffa6f3ead6a682566')
+        raw = gzip.decompress(packed)
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),
+                         '5730410fa0c69d7f87603d6446ca5344ef15970bf33c328d931d66949273ddff')
+        text = raw.decode('utf-8')
+        result = report.analyze(text)
+        self.assertTrue(result['complete'] and result['pairing_reliable'])
+        self.assertEqual((result['dropped'], result['unreadable']), (0, 0))
+        self.assertEqual(result['event_count'], 10232)
+        self.assertEqual(len(result['pairs']), 5116)
+        self.assertEqual(result['unmatched_entries'], [])
+        self.assertEqual(result['unmatched_exits'], [])
+        loads = [p for p in result['pairs'] if p['site'] == 'quick_load']
+        self.assertEqual(loads, [dict(site='quick_load', thread=26136,
+            enter_sequence=3011, exit_sequence=3012, duration_ticks=118350, depth=0)])
+        rows = {int(r['sequence']): r for r in csv.DictReader(text.splitlines()[1:-1])}
+        before, after = rows[3011], rows[3012]
+        for key in ('session', 'game', 'rom', 'bytes', 'argument'):
+            self.assertEqual(before[key], after[key])
+        self.assertEqual((before['root'], after['root']), ('17ab1000', '17cb1000'))
+        self.assertEqual(after['result'], '0')
+        self.assertEqual((rows[3010]['site'], rows[3010]['exit']), ('0', '1'))
+        self.assertEqual((rows[3013]['site'], rows[3013]['exit']), ('0', '0'))
+        self.assertEqual(rows[3013]['root'], after['root'])
+
     def test_live_quick_load_attempt_remains_incomplete_despite_paired_rows(self):
         packed = (Path(__file__).parent / 'fixtures/collection-boundary-quicksave-20261008-incomplete.csv.gz').read_bytes()
         raw = gzip.decompress(packed)

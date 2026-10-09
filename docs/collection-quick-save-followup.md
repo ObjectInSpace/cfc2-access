@@ -1,5 +1,13 @@
 # User-facing quick-save follow-up
 
+Latest evidence, recorded 2026-10-09: [the completed capture](collection-quicksave-live-20261008-complete.md)
+contains one CVS2 Quick Load entry/exit pair, root replacement and zero drops.
+The discovery fix kept speech responsive by user report and capture completed
+promptly. The user clarified that usual saves load the Vs. screen; this save
+is after the final match ends. Retain both observations, not a universal
+post-victory or Vs. screen rule. The probe is disabled again. Next resolve the
+following restoration/repair completion and mode gate before native wiring.
+
 Update 2026-10-08: the [live attempt](collection-quicksave-live-20261008.md)
 returned the user to the menu and then, on exiting it, to the saved point after
 the last-boss victory. The earlier Vs. screen expectation does not describe

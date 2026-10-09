@@ -1,5 +1,13 @@
 # Collection boundary event probe
 
+Latest result, recorded 2026-10-09: the [second 2026-10-08 launch completed](collection-quicksave-live-20261008-complete.md)
+with 10,232 events, zero drops and a Quick Load pair replacing CVS2's root.
+The user confirmed responsive speech and restoration of this save's post-final-
+match checkpoint. Usual saves still load the Vs. screen by their report.
+The probe is disabled for future launches. Do not repeat the exercise below
+merely to recapture this transaction; next work is the restoration/repair
+completion boundary and supported offline-mode gate.
+
 Current continuation, 2026-10-08: the [bounded message-discovery fix](gmd-discovery-worker-fix.md)
 passes 35 native runners, 67 collection Python tests and build/import checks.
 It is staged with the game closed and the probe enabled for a repeat load-only

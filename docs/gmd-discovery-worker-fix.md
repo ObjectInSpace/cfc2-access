@@ -1,5 +1,11 @@
 # Bounded message discovery after the Quick Load capture stall
 
+Live follow-up, recorded 2026-10-09: the [completed CVS2 load capture](collection-quicksave-live-20261008-complete.md)
+has zero drops and a successful footer about 120.238 seconds after start.
+The retained log contains incremental English resolution and no synchronous
+gmdfind scans; the user confirmed speech kept up. This validates this run,
+not a universal latency bound. The probe marker is removed for future launches.
+
 2026-10-08. The [incomplete live capture](collection-quicksave-live-20261008.md)
 showed repeated eight-second gmd_find calls on the shared output worker. The
 caller retried on every poll and restarted the address-space walk on failure.

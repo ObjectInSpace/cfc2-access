@@ -45,6 +45,15 @@ restoration. This transaction needs departure/new-generation semantics even
 for identical game/ROM/root addresses. Its direct cleanup call bypasses the
 old monitored wrapper. Return is not yet secondary-to-primary restore completion.
 
+The [completed live Quick Load capture](collection-quicksave-live-20261008-complete.md)
+now confirms a depth-zero transaction between outer updates on thread 26136:
+session/game/ROM persist while root changes from 0x17ab1000 to 0x17cb1000.
+The signed result is zero; no cleanup-wrapper or snapshot callback event nests
+inside it. The complete trace has zero drops. Same-address replacement remains
+a required control, not an observed case in this run. Next trace the following
+secondary-to-primary restoration/repair and supported-mode gate; this capture
+does not authorize acquisition at transaction return or at an arbitrary update.
+
 Native memory must be copied at an evidenced lifetime-safe point. Checking
 labels before and after an arbitrary worker read can reject stale data but
 does not protect a freed allocation during that read. Keep native pointers
