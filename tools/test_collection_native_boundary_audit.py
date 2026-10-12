@@ -31,7 +31,18 @@ class NativeBoundaryAuditTests(unittest.TestCase):
                  0x140FEFAC8, 0x1400B499E + 2,
                  0x1400B49D1 + 1, 0x1400B5784 + 4*4,
                  0x1400B5727 + 2, 0x14056DCC6 + 6,
-                 0x140038843 + 2, 0x1406D66BF + 2, 0x14070005D + 2)
+                 0x140038843 + 2, 0x1406D66BF + 2, 0x14070005D + 2,
+                 0x1401F6CFA + 1, 0x1401F7E33 + 3,
+                 0x1401F7E8B + 3, 0x14056E0AB + 2,
+                 0x14056E485 + 3, 0x141069370,
+                 0x14056DE4C + 3, 0x14056DE79 + 3,
+                 0x1401F6731 + 1, 0x1401F673E + 2,
+                 0x1401F65EA + 2, 0x1401F6654 + 7,
+                 0x1401F6779 + 3, 0x1401F84FB + 2,
+                 0x1401F8698 + 3, 0x1401F869C + 2,
+                 0x1401F86CC, 0x140FE21B8,
+                 0x14017B7DC + 2, 0x14056E177 + 2,
+                 0x1401798F2 + 3, 0x14017AD10 + 3)
         original = audit.Dump.read
         for address in sites:
             with self.subTest(address=hex(address)):
@@ -74,6 +85,51 @@ class NativeBoundaryAuditTests(unittest.TestCase):
         self.assertFalse(report['training_input']['live_verified'])
         self.assertFalse(report['training']['complete_mutation_inventory'])
 
+    def test_ring_completion_evidence_limits(self):
+        scheduler = audit.produce()['scheduler']
+        self.assertEqual(scheduler['completion_distance_limit_exclusive'], 4096)
+        self.assertFalse(scheduler['submitter_capacity_check_present'])
+        self.assertTrue(scheduler['consume_index_advances_before_callback'])
+        self.assertTrue(scheduler['callback_pointer_cleared_before_call'])
+        self.assertFalse(scheduler['poll_retry_rechecks_submission_distance'])
+        self.assertTrue(scheduler['group_destructor_deletes_members'])
+        self.assertFalse(scheduler['live_geometry_arena_access_proven'])
+
+    def test_equality_bypass_schedule_model(self):
+        # Conditional schedule witness, not a live game/concurrency test:
+        # worker A has claimed job zero and is paused in its callback;
+        # worker B completes all later jobs. No slot has been overwritten.
+        # The modeled unsigned subtraction/branch is pinned by the audit.
+        scheduler = audit.produce()['scheduler']
+        limit = scheduler['completion_distance_limit_exclusive']
+        first = scheduler['generic_initial_ticket']
+        for count in (limit - 1, limit):
+            with self.subTest(submissions=count):
+                contexts = [True] + [False] * (count - 1)
+                producer = consumer = first + count
+                outstanding_callbacks = {first}
+                blocked = []
+                bypassed = []
+                for saved in range(first, first + count):
+                    distance = (producer - saved) & ((1 << 64) - 1)
+                    if distance >= limit:
+                        bypassed.append(saved)
+                    elif contexts[saved - first]:
+                        blocked.append(saved)
+                self.assertEqual(producer, consumer)  # Queue empty, job still running.
+                self.assertEqual(outstanding_callbacks, {first})
+                self.assertEqual(blocked, [first] if count < limit else [])
+                self.assertEqual(bypassed, [] if count < limit else [first])
+
+    def test_outer_batch_and_later_phases_do_not_certify_generic_completion(self):
+        row = audit.produce()['scheduler']
+        self.assertEqual(row['generic_startup_worker_limit'], 8)
+        self.assertEqual(row['generic_startup_wake_limit'], 4096)
+        self.assertTrue(row['batch_kind_zero_signals_after_own_callbacks'])
+        self.assertFalse(row['batch_kind_zero_drains_generic_ring'])
+        self.assertTrue(row['later_unit_phases_resolved'])
+        self.assertFalse(row['later_group_phases_explicit_generic_barrier'])
+        self.assertFalse(row['all_async_tasks_covered'])
     def test_versus_rematch_and_geometry_evidence_limits(self):
         report = audit.produce()
         rematch = report['versus_rematch']

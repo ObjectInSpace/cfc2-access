@@ -1,9 +1,9 @@
 # Application scheduling and CVS2 mode mutations
 
-Reviewed through 2026-10-11 against the same unpacked build as the
+Reviewed through 2026-10-12 against the same unpacked build as the
 [offline gate trace](collection-offline-gate-trace.md). Reproduce with
 `python tools/collection_native_boundary_audit.py --manifest-out docs/collection-native-boundary-manifest.json`.
-The [manifest](collection-native-boundary-manifest.json) pins 62 aligned spans,
+The [manifest](collection-native-boundary-manifest.json) pins 73 aligned spans,
 references and virtual slots. These establish local ordering, not exclusive
 thread ownership. No production hook or native read is enabled by this result.
 
@@ -40,7 +40,8 @@ Thread-creation excerpt `0x14020c3c1..0x14020c40a` supplies routine
 `0x14020bb10` and driver context to import slot `0x140fdc3c0`, saves the
 returned handle at driver+0x2a90, and initialization later invokes slot
 `0x140fdc3d0` on that handle. These have CreateThread/ResumeThread argument
-shapes; the audit pins slots rather than asserting unverified export identities.
+shapes; the static audit pins slots. The live capture below resolves their
+export identities for that process, without observing return values.
 
 The routine loads driver+0x2a98, calls registry lookup `0x1400bcc90`, calls
 the resulting descriptor's factory+8 at `0x14020bb44`, and retains the
@@ -141,6 +142,219 @@ a global submission distance strictly below 4096 while a required callback is
 outstanding, or another barrier that covers that callback. Include nested groups
 and concurrent submitters in that bound.
 
+### Completion predicates and the equality witness (2026-10-12)
+
+The complete submitter span has no capacity check: it reads producer +0xb0
+at `0x1401f6ce5`, increments it at `0x1401f6cf0`, masks the saved index
+at `0x1401f6cfa`, and writes the record. It does not compare the consumer
+index or wait for a previous occupant's context to clear. The later wake-shaped
+import cannot retroactively protect those writes. An external capacity invariant
+is still possible, but it is not enforced by this routine.
+
+Worker `0x1401f7e33` advances consumer +0xb8 before callback execution. In
+the kind-zero path it also clears record+8 (the callback pointer) at
+`0x1401f7e8b` **before** calling the saved callback at `0x1401f7e9a`.
+Consequently neither producer==consumer nor a null callback pointer proves
+completion. The context clear after return is the relevant observed marker,
+provided that the slot has not been reused.
+
+The caller reads the producer and subtracts the saved index at
+`0x14056e0a4..0x14056e0ab`. Its unsigned `jae` bypass includes equality.
+After entering the context polling loop, the back edge at `0x14056e0e4`
+returns to `0x14056e0d0`, not to the distance check. Thus a distance measured
+below 4096 at poll entry is insufficient if other submissions can reuse the
+slot during polling. The proof must protect the slot throughout the wait.
+
+The audit tests now contain a deterministic, conditional schedule witness:
+worker A claims job 0 and pauses inside its callback; worker B completes jobs
+1 through N-1. With N=4095, the first context blocks the caller. With N=4096,
+the first record is bypassed and every remaining context is zero, permitting
+caller return while job 0 is outstanding. Both cases can have producer==consumer;
+neither requires slot overwrite. This assumes at least two available workers,
+a group taking the queued path with N valid submissions, and the described
+callback timing. It does not establish live group size, worker count, game
+failure or access to the CVS2 arena. The model tests the insufficiency of the
+completion predicate, not native scheduling or memory visibility.
+
+The lifetime dependency also includes the group itself: thunk `0x14056e480`
+reads group+0x60 and group+0x70 before dispatching the selected member. The
+group's deleting destructor, vtable slot `0x141069370` -> `0x14056ddc0`,
+deletes members at `0x14056de27`, frees their pointer array at `0x14056de4c`,
+and frees the saved-index array at `0x14056de79`. These operations are now
+pinned. This identifies allocations that require protection; it does not prove
+concurrent destruction or exclude synchronization inside untraced callees.
+
+Next resolve actual group membership and descendant callbacks in the admitted
+CVS2 paths, the global submission bound across nested/concurrent groups, and
+any enclosing barrier that covers still-running callbacks. A successful wait
+for an outer batch task alone is insufficient if that task can return from this
+inner poll early. No native producer is authorized by this static witness.
+
+## Worker completion continuation
+
+### Worker construction, outer completion and later phases
+
+The newly pinned startup excerpt `0x1401f65de..0x1401f682e` initializes
+producer and consumer to **1**, at `0x1401f6654` and `0x1401f6688`.
+The earlier job-0 example uses relative ticket numbering; the executable model
+now starts at the native value. The equality counterexample is unchanged:
+after tickets 1..4096, producer 4097 minus ticket 1 equals 4096.
+
+Startup stores `min(application+0x3fe58, 8)` at +0xac, creates that many
+generic workers using entry `0x1401f7d40`, and stores handles at
++0x3fc20 with stride 0x38. The constructor calls slot `0x140fdc3e0` with
+initial count 0 and maximum 4096, storing its result at +0xc0. The live export
+resolution below identifies this as CreateSemaphoreA. This maximum limits wake
+tokens, not lifetime of already-consumed callbacks: the worker waits before
+claiming a record and advances the consume index before calling it. Even a
+successful ReleaseSemaphore does not make producer distance a completion count.
+
+For the outer pool, entry `0x1401f8410` dispatches application+0x78 to
+`0x1401f8430`. Batch kind 0 (used by the category updater) takes jump-table
+entry `0x1401f86cc` to `0x1401f84b7`, claims from application+0x9c and
+invokes application+0xc8 records at `0x1401f84fb`. After its own callback loop,
+`0x1401f8698..0x1401f869c` signals worker-context+0x20. These are the
+completion-event handles collected by `0x1401f8075` and waited on at
+`0x1401f80a7`. The caller-side kind-0 path similarly invokes its own records
+at `0x1401f8778`. Neither path explicitly drains the generic ring. Thus even
+a successful outer wait does not repair an inner group callback that returned
+early. This closes the proposed outer-batch-barrier explanation at that level;
+descendant callbacks or another enclosing mechanism remain separate questions.
+
+Two later application calls are also resolved:
+
+- `0x140057d08` -> unit-manager+0x68 -> `0x14017b800` -> category+0x60
+  -> `0x14017b720`, which dispatches unit+0x50 at `0x14017b7dc`.
+- `0x140057d15` -> unit-manager+0x58 -> `0x14017b0c0` -> category+0x50
+  -> `0x14017af60`, which dispatches unit+0x48 directly or in another batch.
+
+Both category paths can also call unit+0x40 while admitting newly initialized
+units. The geometry-group +0x50 and +0x48 methods (`0x14056e420` and
+`0x14056e140`) iterate member+0x50/+0x48 respectively. Their own bodies
+contain no explicit generic completion check. Unreviewed member implementations
+are not ruled out as barriers. The application-return candidate still needs
+coverage of every such invocation and descendant.
+
+### Live Arcade evidence, 2026-10-12
+
+The user supplied an Arcade session, PID 35472. The read-only worker inventory
+validated all 73 reviewed code spans. Game=1, ROM=3, and raw S+0x7b4,
+S+0x80c and S+0x828 were zero. The mode label is user-supplied provenance;
+those zero values alone do not establish Arcade. An accompanying existing-tool
+state capture retained phase bytes `0201010100000000`; it is a separate
+observation, not an atomic join to the worker inventory.
+
+Retained evidence is in
+[`collection-worker-arcade-20261012.json.gz`](../tools/fixtures/collection-worker-arcade-20261012.json.gz),
+SHA-256 `b2c4205cd5f2ab9b067c66aed600f495fc641cae60d68e064870bc0c28aac3e6`.
+It includes the first inventory, the final 12-sample series, and live import
+resolution, with original artifact and tool hashes. Intermediate exploratory
+captures remain under `build/worker-arcade-20261012-*`.
+
+The final series contains 24 observations over about 2.8 seconds. All showed
+8 generic workers, producer=consumer=1, no occupied generic records, and no
+exact reviewed geometry-group vtable in the traversed lists. Ten unit nodes
+were recorded, versus five in the earlier inventory. The final nonempty
+categories were 0,1,2,3,4,23,24,26,27. All 32 category flags were 0x3fd:
+bit 0 selects queued dispatch, bit 1 does not skip the category. Category 3
+contained the known pause-task vtable `0x140fed360`, with unit flags 0xf4c1a.
+This resolves its observed registration and queued configuration for this run,
+not the thread on which every pause callback actually executed. The batch
+launcher can execute work on the caller, including a width-1 path.
+Specifically, batch count 1 branches at `0x1401f7fd0` to `0x1401f80b6`,
+temporarily sets width 1 at `0x1401f80c3`, and invokes caller-side execution
+at `0x1401f80cd`. The observed pause category has one member. With a clean
+batch accumulator and unchanged membership, that category therefore takes the
+caller-only branch; the samples do not correlate a particular pause invocation
+with that branch.
+
+Eleven sample brackets matched; one changed as outer batch metadata changed.
+There were no read errors or truncations. Each final bracket took about
+1.3–1.8 ms externally; this is not a native hook budget measurement. The
+generic pool's startup-valued counters and empty records are evidence that
+this sampled scene did not expose the 4096 workload. They do not prove that
+transient groups, reflective writes, reset/re-entry or another mode cannot do so.
+The tool traverses reviewed category lists and exact group-member layouts,
+not arbitrary containers or every callback's descendants.
+
+Nine IAT targets resolved to KERNEL32 exports in this live process. Each target's
+first 16 bytes matched the corresponding local DLL export; the report retains
+module base, RVA and full DLL file hash:
+
+| Import slot | Live export |
+| --- | --- |
+| `0x140fdc0c8` | WaitForMultipleObjects |
+| `0x140fdc350` | WaitForSingleObject |
+| `0x140fdc3a0` / `0x140fdc3a8` | SetEvent / ResetEvent |
+| `0x140fdc3b0` / `0x140fdc3e0` | ReleaseSemaphore / CreateSemaphoreA |
+| `0x140fdc3c0` / `0x140fdc3d0` | CreateThread / ResumeThread |
+| `0x140fdc1d0` | CloseHandle |
+
+This resolves identities for the captured process, not successful wait/signal
+outcomes, full module integrity, or all future builds. The static manifest's
+import-identity flag remains false because its evidence source is the dump.
+
+Reproduce against a new user-labelled live scene (fresh output paths):
+
+```powershell
+python tools/collection_worker_capture.py PID --mode Arcade --label character-selection --count 12 --out build/worker-next.json
+python tools/collection_worker_imports.py PID --out build/worker-next-imports.json
+```
+
+Use Versus and Training labels only for those observed modes. Next capture
+reset/rematch/re-entry and Arcade mutation transitions, identify any newly
+observed callback/container types, and establish wait outcomes and lifetime
+coverage. Current evidence does not justify treating the generic group bypass
+as an active Arcade-selection failure, nor certify the production copy boundary.
+
+### Live Versus follow-up
+
+The user then confirmed Versus character selection in the same PID. The
+12-sample capture again retained game=1, ROM=3, but now S+0x80c=1 and
+S+0x828=0. All 24 observations retained producer=consumer=1, empty generic
+records and no reviewed geometry-group node. The lists contained 11 units,
+including the expected Versus cycle vtable `0x140fefa88` (+0x40=`0x1400b46b0`).
+Nonempty categories and 0x3fd flags matched the final Arcade series. Ten
+brackets matched and two changed; no read errors or truncations occurred.
+External bracket durations were about 1.3–1.9 ms.
+
+The retained
+[`collection-worker-versus-20261012.json.gz`](../tools/fixtures/collection-worker-versus-20261012.json.gz)
+has SHA-256 `6840974e1f9c5968052269498e0d29005aafdacc5201841fa4781b989adc3dd2`.
+This supplies a second mode's bounded membership/counter observation, not
+Versus rematch coverage or proof of wait success. Mode switching did not produce
+a different generic counter value in these endpoint samples; the switch itself
+was not continuously traced.
+
+### Live Training follow-up and three-mode scope
+
+The user confirmed Training character selection, again at PID 35472. The
+12-sample series validated all 73 code spans and recorded game=1, ROM=3,
+S+0x80c=0 and S+0x828=1. All 24 observations retained eight configured
+generic workers, producer=consumer=1 and empty generic records. Eight unit
+nodes were traversed, with no exact reviewed geometry-group vtable. Nonempty
+categories were 0 through 5; all 32 category flags remained 0x3fd.
+
+The three additional category-5 vtables and their +0x40 targets were
+`0x140fe5818` -> `0x1400789d0`, `0x140fea3e8` -> `0x1400917d0`, and
+`0x140fea618` -> `0x140092160`. The previously observed Versus cycle vtable
+was absent from this inventory. These are concrete next callback targets for
+arena-access coverage; their presence does not certify their descendants.
+
+Nine brackets matched and three changed; no read errors or truncations occurred.
+External bracket durations were about 1.3–1.9 ms. The retained
+[`collection-worker-training-20261012.json.gz`](../tools/fixtures/collection-worker-training-20261012.json.gz)
+has SHA-256 `347229ce3a273955a1d6db73cd6841556c77537e659588790e3d73b93261b646`.
+
+There are now 12-sample selection-scene series for Arcade, Versus and Training:
+36 brackets / 72 observations in total, plus the initial Arcade inventory.
+Every observation in those series retained startup-valued generic counters,
+empty generic records and no reviewed group node in the traversed lists.
+The 4096-submission counterexample remains a conditional static schedule;
+these captures did not reproduce it. They do not cover reset/rematch/re-entry,
+all containers or callback descendants, successful wait outcomes, or continuous
+execution between samples. Native lifetime protection remains unproven.
+
 ## Destruction order and its limit
 
 Application destructor body `0x140056e10..0x140057169` calls `0x1401f8130`
@@ -158,8 +372,8 @@ has finished reading either allocation.
 `0x1401f8130` sets application+0x7f, wakes workers, visits handles including
 application+0x3fc20, invokes a single-handle infinite-wait-shaped import and
 closes handles. It also visits the separate five-thread task pool. This narrows
-the retirement candidate; verified import identities, failure behavior and
-complete task coverage remain unresolved. Likewise, the
+the retirement candidate. The live capture below resolves the wait and close
+imports; successful outcomes and complete task coverage remain unresolved. Likewise, the
 manager base constructor/destructor invoke imports on object+8. Their presence
 does not prove an acquired shared lifetime guard around update, copying and
 destruction. Do not assign lock semantics from their shape alone.
@@ -311,9 +525,9 @@ meaning to a phase value or a readiness flag from these two conditional writers.
 ## Concrete remaining evidence
 
 1. Resolve task submissions that can touch the arena, including the generic
-   pool and application release-all paths; verify wait identities and outcomes.
-   Record actual category flags and worker dispatch; pause registration is now
-   resolved. Close generic-ring reuse/completion invariants. Establish native
+   pool and application release-all paths; verify wait outcomes. Import identities
+   and Arcade category flags are captured above; actual callback-thread coverage
+   and other modes remain open. Close generic-ring reuse/completion invariants. Establish native
    exclusivity across manager traversal, UI Quick Load, Training mutation,
    reinitialization and arena release, or identify a real shared lifetime guard.
 2. Validate outcome coverage for the now-traced Versus Rematch Yes/No route

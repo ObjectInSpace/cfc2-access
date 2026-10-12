@@ -50,6 +50,22 @@
     "geometry_parallel_threshold": 10,
     "geometry_threshold_is_capacity": false,
     "ring_reuse_safety_proven": false,
+    "ring_slots": 4096,
+    "completion_distance_limit_exclusive": 4096,
+    "submitter_capacity_check_present": false,
+    "consume_index_advances_before_callback": true,
+    "callback_pointer_cleared_before_call": true,
+    "poll_retry_rechecks_submission_distance": false,
+    "group_destructor_deletes_members": true,
+    "live_geometry_arena_access_proven": false,
+    "generic_initial_ticket": 1,
+    "generic_startup_worker_limit": 8,
+    "generic_startup_wake_limit": 4096,
+    "wake_import_identity_verified": false,
+    "batch_kind_zero_signals_after_own_callbacks": true,
+    "batch_kind_zero_drains_generic_ring": false,
+    "later_unit_phases_resolved": true,
+    "later_group_phases_explicit_generic_barrier": false,
     "candidate": "application update return; not yet certified"
   },
   "character_change": {
@@ -92,6 +108,38 @@
     "worker_native_read_allowed": false
   },
   "slots": [
+    {
+      "address": "0x140fe21b8",
+      "target": "0x1401f8430"
+    },
+    {
+      "address": "0x140fe21c0",
+      "target": "0x1401f7d60"
+    },
+    {
+      "address": "0x141015d80",
+      "target": "0x14017b800"
+    },
+    {
+      "address": "0x141015d78",
+      "target": "0x14017b720"
+    },
+    {
+      "address": "0x141015d70",
+      "target": "0x14017b0c0"
+    },
+    {
+      "address": "0x141015d68",
+      "target": "0x14017af60"
+    },
+    {
+      "address": "0x1410693b8",
+      "target": "0x14056e140"
+    },
+    {
+      "address": "0x1410693c0",
+      "target": "0x14056e420"
+    },
     {
       "address": "0x141018b18",
       "target": "0x1401a5900"
@@ -149,6 +197,10 @@
       "target": "0x14056dff0"
     },
     {
+      "address": "0x141069370",
+      "target": "0x14056ddc0"
+    },
+    {
       "address": "0x141069308",
       "target": "0x14056dbe0"
     },
@@ -166,6 +218,26 @@
     }
   ],
   "references": [
+    {
+      "address": "0x1401f65f0",
+      "target": "0x140fdc3e0"
+    },
+    {
+      "address": "0x1401f6779",
+      "target": "0x1401f7d40"
+    },
+    {
+      "address": "0x1401f67a5",
+      "target": "0x140fdc3c0"
+    },
+    {
+      "address": "0x1401f8413",
+      "target": "0x1422c8b70"
+    },
+    {
+      "address": "0x1401f869c",
+      "target": "0x140fdc3a0"
+    },
     {
       "address": "0x14002aad1",
       "target": "0x141018b30"
@@ -320,6 +392,18 @@
     }
   ],
   "tables": [
+    {
+      "address": "0x1401f86cc",
+      "values": [
+        2065591
+      ]
+    },
+    {
+      "address": "0x1401f895c",
+      "values": [
+        2066222
+      ]
+    },
     {
       "address": "0x141207d30",
       "values": [
@@ -740,6 +824,72 @@
       "start": "0x14059c030",
       "end_exclusive": "0x14059c051",
       "sha256": "7d26935fea56070343473cf9e3ed92f32a5997c21dc6cf57bcb7175c301b26b5"
+    },
+    {
+      "label": "geometry-group-deleting-destructor",
+      "start": "0x14056ddc0",
+      "end_exclusive": "0x14056df06",
+      "sha256": "46b8d46b7bcb89f453834346530bd88a968a0cd65b92c111b7b40795177f1954"
+    },
+    {
+      "label": "generic-worker-construction-excerpt",
+      "start": "0x1401f65de",
+      "end_exclusive": "0x1401f682e",
+      "sha256": "51ddf52352ed5791c76102a4ce217448ed6e1b458e9a5fdde356776fcda7170a"
+    },
+    {
+      "label": "batch-worker-entry",
+      "start": "0x1401f8410",
+      "end_exclusive": "0x1401f8421",
+      "sha256": "f8973ee7b9d3194c2e938c08a95d8acb3e1df8dc7d7a46fe91e60512e1da2121"
+    },
+    {
+      "label": "batch-worker-body",
+      "start": "0x1401f8430",
+      "end_exclusive": "0x1401f86ca",
+      "sha256": "935ccc0cbf454c5623576fb85250285404105e5a59444a7dbe0d6bdcdbb70553"
+    },
+    {
+      "label": "batch-caller-body",
+      "start": "0x1401f86f0",
+      "end_exclusive": "0x1401f895a",
+      "sha256": "8ab76009846a2dcf6e3b166a505a6ac2ddc0ff8601acf1ea094f518374ef3aeb"
+    },
+    {
+      "label": "unit-manager-later-phase",
+      "start": "0x14017b800",
+      "end_exclusive": "0x14017b872",
+      "sha256": "92976aa7429eb828ee362bcb9acc2b3323c152bfb5e65c68ad7473f88f897d2e"
+    },
+    {
+      "label": "unit-manager-later-category",
+      "start": "0x14017b720",
+      "end_exclusive": "0x14017b7f7",
+      "sha256": "0017cef3af51920cc1c2c6b07e29d668b6d31a762847b992b20976c14048548c"
+    },
+    {
+      "label": "unit-manager-final-phase",
+      "start": "0x14017b0c0",
+      "end_exclusive": "0x14017b132",
+      "sha256": "d3dc4c4552373cbf8ad2c830eddc57cef60b1ad38f88b762d9b61806211bda18"
+    },
+    {
+      "label": "unit-manager-final-category",
+      "start": "0x14017af60",
+      "end_exclusive": "0x14017b0b8",
+      "sha256": "41fcb2cd197889b44ea17241131dc497d66e1f62ab38faea5b7eed951da717e6"
+    },
+    {
+      "label": "geometry-group-later-phase",
+      "start": "0x14056e420",
+      "end_exclusive": "0x14056e47a",
+      "sha256": "a7995756a1fc3bf2c6fe5c7cdc40e603c4e5af50a7376152d21f8ec726f26cd4"
+    },
+    {
+      "label": "geometry-group-final-phase",
+      "start": "0x14056e140",
+      "end_exclusive": "0x14056e19a",
+      "sha256": "3c5bef75b37960c7a4bd4f43e42e42b684eee026027f1a445484392323a62081"
     },
     {
       "label": "versus-cycle-constructor",

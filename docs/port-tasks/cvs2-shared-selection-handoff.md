@@ -1,6 +1,6 @@
 # CVS2 shared selection implementation handoff
 
-Reviewed through 2026-10-11 against base commit `90fe595`.
+Reviewed through 2026-10-12 against base commit `90fe595`.
 
 ## Identity, outcome and readiness
 
@@ -179,7 +179,7 @@ application deletion destroys the manager before the shell arena. Outer routine
 `0x14020bb10` updates then eventually deletes that same application object.
 The unit manager supports direct and batched +0x40 dispatch, with a wait-all-shaped
 import at `0x1401f80a7`; its result is unchecked. Resolve pause-task category
-flags and dispatch, wait identities/outcomes, generic asynchronous pool coverage and
+flags and dispatch across modes, wait outcomes, generic asynchronous pool coverage and
 release-all callers next. Relate these to Quick Load, Training mutation and
 arena release. Local ordering does not prove
 exclusive ownership. Observer-only locks, thread-ID checks and revision brackets
@@ -362,6 +362,64 @@ Versus Rematch Yes/No and two native result-signal writers are now traced. Yes
 requires cleanup/new generation; No exits separately. Required remaining mode
 work is outcome/ordering coverage and additional reset/re-entry paths, rather
 than rediscovering this dialog.
+
+The first 2026-10-12 lifetime continuation pinned 63 spans and 44 changed-byte refusal
+controls. The generic submitter has no local capacity check; the consumer index
+and callback pointer both change before callback completion. The caller checks
+submission distance only before entering its context polling loop, so a bound
+at poll entry alone cannot protect against later slot reuse. A conditional
+two-worker schedule model distinguishes 4095 submissions (slow first callback
+blocks) from 4096 (first callback bypassed, caller can return). This is not a
+live failure reproduction. The geometry-group destructor and thunk now identify
+the group/member allocations whose lifetime must be covered. Actual CVS2 group
+membership, arena access, global submission bounds and enclosing completion
+remain open; see the native boundary trace for addresses and assumptions.
+
+The subsequent live-assisted continuation pins **73 spans and 58 changed-byte
+refusal controls**. It resolves the outer kind-0 worker's completion signal:
+that signal follows its own callback loop, with no explicit generic-ring drain.
+Later unit-manager phases dispatch member +0x50/+0x48; their geometry-group
+implementations also provide no explicit generic completion barrier. Generic
+startup initializes tickets to 1 and configures up to 8 workers. Its semaphore
+maximum of 4096 constrains wake tokens, not already-running callbacks.
+
+The user-labelled Arcade run (PID 35472, game 1, ROM 3) supplies actual category
+flags and a bounded worker inventory. The final 12-sample series found 8 generic
+workers, producer=consumer=1, empty generic records and no exact reviewed
+geometry group in the traversed unit lists. Pause category 3 had flags 0x3fd,
+selecting queued dispatch; the caller can still execute batch work. Eleven
+brackets matched and one changed; none was unreadable or truncated. These
+observations narrow this scene without proving a global bound or every mode.
+Nine live IAT targets, including both wait APIs and the event/semaphore APIs,
+resolved against DLL exports with matching prefixes. Wait outcomes remain
+unobserved. The compressed retained fixture and reproduction commands are in
+the native boundary trace; `collection_worker_capture.py` and
+`collection_worker_imports.py` perform read-only research without hooks.
+
+The user-confirmed Versus character-selection follow-up in the same process
+also retained producer=consumer=1 and an empty generic ring in all 24
+observations. S+0x80c=1 and the expected Versus cycle unit were present; 11
+units were traversed. Ten brackets matched and two changed, with no read errors
+or truncations. The separate Versus fixture is linked in the native trace.
+Neither series covers rematch/reset transitions or proves callback descendants
+cannot touch the arena. Queued category configuration also does not establish
+a separate worker: batch count 1 takes the caller-only path.
+
+The user-confirmed Training character-selection capture completes the three
+bounded selection-scene inventories. Game=1, ROM=3, S+0x80c=0 and S+0x828=1
+were recorded. All 24 observations retained eight generic workers,
+producer=consumer=1, empty generic records and no reviewed geometry group.
+Eight units occupied categories 0 through 5, including the three additional
+Training UI vtables documented in the native trace. Nine brackets matched and
+three changed, with no read errors or truncations. The retained Training fixture
+does not cover reset, character change or callback descendants.
+
+Validation after all three selection-scene captures: all 111 collection Python tests
+pass, including recorded-evidence, read-budget, unreadable-memory and changed
+sample controls. No runtime source, DLL build, deployment or hook installation
+was part of this continuation. The next native evidence is mutation/re-entry
+coverage, arena-access coverage of observed callbacks, and successful wait
+outcomes; the 4096-submission schedule was not reproduced in these scenes.
 
 The concrete next implementation is step 1: the worker-owned offline bridge and
 existing-fixture parity. Step 3's dispatcher can be implemented and concurrency
