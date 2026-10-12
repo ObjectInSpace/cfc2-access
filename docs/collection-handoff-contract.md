@@ -76,11 +76,32 @@ Versus writers now explain two bypass fields; special clears prevent S+0x7b4
 from serving as a universal mode flag. Quick Load retains validated route
 provenance under a fresh transaction label, never the old owner generation.
 
-Synchronous manager-update return is the candidate after enclosing updates
-and deferred replacement. Re-resolve membership and reject any intervening
+The [2026-10-10 scheduler trace](collection-native-boundary-trace.md) moves the
+encompassing candidate to synchronous application-update return: unit-task
+updates follow manager traversal and deferred replacement. The batch wait's
+success and separate asynchronous work coverage remain unproven. Re-resolve
+membership and reject any intervening
 departure before copying. That ordering does not establish lifetime protection:
 the engine scheduler/destructor ownership or a shared native lifetime guard
 still needs proof. The worker must not read native memory in the meantime.
+
+Versus and Training Change Character both reach cleanup/reinitialization when
+S+0x840 is nonzero. Require a new generation after validated initialization and
+enclosing completion; a UI command or initializer return alone is insufficient.
+Training also has a separate same-allocation callback mutation that skips
+ordinary update. These are distinct lifecycle controls, not the Arcade restore gate.
+The configured Coin Button restart is now statically connected to that Training
+callback through the settings writer and input reader. Pause-task registration
+into unit category 3 is also resolved. The generic work queue's ring-reuse bypass
+still prevents treating its normal completion poll as universal lifetime proof.
+
+Continuation, 2026-10-11: Versus Rematch Yes is now traced separately from
+Change Character. The native result flag reaches a cycle unit and Yes/No dialog;
+Yes executes cleanup at `0x1400b49d1` and init at `0x1400b49dd`, followed by
+session/counter writes through parent return `0x1400b4b86`. Require fresh
+generation and protected enclosing completion. No must not acquire a new owner.
+Static result-signal writers do not certify every win/loss/draw outcome or live
+ordering. The trace records the exact conditions and remaining lifetime limits.
 
 Native memory must be copied at an evidenced lifetime-safe point. Checking
 labels before and after an arbitrary worker read can reject stale data but

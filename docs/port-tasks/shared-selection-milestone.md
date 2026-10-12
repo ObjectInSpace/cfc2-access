@@ -9,6 +9,37 @@ Versus and Training**. The Arcade-only Quick Load research pilot is temporary
 and does not narrow delivery scope. Track Versus and Training integration and
 live acceptance as required work, with mode-specific lifecycle evidence.
 
+The [CVS2 implementation handoff](cvs2-shared-selection-handoff.md) reviews
+the existing reader at `90fe595`, separates ready offline bridge/parity work
+from native activation prerequisites, and specifies required acceptance for
+all three modes. It reuses the current decoders and test fixtures.
+
+The 2026-10-10 continuation resolves application-loop update/deletion ordering,
+later unit-task dispatch, Training's mutation that skips ordinary update, and
+Versus/Training Change Character cleanup/reinitialization; see the
+[native boundary trace](../collection-native-boundary-trace.md). The
+[dispatch contract](../shared-output-dispatch-contract.md) defines reservation,
+revocation and retirement ordering for implementation. Neither result proves
+exclusive native scheduling or completes Versus/Training lifecycle coverage.
+The encompassing copy candidate is now application-update return: unit updates
+follow the earlier manager-return candidate. Both remain unapproved for native
+copying. The 62-span audit and all 96 collection Python tests pass; the bounded
+offline bridge and dispatch implementation are next. Runtime delivery and live
+acceptance remain open.
+
+The later continuation also traces pause-task registration into category 3 and
+the configured Coin Button Training restart. The separate generic queue's known
+caller polls normal completion but bypasses polling after ring reuse. Resolve
+that invariant and its enclosing virtual caller before native activation; retain
+Versus outcome coverage and other untraced reset paths as remaining evidence.
+
+Continuation, 2026-10-11: Versus Rematch now has a static chain from two native
+result-signal writers to the category-4 cycle unit and category-25 Rematch?
+dialog. Yes reaches cleanup/init plus later session writes; No exits separately.
+This requires new-generation semantics and protected enclosing completion.
+The generic queue caller is identified as a geometry-group unit; its threshold
+of 10 selects parallel execution and does not prove capacity or reuse safety.
+
 Continuation correction: reuse the existing CVS2 implementation and recorded
 research before proposing another acquisition trace. `cvs2_select_tick` in
 `src/cvs2_select.c` already polls and copies state; its decoders distinguish

@@ -8,6 +8,13 @@ The audit retains fourteen instruction-aligned spans, exact dispatch entries,
 and the relevant local `msg.arc/menu_eng` label records. Full instructions
 are in `build/collection-offline-gate-audit.json`.
 
+Continuation, 2026-10-10: the [native scheduler trace](collection-native-boundary-trace.md)
+resolves the immediate manager callers and outer application update/deletion
+path. Unit updates follow manager return, so the encompassing copy candidate
+is now application-update return. Neither boundary has certified lifetime
+protection. The manager placement and next-caller search below describe the
+earlier investigation, superseded on those points by the continuation.
+
 This establishes a positive **Offline Play / Arcade Mode** entry contract for
 a future CVS2 pilot. It does not implement support or certify a protected
 native copy. The best evidenced completion candidate remains the synchronous
@@ -186,7 +193,7 @@ Immediate revocation prevents stale publication/output but cannot replace
 lifetime protection during the read. Do not suppress native cleanup merely
 because a nonblocking observer lock is contended.
 
-The next concrete research target is the engine consumer of manager table
+The original research target was the engine consumer of manager table
 `0x141018b60` virtual +0x30 (update), +0x28 (release-all at `0x1401a6390`)
 and +0 (deleting destructor at `0x1401a5c10`). Relate those callers to direct
 Quick Load cleanup at `0x14004ffd0` and the shell-owner arena release edge at

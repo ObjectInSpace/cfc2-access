@@ -1,0 +1,799 @@
+{
+  "schema": 1,
+  "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
+  "evidence": "static local ordering; native scheduling/lifetime not certified",
+  "manager": {
+    "type_name": "sArea",
+    "singleton": "0x1422c8358",
+    "application_field": "0x3ffc0",
+    "update_call": "0x140057cd4",
+    "release_all_call": "0x140057e50",
+    "delete_call": "0x140056f21"
+  },
+  "shell": {
+    "application_field": "0x40100",
+    "delete_call": "0x140056f63",
+    "arena_release": "0x1400485f6"
+  },
+  "training": {
+    "session_callback_offset": "0x28",
+    "callback": "0x1406a9a30",
+    "mutation": "0x1406aa960",
+    "screen_call": "0x1400391f1",
+    "early_exit": "0x140039254",
+    "ordinary_update_skipped_on_this_path": true,
+    "complete_mutation_inventory": false,
+    "live_UI_reset_mapping": false
+  },
+  "training_input": {
+    "configured_coin_route_resolved": true,
+    "option_field": "shell+0xd04b8 -> +0x1c",
+    "reader": "0x14004c790",
+    "screen_call": "0x1400390fb",
+    "live_verified": false
+  },
+  "scheduler": {
+    "application_routine": "0x14020bb10",
+    "update_call": "0x14020bd77",
+    "delete_call": "0x14020bdd7",
+    "same_path_update_before_delete": true,
+    "unit_update_after_manager": "0x140057cee",
+    "batch_wait_import_slot": "0x140fdc0c8",
+    "wait_return_checked": false,
+    "all_async_tasks_covered": false,
+    "pause_task_category": 3,
+    "pause_task_registration_resolved": true,
+    "generic_submit": "0x1401f6ca0",
+    "generic_caller": "0x14056dff0",
+    "generic_caller_polls_completion": true,
+    "generic_caller_type": "uGeometry2Group",
+    "geometry_parallel_threshold": 10,
+    "geometry_threshold_is_capacity": false,
+    "ring_reuse_safety_proven": false,
+    "candidate": "application update return; not yet certified"
+  },
+  "character_change": {
+    "modes": [
+      "Versus",
+      "Training"
+    ],
+    "commands": [
+      8,
+      9
+    ],
+    "state": 14,
+    "branch": "0x1400a6bf0",
+    "requires_new_generation": true,
+    "live_verified": false
+  },
+  "versus_rematch": {
+    "cycle_category": 4,
+    "dialog_category": 25,
+    "dialog_label": 945,
+    "yes_flag": "0x2a1",
+    "no_flag": "0x2a2",
+    "cleanup_call": "0x1400b49d1",
+    "init_call": "0x1400b49dd",
+    "enclosing_return": "0x1400b4b86",
+    "requires_new_generation": true,
+    "result_signal_writers": [
+      "0x1406d66bf",
+      "0x14070005d"
+    ],
+    "result_signal_producer_resolved": true,
+    "complete_outcome_coverage": false,
+    "live_verified": false
+  },
+  "boundary": {
+    "application_caller_resolved": true,
+    "application_exclusive_thread_proven": false,
+    "shared_lifetime_guard_proven": false,
+    "lifetime_protection_proven": false,
+    "worker_native_read_allowed": false
+  },
+  "slots": [
+    {
+      "address": "0x141018b18",
+      "target": "0x1401a5900"
+    },
+    {
+      "address": "0x141018b60",
+      "target": "0x1401a5c10"
+    },
+    {
+      "address": "0x141018b88",
+      "target": "0x1401a6390"
+    },
+    {
+      "address": "0x141018b90",
+      "target": "0x1401a6200"
+    },
+    {
+      "address": "0x140fe2140",
+      "target": "0x140057360"
+    },
+    {
+      "address": "0x140fe2168",
+      "target": "0x140057e30"
+    },
+    {
+      "address": "0x140fe2170",
+      "target": "0x140057ae0"
+    },
+    {
+      "address": "0x140fe12f0",
+      "target": "0x140048700"
+    },
+    {
+      "address": "0x140fe1320",
+      "target": "0x140050a10"
+    },
+    {
+      "address": "0x140fe2010",
+      "target": "0x1400565b0"
+    },
+    {
+      "address": "0x141015d48",
+      "target": "0x14017aee0"
+    },
+    {
+      "address": "0x141015d60",
+      "target": "0x14017ac60"
+    },
+    {
+      "address": "0x140fed3a0",
+      "target": "0x1400a65e0"
+    },
+    {
+      "address": "0x1410693b0",
+      "target": "0x14056dff0"
+    },
+    {
+      "address": "0x141069308",
+      "target": "0x14056dbe0"
+    },
+    {
+      "address": "0x140fefac8",
+      "target": "0x1400b46b0"
+    },
+    {
+      "address": "0x140fefed0",
+      "target": "0x1400b5a10"
+    },
+    {
+      "address": "0x140fefee8",
+      "target": "0x1400b54f0"
+    }
+  ],
+  "references": [
+    {
+      "address": "0x14002aad1",
+      "target": "0x141018b30"
+    },
+    {
+      "address": "0x14002aaf2",
+      "target": "0x141018b10"
+    },
+    {
+      "address": "0x1401a5a5e",
+      "target": "0x141018b60"
+    },
+    {
+      "address": "0x1401a5aa6",
+      "target": "0x1422c8358"
+    },
+    {
+      "address": "0x1401a5c74",
+      "target": "0x1422c8358"
+    },
+    {
+      "address": "0x140056e1a",
+      "target": "0x140fe2140"
+    },
+    {
+      "address": "0x1400485e9",
+      "target": "0x141c14f98"
+    },
+    {
+      "address": "0x140048635",
+      "target": "0x141c14f90"
+    },
+    {
+      "address": "0x1406a98da",
+      "target": "0x1406a9a30"
+    },
+    {
+      "address": "0x1406aa964",
+      "target": "0x1422debd0"
+    },
+    {
+      "address": "0x1406aa981",
+      "target": "0x1422dec30"
+    },
+    {
+      "address": "0x1406b2394",
+      "target": "0x1422dec30"
+    },
+    {
+      "address": "0x1400274e1",
+      "target": "0x140fe1ff8"
+    },
+    {
+      "address": "0x1400274ec",
+      "target": "0x141c1b6c0"
+    },
+    {
+      "address": "0x140027502",
+      "target": "0x140fe2008"
+    },
+    {
+      "address": "0x140047050",
+      "target": "0x141c1b6c0"
+    },
+    {
+      "address": "0x14020c3cd",
+      "target": "0x14020bb10"
+    },
+    {
+      "address": "0x14020c3f2",
+      "target": "0x140fdc3c0"
+    },
+    {
+      "address": "0x14020c169",
+      "target": "0x140fdc3d0"
+    },
+    {
+      "address": "0x140178f86",
+      "target": "0x141015d18"
+    },
+    {
+      "address": "0x14017acfc",
+      "target": "0x140179c1c"
+    },
+    {
+      "address": "0x14017ae56",
+      "target": "0x1422c8b70"
+    },
+    {
+      "address": "0x1401f80a7",
+      "target": "0x140fdc0c8"
+    },
+    {
+      "address": "0x1400a5cce",
+      "target": "0x140fed360"
+    },
+    {
+      "address": "0x140038c61",
+      "target": "0x1422c80b0"
+    },
+    {
+      "address": "0x1401798eb",
+      "target": "0x1422c80b0"
+    },
+    {
+      "address": "0x1401f7d43",
+      "target": "0x1422c8b70"
+    },
+    {
+      "address": "0x14056e060",
+      "target": "0x1422c8b70"
+    },
+    {
+      "address": "0x14056e067",
+      "target": "0x14056e480"
+    },
+    {
+      "address": "0x140034cb1",
+      "target": "0x141069310"
+    },
+    {
+      "address": "0x140034cd2",
+      "target": "0x141069300"
+    },
+    {
+      "address": "0x14056dc30",
+      "target": "0x141069370"
+    },
+    {
+      "address": "0x1400b45ce",
+      "target": "0x140fefa88"
+    },
+    {
+      "address": "0x1400b5338",
+      "target": "0x140fefea8"
+    },
+    {
+      "address": "0x140038eb8",
+      "target": "0x1422c80b0"
+    },
+    {
+      "address": "0x1406d6660",
+      "target": "0x141c14f98"
+    },
+    {
+      "address": "0x1406d66b8",
+      "target": "0x141c14f98"
+    },
+    {
+      "address": "0x140700013",
+      "target": "0x141c14f98"
+    }
+  ],
+  "tables": [
+    {
+      "address": "0x141207d30",
+      "values": [
+        250,
+        250,
+        1070,
+        253,
+        226,
+        574,
+        681,
+        4110,
+        756,
+        756,
+        254,
+        255,
+        256
+      ]
+    },
+    {
+      "address": "0x1400a6f6c",
+      "values": [
+        682138,
+        682138
+      ]
+    },
+    {
+      "address": "0x1400a6f30",
+      "values": [
+        682992
+      ]
+    },
+    {
+      "address": "0x1411f7c70",
+      "values": [
+        8,
+        1,
+        256,
+        512,
+        1024,
+        2048,
+        2,
+        4
+      ]
+    },
+    {
+      "address": "0x1411f7cb0",
+      "values": [
+        55,
+        56,
+        4,
+        5,
+        2,
+        3,
+        6,
+        7
+      ]
+    },
+    {
+      "address": "0x1400b5784",
+      "values": [
+        742695,
+        742708,
+        742883,
+        743058,
+        743150,
+        743234,
+        742970
+      ]
+    }
+  ],
+  "labels": [
+    {
+      "index": 25,
+      "key": "SYS_WINDOW_YES",
+      "text": "Yes"
+    },
+    {
+      "index": 26,
+      "key": "SYS_WINDOW_NO",
+      "text": "No"
+    },
+    {
+      "index": 551,
+      "key": "MENU_OP_COIN_BTN",
+      "text": "Coin Button"
+    },
+    {
+      "index": 552,
+      "key": "HELP_OP_COIN_BTN",
+      "text": "Change the coin button for each game. (Restarts the match in training mode.)"
+    },
+    {
+      "index": 756,
+      "key": "CHARA_CHANGE",
+      "text": "Change Character"
+    },
+    {
+      "index": 945,
+      "key": "ASK_REMATCH",
+      "text": "Rematch?"
+    }
+  ],
+  "spans": [
+    {
+      "label": "manager-type-registration",
+      "start": "0x14002aac0",
+      "end_exclusive": "0x14002ab10",
+      "sha256": "efd8ea26ac85a3f2f8397678c018b26e69faacf588ab2acc9609188c5f937e89"
+    },
+    {
+      "label": "manager-in-place-constructor",
+      "start": "0x1401a5a50",
+      "end_exclusive": "0x1401a5b5a",
+      "sha256": "6fae5292d149bae000a6c4ae5b118ff7f66a216a5227e5f60fc1693de5b72b7b"
+    },
+    {
+      "label": "manager-deleting-destructor",
+      "start": "0x1401a5c10",
+      "end_exclusive": "0x1401a5cf8",
+      "sha256": "32c51ab10bfe3aa255fe5faacd279c240a872e88d00254e726655046c19d94dc"
+    },
+    {
+      "label": "manager-update",
+      "start": "0x1401a6200",
+      "end_exclusive": "0x1401a62a6",
+      "sha256": "8c0ae503d90ad4e7fa2081bf12ea95364d979843e8d68955d6c71fc800540f60"
+    },
+    {
+      "label": "manager-release-all",
+      "start": "0x1401a6390",
+      "end_exclusive": "0x1401a6403",
+      "sha256": "e7eaf2bdfc09c8246206931f244276fafece67e78a8ec512c95475d0da36bde6"
+    },
+    {
+      "label": "application-constructor",
+      "start": "0x140056600",
+      "end_exclusive": "0x140056e05",
+      "sha256": "9a14759c70552e26ff7a29c3460cbf23624f72d35d777042d747695ea822ffca"
+    },
+    {
+      "label": "application-destructor-body",
+      "start": "0x140056e10",
+      "end_exclusive": "0x140057169",
+      "sha256": "3d446f36061dacc5eed666315e85d06443cc1e0b8caf8b94a7cd019f797956f1"
+    },
+    {
+      "label": "application-deleting-destructor",
+      "start": "0x140057360",
+      "end_exclusive": "0x1400573c2",
+      "sha256": "b4239ef6dc369e343ec706b6b8bfb432306ab0e02b48dc7f5f73f69c6d89bcef"
+    },
+    {
+      "label": "application-update",
+      "start": "0x140057ae0",
+      "end_exclusive": "0x140057e26",
+      "sha256": "9af4da3ea748531a692bde7c4a931af8515c1b885f79ad39e427ec91298f2ec5"
+    },
+    {
+      "label": "application-release-all",
+      "start": "0x140057e30",
+      "end_exclusive": "0x140057f84",
+      "sha256": "f691e554c19182de03e94b85390c94f2ddb4f4ea1388162796fa424700a26fe6"
+    },
+    {
+      "label": "application-worker-retirement",
+      "start": "0x1401f8130",
+      "end_exclusive": "0x1401f823a",
+      "sha256": "a158b9ca82895fd15815753225803e74a335887dd31dc06cb78030ce731ca79a"
+    },
+    {
+      "label": "base-constructor",
+      "start": "0x1402071c0",
+      "end_exclusive": "0x1402071ea",
+      "sha256": "94a161934cf2871ae02730c7812fbb44b7352f6fd121941200450ce813217dea"
+    },
+    {
+      "label": "base-destructor",
+      "start": "0x1402071f0",
+      "end_exclusive": "0x14020721d",
+      "sha256": "3a6ba2d989123f4c3d792c3a0e236c4182a5108ecc7e3f17804c444abaa8ab59"
+    },
+    {
+      "label": "shell-destructor",
+      "start": "0x140048380",
+      "end_exclusive": "0x1400486b1",
+      "sha256": "16d2966bb197ae0b4d571f2b7ec5cc0f974d9f561d46f1475b0e1c97d8b682ff"
+    },
+    {
+      "label": "shell-deleting-destructor",
+      "start": "0x140048700",
+      "end_exclusive": "0x140048762",
+      "sha256": "88b3b105f210afe4c3a7e6235c9950b7c9df7de484717463a4953da75199cf3c"
+    },
+    {
+      "label": "screen-initialization",
+      "start": "0x140038af0",
+      "end_exclusive": "0x140038f8d",
+      "sha256": "5f00e0da862a15619a31e5069efc4cf0d5ed47b68374a2a67b9f7a14a8c91c6c"
+    },
+    {
+      "label": "screen-update-with-training-mutation",
+      "start": "0x140038f90",
+      "end_exclusive": "0x140039778",
+      "sha256": "b2e0baca5568cbbc779f57aab642f0d0564eee3b31857b4f8a343f9ec2028f4f"
+    },
+    {
+      "label": "training-callback-dispatch",
+      "start": "0x140050fd0",
+      "end_exclusive": "0x140051011",
+      "sha256": "ea0916f949f6a1ebba8728f8c6413027341d5761dff3316e28ec328583782018"
+    },
+    {
+      "label": "CVS2-initializer",
+      "start": "0x1406a97d0",
+      "end_exclusive": "0x1406a9a0f",
+      "sha256": "ca6affb79adb124c7fad14a525318778d9aed320d923c157ae5e4aee11249b74"
+    },
+    {
+      "label": "CVS2-training-callback",
+      "start": "0x1406a9a30",
+      "end_exclusive": "0x1406a9a45",
+      "sha256": "3e8b86f8fab4ae663b47ca08ecd2fd2a4e9579663854e0d2f8b74e1c04279b7e"
+    },
+    {
+      "label": "CVS2-training-mutation",
+      "start": "0x1406aa960",
+      "end_exclusive": "0x1406aab1d",
+      "sha256": "ac1244fdf3a0637e23157451ec9b16b1e1e3eac46c3581f6f7c2b08131a5b153"
+    },
+    {
+      "label": "CVS2-training-nested-dispatch",
+      "start": "0x1406b2390",
+      "end_exclusive": "0x1406b23eb",
+      "sha256": "5cac232aac485a9055cbd95b5720743c29c5c4380e24d18a49ef1ac7b3a49ac5"
+    },
+    {
+      "label": "UI-reinitialize-branch",
+      "start": "0x1400a6bf0",
+      "end_exclusive": "0x1400a6c97",
+      "sha256": "efd4472f90f886b9c7552e8e29560e9a0fe416d9d0286f80644f5c2d0bda877c"
+    },
+    {
+      "label": "UI-deferred-reinitialize-request",
+      "start": "0x1400a6df4",
+      "end_exclusive": "0x1400a6e14",
+      "sha256": "5428d710b8ef07667997d55316417ed58500cb2044c5fcc8e6010f99a91559b9"
+    },
+    {
+      "label": "application-type-registration",
+      "start": "0x1400274d0",
+      "end_exclusive": "0x140027520",
+      "sha256": "633f0f97087f17bfdf0506c80e9e4480a4d49dd237808beb7a43445cafebb9cb"
+    },
+    {
+      "label": "application-factory",
+      "start": "0x1400565b0",
+      "end_exclusive": "0x1400565f2",
+      "sha256": "6d2202ec29efa073f154801d033992814e7db18377fd8db96b4bd47d65891748"
+    },
+    {
+      "label": "application-bootstrap-excerpt",
+      "start": "0x140047050",
+      "end_exclusive": "0x1400470d5",
+      "sha256": "2cee2bf823937e8ed573933a4f6e4c5e0de2730511980a8036dcd157279fa066"
+    },
+    {
+      "label": "application-thread-routine",
+      "start": "0x14020bb10",
+      "end_exclusive": "0x14020be00",
+      "sha256": "00d7c0ae35673a10ba0506433d2ea1a6e8453a1deec2d356a333df52578fae0d"
+    },
+    {
+      "label": "application-thread-create-excerpt",
+      "start": "0x14020c3c1",
+      "end_exclusive": "0x14020c40a",
+      "sha256": "6e84790218a81d600ef28b3d7c8712257e0ec989a530a83b1c5a899468343420"
+    },
+    {
+      "label": "application-thread-type-and-resume",
+      "start": "0x14020bff0",
+      "end_exclusive": "0x14020c16f",
+      "sha256": "b36dca5ffd11dd32165065579d72511d07819b7e60f89a448765fb842b274fe1"
+    },
+    {
+      "label": "unit-manager-constructor",
+      "start": "0x140178f60",
+      "end_exclusive": "0x140179976",
+      "sha256": "50f5711d3c49c73d5bb480e2fb0274edc0b23044a3372f434a86d1970f76f78c"
+    },
+    {
+      "label": "unit-manager-insert",
+      "start": "0x140179e00",
+      "end_exclusive": "0x140179eeb",
+      "sha256": "2687816934b8b6d59d1358d72ef4d9c9195523f9f700b196da27231e42739c2b"
+    },
+    {
+      "label": "unit-manager-update",
+      "start": "0x14017aee0",
+      "end_exclusive": "0x14017af52",
+      "sha256": "2610cfd2aa10b2f6ac91d5446d974d546ce8bdd50372264b664abe29ef7b661a"
+    },
+    {
+      "label": "unit-manager-category-update",
+      "start": "0x14017ac60",
+      "end_exclusive": "0x14017aed8",
+      "sha256": "6dd43cebe3439e2568c31a9060fd2311bf85348c63a28c21fcd8b31bec2dab11"
+    },
+    {
+      "label": "unit-task-thunk",
+      "start": "0x140179c1c",
+      "end_exclusive": "0x140179c22",
+      "sha256": "fe0d902e39f5890598345f993b2f4f9b1bd88e7826c590870e35a41937880087"
+    },
+    {
+      "label": "application-batch-launch-and-wait",
+      "start": "0x1401f7eb0",
+      "end_exclusive": "0x1401f80fe",
+      "sha256": "3d38572c4d395f59d5e0af0c278ed41d68252d725c399dc0f98bd992efda979a"
+    },
+    {
+      "label": "pause-task-constructor",
+      "start": "0x1400a5cc0",
+      "end_exclusive": "0x1400a5ce1",
+      "sha256": "4c233445dd381035f053e0663a78808d1da8ee571b3e512af14723c730c8cf90"
+    },
+    {
+      "label": "pause-offline-command-construction",
+      "start": "0x1400a5db0",
+      "end_exclusive": "0x1400a5f5e",
+      "sha256": "206bdb83e824fbb089998da16a352ec1ff6a5dde1886d5cf26e6bc466bdcf672"
+    },
+    {
+      "label": "pause-state-dispatch",
+      "start": "0x1400a65e0",
+      "end_exclusive": "0x1400a6622",
+      "sha256": "fdeb61441bd4b9fd6b6e7b6c2b42639a5897140f8524b24592f644d3380427de"
+    },
+    {
+      "label": "pause-command-dispatch",
+      "start": "0x1400a67ef",
+      "end_exclusive": "0x1400a6817",
+      "sha256": "4c5529bc64d459d24d1c9f12683a04fe651ab23060f4d0da658143f5cb4ccaa7"
+    },
+    {
+      "label": "pause-character-change-transition",
+      "start": "0x1400a689a",
+      "end_exclusive": "0x1400a68af",
+      "sha256": "27cb76d2e0dba211f77d7b736e8a735a9c877a5e74d2551db0432ed36275953b"
+    },
+    {
+      "label": "pause-restart-shortcut-gates",
+      "start": "0x1400a75f3",
+      "end_exclusive": "0x1400a7636",
+      "sha256": "4bcccd71abfd4496121348e9601c780af4b62fa6997c385203df28da99001126"
+    },
+    {
+      "label": "generic-worker-submit",
+      "start": "0x1401f6ca0",
+      "end_exclusive": "0x1401f6d6e",
+      "sha256": "372d9dedf83d087cc2134d8bf3bee72e4f2d39e3624737d23e0ea4510064d1bf"
+    },
+    {
+      "label": "generic-worker-entry",
+      "start": "0x1401f7d40",
+      "end_exclusive": "0x1401f7d54",
+      "sha256": "9295461c4590f8f0c37137e47dc5fbff47627d1edfa4049eb3dd8b9dfe86c4c1"
+    },
+    {
+      "label": "generic-worker-consume",
+      "start": "0x1401f7d60",
+      "end_exclusive": "0x1401f7ea4",
+      "sha256": "fd597b90ad3b9f92dcd19a6deddc7a6931eab7df547590e0f4d6edb4956204be"
+    },
+    {
+      "label": "generic-worker-caller-and-completion-poll",
+      "start": "0x14056dff0",
+      "end_exclusive": "0x14056e137",
+      "sha256": "c0d779cd6bfa5710e285ee14510c64656d385fe7c9ab1f42e477be8047b0865c"
+    },
+    {
+      "label": "generic-worker-member-update-thunk",
+      "start": "0x14056e480",
+      "end_exclusive": "0x14056e49c",
+      "sha256": "1f78218f067be51be03e2a94a62da13f4ba7c81cc726c055effe5b03420070e2"
+    },
+    {
+      "label": "system-settings-commit",
+      "start": "0x1400a2f00",
+      "end_exclusive": "0x1400a333f",
+      "sha256": "975d9293627949b19096ad65d20fdffff21d485ba07e66cb0ed645b54983fad7"
+    },
+    {
+      "label": "system-settings-row-value-excerpt",
+      "start": "0x1400a3370",
+      "end_exclusive": "0x1400a357f",
+      "sha256": "3103134b10d8355d30abbf34c9b0f90d6d3a954aff3a8f8e285f332fce0649b2"
+    },
+    {
+      "label": "training-configured-coin-input",
+      "start": "0x14004c790",
+      "end_exclusive": "0x14004c809",
+      "sha256": "7e363d70075a741e84a6b2a911defd8783a73cc05ae55a30eb8bda2e3b6976af"
+    },
+    {
+      "label": "geometry-group-type-registration",
+      "start": "0x140034ca0",
+      "end_exclusive": "0x140034cf0",
+      "sha256": "30a588ed12e2359b84eef13081cb1e20ab1bf3cb852121deef315a6b66bfa753"
+    },
+    {
+      "label": "geometry-group-factory",
+      "start": "0x14056dbe0",
+      "end_exclusive": "0x14056dcfc",
+      "sha256": "5af1b1c64c5f905d431e3130ee848e2dac927ea41f9bad03d76aa13a1ff34cd9"
+    },
+    {
+      "label": "geometry-unit-base-constructor",
+      "start": "0x14059c030",
+      "end_exclusive": "0x14059c051",
+      "sha256": "7d26935fea56070343473cf9e3ed92f32a5997c21dc6cf57bcb7175c301b26b5"
+    },
+    {
+      "label": "versus-cycle-constructor",
+      "start": "0x1400b45c0",
+      "end_exclusive": "0x1400b45e1",
+      "sha256": "496e645ba633ffce5bbd0662bda9c9f1be156de526513f96606ca3a0cdb82d2e"
+    },
+    {
+      "label": "versus-cycle-update",
+      "start": "0x1400b46b0",
+      "end_exclusive": "0x1400b48f8",
+      "sha256": "f2bf5f63d99ce585302bcb88937fb5fcc5d648379cdefbb2e02bd6c61ed34a1d"
+    },
+    {
+      "label": "versus-rematch-transaction",
+      "start": "0x1400b4900",
+      "end_exclusive": "0x1400b4b87",
+      "sha256": "ff1d0b98aa8adfb706b3519e99ea8d22f61b37261e32a815bf1550d2518e7a6f"
+    },
+    {
+      "label": "versus-rematch-dialog-constructor",
+      "start": "0x1400b5320",
+      "end_exclusive": "0x1400b542a",
+      "sha256": "7c5681f490d166797d59687c905c78e1c655f7ab09b37398229ca93b96530833"
+    },
+    {
+      "label": "versus-rematch-dialog-update",
+      "start": "0x1400b54f0",
+      "end_exclusive": "0x1400b5784",
+      "sha256": "2a46ed1bb4d1dc7f8a03eb015e6920361418df3844aba2d99020e6fe5da9d17b"
+    },
+    {
+      "label": "versus-rematch-dialog-initialize",
+      "start": "0x1400b5a10",
+      "end_exclusive": "0x1400b5dee",
+      "sha256": "d691a7158d02c7581bef3489b153580b8ca3cf5f754536d07ffb6b8e07817866"
+    },
+    {
+      "label": "session-rematch-option-writer",
+      "start": "0x140038280",
+      "end_exclusive": "0x140038931",
+      "sha256": "be13093c02691aa3819afa48b05103b5388a17ce5d4f359b053a6a18195389ea"
+    },
+    {
+      "label": "CVS2-result-signal-with-result-bits",
+      "start": "0x1406d6610",
+      "end_exclusive": "0x1406d678d",
+      "sha256": "6ef7287734e095561665c6a2f326ddbe9d8be00c2327740af72f2c38c5e52dc5"
+    },
+    {
+      "label": "CVS2-result-signal-countdown",
+      "start": "0x1406ffe60",
+      "end_exclusive": "0x1407000f6",
+      "sha256": "21e59cfa731d41fd6de5afdd430c982368158d7857b4b109fca893fd976546be"
+    }
+  ]
+}
