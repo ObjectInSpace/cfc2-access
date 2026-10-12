@@ -3,7 +3,7 @@
 Reviewed through 2026-10-12 against the same unpacked build as the
 [offline gate trace](collection-offline-gate-trace.md). Reproduce with
 `python tools/collection_native_boundary_audit.py --manifest-out docs/collection-native-boundary-manifest.json`.
-The [manifest](collection-native-boundary-manifest.json) pins 73 aligned spans,
+The [manifest](collection-native-boundary-manifest.json) pins 86 aligned spans,
 references and virtual slots. These establish local ordering, not exclusive
 thread ownership. No production hook or native read is enabled by this result.
 
@@ -526,8 +526,8 @@ meaning to a phase value or a readiness flag from these two conditional writers.
 
 1. Resolve task submissions that can touch the arena, including the generic
    pool and application release-all paths; verify wait outcomes. Import identities
-   and Arcade category flags are captured above; actual callback-thread coverage
-   and other modes remain open. Close generic-ring reuse/completion invariants. Establish native
+   and three-mode selection category flags are captured above; actual callback-thread
+   coverage and transition scenes remain open. Close generic-ring reuse/completion invariants. Establish native
    exclusivity across manager traversal, UI Quick Load, Training mutation,
    reinitialization and arena release, or identify a real shared lifetime guard.
 2. Validate outcome coverage for the now-traced Versus Rematch Yes/No route
@@ -546,3 +546,115 @@ The [implementation handoff](port-tasks/cvs2-shared-selection-handoff.md) and
 [dispatch proposal](shared-output-dispatch-contract.md) separate work that can
 proceed offline from native activation. The mutation-sabotage tests protect
 these static claims; they do not certify scheduling or audible behavior.
+
+## Independent continuation audit (2026-10-12)
+
+Rechecked against base `46bf563`, the hashed dump, aligned disassembly and the
+retained fixtures. The starting 111 collection tests passed. The existing
+conclusions about manager/application ordering, selection-scene inventories,
+same-allocation Training mutation and conditional 4096 bypass withstand this
+review. No retained record contains a wait return value. The new manifest has
+86 spans; it does not retroactively increase the 73 spans checked in each
+historical live capture. No new live transition or wait-success claim is made.
+
+### Training reset and Change Character continuation
+
+The reset request has an additional statically visible input to the existing
+consumer. After testing `(S+0x830 & 0xf)==2`, `0x1400390a6` tests **DL**, the
+low byte of that field. When its sign bit is set, `0x1400390aa` writes
+S+0x838=1. The nonzero test at `0x1400390b8` then branches directly to the
+callback path at `0x1400391ea`, bypassing the configured-input polling and its
+cooldown check. This identifies a forced-request consumer, not the UI action
+or every writer that can set bit 7. It is not a second proven live reset route.
+
+The earlier S+0x830==1 countdown branch calls `0x1400b60b0` with ECX=3 at
+`0x140039058`. That helper copies **from** S+0x1c0, length S+0x1c8, to
+slot-3 storage plus its 0x18-byte header, subject to its pointer gates. This
+is a save-direction copy, not a positive restoration completion. Afterwards
+the screen sets S+0x830=2, clears S+0x838 and sets cooldown S+0x83c=30.
+The actual reset callback also has later screen writes: it conditionally clears
+S+0xca8 or S+0xcac for S+0x850 values 3/4, clears the request and resets the
+cooldown before taking the early screen return. Callback return alone is still
+too early for publication.
+
+Change Character's cleanup/init branch continues via `0x1400a6e02`, calls
+`0x14007d090` to change task state, joins at `0x1400a6e8f`, may perform later
+UI calls and finally returns from the pause update at `0x1400a6ef4`. The
+initializer's return is not the end of this invocation. The branch passes
+ECX=1 to `0x1400b5f90`; that helper permits only indices 0 or 3 past
+`0x1400b5fbc..0x1400b5fc3`. Thus this particular slot-1 call bypasses the
+copy at `0x1400b6070`. It cannot be used as restore evidence. Cleanup/init
+still requires a new generation, and later application work still needs to
+finish under lifetime protection. The S+0x840==0 path remains a non-mutating
+close with respect to this cleanup/init transaction.
+
+### Training callback coverage now has concrete descendant edges
+
+The retained category-5 objects resolve as follows. Names below describe the
+examined work, not an assertion that the whole object is harmless UI.
+
+| Observed vtable | +0x40 update | Gated descendant | Concrete remaining edge |
+| --- | --- | --- | --- |
+| `0x140fe5818` | `0x1400789d0` | `0x140078b30` | Session-statistic writes; indirect call at `0x140078e3b` |
+| `0x140fea3e8` | `0x1400917d0` | `0x1400918a0` | Formatting/helpers; indirect call at `0x140091f1b` |
+| `0x140fea618` | `0x140092160` | `0x140092220` | Session-counter reads/helpers; indirect call at `0x1400923b9` |
+
+For example, `0x140078b36` loads the session singleton; `0x140078b4c` clamps
+S+0x8d4 to 99999, and `0x140078bc2` updates S+0x8f4. These are actual
+session writes, not proof of writes into the CVS2 root allocation. Each
+descendant's indirect call uses slot+0x60 on its receiver; the slot number
+alone does not identify the unit, allocator or arena ownership.
+
+All three observed vtables have +0x50=`0x140036b70`, an empty return, but
+their +0x48=`0x1402160e0` tail-calls `0x140216460`. The latter dispatches
+virtual +0x150 and action slots +0x158/+0x160/+0x170/+0x190/+0x198/+0x1a0,
+and invokes `0x140308050` on a held object. The pinned span includes code
+after the first return, since branches reach `0x140216661..0x1402166b9`.
+Therefore +0x40-only inspection cannot exclude later arena access or establish
+completion. These helpers, their receiver lifetimes, initialization and the
+other observed unit types remain in the coverage inventory. No claim that
+all arena-mutating callbacks have been enumerated is justified yet.
+
+### Wait results: exact observation sites, still no live outcomes
+
+The previous single `wait_return_checked=false` field describes the **batch
+join**, not all waits. The manifest now records each continuation separately.
+Live export identities from the retained Arcade report apply to that process;
+the following result-handling claims come from the static call sites.
+
+| Purpose | Call | First instruction after call | Result handling |
+| --- | --- | --- | --- |
+| Generic worker wake | `0x1401f7d9c` | `0x1401f7da2` | Tests EAX; nonzero retries without claiming a record |
+| Batch worker wake | `0x1401f8479` | `0x1401f847f` | Nonzero skips callbacks and completion signal, then checks stop/retries |
+| Batch completion join | `0x1401f80a7` | `0x1401f80ad` | No result test before another call |
+| Generic worker retirement join | `0x1401f81b3` | `0x1401f81b9` | No result test before closing the thread handle |
+| Batch worker retirement join | `0x1401f8202` | `0x1401f8208` | No result test before closing handles |
+
+The batch wake failure branch reaches `0x1401f86a2`, **past** the completion
+signal at `0x1401f869c`. It must not be summarized as signalling completion
+on every return from the wake wait. Neither unchecked joins nor a conditional
+failure branch establish that any wait actually failed.
+
+The read-only inventory/import tools cannot capture these ephemeral register
+results, and the existing six-site diagnostic does not record them. A fresh
+inventory, a matching IAT export or a signalled handle sampled later cannot
+substitute for the game's own result at the reviewed call. Actual outcomes
+remain unobserved in this continuation.
+
+The next bounded diagnostic must correlate call/return by thread and invocation,
+copy raw EAX immediately at the five continuations above, retain the original
+handle or bounded wait-all handle list, timeout and return-site identity, and
+report loss/overflow and unmatched entries. Preserve original arguments,
+return values and last-error state; a WAIT_FAILED record needs the error value
+before diagnostic API calls overwrite it. Classify caller-only batch execution
+as **no join executed**, not successful wait. Retain wake/signal outcomes too,
+and keep shutdown joins in a separate shutdown exercise. A successful outer
+join still does not prove that descendants drained the generic ring.
+
+Training exercise records must join the request and mutation with cleanup/init
+when present, the pause/screen invocation and the outermost application update.
+Run plain and modifier reset, Change Character with and without the cleanup
+gate, and re-entry under user-confirmed mode provenance. Record uncaptured or
+inapplicable actions explicitly. This specifies missing evidence; it does not
+claim a ready or installed completion probe. The 4096 witness remains a
+conditional counterexample, with no observed failure in any retained scene.

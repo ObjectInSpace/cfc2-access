@@ -30,7 +30,53 @@
     "option_field": "shell+0xd04b8 -> +0x1c",
     "reader": "0x14004c790",
     "screen_call": "0x1400390fb",
+    "signed_low_byte_forced_request": true,
+    "forced_request_writer_inventory_complete": false,
+    "countdown_copy_direction": "native to slot 3",
     "live_verified": false
+  },
+  "training_UI": {
+    "category": 5,
+    "statistics_writes_session": true,
+    "update_descendants": [
+      "0x140078b30",
+      "0x1400918a0",
+      "0x140092220"
+    ],
+    "final_phase": "0x1402160e0",
+    "final_dispatch": "0x140216460",
+    "later_phase_is_empty": true,
+    "callback_descendants_fully_covered": false,
+    "arena_write_exclusion_proven": false
+  },
+  "wait_outcomes": {
+    "evidence": "static result handling only; no live return observations",
+    "live_observed": false,
+    "generic_wake": {
+      "call": "0x1401f7d9c",
+      "result_site": "0x1401f7da2",
+      "nonzero": "retry wait; no queue claim on that iteration"
+    },
+    "batch_wake": {
+      "call": "0x1401f8479",
+      "result_site": "0x1401f847f",
+      "nonzero": "skip callbacks and completion signal; check stop then retry"
+    },
+    "batch_join": {
+      "call": "0x1401f80a7",
+      "result_site": "0x1401f80ad",
+      "checked": false
+    },
+    "generic_retirement": {
+      "call": "0x1401f81b3",
+      "result_site": "0x1401f81b9",
+      "checked": false
+    },
+    "batch_retirement": {
+      "call": "0x1401f8202",
+      "result_site": "0x1401f8208",
+      "checked": false
+    }
   },
   "scheduler": {
     "application_routine": "0x14020bb10",
@@ -79,6 +125,8 @@
     ],
     "state": 14,
     "branch": "0x1400a6bf0",
+    "enclosing_return": "0x1400a6ef4",
+    "slot_one_copy_bypassed": true,
     "requires_new_generation": true,
     "live_verified": false
   },
@@ -108,6 +156,42 @@
     "worker_native_read_allowed": false
   },
   "slots": [
+    {
+      "address": "0x140fe5858",
+      "target": "0x1400789d0"
+    },
+    {
+      "address": "0x140fea428",
+      "target": "0x1400917d0"
+    },
+    {
+      "address": "0x140fea658",
+      "target": "0x140092160"
+    },
+    {
+      "address": "0x140fe5860",
+      "target": "0x1402160e0"
+    },
+    {
+      "address": "0x140fea430",
+      "target": "0x1402160e0"
+    },
+    {
+      "address": "0x140fea660",
+      "target": "0x1402160e0"
+    },
+    {
+      "address": "0x140fe5868",
+      "target": "0x140036b70"
+    },
+    {
+      "address": "0x140fea438",
+      "target": "0x140036b70"
+    },
+    {
+      "address": "0x140fea668",
+      "target": "0x140036b70"
+    },
     {
       "address": "0x140fe21b8",
       "target": "0x1401f8430"
@@ -218,6 +302,34 @@
     }
   ],
   "references": [
+    {
+      "address": "0x140078b36",
+      "target": "0x141c14f98"
+    },
+    {
+      "address": "0x1401f7d9c",
+      "target": "0x140fdc350"
+    },
+    {
+      "address": "0x1401f8479",
+      "target": "0x140fdc350"
+    },
+    {
+      "address": "0x1401f81b3",
+      "target": "0x140fdc350"
+    },
+    {
+      "address": "0x1401f8202",
+      "target": "0x140fdc350"
+    },
+    {
+      "address": "0x1401f81c1",
+      "target": "0x140fdc1d0"
+    },
+    {
+      "address": "0x1401f820b",
+      "target": "0x140fdc1d0"
+    },
     {
       "address": "0x1401f65f0",
       "target": "0x140fdc3e0"
@@ -507,6 +619,84 @@
     }
   ],
   "spans": [
+    {
+      "label": "training-statistics-update",
+      "start": "0x1400789d0",
+      "end_exclusive": "0x140078a50",
+      "sha256": "0737394cda11f6d2a47213d605e526a2b0c4a6357bc1133c060ad030c0ddea9e"
+    },
+    {
+      "label": "training-statistics-body",
+      "start": "0x140078b30",
+      "end_exclusive": "0x140078e5b",
+      "sha256": "a7fe3afb25426c852a95f897cb6537a4a86a84751208e169d0cfd6d999a350d6"
+    },
+    {
+      "label": "training-input-display-update",
+      "start": "0x1400917d0",
+      "end_exclusive": "0x14009184e",
+      "sha256": "1838a1ca645af7ebc265b87d0d26df01523694033b9d85e0ae73fb3f2274dbcc"
+    },
+    {
+      "label": "training-input-display-body",
+      "start": "0x1400918a0",
+      "end_exclusive": "0x140091f33",
+      "sha256": "18202d8685549e89447b45ee53a5e60785d102ae971938b1a6f14f38194e2d9f"
+    },
+    {
+      "label": "training-counter-display-update",
+      "start": "0x140092160",
+      "end_exclusive": "0x1400921d6",
+      "sha256": "dd189fff7c79308ce0855102d95bf43350dfe65466ceaf5e5daf4101ec8fa1c0"
+    },
+    {
+      "label": "training-counter-display-body",
+      "start": "0x140092220",
+      "end_exclusive": "0x1400923cc",
+      "sha256": "8b4187cf4fb4bcc99e8dbb428dff4f84eefd6ed61c18f937d5a0d556254212f9"
+    },
+    {
+      "label": "training-UI-final-phase",
+      "start": "0x1402160e0",
+      "end_exclusive": "0x1402160fe",
+      "sha256": "2f5477f6a12d93cf59304437efb02211139d969643a637298e1c9a17a1293905"
+    },
+    {
+      "label": "training-UI-final-dispatch",
+      "start": "0x140216460",
+      "end_exclusive": "0x1402166b9",
+      "sha256": "ec3c89283b3d76fc800d0dd0ada3c4f58366dc4e0f7d004e9b9e9ab3b4ab2b2b"
+    },
+    {
+      "label": "empty-unit-later-phase",
+      "start": "0x140036b70",
+      "end_exclusive": "0x140036b73",
+      "sha256": "b6cbececf1b07e74f37d57710c68c31f0b92cb08d51093252b321b07542e177b"
+    },
+    {
+      "label": "pause-character-change-close",
+      "start": "0x1400a6e02",
+      "end_exclusive": "0x1400a6e14",
+      "sha256": "9b3134bd319db240bd2130532d38bc37abcc548f1c3558d5c3bb5548716d48c0"
+    },
+    {
+      "label": "pause-update-continuation",
+      "start": "0x1400a6e8f",
+      "end_exclusive": "0x1400a6ef5",
+      "sha256": "4910ebec6d1f6c97be3694ed842c7a5fc2f3d6f7065ad9309c47b193db73f908"
+    },
+    {
+      "label": "slot-copy-to-native",
+      "start": "0x1400b5f90",
+      "end_exclusive": "0x1400b60a8",
+      "sha256": "02b229e06d0c074623e66f4bd9dac21d467caada4ec69afbca68a9ad1a87fa70"
+    },
+    {
+      "label": "slot-copy-from-native",
+      "start": "0x1400b60b0",
+      "end_exclusive": "0x1400b618d",
+      "sha256": "52fb3d8865f75216966aae5383046cfd0addcf13cf86041480fd0cd050571748"
+    },
     {
       "label": "manager-type-registration",
       "start": "0x14002aac0",

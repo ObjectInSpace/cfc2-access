@@ -8,6 +8,23 @@ import collection_native_boundary_audit as audit
 
 
 class NativeBoundaryAuditTests(unittest.TestCase):
+    def test_wait_result_handling_does_not_claim_live_outcomes(self):
+        waits = audit.produce()['wait_outcomes']
+        self.assertFalse(waits['live_observed'])
+        self.assertEqual(waits['generic_wake']['result_site'], '0x1401f7da2')
+        self.assertEqual(waits['batch_wake']['result_site'], '0x1401f847f')
+        for key in ('batch_join', 'generic_retirement', 'batch_retirement'):
+            self.assertFalse(waits[key]['checked'])
+
+    def test_training_continuations_keep_coverage_open(self):
+        report = audit.produce()
+        self.assertTrue(report['character_change']['slot_one_copy_bypassed'])
+        self.assertEqual(report['character_change']['enclosing_return'], '0x1400a6ef4')
+        self.assertTrue(report['training_UI']['statistics_writes_session'])
+        self.assertFalse(report['training_UI']['arena_write_exclusion_proven'])
+        self.assertFalse(report['training_UI']['callback_descendants_fully_covered'])
+        self.assertFalse(report['training_input']['forced_request_writer_inventory_complete'])
+
     def test_manifest_reproduces(self):
         path = Path(__file__).resolve().parents[1] / 'docs/collection-native-boundary-manifest.json'
         self.assertEqual(audit.compact(audit.produce()), json.loads(path.read_bytes()))
@@ -42,7 +59,16 @@ class NativeBoundaryAuditTests(unittest.TestCase):
                  0x1401F8698 + 3, 0x1401F869C + 2,
                  0x1401F86CC, 0x140FE21B8,
                  0x14017B7DC + 2, 0x14056E177 + 2,
-                 0x1401798F2 + 3, 0x14017AD10 + 3)
+                 0x1401798F2 + 3, 0x14017AD10 + 3,
+                 0x1400390A8 + 1, 0x1400390AA + 3,
+                 0x1400B5FC0 + 2, 0x1400A6E12 + 1,
+                 0x140078B4C + 6, 0x140078E3B + 2,
+                 0x140091822 + 1, 0x1400921AA + 1,
+                 0x140FE5858, 0x140FEA430, 0x140FEA668,
+                 0x14021655F + 2, 0x1402165C6 + 2,
+                 0x1401F7DA4 + 1, 0x1401F8481 + 2,
+                 0x1401F81B3 + 2, 0x1401F8202 + 2,
+                 0x1401F81C1 + 2, 0x1401F80AF + 1)
         original = audit.Dump.read
         for address in sites:
             with self.subTest(address=hex(address)):

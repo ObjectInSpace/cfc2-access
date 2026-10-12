@@ -428,3 +428,33 @@ prove arena-mutating task coverage and completion, map remaining rematch/reset
 routes, then validate a protected application-level producer across all three
 modes. Preserve the existing captures and decoder research. This handoff is
 complete; shared runtime delivery and live acceptance are not.
+
+Independent continuation audit against `46bf563`: the starting 111 tests and
+retained three-mode evidence reproduce. The manifest now pins 86 spans, with
+113 collection tests passing and 77 changed-byte refusal controls. Historical
+captures still validated 73 spans; they have not been relabelled as fresh runs.
+
+Training reset has a forced-request consumer: bit 7 of the low byte of S+0x830,
+under the existing low-nibble and mode gates, sets S+0x838 and bypasses coin
+polling/cooldown. Its full writer inventory and live UI mapping remain open.
+The countdown's slot-3 helper copies from native storage into the slot, so its
+return is not restore completion. Change Character continues through the pause
+task return at `0x1400a6ef4`; its slot-1 call to `0x1400b5f90` bypasses copying
+and cannot supply positive restore evidence. Preserve the cleanup/new-generation
+contract and enclosing application completion requirement.
+
+The three additional Training category-5 update callbacks now have pinned
+descendants. One writes session statistics. All three also inherit a +0x48
+phase that reaches virtual action dispatch through `0x140216460`; their +0x50
+is an empty return. Neither UI naming nor +0x40-only inspection establishes
+arena-write exclusion. Full descendant and receiver-lifetime coverage remains
+open, including the other observed unit types.
+
+Wait handling is now separated by call site: both worker wake waits check EAX,
+whereas the batch join and both retirement joins do not. A failed/nonzero batch
+wake path skips its completion signal. Actual wait outcomes remain unobserved;
+neither read-only capture tool nor the existing six-site probe records those
+return values. The native trace now specifies five exact result sites and the
+bounded correlation/loss requirements for a future diagnostic. No diagnostic
+extension, runtime deployment or fresh live transition is claimed. The 4096
+case remains conditional, not an observed game failure.
