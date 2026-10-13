@@ -2,6 +2,7 @@
 #define CFC2_CVS2_SELECT_H
 #include <windows.h>
 #include "game_selection.h"
+#include "transition_channel.h"
 #define CVS2_STATE_SIZE 0x216B0u
 /* -1 inactive, -2 inconsistent/special; otherwise an ordinary character ID. */
 int cvs2_select_decode(const BYTE *state, SIZE_T size, unsigned player);
@@ -63,6 +64,9 @@ void cvs2_gauges_log_stats(void);
  * fighter + ratio when a round starts. Gauges remain audio cues -- the design
  * forbids narrating DURING play, which these do not do. */
 void cvs2_announce_observe(const BYTE *state, SIZE_T size, ULONGLONG root);
+/* The owned transition observation for an in-match state (no phase check).
+ * Exposed so the replay suite can assert names, ratios and ownership. */
+void cvs2_announce_observation(const BYTE *state, transition_observation *o);
 
 /* Completed native draw buffers; see docs/cvs2-win-quote-reader.md.
  * ASCII/English only. Output capacity must be at least 161 wchar_t units. */

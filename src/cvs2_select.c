@@ -1,5 +1,6 @@
 #include "selection_channel.h"
 #include "match_audio.h"
+#include "transition_channel.h"
 /* CVS2 native-state evidence: docs/cvs2-state-access-trace.md.
  * No keyboard history, guest-address assumption, or game-memory writes. */
 #include "cvs2_select.h"
@@ -592,11 +593,10 @@ void cvs2_gauges_observe(const BYTE *state, SIZE_T size, ULONGLONG root)
  * these fire at natural pauses, which is the case that rule was not about.
  * Gauges stay cues. */
 
-static ULONGLONG g_an_root;
-static int g_an_match_done;          /* team/groove announced this match  */
-static int g_an_char[2] = {-1,-1};   /* last fighter announced, per player */
-static unsigned g_an_team[2][3];     /* team that was announced           */
-static int g_an_size[2] = {-1,-1};
+/* Formatting, grouping and acceptance-gated latching are shared --
+ * src/transition_channel.c. This adapter keeps CVS2's phase gate, names,
+ * grooves, team slots and the ratio-budget rule below. */
+static transition_channel g_an;
 
 /* Ratio for team slot `i`, as DISPLAYED. The game stores ratio-1, and the
  * layout table already holds displayed values, so B+0x5CC..E needs +1. */
@@ -638,91 +638,82 @@ static unsigned an_ratio(const BYTE *s, unsigned b, unsigned i)
     return r == 255 ? 0 : r + 1;
 }
 
+/* ⭐ WHO IS "YOU"? 0x1FFEC is the joined-player mask the selection handlers
+ * test per side (`s[0x1ffec] & (1u<<p)`). In-match it reads 0x1 in every
+ * Arcade capture (P1 human vs CPU) and 0x0 in every Training capture, where
+ * it identifies nobody. So exactly ONE bit names the local side; anything else
+ * (Training, two humans) is unknown and speaks "Player 1/2" rather than
+ * assuming the listener is P1. */
+static transition_ownership an_ownership(const BYTE *s, unsigned p)
+{
+    unsigned mask = s[0x1ffec] & 3u;
+    if (mask != 1u && mask != 2u) return TRANSITION_OWNER_UNKNOWN;
+    return (mask & (1u << p)) ? TRANSITION_OWNER_LOCAL : TRANSITION_OWNER_OPPONENT;
+}
+
+void cvs2_announce_observation(const BYTE *s, transition_observation *o)
+{
+    unsigned p, i;
+    memset(o, 0, sizeof *o);
+    o->team_ready = true;
+    for (p = 0; p < 2; p++) {
+        unsigned b = 0x1eba8 + p * 0x678, n = s[b + 0x5d1];
+        transition_side *side = &o->side[p];
+        int id = s[b + 1];
+        side->present = true;
+        side->player = p + 1;
+        side->ownership = an_ownership(s, p);
+        /* The introduction needs a real team and groove; until then only
+         * fighter changes speak, as before. */
+        if (n < 1 || n > 3 || s[b + 0x5d0] >= 6) {
+            o->team_ready = false;
+        } else {
+            swprintf(side->style, TRANSITION_LABEL, L"%ls", names[48 + s[b + 0x5d0]]);
+            side->count = n;
+            for (i = 0; i < n; i++) {
+                unsigned m = s[b + 0x5c0 + i];
+                if (m >= 48) continue;
+                side->member[i].valid = true;
+                side->member[i].id = m;
+                side->member[i].ratio = an_ratio(s, b, i);
+                swprintf(side->member[i].name, TRANSITION_LABEL, L"%ls", names[m]);
+            }
+        }
+        if (id >= 0 && id < 48) {
+            unsigned slot;
+            /* Which team slot is this fighter, so the ratio matches. */
+            for (slot = 0; slot < n && slot < 3; slot++)
+                if ((int)s[b + 0x5c0 + slot] == id) break;
+            side->current.valid = true;
+            side->current.id = (unsigned)id;
+            side->current.ratio = slot < 3 ? an_ratio(s, b, slot) : 0;
+            swprintf(side->current.name, TRANSITION_LABEL, L"%ls", names[id]);
+        }
+    }
+}
+
 void cvs2_announce_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
 {
-    wchar_t line[600] = L"", part[200];
-    unsigned p, i;
-    int said = 0;
+    static ULONGLONG owner_root;
+    transition_observation o;
 
-    if (!s || size != CVS2_STATE_SIZE) { g_an_root = 0; return; }
-
-    /* A new state block is a new session: re-announce everything. */
-    if (root != g_an_root) {
-        g_an_root = root;
-        g_an_match_done = 0;
-        g_an_char[0] = g_an_char[1] = -1;
-        g_an_size[0] = g_an_size[1] = -1;
+    if (!s || size != CVS2_STATE_SIZE || !root) {
+        transition_channel_depart(&g_an);
+        owner_root = 0;
+        return;
     }
-
-    /* Only in an actual match. Phase bytes 02 01 02 02 with byte 4 in the
-     * in-round range; the selection screens use a different phase. */
+    /* A new state block is a new presentation owner: re-announce everything
+     * (the same compatibility identity the other CVS2 channels use). */
+    if (!g_an.begun || root != owner_root) {
+        transition_channel_begin(&g_an, "cvs2-announce");
+        owner_root = root;
+    }
+    /* Only in an actual match. Phase bytes 02 01 02 02; selection screens and
+     * quotes use other phases. Latches survive between matches, so the same
+     * teams are not re-introduced but a new opponent's team is. */
     if (memcmp(s + 0x78, "\x02\x01\x02\x02", 4)) return;
-
-    /* ---- match start: team order + groove, once per team composition ---- */
-    if (!g_an_match_done) {
-        int ok = 1;
-        for (p = 0; p < 2 && ok; p++) {
-            unsigned b = 0x1eba8 + p * 0x678;
-            if (s[b + 0x5d1] < 1 || s[b + 0x5d1] > 3) ok = 0;
-            if (s[b + 0x5d0] >= 6) ok = 0;
-        }
-        if (ok) {
-            for (p = 0; p < 2; p++) {
-                unsigned b = 0x1eba8 + p * 0x678, n = s[b + 0x5d1];
-                swprintf(part, 200, L"%ls: %ls, ",
-                         p == 0 ? L"You" : L"Opponent",
-                         names[48 + s[b + 0x5d0]]);
-                wcscat(line, part);
-                for (i = 0; i < n; i++) {
-                    unsigned id = s[b + 0x5c0 + i], ratio = an_ratio(s, b, i);
-                    if (id >= 48) continue;
-                    g_an_team[p][i] = id;
-                    if (ratio)
-                        swprintf(part, 200, L"%ls ratio %u%ls", names[id], ratio,
-                                 i + 1 < n ? L", " : L"");
-                    else
-                        swprintf(part, 200, L"%ls%ls", names[id],
-                                 i + 1 < n ? L", " : L"");
-                    wcscat(line, part);
-                }
-                g_an_size[p] = (int)n;
-                if (p == 0) wcscat(line, L". ");
-            }
-            if (tc_say(line, TRUE, "cvs2-announce")) {
-                g_an_match_done = 1;
-                /* The fighters now on screen are announced, so do not repeat
-                 * them as a round change immediately afterwards. */
-                for (p = 0; p < 2; p++)
-                    g_an_char[p] = s[0x1eba8 + p * 0x678 + 1];
-            }
-            return;
-        }
-    }
-
-    /* ---- round start: whichever fighter changed, with its ratio -------- */
-    line[0] = 0;
-    for (p = 0; p < 2; p++) {
-        unsigned b = 0x1eba8 + p * 0x678;
-        int id = s[b + 1];
-        unsigned n = s[b + 0x5d1], slot;
-        if (id < 0 || id >= 48) continue;
-        if (g_an_char[p] == id) continue;
-        /* Which team slot is this fighter, so the ratio matches. */
-        for (slot = 0; slot < n && slot < 3; slot++)
-            if ((int)s[b + 0x5c0 + slot] == id) break;
-        {
-            unsigned ratio = (slot < 3) ? an_ratio(s, b, slot) : 0;
-            if (ratio)
-                swprintf(part, 200, L"%ls%ls, ratio %u",
-                         said ? L". " : L"", names[id], ratio);
-            else
-                swprintf(part, 200, L"%ls%ls", said ? L". " : L"", names[id]);
-        }
-        wcscat(line, part);
-        g_an_char[p] = id;
-        said = 1;
-    }
-    if (said) tc_say(line, TRUE, "cvs2-announce");
+    cvs2_announce_observation(s, &o);
+    transition_channel_offer(&g_an, &o);
 }
 
 /* ---- Win quotes --------------------------------------------------------- */

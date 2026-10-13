@@ -4,7 +4,7 @@ $gcc = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.
 New-Item -ItemType Directory -Force -Path "$root\build\test" | Out-Null
 & $gcc -O2 -Wall -Wextra -Werror -o "$root\build\test\test_cvs2_select.exe" "$root\tools\test_cvs2_select.c" "$root\src\cvs2_select.c" "$root\src\text_channel.c" `
     "$root\src\selection_channel.c" "$root\src\game_selection.c" "$root\src\game_session.c" `
-    "$root\src\cvs2_frame.c" "$root\src\match_audio.c"
+    "$root\src\cvs2_frame.c" "$root\src\match_audio.c" "$root\src\transition_channel.c"
 if ($LASTEXITCODE -ne 0) { throw 'CVS2 test build failed' }
 Push-Location $root
 try {

@@ -126,12 +126,44 @@ replay suite now exercises `cvs2_frame_decode` against real captures (KO
 sentinel, stance ladder, pan, clock, win-quote exit). Live listening is
 pending.
 
-## Transitions and remaining shared work
+## Transitions: implemented shared announcer
 
-The following shared work is NOT yet claimed complete:
+`src/transition_channel.{h,c}` owns match introductions and active-fighter
+change announcements, formerly private to `cvs2_announce_observe`. CVS2 uses
+it in the DLL build. Worker only; output through `tc_say`.
 
-- Extracting CVS2's match/team/active-fighter presentation into reusable
-  transition formatting and acceptance handling, with explicit player ownership.
+Adapter responsibilities:
+
+1. Keep one zero-initialised `transition_channel`. Call
+   `transition_channel_begin` on a new presentation owner and
+   `transition_channel_depart` on departure. Offer only in the title's
+   in-match phase; latches survive between matches of one owner.
+2. Fill a `transition_observation` with copied labels: up to 4 sides, each
+   with its 1-based player number, ownership, optional style label, team of up
+   to `TRANSITION_TEAM_MAX` (4) members with ids, names and displayed
+   ratio/level (0 = none), and the current active fighter. Set `team_ready`
+   only when every present side's team and style are complete.
+3. Supply ownership only with evidence. `UNKNOWN` speaks "Player N";
+   `LOCAL`/`OPPONENT` speak "You"/"Opponent". Team rules (sizes, ratio
+   budgets, style tables) and native IDs stay in the adapter.
+
+Policy: one grouped introduction per team composition, then grouped changes
+of the active fighter with their ratio. Fighters on screen at the
+introduction are not repeated. No queue: each offer recomputes from the
+latest observation, so a newer transition supersedes a refused one.
+
+Deliberate corrections relative to the previous CVS2 code, pinned by tests:
+nothing is latched until `tc_say` accepts it (the fighter-change path used to
+latch first, losing a refused line); the introduction is keyed on the team
+composition, so the next Arcade opponent's team is introduced; CVS2 says
+"You/Opponent" only when its joined-player mask `0x1FFEC` has exactly one bit
+(every Arcade capture: 0x1) and "Player 1/Player 2" otherwise (every Training
+capture: 0x0, or two joined humans). Tests: `run_transition_test.ps1` and
+`python tools\sabotage_transition.py` (4 sabotages, each caught), plus CVS2
+replay cases for refusal retry and ownership. Live listening is pending.
+
+## Remaining shared work
+
 - Four-player/arena spatial audio and perceptual acceptance for Power Stone 2.
 - A collection-wide runtime adapter router and ownership policy for asynchronous
   text/audio sources. The selection channel is a worker-side component, not

@@ -767,6 +767,52 @@ int main(void)
         before=calls;
         cvs2_announce_observe(ryu,sizeof ryu,0x17000000ULL);
         assert(calls==before);
+
+        /* ⭐ CORRECTION: a REFUSED fighter change is retried, not lost. The
+         * old path latched the fighter before speech was accepted. */
+        cvs2_announce_observe(NULL,0,0);
+        cvs2_announce_observe(m1,sizeof m1,0x30000000ULL);   /* intro */
+        speech_accepts=0; before=calls;
+        cvs2_announce_observe(m2,sizeof m2,0x30000000ULL);   /* refused */
+        assert(calls==before+1);
+        speech_accepts=1;
+        cvs2_announce_observe(m2,sizeof m2,0x30000000ULL);   /* retried */
+        assert(calls==before+2 && wcsstr(last,L"Ken")!=NULL);
+        assert(wcsstr(last,L"Groove")==NULL);
+        cvs2_announce_observe(m2,sizeof m2,0x30000000ULL);
+        assert(calls==before+2);                             /* then done */
+
+        /* A refused INTRODUCTION is retried too, and stays the intro. */
+        cvs2_announce_observe(NULL,0,0);
+        speech_accepts=0; before=calls;
+        cvs2_announce_observe(m1,sizeof m1,0x31000000ULL);
+        speech_accepts=1;
+        cvs2_announce_observe(m1,sizeof m1,0x31000000ULL);
+        assert(calls==before+2 && wcsstr(last,L"C Groove")!=NULL);
+
+        /* ⭐ OWNERSHIP: Arcade's joined mask names P1 as the player... */
+        {
+            transition_observation o;
+            static BYTE tr[CVS2_STATE_SIZE];
+            cvs2_announce_observation(m1,&o);
+            assert(o.side[0].ownership==TRANSITION_OWNER_LOCAL);
+            assert(o.side[1].ownership==TRANSITION_OWNER_OPPONENT);
+            assert(o.team_ready && o.side[0].count==3 && o.side[1].count==2);
+            assert(o.side[0].member[2].ratio==2);          /* 1/1/2 budget */
+            /* ...but Training's mask is 0: nobody is named "You". */
+            load("crouch-01",tr);
+            cvs2_announce_observation(tr,&o);
+            assert(o.side[0].ownership==TRANSITION_OWNER_UNKNOWN);
+            assert(o.side[1].ownership==TRANSITION_OWNER_UNKNOWN);
+            cvs2_announce_observe(NULL,0,0);
+            cvs2_announce_observe(tr,sizeof tr,0x32000000ULL);
+            /* 1v1, so the stored 1/1/1 is not a 4-point budget: no ratios. */
+            assert(!wcscmp(last,L"Player 1: C Groove, Ryu. Player 2: C Groove, Kyo"));
+            /* Two joined humans also identify nobody. */
+            tr[0x1ffec]=3;
+            cvs2_announce_observation(tr,&o);
+            assert(o.side[0].ownership==TRANSITION_OWNER_UNKNOWN);
+        }
     }
 
     /* ROM changes at a reused root must rearm the common presentation owner. */

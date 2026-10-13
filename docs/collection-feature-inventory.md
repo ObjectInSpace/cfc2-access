@@ -34,8 +34,10 @@ are separate statuses. A compiled reader is not automatically a validated port.
   `cvs2_announce_observe` announces teams/grooves and changed fighters/ratios.
   Adapt to the title's team/order/switch system and speak during safe
   transitions. Current “You/Opponent” wording assumes P1; determine actual
-  local ownership for P2, multiplayer and spectators. Audit retry behavior:
-  the fighter-change path currently updates its latch before speech acceptance.
+  local ownership for P2, multiplayer and spectators. Update 2026-10-13:
+  policy is now shared in `transition_channel`; latches advance only on
+  speech acceptance, and CVS2 speaks "Player 1/2" unless its joined-player
+  mask names exactly one local side. Live listening pending.
 - F07 — Health sonification, two owners, current and maximum values. CVS2's
   frame hook feeds health changes, with worker-side gauge handling as well.
   Preserve audible health/range behavior, resets and HUD ownership. New games
