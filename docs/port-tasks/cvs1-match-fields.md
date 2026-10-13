@@ -22,7 +22,7 @@ Actor = R + 0x3FB8 + side*0x700, where R is the root published at `0x1422D2B90`.
   - All ten in-match snapshots match it; character select reads 02 01 01 06 06.
 - **Frame timing: the hook is on update `0x1405A65F0`.** Wrapper `0x1405A5C60` calls it once per frame, and setup publishes its root.
 
-## Derived, pending listening
+## Derived, confirmed by listening 2026-10-13 (pan, airborne pitch, pause)
 
 - **Beacon pan.** CVS2's camera approximation, which tracks the midpoint clamped at the stage edges, applied with CVS2's screen half-width of 192. The world geometry matches CVS2 exactly; the screen width is the assumption a listening check confirms.
 - **Airborne pitch** scales with height. Standing otherwise.
