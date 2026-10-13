@@ -21,6 +21,7 @@ static SIZE_T test_query(LPCVOID p, PMEMORY_BASIC_INFORMATION m, SIZE_T n)
 }
 #define GetSystemInfo test_system_info
 #define VirtualQuery test_query
+#define GMD_HINT_FILE ""   /* never read or write a hint file here */
 #include "../src/gmd_find.c"
 #undef GetSystemInfo
 #undef VirtualQuery
@@ -154,6 +155,40 @@ int main(void)
     CHECK(skip_strings(spanish, 29) == spanish + 29 * 8192);
     spanish[8191] = 'x';
     CHECK(skip_strings(spanish, 29) == NULL);
+    /* A REMEMBERED table address (cfc2_text_hint.txt in the DLL) is tried
+     * first: it resolves in a handful of polls instead of a full scan. */
+    {
+        unsigned n = 0;
+        gmd_test_set_expected_language("eng");
+        gmd_text_invalidate();
+        /* Invalidation re-initialises discovery, which reloads the address
+         * from the hint file (disabled here), so set it after that. */
+        CHECK(!poll_ready());
+        g_discovery.candidate = NULL;
+        g_discovery.remembered = (uintptr_t)table;
+        g_discovery.cursor = g_discovery.minimum;       /* the scan starts over */
+        g_discovery.scanned = 0;
+        CHECK(!poll_ready());
+        /* Taken on the FIRST poll, before any scan step; the remaining polls
+         * are the language-offset walk (this fixture's English sits outside
+         * the hint list; the live game's 0xD0000 is fourth in it). */
+        CHECK(g_discovery.candidate == table && g_discovery.from_hint);
+        CHECK(g_discovery.scanned == 0 || g_discovery.cursor == g_discovery.minimum);
+        while (n < 400 && !poll_ready()) ++n;
+        printf("remembered address resolved after %u more polls\n", n);
+        CHECK(g_text_blob == table + 0x1b0000 && g_discovery.from_hint);
+        /* A stale address (nothing valid there) never earns trust: the scan
+         * still finds the table. */
+        gmd_text_invalidate();
+        CHECK(!poll_ready());
+        g_discovery.candidate = NULL;
+        g_discovery.remembered = (uintptr_t)(test_base + 0x1000);
+        g_discovery.from_hint = FALSE;
+        g_discovery.cursor = g_discovery.minimum;
+        CHECK(resolve());
+        CHECK(g_text_blob == table + 0x1b0000 && !g_discovery.from_hint);
+        g_discovery.remembered = 0;
+    }
     CHECK(max_queries <= 16);
     printf("discovery: %d checks, %d failures, first resolution %u polls, "
            "max %u scanner queries/poll, max %.3f ms/poll (observed)\n",

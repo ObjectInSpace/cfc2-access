@@ -1100,6 +1100,8 @@ typedef struct {
     ULONGLONG retry_at;
     ULONGLONG started;        /* diagnostics: time and bytes to resolution */
     unsigned long long scanned;
+    uintptr_t remembered;     /* last resolved table address, from the hint file */
+    BOOL from_hint;
 } text_discovery;
 static text_discovery g_discovery;
 
@@ -1124,6 +1126,53 @@ static void discovery_clear_region(void)
     memset(&g_discovery.hits, 0, sizeof(g_discovery.hits));
 }
 
+/* ⭐ REMEMBER WHERE THE TABLE WAS. A full scan takes ~30 s (1.3 GB), and the
+ * main menu speaks positions only until it finishes -- the first menu of
+ * every session was nameless (user-reported 2026-10-13). The live table sat
+ * at the same address in consecutive runs (0x3B7E00A0), so the last resolved
+ * address is kept in cfc2_text_hint.txt beside the exe and tried first, on
+ * every poll, until the table is built there. A remembered address earns no
+ * trust: it must pass the same index-0 label-chain check as a scan
+ * candidate, through the same guarded reads, and the scan runs alongside. */
+#ifndef GMD_HINT_FILE
+#define GMD_HINT_FILE "cfc2_text_hint.txt"   /* "" disables (offline tests) */
+#endif
+static void hint_path(char *out, DWORD cap)
+{
+    DWORD n = GMD_HINT_FILE[0] ? GetModuleFileNameA(NULL, out, cap) : 0;
+    char *slash;
+    out[0] = n && n < cap ? out[0] : 0;
+    if (!out[0] || !(slash = strrchr(out, 0x5C))) { out[0] = 0; return; }
+    _snprintf(slash + 1, cap - (DWORD)(slash + 1 - out), "%s", GMD_HINT_FILE);
+    out[cap - 1] = 0;
+}
+
+static uintptr_t hint_load(void)
+{
+    char path[MAX_PATH];
+    unsigned long long v = 0;
+    FILE *f;
+    hint_path(path, MAX_PATH);
+    if (!path[0] || !(f = fopen(path, "r"))) return 0;
+    if (fscanf(f, "%llx", &v) != 1) v = 0;
+    fclose(f);
+    return (uintptr_t)v;
+}
+
+static void hint_save(uintptr_t address)
+{
+    char path[MAX_PATH];
+    FILE *f;
+    if (address == g_discovery.remembered) return;
+    hint_path(path, MAX_PATH);
+    if (!path[0] || !(f = fopen(path, "w"))) {
+        log_line("gmdtext: ⚠ could not save the table address hint");
+        return;
+    }
+    fprintf(f, "%llx\n", (unsigned long long)address);
+    fclose(f);
+}
+
 static void discovery_init(void)
 {
     SYSTEM_INFO si;
@@ -1143,6 +1192,7 @@ static void discovery_init(void)
     filter_init();
     crc_init();
     g_discovery.started = GetTickCount64();
+    g_discovery.remembered = hint_load();
     g_discovery.initialized = TRUE;
 }
 
@@ -1266,6 +1316,16 @@ BOOL gmd_text_ready(void)
     if (g_text_blob) return TRUE;
     if (!mem_guard_install()) return FALSE;
     if (!d->initialized) discovery_init();
+    /* The remembered address first, every poll, ahead of the scan's backoff:
+     * one 0x20-byte guarded copy and one guarded label read. */
+    if (!d->candidate && d->remembered &&
+        discovery_label_valid((BYTE *)d->remembered)) {
+        d->candidate = (BYTE *)d->remembered;
+        d->from_hint = TRUE;
+        d->hint = 0;
+        d->first_delta = 0;
+        d->expected[0] = '\0';
+    }
     if (GetTickCount64() < d->retry_at) return FALSE;
     if (!d->candidate) { discovery_scan_step(); return FALSE; }
     if (!discovery_label_valid(d->candidate)) {
@@ -1301,11 +1361,13 @@ BOOL gmd_text_ready(void)
     g_text_blob = d->candidate + selected;
     g_text_count = GMD_LABEL_COUNT;
     text_index_free();
+    hint_save((uintptr_t)d->candidate);
     d->candidate = NULL;
     log_line("gmdtext: blob resolved incrementally at delta 0x%llx, language %s, "
-             "%.1f s after discovery began, %llu MB scanned",
+             "%.1f s after discovery began, %llu MB scanned%s",
              (unsigned long long)selected, gmd_text_language(),
-             (double)(GetTickCount64() - d->started) / 1000.0, d->scanned >> 20);
+             (double)(GetTickCount64() - d->started) / 1000.0, d->scanned >> 20,
+             d->from_hint ? ", found at the remembered address" : "");
     return TRUE;
 }
 
