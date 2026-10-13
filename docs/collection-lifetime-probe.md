@@ -2,8 +2,8 @@
 
 Prepared 2026-10-12 after the independent static audit in `6ca5e51`.
 This is diagnostic instrumentation, not a native selection producer or a
-lifetime guard. Actual game wait outcomes and Training transition acceptance
-remain unobserved until a labelled capture is collected.
+lifetime guard. The 2026-10-13 capture below records Change Character and actual
+batch wait outcomes. Training reset and complete lifetime coverage remain open.
 
 ## Instrumentation and limits
 
@@ -133,3 +133,52 @@ evidence. Do not manufacture the S+0x840==0 branch by modifying game memory.
 Arcade, Versus, shutdown, signal outcomes, complete callback descendants and
 overhead measurements remain separate work. The conditional 4096 counterexample
 is not promoted to an active game failure by any of these diagnostics.
+
+## Live Free Play Change Character capture, 2026-10-13
+
+The user confirmed CVS2 Training in Free Play, using Pause > Change Character,
+and returning to stage selection. Reported selection order: stage, groove,
+character. Coin/reset was skipped; no Training reset was exercised. Speech or
+control issues were not explicitly reported. PID 25264 used the staged DLL.
+The log records capture start 11:35:13.825, Change Character speech 11:36:32.585,
+stage speech 11:36:34.211, and capture end 11:37:13.819.
+
+Retained [live evidence](../tools/fixtures/collection-lifetime-training-change-character-20261013.json.gz)
+contains the original CSV, copied log, user provenance, hashes and full report.
+Artifact SHA256: `ec4efb4e3632d12e6bc846921c23c00734cf565c63bc78159f4216481ec72175`.
+CSV SHA256: `02b09966484d12b8a8f8c4ca1456fc307b09b04097897b31e0e2d9983c53319c`.
+The footer reports **11,225 dropped records**. There are 311,693 retained events,
+150,585 candidate pairs, 4,109 unmatched entries and 6,414 unmatched exits.
+All records are readable, but `pairing_reliable=false` and `lifetime_proven=false`.
+There is no global loss-free ordering claim.
+
+Thread 14208 application invocation 24189 contains these matched boundaries:
+
+| Boundary | Entry sequence | Exit sequence |
+| --- | --- | --- |
+| Application update | 181132 | 181190 |
+| Pause update, invocation 24190 | 181135 | 181140 |
+| Game cleanup | 181136 | 181137 |
+| Initialization, invocation 24191, caller `0x1400a6c45` | 181138 | 181139 |
+
+Initialization changes root `0x176c1000` to `0x13ac1000`, with game=1, ROM=3,
+Training=1 and bytes=136880. Cleanup return still reports the former root;
+that pointer value does not establish continued allocation validity. Reset-state
+changes 0 to 2 across initialization; character gate remains 1. These are
+reinitialization observations, not a reset-button exercise or atomic snapshot.
+
+After pause return, five matched batch joins in that application invocation
+(24192 through 24196) return raw 0: sequence pairs 181142/181149,
+181158/181159, 181168/181169, 181172/181179 and 181180/181189. Each waits for all
+four copied handles [3436, 3440, 3468, 3472] with infinite timeout at reviewed
+return site `0x1401f80ad`, before application return. These are actual successful
+API returns, not proof of every task descendant's completion or allocation lifetime.
+
+Across the window, 105,772 matched batch wakes and 27,408 matched batch joins
+all return raw 0 (signaled). No matched failed, timeout, abandoned, generic-wake
+or retirement outcomes occur in retained pairs. Loss and unobserved paths
+prohibit extrapolating to all waits. Worker application IDs remain zero and are
+not assigned to application calls by timing. There are no Training-reset pairs.
+Arena-mutating callback descendants and signal outcomes remain open. The
+conditional 4096 bypass was not observed. The lifetime marker was removed after
+capture completion; no restart is needed for this retained evidence.

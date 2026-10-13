@@ -477,3 +477,13 @@ retained in the offline validation fixture linked from the run card. On
 the lifetime marker enabled while the game was closed. The user was notified
 to launch for the first labelled Training exercise; no live outcome is yet
 claimed.
+
+The 2026-10-13 live Free Play Training Change Character exercise is retained in
+[lifetime run card](../collection-lifetime-probe.md#live-free-play-change-character-capture-2026-10-13). The user returned to stage select (then groove, then character).
+Application invocation 24189 retains cleanup, initialization (root changes),
+pause return, five successful wait-all batch joins and application return.
+The window retains 105,772 successful batch-wake pairs and 27,408 successful
+batch-join pairs. Its 11,225 dropped records make global pairing unreliable.
+Reset was skipped; generic/retirement wait outcomes, signal outcomes, complete
+arena-mutating callback descendants and lifetime proof remain open. The
+probe marker is removed. The 4096 bypass remains conditional, not observed.
