@@ -24,10 +24,17 @@ silent on pause. Field evidence: [cvs1-match-fields.md](cvs1-match-fields.md).
 5. Exit to the menus: every tone stops.
 6. F5 and F7 still change the health and beacon volumes.
 
+## Added after the Arcade capture (listening pending)
+
+- A power-gauge tone as the gauge builds and when a super spends it, on the
+  owner's side.
+- Clock ticks at 30, 15 and the last five seconds, when the clock counts
+  down (Arcade).
+- No tone sweep at the start of a new round.
+
 ## Not expected yet
 
-No power-gauge tone, no clock ticks, and no pitch change when crouching or
-knocked down. Those fields are not decoded yet.
+No pitch change when crouching or knocked down; those are not decoded yet.
 
 The CVS1 log lines to look for in `CFC2Access.log`: `cvs1-frame: hooked`
 at start-up, and periodic `cvs1-frame: N frames (60/s), ... health-change(s)`

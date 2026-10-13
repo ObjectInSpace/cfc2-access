@@ -75,7 +75,9 @@ pitch. They run through the shared match-audio controller:
 CVS1's audio epoch. Fields and their code evidence are in
 [cvs1-match-fields.md](cvs1-match-fields.md). The replay test is
 `run_cvs1_frame_test.ps1`, over the ten labelled snapshots. Not sounded yet:
-power gauge, crouch and knockdown, round clock. Live listening is pending.
+crouch and knockdown. The user confirmed health, position, jump pitch and
+pause. Power gauge (F08) and clock warnings (F11) were added later from the
+Arcade capture, with listening pending.
 
 ## Earlier status update
 

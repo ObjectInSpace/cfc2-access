@@ -9,8 +9,11 @@
  *   +0x200 maximum health (0x1405B8224 resets health to 3/10 of it)
  *   +0xB4  X, +0xB8 height, signed 16.16 (motion routine 0x1405EA130)
  *
- * Not decoded, so not sounded: the power gauge, crouch and knockdown, and the
- * round clock. Unknown stance is treated as standing, never guessed.
+ *   +0x2D1 power gauge, cap 144 or 100 by groove flag +0x2C1
+ *   P+0x6C round clock (P = R + 0x3E58)
+ *
+ * Not decoded, so not sounded: crouch and knockdown. Unknown stance is
+ * treated as standing, never guessed.
  */
 #ifndef CFC2_CVS1_FRAME_H
 #define CFC2_CVS1_FRAME_H

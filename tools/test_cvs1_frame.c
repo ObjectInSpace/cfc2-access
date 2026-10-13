@@ -18,7 +18,8 @@ MH_STATUS WINAPI MH_DisableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
 #define P_SIZE 0x112u
 #define A_OFF 0x3FB8u
 #define A_SIZE 0xE00u
-static unsigned char *snap[10];
+#define RECORDS 13          /* 10 labelled Training snapshots + 3 Arcade moments */
+static unsigned char *snap[RECORDS];
 
 static void load(void)
 {
@@ -26,8 +27,8 @@ static void load(void)
     unsigned char magic[4];
     unsigned count;
     assert(f && fread(magic, 1, 4, f) == 4 && !memcmp(magic, "CV1F", 4));
-    assert(fread(&count, 4, 1, f) == 1 && count == 10);
-    for (unsigned i = 0; i < 10; i++) {
+    assert(fread(&count, 4, 1, f) == 1 && count == RECORDS);
+    for (unsigned i = 0; i < RECORDS; i++) {
         snap[i] = calloc(1, 0x32AB0);
         assert(snap[i]);
         assert(fread(snap[i] + P_OFF, 1, P_SIZE, f) == P_SIZE);
@@ -54,8 +55,12 @@ int main(void)
         assert(m.owner[p].beacon_valid && m.owner[p].stance == AUDIO_STANCE_STAND);
     }
     assert(m.owner[0].screen_pan < 0.0f && m.owner[1].screen_pan > 0.0f);
-    assert(!m.clock_valid);                      /* not traced: no fabricated timer */
-    assert(!m.owner[0].resource.valid);          /* power gauge not traced */
+    /* Training starts the gauge full: 144 of a 144 cap (groove flag 0), and
+     * its clock is frozen at 99. */
+    for (int p = 0; p < 2; p++)
+        assert(m.owner[p].resource.valid && m.owner[p].resource.value == 144 &&
+               m.owner[p].resource.maximum == 144);
+    assert(m.clock_valid && m.clock == 99);
 
     /* 2. P1 damaged to 4320; P2 untouched. */
     cvs1_frame_decode(snap[1], &m);
@@ -80,6 +85,34 @@ int main(void)
     cvs1_frame_decode(snap[8], &m);
     assert(m.owner[0].screen_pan >= 0.99f);
 
+    /* 7. Right after the super: P1's gauge spent to 2, P2's still full. */
+    cvs1_frame_decode(snap[6], &m);
+    assert(m.owner[0].resource.valid && m.owner[0].resource.value == 2);
+    assert(m.owner[1].resource.value == 144);
+
+    /* Arcade: 64 before the super, 16 after (one level of 48), and the
+     * round-intro sample where the gauge blips to 0 is NOT live: gauges are
+     * invalid there, so no tone sweeps at a round start. */
+    cvs1_frame_decode(snap[10], &m);
+    assert(m.owner[0].resource.valid && m.owner[0].resource.value == 64 &&
+           m.owner[0].resource.maximum == 144);
+    cvs1_frame_decode(snap[11], &m);
+    assert(m.owner[0].resource.valid && m.owner[0].resource.value == 16);
+    cvs1_frame_decode(snap[12], &m);
+    assert(m.in_match && !m.owner[0].resource.valid && !m.owner[0].health.valid);
+    assert(m.clock_valid);
+
+    /* The other groove's ceiling is 100. */
+    {
+        unsigned char *s = snap[11];
+        s[A_OFF + 0x2C1] = 1;
+        cvs1_frame_decode(s, &m);
+        assert(m.owner[0].resource.valid && m.owner[0].resource.maximum == 100);
+        s[A_OFF + 0x2D1] = 101;
+        cvs1_frame_decode(s, &m);
+        assert(!m.owner[0].resource.valid);   /* over the cap: no wrong fill */
+    }
+
     /* 10. Paused: still the match phase. Pause is detected over time by the
      *     shared controller, not by phase. */
     cvs1_frame_decode(snap[9], &m);
@@ -101,7 +134,7 @@ int main(void)
         assert(!m.in_match && !m.owner[0].present);
     }
 
-    printf("PASS: 10 labelled CVS1 snapshots -- health/max, KO sentinel, position pan, "
-           "airborne pitch, untraced stances standing, match gate\n");
+    printf("PASS: 10 labelled CVS1 snapshots + 3 Arcade moments -- health/max, gauge and "
+           "groove caps, clock, live-round gate, KO sentinel, pan, airborne pitch, match gate\n");
     return 0;
 }

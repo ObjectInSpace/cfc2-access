@@ -20,6 +20,16 @@ static const unsigned char FRAME_SIG[] = { 0x48,0x83,0xEC,0x28, 0xE8,0x77,0x05,0
 #define OFF_MAXHP  0x200u
 #define OFF_POSX   0xB4u
 #define OFF_POSY   0xB8u
+/* Power gauge, actor+0x2D1, u8. Gain paths clamp it at 0x90 when groove flag
+ * actor+0x2C1 is 0 and at 0x64 otherwise (0x1405B7F3B..0x1405B7F78); level
+ * checks compare 0x30/0x60/0x90. Arcade capture: +1 per hit, +4..6 per
+ * special, -48 for a super. */
+#define OFF_METER  0x2D1u
+#define OFF_GROOVE 0x2C1u
+/* Round clock, P+0x6C, signed 16-bit: set at round start from the time table
+ * 0x141217D78 (30/60/99) indexed by P+0x43 (0x1405B1546, 0x1405B2B68); the
+ * Arcade trace counts it down one per ~0.8 s and resets it to 99 per round. */
+#define OFF_CLOCK  0x6Cu
 /* Same world geometry as CVS2, measured, not assumed: fighters start at
  * exactly -100/+100 and the walls are at -352/+352 (snapshots 1, 8, 9 of
  * tools/fixtures/cvs1-match-20261013). The screen half-width is CVS2's; the
@@ -33,7 +43,8 @@ static pfn_frame g_real_frame;
 static volatile LONG g_frames, g_changes, g_installed, g_pauses;
 static int g_last_hp[2] = { -1, -1 };
 static match_audio_producer g_prod = {
-    .feeds = MATCH_AUDIO_FEED_HEALTH | MATCH_AUDIO_FEED_BEACON
+    .feeds = MATCH_AUDIO_FEED_HEALTH | MATCH_AUDIO_FEED_RESOURCE |
+             MATCH_AUDIO_FEED_BEACON | MATCH_AUDIO_FEED_CLOCK
 };
 
 static int i32(const unsigned char *s, unsigned off) { int v; memcpy(&v, s + off, 4); return v; }
@@ -43,12 +54,18 @@ void cvs1_frame_decode(const unsigned char *s, match_audio_sample *m)
 {
     float x[2], mid, cam, lim = STAGE_HALF - SCREEN_HALF;
     unsigned p;
+    bool live;
 
     memset(m, 0, sizeof *m);
     /* In a match: phase 02 01 02 02, as CVS2. Every in-match snapshot has it;
      * the select screen reads 02 01 01 06. Guard on the state, not values. */
     if (memcmp(s + PHASE_OFF, "\x02\x01\x02\x02", 4) != 0) return;
     m->in_match = true;
+    /* Phase byte 4: 4 intro, 5 fighting, 6 round over, 7 transition (Arcade
+     * trace). Health refills and the gauge blips to 0 outside 5/6, so the
+     * gauges are only valid while the round is live: outside it they reset
+     * silently and reseed, instead of sweeping a tone at every round start. */
+    live = s[PHASE_OFF + 4] == 5 || s[PHASE_OFF + 4] == 6;
 
     /* Pause: positions plus the animation counters +0x162/+0x164/+0x168,
      * which change in about half of all 20 Hz samples during play. */
@@ -68,10 +85,21 @@ void cvs1_frame_decode(const unsigned char *s, match_audio_sample *m)
         match_audio_owner *o = &m->owner[p];
         o->present = true;
         /* 0x1405B4E3B writes -1 here: a sentinel, never a value. */
-        o->health.valid = mx > 0 && hp >= 0 && hp <= mx;
+        o->health.valid = live && mx > 0 && hp >= 0 && hp <= mx;
         o->health.value = hp;
         o->health.maximum = mx;
         x[p] = (float)i32(s, a + OFF_POSX) / 65536.0f;
+        {
+            int cap = s[a + OFF_GROOVE] ? 0x64 : 0x90, meter = s[a + OFF_METER];
+            o->resource.valid = live && meter <= cap;
+            o->resource.value = meter;
+            o->resource.maximum = cap;
+        }
+    }
+    {
+        int clock = i16(s, PHASE_OFF + OFF_CLOCK);
+        m->clock_valid = clock >= 0 && clock <= 99;
+        m->clock = clock;
     }
 
     mid = (x[0] + x[1]) * 0.5f;

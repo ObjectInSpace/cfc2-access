@@ -48,6 +48,35 @@ IN_MATCH_PLAN = [
 ]
 
 
+# ---- the mod's own hooks -----------------------------------------------------
+
+# Entry points CFC2 Access itself detours with MinHook (a 5-byte jmp rel32),
+# with the reviewed original bytes. Signature checks see through exactly these
+# patches and nothing else: any other difference still refuses.
+OWN_HOOKS = {
+    0x1406AA7A0: bytes.fromhex('48895c2408'),   # cvs2_frame.c
+    0x1405A65F0: bytes.fromhex('4883ec28e8'),   # cvs1_frame.c
+}
+
+
+def unhooked(read):
+    """A read that shows the reviewed bytes at the mod's own hook sites, only
+    where those sites currently hold a jmp rel32 (MinHook's patch)."""
+    def view(address, size):
+        raw = bytearray(read(address, size))
+        for site, original in OWN_HOOKS.items():
+            if site + 5 <= address or site >= address + size:
+                continue
+            patch = read(site, 5)
+            if patch[0] != 0xE9 or patch == original:
+                continue
+            for i in range(5):
+                if address <= site + i < address + size:
+                    raw[site + i - address] = original[i]
+        return bytes(raw)
+    return view
+
+
 # ---- identity ---------------------------------------------------------------
 
 def game_paths(lifecycle):
@@ -425,10 +454,10 @@ def main():
     say = speaker(args.game_dir)
     cap = None
     try:
-        checked = metadata.verify_build(reader.read, lifecycle)
+        checked = metadata.verify_build(unhooked(reader.read), lifecycle)
         if args.game == 'cvs1':
             import cvs1_selection_capture as selection
-            checked += selection.verify(reader.read, lifecycle,
+            checked += selection.verify(unhooked(reader.read), lifecycle,
                                         json.loads(selection.ACQUISITION.read_bytes()))
         cap = Capture(reader.read, lifecycle, args.game, args.out,
                       window_grabber(args.pid) if args.screenshots else None,

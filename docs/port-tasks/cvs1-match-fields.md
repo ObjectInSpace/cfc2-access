@@ -20,6 +20,14 @@ Actor = R + 0x3FB8 + side*0x700, where R is the root published at `0x1422D2B90`.
   - Snapshots: X is exactly -100.0 and +100.0 at round start, and about -352 and +352 in the corners, CVS2's stage geometry. Height read 67.8 mid-jump and 0 in every other snapshot.
 - **Match gate: phase R+0x3E58 starting 02 01 02 02.**
   - All ten in-match snapshots match it; character select reads 02 01 01 06 06.
+- **Power gauge, actor+0x2D1, u8.**
+  - Code: gain paths at `0x1405B7F3B..0x1405B7F78` clamp it at 0x90 (144) when groove flag actor+0x2C1 is 0, and at 0x64 (100) otherwise. Level checks compare it against 0x30, 0x60 and 0x90.
+  - Arcade trace (`tools/fixtures/cvs1-arcade-20261013`): +1 per hit, +4..6 per special move, and -48 for one super, 64 to 16.
+  - Training: it starts full at 144, which is why snapshots 1 to 6 looked identical.
+- **Round clock, P+0x6C, signed 16-bit.**
+  - Code: set at round start from the time table `0x141217D78` (30, 60, 99, 99), indexed by P+0x43 (`0x1405B1546`, `0x1405B2B68`).
+  - Arcade trace: it counts down one step about every 0.8 s while fighting and is set to 99 per round. The decrement instruction itself was not located.
+- **Live round: phase byte 4.** It reads 4 at the intro, 5 while fighting, 6 once the round is over, and 7 in transition (Arcade trace). Health and gauge are fed only in 5 and 6. Outside those, health refills and the gauge blips to 0, and those changes must not sound.
 - **Frame timing: the hook is on update `0x1405A65F0`.** Wrapper `0x1405A5C60` calls it once per frame, and setup publishes its root.
 
 ## Derived, confirmed by listening 2026-10-13 (pan, airborne pitch, pause)
@@ -30,6 +38,4 @@ Actor = R + 0x3FB8 + side*0x700, where R is the root published at `0x1422D2B90`.
 
 ## Not decoded, so not sounded
 
-- **Power gauge.** No field cleanly separated snapshot 6 (full) from 7 (spent). It needs code tracing or a capture outside Training.
 - **Crouch and knockdown.** actor+0x170 read 0, 1, 20 and 22 for stand, crouch, jump and down, one sample each. Very few instructions touch it and none writes those constants, so it is not used. The beacon stays at standing pitch.
-- **Round clock.** It doesn't count down in Training. It needs an Arcade capture.
