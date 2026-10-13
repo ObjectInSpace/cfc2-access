@@ -458,3 +458,22 @@ return values. The native trace now specifies five exact result sites and the
 bounded correlation/loss requirements for a future diagnostic. No diagnostic
 extension, runtime deployment or fresh live transition is claimed. The 4096
 case remains conditional, not an observed game failure.
+
+The next continuation adds a separately opted-in, schema-3 diagnostic for the
+five reviewed wait callers plus application, Training callback, initialization
+and pause-update pairs. It reuses the existing bounded probe ring and file
+writer and does not feed the session/presenter. See the
+[lifetime run card](../collection-lifetime-probe.md). Whole-body guards, exact
+API forwarding, raw DWORD results, last-error preservation, owned handle copies,
+invocation matching and loss controls are tested. A compiler-eliminated guard
+arming store was reproduced in its synthetic unreadable-memory test and fixed
+with volatile TLS plus compiler barriers. This is not a live-game failure.
+The native manifest now has 87 spans; all 121 collection Python tests pass.
+Actual Training/reset and wait outcomes still require the labelled exercise.
+All 35 native runners subsequently passed with individually checked exit codes;
+the DLL build/import checks passed. Logs and the synthetic CSV/report are
+retained in the offline validation fixture linked from the run card. On
+2026-10-13 the verified DLL was staged with a verified prior-DLL backup and
+the lifetime marker enabled while the game was closed. The user was notified
+to launch for the first labelled Training exercise; no live outcome is yet
+claimed.

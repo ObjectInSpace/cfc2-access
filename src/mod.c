@@ -1705,8 +1705,10 @@ static DWORD WINAPI worker(LPVOID param)
     if (unpacked) cvs2_hit_install();
     if (unpacked && hook_enabled) cvs2_story_install();
     if (unpacked && hook_enabled) cvs2_text_install();
-    if (unpacked && hook_enabled && opt_in_file_present("cfc2_collection_probe.on"))
-        collection_probe_install();
+    if (unpacked && hook_enabled) {
+        if (opt_in_file_present("cfc2_lifetime_probe.on")) collection_probe_install_lifetime();
+        else if (opt_in_file_present("cfc2_collection_probe.on")) collection_probe_install();
+    }
 
     /* ⭐ The shell registers LAST, so a running game answers the ` key first and the
      * menus are the fallback. Order here IS the priority order, which is why

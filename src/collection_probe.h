@@ -6,5 +6,7 @@
  * honors cfc2_hook.off. No speech/audio or game-state writes. Hooks record
  * bounded events; only the worker writes the capture file. */
 BOOL collection_probe_install(void);
+/* Separate cfc2_lifetime_probe.on opt-in; schema 3, reviewed wait API callers. */
+BOOL collection_probe_install_lifetime(void);
 void collection_probe_tick(void);
 #endif

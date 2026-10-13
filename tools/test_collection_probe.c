@@ -13,8 +13,9 @@ static HANDLE reader_entered, reader_release;
 
 BOOL probe_test_mem_copy(void *destination, const void *source, SIZE_T size)
 {
-    for (unsigned i = 0; i < SITE_COUNT; ++i) {
-        if ((uintptr_t)source != g_sites[i].address || size != g_sites[i].size) continue;
+    for (unsigned i = 0; i < SITE_COUNT + sizeof g_wait_guards / sizeof g_wait_guards[0]; ++i) {
+        const probe_site *site = i < SITE_COUNT ? &g_sites[i] : &g_wait_guards[i-SITE_COUNT];
+        if ((uintptr_t)source != site->address || size != site->size) continue;
         memcpy(destination, fixtures[i], size);
         if ((int)i == corrupt_site) ((unsigned char *)destination)[size-1] ^= 1;
         return TRUE;
@@ -55,6 +56,10 @@ static void reset(void)
     g_sequence = 0;
     g_deadline_ticks = UINT64_MAX;
     g_attempted = FALSE;
+    g_lifetime = FALSE;
+    g_native_sites = LEGACY_SITES;
+    g_call_id = g_application_id = 0;
+    g_resolve_wait_targets = resolve_wait_targets;
     creates = removes = disables = calls = 0;
     fail_create = corrupt_site = -1;
     fail_enable = 0;
@@ -170,13 +175,13 @@ static void test_guard_nesting(void)
 
 static void test_install_refusal_and_rollback(void)
 {
-    for (unsigned i = 0; i < SITE_COUNT; ++i) {
+    for (unsigned i = 0; i < LEGACY_SITES; ++i) {
         reset();
         InterlockedExchange(&g_active, 0);
         corrupt_site = (int)i;
         assert(!collection_probe_install() && creates == 0 && !g_file);
     }
-    for (unsigned i = 0; i < SITE_COUNT; ++i) {
+    for (unsigned i = 0; i < LEGACY_SITES; ++i) {
         reset();
         InterlockedExchange(&g_active, 0);
         fail_create = (int)i;
@@ -186,7 +191,7 @@ static void test_install_refusal_and_rollback(void)
     reset();
     InterlockedExchange(&g_active, 0);
     fail_enable = 1;
-    assert(!collection_probe_install() && !g_file && removes == SITE_COUNT);
+    assert(!collection_probe_install() && !g_file && removes == LEGACY_SITES);
     puts("ok: whole-body changes refuse hooks; partial install rolls back");
 }
 
@@ -247,8 +252,149 @@ static void test_footer_waits_for_in_flight_producer(void)
     puts("ok: completion waits for a producer already inside the capture window");
 }
 
+static DWORD wait_result;
+static const HANDLE *wait_array;
+static DWORD WINAPI fake_single(HANDLE handle, DWORD timeout)
+{
+    assert(handle == (HANDLE)0x456 && timeout == INFINITE);
+    assert(GetLastError() == 123);
+    ++calls;
+    SetLastError(ERROR_INVALID_HANDLE);
+    return wait_result;
+}
+
+static DWORD WINAPI fake_multiple(DWORD count, const HANDLE *handles, BOOL all, DWORD timeout)
+{
+    assert(count == 2 && handles == wait_array && all == TRUE && timeout == INFINITE);
+    assert(GetLastError() == 123);
+    ++calls;
+    /* Prove the diagnostic keeps the entry copy, not a post-call reread. */
+    ((HANDLE *)handles)[0] = (HANDLE)0x999;
+    SetLastError(ERROR_INVALID_HANDLE);
+    return wait_result;
+}
+
+static DWORD WINAPI first_wait_on_thread(void *unused)
+{
+    (void)unused;
+    SetLastError(123);
+    DWORD result = observe_single(0x1401f847f, (HANDLE)0x456, INFINITE);
+    return result == wait_result && GetLastError() == ERROR_INVALID_HANDLE ? 0 : 1;
+}
+
+static void test_wait_forwarding_and_correlation(void)
+{
+    probe_event events[PROBE_BATCH];
+    const DWORD results[] = {WAIT_OBJECT_0, WAIT_FAILED, WAIT_TIMEOUT, WAIT_ABANDONED, 0x87654321};
+    reset();
+    g_lifetime = TRUE;
+    g_real_single = fake_single;
+    g_real_multiple = fake_multiple;
+    g_application_id = 77;
+    for (unsigned i = 0; i < sizeof results / sizeof results[0]; ++i) {
+        wait_result = results[i];
+        SetLastError(123);
+        assert(observe_single(0x1401f7da2, (HANDLE)0x456, INFINITE) == wait_result);
+        assert(GetLastError() == ERROR_INVALID_HANDLE);
+        assert(take_events(events) == 2);
+        assert(events[0].invocation == events[1].invocation && events[0].invocation);
+        assert(events[1].application_invocation == 77 && (DWORD)events[1].result == wait_result);
+        assert(events[1].handles[0] == 0x456 && events[1].last_error == ERROR_INVALID_HANDLE);
+        HANDLE handles[] = {(HANDLE)0x111, (HANDLE)0x222};
+        wait_array = handles;
+        SetLastError(123);
+        assert(observe_multiple(0x1401f80ad, 2, handles, TRUE, INFINITE) == wait_result);
+        assert(GetLastError() == ERROR_INVALID_HANDLE && take_events(events) == 2);
+        assert(events[0].handles_readable && events[1].handles_readable);
+        assert(events[1].handles[0] == 0x111 && events[1].handles[1] == 0x222);
+        assert(events[1].wait_count == 2 && events[1].wait_all == TRUE);
+    }
+    SetLastError(123);
+    assert(observe_single(0x1234, (HANDLE)0x456, INFINITE) == wait_result);
+    assert(GetLastError() == ERROR_INVALID_HANDLE && take_events(events) == 0);
+    HANDLE first = CreateThread(NULL, 0, first_wait_on_thread, NULL, 0, NULL);
+    DWORD code = 1;
+    assert(first && WaitForSingleObject(first, 5000) == WAIT_OBJECT_0);
+    assert(GetExitCodeThread(first, &code) && code == 0);
+    CloseHandle(first);
+    assert(take_events(events) == 2 && events[0].invocation == 1);
+    assert(events[0].application_invocation == 0);
+    probe_event extra = {0};
+    extra.wait_count = 65;
+    copy_wait_handles(&extra, (HANDLE *)1);
+    assert(!extra.handles_readable);
+    extra.wait_count = 2;
+    g_mem_guard_armed = 1;
+    copy_wait_handles(&extra, (HANDLE *)1);
+    assert(!extra.handles_readable && g_mem_guard_armed);
+    g_mem_guard_armed = 0;
+    assert(mem_guard_install());
+    copy_wait_handles(&extra, (HANDLE *)1);
+    assert(!extra.handles_readable && !g_mem_guard_armed);
+    puts("ok: raw wait results, last-error, exact arguments, copied handles and caller filtering");
+}
+
+static void nested_application(void *object)
+{
+    assert(GetLastError() == 123 && g_application_id);
+    observe_one(SITE_TRAINING, object, original_one, 0x1400391f6);
+    SetLastError(777);
+}
+
+static BOOL fake_wait_targets(void)
+{
+    g_targets[SITE_COUNT] = (void *)fake_single;
+    g_targets[SITE_COUNT+1] = (void *)fake_multiple;
+    return TRUE;
+}
+
+static void test_lifetime_install_and_nesting(void)
+{
+    probe_event events[PROBE_BATCH];
+    reset();
+    SetLastError(123);
+    observe_one(SITE_APPLICATION, (void *)123, nested_application, 0x14020bd7a);
+    assert(GetLastError() == 777 && !g_application_id && take_events(events) == 4);
+    assert(events[0].invocation == events[3].invocation);
+    assert(events[1].invocation == events[2].invocation);
+    assert(events[0].invocation != events[1].invocation);
+    for (unsigned i = 0; i < 4; ++i) assert(events[i].application_invocation == events[0].invocation);
+    for (unsigned i = 0; i < SITE_COUNT + sizeof g_wait_guards / sizeof g_wait_guards[0]; ++i) {
+        reset();
+        InterlockedExchange(&g_active, 0);
+        corrupt_site = (int)i;
+        assert(!collection_probe_install_lifetime() && !creates && !g_file);
+    }
+    for (unsigned i = 0; i < HOOK_COUNT; ++i) {
+        reset();
+        InterlockedExchange(&g_active, 0);
+        g_resolve_wait_targets = fake_wait_targets;
+        fail_create = (int)i;
+        assert(!collection_probe_install_lifetime() && !g_file);
+        assert(creates == i+1 && removes == i);
+    }
+    reset();
+    InterlockedExchange(&g_active, 0);
+    g_resolve_wait_targets = fake_wait_targets;
+    assert(collection_probe_install_lifetime() && creates == HOOK_COUNT);
+    SetLastError(123);
+    observe_one(SITE_APPLICATION, (void *)123, nested_application, 0x14020bd7a);
+    g_real_single = fake_single;
+    wait_result = WAIT_FAILED;
+    SetLastError(123);
+    observe_single(0x1401f81b9, (HANDLE)0x456, INFINITE);
+    g_started = GetTickCount64()-120001;
+    g_last_drain = g_started;
+    collection_probe_tick();
+    g_last_drain = GetTickCount64()-251;
+    collection_probe_tick();
+    assert(!g_file);
+    puts("ok: lifetime IDs, enclosing application, all guards and partial-hook rollback");
+}
+
 int main(void)
 {
+    setvbuf(stdout, NULL, _IONBF, 0);
     test_nested_call_forwarding();
     test_quick_load_forwarding();
     test_loss_is_explicit();
@@ -256,5 +402,7 @@ int main(void)
     test_install_refusal_and_rollback();
     test_worker_file_completion();
     test_footer_waits_for_in_flight_producer();
+    test_wait_forwarding_and_correlation();
+    test_lifetime_install_and_nesting();
     return 0;
 }

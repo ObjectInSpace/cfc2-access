@@ -620,6 +620,12 @@
   ],
   "spans": [
     {
+      "label": "pause-update-complete-instruction-body",
+      "start": "0x1400a65e0",
+      "end_exclusive": "0x1400a6ef5",
+      "sha256": "1a8dde186f84aea500f47eb0dc739a8da282954115cb108f28e4b2f6db9ddc50"
+    },
+    {
       "label": "training-statistics-update",
       "start": "0x1400789d0",
       "end_exclusive": "0x140078a50",

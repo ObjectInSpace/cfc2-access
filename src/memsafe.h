@@ -43,7 +43,10 @@ void mem_guard_remove(void);
  * onto another thread's stack -- see the comment in memsafe.c. Hooks run the
  * guard on the game's threads, so this is load-bearing, not tidiness. */
 extern __thread jmp_buf g_mem_guard;
-extern __thread int     g_mem_guard_armed;
+/* Observed asynchronously by the VEH. The macro's compiler barriers also
+ * matter: the tested GCC emulated-TLS build still eliminated armed=1 with
+ * volatile alone when the guarded body contained only loads/stores. */
+extern __thread volatile int g_mem_guard_armed;
 
 /* Run `stmt` under the guard. `faulted` is set TRUE if it faulted.
  * A macro because setjmp's buffer must belong to a frame that is still live
@@ -53,7 +56,9 @@ extern __thread int     g_mem_guard_armed;
         (faulted) = FALSE;                                                    \
         if (setjmp(g_mem_guard) == 0) {                                       \
             g_mem_guard_armed = 1;         /* per-thread: no interlock needed */\
+            __asm__ __volatile__("" ::: "memory");                            \
             { stmt; }                                                         \
+            __asm__ __volatile__("" ::: "memory");                            \
             g_mem_guard_armed = 0;                                            \
         } else {                                                              \
             (faulted) = TRUE;                                                 \

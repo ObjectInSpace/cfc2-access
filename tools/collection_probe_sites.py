@@ -12,6 +12,18 @@ SITES = (
     ('game_cleanup', 0x14004ADC0, 0x14004ADE9),
     ('screen_release', 0x140037140, 0x140037292),
     ('quick_load', 0x14004FFD0, 0x14005007B),
+    ('application_update', 0x140057AE0, 0x140057E26),
+    ('training_reset', 0x140050FD0, 0x140051011),
+    ('game_initialize', 0x14004C540, 0x14004C674),
+    ('pause_update', 0x1400A65E0, 0x1400A6EF5),
+)
+
+# These are verified, not hooked. They pin the API callers/return filters.
+WAIT_GUARDS = (
+    ('generic_worker', 0x1401F7D60, 0x1401F7EA4),
+    ('batch_worker', 0x1401F8430, 0x1401F86CA),
+    ('batch_join', 0x1401F7EB0, 0x1401F80FE),
+    ('worker_retirement', 0x1401F8130, 0x1401F823A),
 )
 
 
@@ -30,6 +42,11 @@ def render(directory=DEFAULT_DUMP):
         dump.instructions(start, end)
         rows.append(f'    {{"{name}", UINT64_C({start:#x}), {end-start}, '
                     f'UINT64_C({fingerprint(dump.read(start,end-start)):#x})}},')
+    rows += ['};', 'static const probe_site g_wait_guards[] = {']
+    for name, start, end in WAIT_GUARDS:
+        dump.instructions(start, end)
+        rows.append(f'    {{"{name}", UINT64_C({start:#x}), {end-start}, '
+                    f'UINT64_C({fingerprint(dump.read(start,end-start)):#x})}},')
     return '\n'.join(rows + ['};', ''])
 
 
@@ -41,14 +58,14 @@ if __name__ == '__main__':
     if args.fixtures:
         dump = Dump(DEFAULT_DUMP)
         rows = ['/* Test-only pinned code bytes. Never executed. */']
-        for index, (_, start, end) in enumerate(SITES):
+        for index, (_, start, end) in enumerate(SITES + WAIT_GUARDS):
             rows.append(f'static const unsigned char fixture_{index}[] = {{')
             raw = dump.read(start, end-start)
             for offset in range(0, len(raw), 20):
                 rows.append('    '+','.join(hex(b) for b in raw[offset:offset+20])+',')
             rows.append('};')
         rows.append('static const unsigned char *fixtures[] = {' +
-                    ','.join(f'fixture_{i}' for i in range(len(SITES))) + '};')
+                    ','.join(f'fixture_{i}' for i in range(len(SITES + WAIT_GUARDS))) + '};')
         args.fixtures.parent.mkdir(parents=True, exist_ok=True)
         args.fixtures.write_text('\n'.join(rows)+'\n', encoding='utf-8')
     else:

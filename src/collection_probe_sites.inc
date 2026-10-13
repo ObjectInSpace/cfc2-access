@@ -6,4 +6,14 @@ static const probe_site g_sites[] = {
     {"game_cleanup", UINT64_C(0x14004adc0), 41, UINT64_C(0x27eb594f28fe0314)},
     {"screen_release", UINT64_C(0x140037140), 338, UINT64_C(0x976673c592b32c16)},
     {"quick_load", UINT64_C(0x14004ffd0), 171, UINT64_C(0x75da97dd559178f1)},
+    {"application_update", UINT64_C(0x140057ae0), 838, UINT64_C(0x3ab4ef6fe4d7a5ab)},
+    {"training_reset", UINT64_C(0x140050fd0), 65, UINT64_C(0x14cffa98ebe622a4)},
+    {"game_initialize", UINT64_C(0x14004c540), 308, UINT64_C(0x1cb437a3534c746)},
+    {"pause_update", UINT64_C(0x1400a65e0), 2325, UINT64_C(0x9c352e0f67ad78e2)},
+};
+static const probe_site g_wait_guards[] = {
+    {"generic_worker", UINT64_C(0x1401f7d60), 324, UINT64_C(0x50a65b1035930aea)},
+    {"batch_worker", UINT64_C(0x1401f8430), 666, UINT64_C(0xc7ec437c1a8d3059)},
+    {"batch_join", UINT64_C(0x1401f7eb0), 590, UINT64_C(0x9d87b99491d8c9d2)},
+    {"worker_retirement", UINT64_C(0x1401f8130), 266, UINT64_C(0x26779e5b1880a0bc)},
 };

@@ -14,6 +14,7 @@ from name_screens import load_corpus
 
 
 SPANS = (
+    ('pause-update-complete-instruction-body', 0x1400A65E0, 0x1400A6EF5),
     ('training-statistics-update', 0x1400789D0, 0x140078A50),
     ('training-statistics-body', 0x140078B30, 0x140078E5B),
     ('training-input-display-update', 0x1400917D0, 0x14009184E),

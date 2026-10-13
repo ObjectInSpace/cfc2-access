@@ -3,7 +3,7 @@
 Reviewed through 2026-10-12 against the same unpacked build as the
 [offline gate trace](collection-offline-gate-trace.md). Reproduce with
 `python tools/collection_native_boundary_audit.py --manifest-out docs/collection-native-boundary-manifest.json`.
-The [manifest](collection-native-boundary-manifest.json) pins 86 aligned spans,
+The [manifest](collection-native-boundary-manifest.json) pins 87 aligned spans,
 references and virtual slots. These establish local ordering, not exclusive
 thread ownership. No production hook or native read is enabled by this result.
 
@@ -658,3 +658,10 @@ gate, and re-entry under user-confirmed mode provenance. Record uncaptured or
 inapplicable actions explicitly. This specifies missing evidence; it does not
 claim a ready or installed completion probe. The 4096 witness remains a
 conditional counterexample, with no observed failure in any retained scene.
+
+The subsequent [lifetime diagnostic extension](collection-lifetime-probe.md)
+implements bounded wait-result and Training/application call records behind a
+separate opt-in. Its synthetic forwarding/serialization controls do not supply
+live outcomes. The manifest adds the complete pause instruction body (87 spans
+total); the historical captures remain intact. Native producer activation and
+complete arena-mutating callback coverage remain unproven.

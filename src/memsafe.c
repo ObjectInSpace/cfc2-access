@@ -17,7 +17,7 @@
  * dinput8. Making the state __thread gives every thread its own buffer and its
  * own armed flag, which is what the design assumed all along. */
 __thread jmp_buf g_mem_guard;
-__thread int     g_mem_guard_armed;
+__thread volatile int g_mem_guard_armed;
 
 static void         *g_veh;
 static volatile LONG g_faults;
