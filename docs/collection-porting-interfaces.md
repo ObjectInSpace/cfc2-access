@@ -188,7 +188,22 @@ optional designs unless a concrete feature or observed defect requires them.
 The 4096 bypass remains conditional. Existing successful wait captures do not
 prove universal safety, and record loss is not hidden.
 
-## Validation of this implementation
+## Validation and deployment: shared audio and transitions
+
+At `cd3e09a`: all 38 native runners passed with individually checked exit
+codes, 121 collection Python tests passed, both sabotage sweeps caught every
+sabotage, and the DLL build and import checks passed.
+[Retained offline validation](../tools/fixtures/shared-audio-transition-validation-20261013.json.gz).
+Artifact SHA256:
+`837c3a9e393969180115af02b3ebe6503e2207b68d1ca46f0f9ce569e70e0327`.
+
+The build is deployed to the game with the previous DLL backed up. Live
+acceptance is PENDING; see the
+[listening checklist](port-tasks/cvs2-shared-audio-listening.md) for hashes,
+rollback and what to listen for. This deployment also carries the selection
+integration below, so that check accepts both.
+
+## Validation of the selection integration (historical, a800114)
 
 All 36 native runners passed with individually checked process exit codes;
 121 collection Python tests passed. The CVS2 suite was rerun after adding the
