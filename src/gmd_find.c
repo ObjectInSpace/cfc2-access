@@ -1075,10 +1075,17 @@ static const char *gmd_expected_language(void)
 
 /* Worker-only discovery. The synchronous gmd_find above is retained for
  * offline diagnostics; it must never be called by the output worker.
- * Per poll: at most four 64-KB copies and eight address-space queries,
- * or one candidate/blob check. A 2-ms elapsed budget also yields between
- * chunks (not a hard real-time guarantee for an OS call). */
-#define DISCOVERY_CHUNKS 4
+ * Per poll: at most 32 64-KB copies and eight address-space queries, or one
+ * candidate/blob check. A 2-ms elapsed budget also yields between chunks
+ * (not a hard real-time guarantee for an OS call).
+ *
+ * ⛔ The cap was 4 chunks (2026-10-08), well under what the 2-ms budget
+ * allows: the main menu then spoke positions only, without names, for about
+ * 68 s after start-up (user-reported 2026-10-13; September's synchronous scan
+ * resolved in ~3 s). 32 chunks measured 0.86 ms per poll in
+ * run_gmd_discovery_test. The time budget, not the chunk cap, is what keeps
+ * speech responsive. */
+#define DISCOVERY_CHUNKS 32
 #define DISCOVERY_QUERIES 8
 typedef struct {
     BOOL initialized;
@@ -1091,6 +1098,8 @@ typedef struct {
     SIZE_T first_delta;
     char expected[8];
     ULONGLONG retry_at;
+    ULONGLONG started;        /* diagnostics: time and bytes to resolution */
+    unsigned long long scanned;
 } text_discovery;
 static text_discovery g_discovery;
 
@@ -1133,6 +1142,7 @@ static void discovery_init(void)
     }
     filter_init();
     crc_init();
+    g_discovery.started = GetTickCount64();
     g_discovery.initialized = TRUE;
 }
 
@@ -1210,6 +1220,7 @@ static void discovery_scan_step(void)
         if (count > sizeof(chunk)) count = sizeof(chunk);
         if (count >= ENT_SIZE) {
             ++chunks;
+            d->scanned += count;
             if (discovery_copy(chunk, d->cursor, count))
                 scan_chunk(chunk, count, (BYTE *)d->cursor, &d->hits);
             else memset(&d->hits, 0, sizeof(d->hits));
@@ -1291,8 +1302,10 @@ BOOL gmd_text_ready(void)
     g_text_count = GMD_LABEL_COUNT;
     text_index_free();
     d->candidate = NULL;
-    log_line("gmdtext: blob resolved incrementally at delta 0x%llx, language %s",
-             (unsigned long long)selected, gmd_text_language());
+    log_line("gmdtext: blob resolved incrementally at delta 0x%llx, language %s, "
+             "%.1f s after discovery began, %llu MB scanned",
+             (unsigned long long)selected, gmd_text_language(),
+             (double)(GetTickCount64() - d->started) / 1000.0, d->scanned >> 20);
     return TRUE;
 }
 
