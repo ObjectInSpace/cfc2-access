@@ -55,7 +55,17 @@ map. Every other feature needs bounded discovery. No CVS1 runtime code exists.
 - F18 read-current: register one `tc_register` source once F17's queue is
   decoded.
 
-## Status update
+## Status update, 2026-10-13 (later)
+
+- Names are resolved for every ID, from the shell's own table: see
+  [character-names.md](character-names.md).
+- F02 character highlight is IMPLEMENTED: `src/cvs1_select.c`, in the DLL,
+  replayed against 52 live highlights (`run_cvs1_select_test.ps1`).
+  - Scope: branch A, mode 0, actor state 4, either side.
+  - Not covered: groove, ratio and EX choices.
+  - Live listening is pending.
+
+## Earlier status update
 
 The capture for steps 1 and 3 below is built:
 `tools/collection_state_capture.py --game cvs1`, which works for every

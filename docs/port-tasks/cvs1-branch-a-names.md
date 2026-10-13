@@ -139,6 +139,13 @@ unrelated association is unresolved; never fill the gap with a guessed name.
 
 ## Completion record
 
+- 2026-10-13: RESOLVED from the collection's own code. The shell's move-list
+  name function maps every CVS1 native ID (0..0x22) to its displayed name,
+  with Japanese and US variants. See [character-names.md](character-names.md).
+  The live capture's 32 highlighted IDs all fall inside that table.
+
+Earlier record:
+
 - Research checkpoint: continuation from 29c5771, recorded in
   [the visit and resource trace](../cvs1-selection-visits.md).
 - Delivered behavior: none; no names mapped and no runtime change.

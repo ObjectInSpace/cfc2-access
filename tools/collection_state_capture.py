@@ -6,7 +6,7 @@ with --game. While the game's published primary block is identified, it:
 - traces the block: a full keyframe, then only changed bytes, ~20 Hz, into
   trace.bin.gz (a new root starts a new keyframe and segment);
 - logs direction presses from the keyboard arrows and XInput pads;
-- screenshots the game window once the cursor has stopped moving;
+- with --screenshots only, pictures the game window once the cursor stops;
 - on F9, saves the whole block plus a screenshot under the next plan label,
   and says through NVDA what was captured and what comes next;
 - where a game has a TRACED cursor decoder (CVS1 only, today), pictures each
@@ -186,6 +186,8 @@ class Capture:
         self.log.flush()
 
     def image(self, stem):
+        if self.grab is None:                      # screenshots are opt-in
+            return dict(image=None, image_status='screenshots off')
         image = self.grab()
         if image is None:
             result = dict(image=None, image_status='no game window found')
@@ -247,7 +249,7 @@ class Capture:
             if self.decoder:
                 self.decode_selections(now)
 
-        if (self.last_press is not None and not self.pictured_since_press and
+        if (self.grab is not None and self.last_press is not None and not self.pictured_since_press and
                 now - self.last_press >= SETTLE_SECONDS):
             self.pictured_since_press = True
             self.pictures += 1
@@ -394,6 +396,8 @@ def main():
     parser.add_argument('--label', required=True)
     parser.add_argument('--language', required=True, help='Shell language and ROM version, or unknown')
     parser.add_argument('--plan', type=Path, help='Snapshot labels, one per line (default: in-match plan)')
+    parser.add_argument('--screenshots', action='store_true',
+                        help='Also picture the window (needs windowed display mode)')
     parser.add_argument('--minutes', type=float, default=10)
     parser.add_argument('--interval', type=float, default=0.05)
     parser.add_argument('--game-dir', default=r'C:\Program Files (x86)\Steam\steamapps\common\CAPCOM FIGHTING COLLECTION 2')
@@ -414,10 +418,12 @@ def main():
             import cvs1_selection_capture as selection
             checked += selection.verify(reader.read, lifecycle,
                                         json.loads(selection.ACQUISITION.read_bytes()))
-        cap = Capture(reader.read, lifecycle, args.game, args.out, window_grabber(args.pid),
+        cap = Capture(reader.read, lifecycle, args.game, args.out,
+                      window_grabber(args.pid) if args.screenshots else None,
                       key_poller(), pad_poller(), say, plan)
         cap.write(dict(kind='provenance', tool='collection-state-capture', schema=1,
                        game=args.game, label=args.label, language=args.language,
+                       screenshots=args.screenshots,
                        created_utc=metadata.utc(), interval=args.interval, plan=plan,
                        decoder=args.game if cap.decoder else None, checked_code_spans=checked,
                        manifest_sha256=hashlib.sha256(lifecycle_raw).hexdigest(),

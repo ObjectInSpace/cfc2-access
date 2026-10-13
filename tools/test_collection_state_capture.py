@@ -180,6 +180,19 @@ class StateCaptureTests(unittest.TestCase):
         self.assertTrue(h.rows('cursor_picture')[0]['image_status'].startswith('black frame'))
         self.assertEqual(sum('unusable' in s for s in h.said), 1)
 
+    def test_screenshots_off_records_state_without_pictures(self):
+        h = self.cvs1()
+        h.cap.grab = None
+        h.keys.down = {0x27}
+        h.poll()
+        h.keys.down = {cap.SNAPSHOT_KEY}
+        h.poll(12)
+        self.assertEqual(h.rows('cursor_picture'), [])
+        self.assertTrue(all(r['image_status'] == 'screenshots off'
+                            for r in h.rows('selection') + h.rows('snapshot')))
+        self.assertEqual(h.rows('snapshot')[0]['status'], 'read')
+        self.assertFalse(any('unusable' in x for x in h.said))
+
     # ---- the traced CVS1 decoder (carried over from the CVS1-only tool) -----
 
     def select(self, h, side, native_id, slot=0):

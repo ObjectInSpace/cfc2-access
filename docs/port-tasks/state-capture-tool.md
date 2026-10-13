@@ -35,6 +35,19 @@ Decided with the user 2026-10-13, inside step 6 of the
   segment.
 - No hooks, no game-memory writes, no DLL changes.
 
+## Field result, 2026-10-13
+
+The first live run (CVS1, `tools/fixtures/cvs1-capture-20261013`) confirmed
+the trace and the CVS1 selection decoder. It also exposed two gaps:
+- The user's controller presses were never seen. Polling XInput from another process missed them, so no press overlapped the 51 s of CVS1 state.
+- Screenshots were black in fullscreen.
+
+Screenshots are now opt-in (`--screenshots`). Names no longer need them:
+see [character-names.md](character-names.md). The cursor analyzer still
+needs a press source the game actually uses. The candidate is each game's
+own input record (CVS1 keeps one at actor+0x5BA, which the replay test
+already uses). It stays unvalidated live until then.
+
 ## Acceptance
 
 - Synthetic tests: a cursor byte ranks first. A timer, an animation counter
