@@ -38,4 +38,19 @@ Actor = R + 0x3FB8 + side*0x700, where R is the root published at `0x1422D2B90`.
 
 ## Not decoded, so not sounded
 
-- **Crouch and knockdown.** actor+0x170 read 0, 1, 20 and 22 for stand, crouch, jump and down, one sample each. Very few instructions touch it and none writes those constants, so it is not used. The beacon stays at standing pitch.
+- **Crouch and knockdown: still unresolved after a dedicated capture**
+  (`tools/fixtures/cvs1-stance-20261013`, Training: three crouch holds and
+  three sweeps that knocked down the dummy, with a complete 20 Hz trace).
+  The beacon stays at standing pitch. Ruled out, do not re-chase:
+  - actor+0x170 reads 1 while crouching but 22 during a sweep: a move or
+    animation number, not a stance. Very few instructions touch it.
+  - actor+0x584 read 33 in all three knockdown snapshots by coincidence. It
+    is a free-running counter that cycles about every 0.67 s.
+  - actor+0x2FE (copy +0x306) is the only byte in the whole block that
+    separates the four real crouch holds (taken from the input record's
+    down bit, 0x1000 at actor+0x5BA) from idle standing. It is an
+    input-driven state-machine index (`0x1405F3ADE` jumps through a handler
+    table with mask 0x800); it is also 0 in the air and always 0 for the
+    dummy.
+  - Next approach: trace in code how a held down input becomes a crouch
+    state, rather than another capture.
