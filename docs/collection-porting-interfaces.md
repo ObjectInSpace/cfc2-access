@@ -1,5 +1,10 @@
 # Implemented porting interfaces and remaining shared work
 
+Execution owner: Opus can implement the remaining shared work and then the
+ports. Follow the [execution plan](port-tasks/opus-shared-selection-execution.md).
+Astra is optional escalation for a concrete blocker; none of the unfinished
+items below is inherently Astra-only work.
+
 Updated 2026-10-13. The purpose of upfront work is to give the implementation
 owner reusable code with explicit inputs, not to require a second-game
 "demonstration" before deciding whether code is useful. Build missing shared

@@ -1,19 +1,16 @@
 # Astra investigation and Opus implementation workflow
 
-## Implementation update, 2026-10-13
+## Current execution owner and sequence, 2026-10-13
 
-The user wants the required reusable mechanisms completed before handing their
-ports to Opus, not an infrastructure demonstration. See the
-[implemented interfaces and remaining shared work](collection-porting-interfaces.md). CVS2 now uses the
-worker-owned selection channel, shared presenter and existing speech backend
-in the DLL build; its native acquisition is retained. Earlier descriptions of
-those selection components as offline-only are historical. Opus should reuse
-this implemented selection path instead of rebuilding it. Shared gameplay,
-transition and arena-audio work still has explicit gaps; do not claim all
-feature families are ready. Finish the mechanism needed for the next feature
-without reopening the optional protected-reader redesign. This update governs
-conflicting implementation status and next actions below. Live acceptance of
-the changed DLL is not yet claimed.
+The [complete Opus execution plan](port-tasks/opus-shared-selection-execution.md) governs conflicting sequencing and
+model assignments below. Opus owns the remaining shared gameplay-audio and
+transition implementation, integration/validation, game-packet audit and ports.
+Reuse the selection channel integrated at `a800114`; its live acceptance is
+pending. Complete required shared mechanisms before multiplying adapters.
+Astra is optional escalation for a concrete blocker, not required groundwork.
+Power Stone adaptations are a separate later phase. The optional protected
+CVS2 reader and broad lifetime campaign remain deferred. Historical research
+and stronger-design contracts are retained, not automatic next actions.
 
 ## Current direction, 2026-10-13: deliver CVS1 selection speech
 
