@@ -57,8 +57,9 @@ map. Every other feature needs bounded discovery. No CVS1 runtime code exists.
 
 ## Status update
 
-The capture for steps 1 and 3 below is built: `tools/cvs1_name_capture.py`,
-with 6 synthetic tests, three of them shown to fail under sabotage. The user
+The capture for steps 1 and 3 below is built:
+`tools/collection_state_capture.py --game cvs1`, which works for every
+traced game path (see [the task note](state-capture-tool.md)). The user
 session is described in [the run card](cvs1-name-capture-run-card.md). It
 has not been run yet.
 

@@ -10,8 +10,11 @@ Purpose: one play session that answers the CVS1 questions blocking the port.
 You do not need to read the screen or name anything. The tool speaks through
 NVDA when you press F9.
 
-Tool: `tools/cvs1_name_capture.py`. It only reads. No hook, no memory writes, no
-DLL change. It refuses to run unless the reviewed CVS1 code and data match.
+Tool: `tools/collection_state_capture.py --game cvs1`. It only reads. No hook,
+no memory writes, no DLL change. It refuses to run unless the reviewed CVS1
+code and data match. It also records your direction presses (keyboard arrows
+or a controller) and a compressed trace of the game state, so this session
+doubles as the test of the cursor-finding analyzer used for later games.
 
 ## Before you start
 
@@ -28,7 +31,7 @@ Launch the game through Steam. Then in PowerShell, from `C:\Users\amock\CFC2 Acc
 
 ```powershell
 Get-Process CapcomFightingCollection2 | Select-Object -ExpandProperty Id
-python tools\cvs1_name_capture.py 12345 --out build\cvs1-names\session-1 --label "roster walk then match states" --language "English shell; US version" --minutes 25
+python tools\collection_state_capture.py 12345 --game cvs1 --out build\captures\cvs1-session-1 --label "roster walk then match states" --language "English shell; US version" --minutes 25
 ```
 
 Replace `12345` with the number the first command prints. Use a new folder
@@ -37,6 +40,8 @@ name each time. Alt-tab back to the game. The tool says "Capture started".
 ## Part 1: walk the roster (Player 1 side)
 
 - In CVS1 Arcade, go to character select.
+- Before moving, stay still on one character for about five seconds. That
+  quiet stretch is the analyzer's control.
 - Move over every character, one step at a time, waiting about one second on
   each. Cover every row and both groups (Capcom and SNK).
 - Each new highlighted character is pictured automatically and silently.
@@ -66,6 +71,14 @@ afterwards if you say which one went wrong.
 Press Ctrl+C in the PowerShell window, or let it time out. Tell Claude the
 folder name, the CVS1 version and language, and anything that went
 differently. Nothing needs to be named by sight.
+
+## What Claude does afterwards
+
+Run `python tools\cursor_candidates.py build\captures\cvs1-session-1`. CVS1's
+cursor is already traced, so this is the analyzer's live control: it must rank
+the selection byte (root+0x3ED0) and the group position bytes (around
+root+0x3F5C) at the top. If it does not, the analyzer is not used on another
+game until the reason is understood.
 
 ## What the evidence will and will not establish
 
