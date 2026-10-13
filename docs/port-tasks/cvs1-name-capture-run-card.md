@@ -9,6 +9,9 @@
 
 ## Part 1: listen
 
+Result 2026-10-13: ACCEPTED by the user. ROM and version logged as
+predicted, and 34 highlights were spoken correctly.
+
 Installed 2026-10-13 from `5f23826`: DLL SHA256
 `9a3d12209543d6d40102603fc5cc9f7f279eeb802d954ad35226b4f6f535f791`.
 The previous DLL, which CVS2 was accepted on, is kept beside it as

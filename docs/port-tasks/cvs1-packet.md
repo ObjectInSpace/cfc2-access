@@ -63,7 +63,9 @@ map. Every other feature needs bounded discovery. No CVS1 runtime code exists.
   replayed against 52 live highlights (`run_cvs1_select_test.ps1`).
   - Scope: branch A, mode 0, actor state 4, either side.
   - Not covered: groove, ratio and EX choices.
-  - Live listening is pending.
+  - LIVE-ACCEPTED 2026-10-13. The log shows `admitted ROM 1 (cvs1u), shell
+    game version 1` and 34 names spoken while moving, including the US
+    regional name M.Bison. The user confirmed the names were right.
 
 ## Earlier status update
 
