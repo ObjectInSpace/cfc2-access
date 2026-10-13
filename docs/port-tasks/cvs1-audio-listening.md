@@ -6,7 +6,9 @@ The previous DLL, accepted for CVS2 and CVS1 character select, is kept as
 `dinput8.dll.pre-cvs1-audio-20261013.bak` (SHA256 `9a3d1220...`). To roll
 back, close the game and copy the backup over `dinput8.dll`.
 
-Status: live acceptance PENDING. Field evidence: [cvs1-match-fields.md](cvs1-match-fields.md).
+Status, 2026-10-13: the user confirmed the health tone and the position
+beacons work. Crouch gives no pitch change, as expected because it is not
+decoded yet. Jump pitch and pause are not yet reported. Field evidence: [cvs1-match-fields.md](cvs1-match-fields.md).
 
 ## Listen for
 
