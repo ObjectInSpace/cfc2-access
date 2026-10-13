@@ -369,7 +369,7 @@ int main(void)
          * capture. (This block used to borrow the selection-screen capture,
          * which the meter path now refuses by phase -- see 7e.) */
         load("hp-hurt", g);
-        assert(match_audio_begin() != 0);
+        assert(match_audio_begin(1) != 0);
 
         /* P1 health 4260 of max 11520; P2 8216 of 11200 -- real captured
          * values. Max health is B+0x170. */
@@ -413,7 +413,7 @@ int main(void)
          * reading as a huge change. */
         before=ga_resets;
         memset(ga_seen,0,sizeof ga_seen);
-        assert(match_audio_begin() != 0);
+        assert(match_audio_begin(1) != 0);
         assert(ga_resets>before);
         cvs2_gauges_observe(g,sizeof g,0x16000000ULL);
         assert(ga_seen[0][0] && ga_seen[0][1]);

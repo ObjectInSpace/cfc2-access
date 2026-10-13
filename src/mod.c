@@ -22,6 +22,7 @@
 #include "cvs2_hit.h"
 #include "audio.h"
 #include "cvs2_frame.h"
+#include "cvs1_frame.h"
 #include "cvs2_story.h"
 #include "cvs2_text.h"
 #include "text_channel.h"
@@ -1744,7 +1745,11 @@ static DWORD WINAPI worker(LPVOID param)
                  audio_cue_volume(AUDIO_CUE_BEACON),
                  audio_cue_volume(AUDIO_CUE_TICK));
         /* Health must be read ON the game's frame, not on our poll. */
-        if (audio_ready() && hook_enabled) cvs2_frame_install();
+        if (audio_ready() && hook_enabled) {
+            cvs2_frame_install();
+            /* CVS1 cues through the same shared controller (cvs1_frame.h). */
+            cvs1_frame_install();
+        }
     }
 
     /* Always on: the quit/consent dialogs, the hints view and per-row captions
@@ -2032,6 +2037,7 @@ static DWORD WINAPI worker(LPVOID param)
             if (tc_read_requested()) tc_read_current();
             cvs2_gauges_log_stats();
             cvs2_frame_log_stats();
+            cvs1_frame_log_stats();
             cvs2_hit_poll_and_log();
 
             /* ⭐⭐⭐ THE MODAL CHECK RUNS AT 100 ms, NOT ON THE 2 s BEAT.

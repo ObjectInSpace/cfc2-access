@@ -316,7 +316,7 @@ static void cvs2_audio_route(ULONGLONG root, unsigned rom)
     }
     if (!epoch || root != owner_root || rom != owner_rom ||
         match_audio_current() != epoch) {
-        epoch = match_audio_begin();
+        epoch = match_audio_begin(1);
         owner_root = root;
         owner_rom = rom;
     }
@@ -546,7 +546,7 @@ static match_audio_producer g_ga_prod = { .feeds = MATCH_AUDIO_FEED_RESOURCE };
 void cvs2_gauges_observe(const BYTE *state, SIZE_T size, ULONGLONG root)
 {
     match_audio_sample m;
-    uint64_t epoch = match_audio_current();
+    uint64_t epoch = match_audio_current_for(1);   /* CVS2 is game 1 */
     unsigned p;
 
     /* Owner changes (leaving CVS2, a relocated block, another ROM) are new

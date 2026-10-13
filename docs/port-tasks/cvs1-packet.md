@@ -67,6 +67,16 @@ map. Every other feature needs bounded discovery. No CVS1 runtime code exists.
     game version 1` and 34 names spoken while moving, including the US
     regional name M.Bison. The user confirmed the names were right.
 
+## Match audio, 2026-10-13
+
+F07 health and F09 beacons are IMPLEMENTED, with F10 limited to airborne
+pitch. They run through the shared match-audio controller:
+`src/cvs1_frame.c` hooks update `0x1405A65F0`, and `cvs1_select_tick` owns
+CVS1's audio epoch. Fields and their code evidence are in
+[cvs1-match-fields.md](cvs1-match-fields.md). The replay test is
+`run_cvs1_frame_test.ps1`, over the ten labelled snapshots. Not sounded yet:
+power gauge, crouch and knockdown, round clock. Live listening is pending.
+
 ## Earlier status update
 
 The capture for steps 1 and 3 below is built:

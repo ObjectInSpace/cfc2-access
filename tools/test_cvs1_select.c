@@ -15,6 +15,14 @@ BOOL speech_say(const wchar_t *s, BOOL interrupt)
 void log_line(const char *fmt, ...) { (void)fmt; }
 BOOL mem_guard_install(void) { return FALSE; }
 BOOL mem_copy(void *d, const void *s, SIZE_T n) { (void)d; (void)s; (void)n; return FALSE; }
+/* Audio routing is exercised by run_match_audio_test; the tick is not run here. */
+#include <stdint.h>
+uint64_t match_audio_begin(unsigned a) { (void)a; return 0; }
+void match_audio_depart(uint64_t e) { (void)e; }
+uint64_t match_audio_current(void) { return 0; }
+LONG cvs1_frame_count(void) { return 0; }
+void audio_beacon_set_owned(uint64_t e, unsigned p, BOOL l, float x, float s)
+{ (void)e; (void)p; (void)l; (void)x; (void)s; }
 
 #define RECORD (2 + CVS1_PHASE_SIZE + 2 * CVS1_ACTOR_HEAD + 2)
 static unsigned count;

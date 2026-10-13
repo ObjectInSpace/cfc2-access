@@ -5,6 +5,9 @@
 #include "selection_channel.h"
 #include "character_name_table.h"
 #include "memsafe.h"
+#include "match_audio.h"
+#include "cvs1_frame.h"
+#include "audio.h"
 #include "log.h"
 #include <string.h>
 #include <stdio.h>
@@ -111,6 +114,47 @@ static const struct { ULONGLONG address; BYTE bytes[16]; unsigned n; } g_sig[] =
     { 0x14007FF39ULL, { 0x8b,0x88,0xb0,0x01,0x00,0x00 }, 6 },         /* version at +0x1B0     */
 };
 
+/* Match-audio ownership for CVS1, worker only: a new epoch per presentation
+ * owner (root + ROM, as for selection); the frame hook feeds only an epoch
+ * that names game 0. Also the frame-stall guard: if the per-frame update
+ * stops running (it may not run while paused), the frame thread cannot turn
+ * the beacons off itself, so the worker does after STALL_MS. */
+#define STALL_MS 250u
+static void cvs1_audio_route(ULONGLONG root, unsigned rom)
+{
+    static uint64_t epoch;
+    static ULONGLONG owner_root;
+    static unsigned owner_rom;
+    static LONG last_frames;
+    static ULONGLONG last_change;
+    static BOOL silenced;
+    ULONGLONG now = GetTickCount64();
+    LONG frames;
+    if (!root) {
+        if (epoch) match_audio_depart(epoch);
+        epoch = 0;
+        return;
+    }
+    if (!epoch || root != owner_root || rom != owner_rom ||
+        match_audio_current() != epoch) {
+        epoch = match_audio_begin(0);
+        owner_root = root;
+        owner_rom = rom;
+        last_change = now;
+        silenced = FALSE;
+    }
+    frames = cvs1_frame_count();
+    if (frames != last_frames) {
+        last_frames = frames;
+        last_change = now;
+        silenced = FALSE;
+    } else if (epoch && !silenced && now - last_change >= STALL_MS) {
+        for (unsigned p = 0; p < 2; p++)
+            audio_beacon_set_owned(epoch, p, FALSE, 0.0f, 1.0f);
+        silenced = TRUE;
+    }
+}
+
 void cvs1_select_tick(void)
 {
     static int guard_ready, sig_ok;
@@ -189,8 +233,10 @@ void cvs1_select_tick(void)
                      rom, rom ? "cvs1u" : "cvs1", sample.variant);
         }
     }
+    cvs1_audio_route(root, rom);
     cvs1_select_observe(&sample, root, rom);
     return;
 inactive:
+    cvs1_audio_route(0, 0);
     cvs1_select_observe(NULL, 0, 0);
 }

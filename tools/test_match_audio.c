@@ -55,7 +55,7 @@ void audio_owner_test_race(void)
 {
     if (!race_armed) return;
     race_armed = 0;
-    race_epoch = match_audio_begin();
+    race_epoch = match_audio_begin(1);
 }
 
 static uint32_t motion = 1;
@@ -93,8 +93,10 @@ int main(void)
     match_audio_feed(&frame, 0, &m);
     CHECK(drained(), "0: epoch 0 feeds produce no sound");
 
-    uint64_t a = match_audio_begin();
+    uint64_t a = match_audio_begin(1);
     CHECK(a != 0 && match_audio_current() == a, "begin returns the current epoch");
+    CHECK(match_audio_current_for(1) == a && match_audio_current_for(0) == 0,
+          "an epoch is visible only to the adapter that owns it");
 
     /* 1. Health: first sighting seeds silently, damage sounds on P1's side. */
     m = sample(); health(&m, 0, 100, 100); health(&m, 1, 100, 100);
@@ -212,7 +214,7 @@ int main(void)
 
     /* 9. Switch: a new owner silences the old one's beacons, and a late
      * frame-thread write still stamped with the old epoch stays silent. */
-    uint64_t b = match_audio_begin();
+    uint64_t b = match_audio_begin(1);
     CHECK(b > a && match_audio_current() == b, "9: a new owner gets a newer epoch");
     CHECK(drained(), "9: the switch silences the old owner's beacons");
     audio_beacon_set_owned(a, 0, TRUE, 0.0f, 1.0f);   /* lost the race */
@@ -268,7 +270,7 @@ int main(void)
     match_audio_feed(&frame, b, &m);
     CHECK(drained(), "11: floor before the tick switch");
     audio_tick_owned(b);
-    uint64_t c2 = match_audio_begin();
+    uint64_t c2 = match_audio_begin(1);
     CHECK(loud(6) < 40, "11: a tick armed before the switch never sounds");
     audio_tick_owned(b);
     CHECK(loud(6) < 40, "11: a late tick from the old owner is silent");

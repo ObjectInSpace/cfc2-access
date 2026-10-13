@@ -24,11 +24,17 @@ void match_audio_depart(uint64_t epoch)
     audio_owner_stop(epoch);
 }
 
-uint64_t match_audio_begin(void)
+uint64_t match_audio_current_for(unsigned adapter)
+{
+    uint64_t epoch = match_audio_current();
+    return epoch && (epoch & 15u) == (adapter & 15u) ? epoch : 0;
+}
+
+uint64_t match_audio_begin(unsigned adapter)
 {
     uint64_t old = match_audio_current();
     if (old) match_audio_depart(old);
-    uint64_t epoch = ++g_next;
+    uint64_t epoch = (++g_next << 4) | (adapter & 15u);
     /* audio.c first: from this store on, nothing stamped with an older epoch
      * can sound, so a producer still holding the old epoch is harmless. */
     if (!audio_owner_begin(epoch)) return 0;

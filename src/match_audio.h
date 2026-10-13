@@ -87,13 +87,18 @@ typedef struct {
     unsigned pauses, ticks, gauge_writes, rejected;
 } match_audio_producer;
 
-/* Worker: claim audio output for a new presentation owner. Departs any
- * previous one. Returns the new nonzero epoch, or 0 if audio refused it. */
-uint64_t match_audio_begin(void);
+/* Worker: claim audio output for a new presentation owner of `adapter`
+ * (0..15, the game index). Departs any previous owner. Returns the new
+ * nonzero epoch, or 0 if audio refused it. The adapter is the epoch's low 4
+ * bits, so epochs stay strictly increasing and one read names the owner. */
+uint64_t match_audio_begin(unsigned adapter);
 /* Worker: stop the current owner. A stale epoch is ignored. */
 void match_audio_depart(uint64_t epoch);
 /* Any thread: the current epoch, 0 when nothing owns match audio. */
 uint64_t match_audio_current(void);
+/* Any thread: the current epoch only if `adapter` owns it, else 0. A frame
+ * hook uses this so it can never feed another game's epoch. */
+uint64_t match_audio_current_for(unsigned adapter);
 
 /* Producer thread: apply one owned sample under `epoch`. A different epoch
  * than last time discards this producer's edge state first, so nothing the

@@ -234,7 +234,7 @@ static void frame_detour(void)
 
     /* One pointer read, one interlocked read, then plain arithmetic. No
      * syscalls on this thread. */
-    uint64_t epoch = match_audio_current();
+    uint64_t epoch = match_audio_current_for(1);   /* CVS2 is game 1 */
     ULONGLONG root = *(volatile ULONGLONG *)(ULONG_PTR)ROOT_PTR;
     if (epoch && root && root < 0x00007FFF00000000ull) {
         match_audio_sample m;

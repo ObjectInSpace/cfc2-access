@@ -36,7 +36,7 @@ New-Item -ItemType Directory -Force -Path "$root\build" | Out-Null
     "$root\src\rom_table.c" "$root\src\gui_text.c" `
     "$root\src\gui_markup.c" "$root\src\prompt_id.c" `
     "$root\src\move_list.c" "$root\src\emu_ram.c" "$root\src\emu_cursor.c" `
-    "$root\src\cvs1_select.c" "$root\src\cvs2_select.c" "$root\src\cvs2_hit.c" "$root\src\cvs2_frame.c" "$root\src\cvs2_story.c" "$root\src\cvs2_text.c" `
+    "$root\src\cvs1_select.c" "$root\src\cvs1_frame.c" "$root\src\cvs2_select.c" "$root\src\cvs2_hit.c" "$root\src\cvs2_frame.c" "$root\src\cvs2_story.c" "$root\src\cvs2_text.c" `
     "$root\src\text_channel.c" "$root\src\text_capture.c" "$root\src\audio.c" `
     "$root\src\collection_probe.c" `
     "$root\src\selection_channel.c" "$root\src\game_selection.c" "$root\src\game_session.c" `
