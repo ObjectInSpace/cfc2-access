@@ -86,6 +86,9 @@ class TraceWriter:
 
     def sample(self, t, root, raw):
         self.samples += 1
+        # A killed capture keeps everything up to the last flush (~1 s).
+        if self.samples % 20 == 0:
+            self.f.flush()
         if self.prev is None or root != self.root or len(raw) != len(self.prev):
             self.f.write(struct.pack('<dQBI', t, root, 1, len(raw)) + raw)
             self.prev, self.root = raw, root
@@ -109,7 +112,16 @@ class TraceWriter:
 
 def read_trace(path):
     """Yield (t, root, keyframe, payload): payload is the whole block for a
-    keyframe, else a list of (offset, value)."""
+    keyframe, else a list of (offset, value). A capture that was killed ends
+    without a gzip trailer; every complete record before that is still
+    yielded, and the partial tail is dropped."""
+    try:
+        yield from _read_trace(path)
+    except EOFError:
+        return
+
+
+def _read_trace(path):
     with gzip.open(path, 'rb') as f:
         if f.read(len(TRACE_MAGIC)) != TRACE_MAGIC:
             raise ValueError('Not a CFC2 state trace')

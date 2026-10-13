@@ -117,6 +117,22 @@ class StateCaptureTests(unittest.TestCase):
         self.assertEqual(records[1][3], [(0x1234, 99)])
         self.assertEqual(records[3][1], ROOT + 0x100000)
 
+    def test_killed_capture_keeps_flushed_records(self):
+        """A capture stopped by killing the process has no gzip trailer. The
+        writer flushes every 20 samples and the reader keeps every complete
+        record, so a killed session is not lost (2026-10-13, cvs1-match-1)."""
+        h = self.cfj()
+        for i in range(45):
+            self.set_byte(h, 0x10, i)
+            h.poll()
+        h.cap.trace.f.flush()                     # no close(): simulates a kill
+        raw = (Path(h.tmp.name) / 'trace.bin.gz').read_bytes()
+        cut = Path(h.tmp.name) / 'cut.gz'
+        cut.write_bytes(raw)
+        self.assertEqual(len(list(cap.read_trace(cut))), 45)
+        cut.write_bytes(raw[:-3])                 # last write torn
+        self.assertGreaterEqual(len(list(cap.read_trace(cut))), 40)
+
     def test_root_moving_mid_read_is_not_traced(self):
         h = self.cfj()
         read = h.memory.read
