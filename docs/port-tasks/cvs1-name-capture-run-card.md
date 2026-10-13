@@ -9,6 +9,14 @@
 
 ## Part 1: listen
 
+Installed 2026-10-13 from `5f23826`: DLL SHA256
+`9a3d12209543d6d40102603fc5cc9f7f279eeb802d954ad35226b4f6f535f791`.
+The previous DLL, which CVS2 was accepted on, is kept beside it as
+`dinput8.dll.pre-cvs1-select-20261013.bak` (SHA256 `827ed7a8...`). To roll
+back, close the game and copy the backup over `dinput8.dll`. The game log
+`CFC2Access.log` should show `cvs1-select: admitted ROM 1 (cvs1u), shell
+game version 1` on reaching CVS1.
+
 With the new DLL installed, go to CVS1 Arcade character select and move
 around normally. Each highlighted character should be spoken once by name.
 Choosing a character and highlighting the same one for the next team slot

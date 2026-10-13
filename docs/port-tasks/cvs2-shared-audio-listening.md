@@ -1,8 +1,9 @@
 # CVS2 listening check: shared selection, audio and transitions
 
-Status: deployed 2026-10-13, live acceptance PENDING. Nothing below has been
-heard yet. This one session also accepts the selection integration from
-`a800114`, which was never deployed before.
+Status: deployed 2026-10-13. The user reported the same day that CVS2
+"works well" after playing it. That is a general acceptance, not an
+item-by-item pass of the checklist below. Any later-reported issue reopens
+the specific item. This covered the selection integration from `a800114`.
 
 ## What is installed
 
