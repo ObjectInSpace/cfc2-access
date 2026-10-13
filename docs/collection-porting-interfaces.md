@@ -72,21 +72,66 @@ all titles expose strings in the same format. Keep backend acceptance and
 encoding in the common code. A new game's text reader still needs visibility,
 completion and name/encoding evidence.
 
-## Audio and transitions: existing code plus named remaining work
+## Gameplay audio: implemented shared controller
 
-The mixer, cue volume controls/persistence, gauge feeds and beacon feeds already
-exist in `audio`. Reuse them; do not add per-game mixers or settings files.
-The scene interface exists, but activating its ownership policy requires the
-compatible clock-event path described in the audio contract. Do not turn it on
-incidentally while porting selection.
+`src/match_audio.{h,c}` owns the in-match cue policy formerly private to
+`cvs2_frame.c` and `cvs2_gauges_observe`. CVS2 uses it in the DLL build. The
+mixer, voices, F5-F8 volume controls and `cfc2_audio.ini` are unchanged. The
+scene interface is still not enabled; this controller drives the two-player
+legacy setters through owner epochs instead.
+
+Adapter responsibilities:
+
+1. Decode an owned `match_audio_sample` from the adapter's justified
+   acquisition: `in_match` (an OBSERVED match or non-match state, never a read
+   failure), per owner health and resource as value plus current maximum with
+   explicit validity, beacon screen pan already projected (-1..+1) and stance
+   already mapped onto the `AUDIO_STANCE_*` ladder, the visible clock with
+   validity, and a motion signature built from fields only the simulation
+   advances. Native offsets, sentinels, resource caps, camera projection and
+   action-ID meanings stay in the adapter. Unreadable state is not a sample:
+   do not feed it.
+2. On the speech worker, call `match_audio_begin()` for each new presentation
+   owner (CVS2 uses its root + ROM compatibility identity) and
+   `match_audio_depart(epoch)` on departure or unsupported context. Begin
+   departs any previous owner. A stale depart is ignored.
+3. Keep one zero-initialised `match_audio_producer` per producer thread, with
+   `feeds` naming the cue families that thread owns. CVS2's frame hook feeds
+   health, beacons and clock on the frame they change; its worker feeds the
+   resource meter. Each producer reads `match_audio_current()` and passes that
+   epoch to `match_audio_feed`.
+
+Shared policy: gauges write the mixer only on a change; an invalid value
+resets once so the next real value seeds silently; a new maximum reseeds
+silently; beacons are fed every frame unless paused; pause is a motion
+signature unchanged for 30 frames; clock ticks only on a decrease landing on
+30, 15 or 1-5; an observed exit silences that producer's families once; a new
+epoch discards the producer's edge state.
+
+Ownership: `audio_owner_begin/stop` in `audio.c` reject every write from any
+epoch but the current running one. Gauges check under the mixer lock.
+Beacons and ticks stay lock-free for the frame thread and are stamped with
+their epoch; the mixer drops a stamp that is not current. A frame-thread
+write that passes its check just before a switch is therefore silent after
+it. Once an epoch is claimed, the unowned legacy setters are rejected.
+
+Deliberate corrections relative to the previous CVS2 code: the meter is now
+gated on the in-match phase as health always was; a changed maximum reseeds
+silently instead of sounding a rescale; beacons are switched off once at the
+pause edge rather than on every paused frame; the worker writes the meter
+only on change. Tests: `run_match_audio_test.ps1` (the real mixer, sample
+assertions, including the switch race through an `AUDIO_OWNER_TEST` seam) and
+`python tools\sabotage_match_audio.py` (5 sabotages, each caught). The CVS2
+replay suite now exercises `cvs2_frame_decode` against real captures (KO
+sentinel, stance ladder, pan, clock, win-quote exit). Live listening is
+pending.
+
+## Transitions and remaining shared work
 
 The following shared work is NOT yet claimed complete:
 
 - Extracting CVS2's match/team/active-fighter presentation into reusable
   transition formatting and acceptance handling, with explicit player ownership.
-- A common gameplay controller for pause/exit/reset, gauge/clock edges and
-  title-supplied resource maxima/projection/stance. The current CVS2 behavior is
-  the implementation input, not a universal per-game schema.
 - Four-player/arena spatial audio and perceptual acceptance for Power Stone 2.
 - A collection-wide runtime adapter router and ownership policy for asynchronous
   text/audio sources. The selection channel is a worker-side component, not

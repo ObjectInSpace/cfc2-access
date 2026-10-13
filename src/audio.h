@@ -174,6 +174,29 @@ void audio_beacons_off(void);
  * right moment, not for sounds to be exclusive. */
 void audio_tick(void);
 
+/* ---- Legacy-path owner routing ------------------------------------------
+ * Used by match_audio, never by an adapter directly. begin/stop run on the
+ * worker. begin accepts only a strictly increasing nonzero epoch and silences
+ * everything the previous owner left (gauges fade, beacons off, its armed
+ * ticks dropped). stop acts only on the CURRENT epoch, so a late stop from a
+ * replaced owner is ignored. Once any epoch has been claimed, the unowned
+ * setters above are rejected.
+ *
+ * The *_owned setters are ignored unless their epoch is current and running.
+ * Gauges check under the mixer lock. Beacons and ticks stay lock-free for the
+ * frame thread; they are stamped with the epoch and the mixer drops a stamp
+ * that is not current, so a write that loses a race with a switch is silent.
+ * Players 0 and 1 only: four-owner routing is the Power Stone phase. */
+BOOL audio_owner_begin(uint64_t epoch);
+void audio_owner_stop(uint64_t epoch);
+void audio_gauge_set_owned(uint64_t epoch, audio_gauge g, unsigned player,
+                           int value, int maxv);
+void audio_gauge_reset_owned(uint64_t epoch, audio_gauge g, unsigned player);
+/* live FALSE silences that one beacon and returns it to its HUD placement. */
+void audio_beacon_set_owned(uint64_t epoch, unsigned player, BOOL live,
+                            float pan, float stance);
+void audio_tick_owned(uint64_t epoch);
+
 /* ---- Test seam ----------------------------------------------------------
  * ⭐ Renders one block into `out` (AUDIO_BLOCK frames, interleaved stereo)
  * WITHOUT any device. The offline suite drives the whole mixer through this,

@@ -1,6 +1,10 @@
 /* Replays real captures through the shipping decoder and speech decisions.
  * No game writes or audible output. Run from the repository root. */
 #include "../src/cvs2_select.h"
+#include "../src/cvs2_frame.h"
+#include "../src/match_audio.h"
+#include "../src/audio.h"
+#include "../libs/minhook/include/MinHook.h"
 #include "../src/text_channel.h"
 /* The generated quote table, so cases 7f/7g can assert that the string spoken
  * is exactly the entry the capture's own index selects. */
@@ -25,12 +29,30 @@ static int ga_sets, ga_resets, ga_last_player, ga_last_value, ga_last_max;
  * independently of health. 0 = SUPER, 1 = HEALTH (audio.h order).
  * ⚠ CVS2 has no stun gauge -- see the note in audio.h. */
 static int ga_val[2][2], ga_max[2][2], ga_seen[2][2];
-void audio_gauge_set(int g, unsigned player, int value, int maxv)
+void audio_gauge_set(audio_gauge g, unsigned player, int value, int maxv)
 { ga_sets++; ga_last_player=(int)player; ga_last_value=value; ga_last_max=maxv;
   if (g>=0 && g<2 && player<2) { ga_val[g][player]=value; ga_max[g][player]=maxv;
                                  ga_seen[g][player]=1; } }
-void audio_gauge_reset(int g, unsigned player) { (void)g; (void)player; ga_resets++; }
+void audio_gauge_reset(audio_gauge g, unsigned player) { (void)g; (void)player; ga_resets++; }
 void audio_gauge_reset_all(void) { ga_resets++; }
+/* The shipping path goes through the REAL match_audio.c into these owned
+ * setters; they forward to the records above. Owner stop counts as a reset:
+ * it is how a departing owner silences every gauge. */
+static int owner_begins, owner_stops;
+BOOL audio_owner_begin(uint64_t e) { (void)e; owner_begins++; return TRUE; }
+void audio_owner_stop(uint64_t e) { (void)e; owner_stops++; ga_resets++; }
+void audio_gauge_set_owned(uint64_t e, audio_gauge g, unsigned player, int value, int maxv)
+{ (void)e; audio_gauge_set(g,player,value,maxv); }
+void audio_gauge_reset_owned(uint64_t e, audio_gauge g, unsigned player)
+{ (void)e; audio_gauge_reset(g,player); }
+void audio_beacon_set_owned(uint64_t e, unsigned player, BOOL live, float pan, float stance)
+{ (void)e; (void)player; (void)live; (void)pan; (void)stance; }
+void audio_tick_owned(uint64_t e) { (void)e; }
+/* cvs2_frame.c is linked for cvs2_frame_decode(); its installer is never run. */
+MH_STATUS WINAPI MH_CreateHook(LPVOID t, LPVOID d, LPVOID *o)
+{ (void)t; (void)d; (void)o; return MH_UNKNOWN; }
+MH_STATUS WINAPI MH_EnableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
+MH_STATUS WINAPI MH_DisableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
 BOOL mem_guard_install(void) { return FALSE; }
 BOOL mem_copy(void *d,const void *s,SIZE_T n)
 { (void)d; (void)s; (void)n; return FALSE; }
@@ -340,10 +362,14 @@ int main(void)
     }
     /* ---- gauges: health must reach the mixer, the sentinel must not ----- */
     {
-        BYTE g[CVS2_STATE_SIZE];
+        static BYTE g[CVS2_STATE_SIZE];
         unsigned b0 = 0x1eba8, b1 = 0x1eba8 + 0x678;
         int before;
-        memcpy(g, ryu, sizeof g);
+        /* The gauges belong to the MATCH, so the base is a real in-match
+         * capture. (This block used to borrow the selection-screen capture,
+         * which the meter path now refuses by phase -- see 7e.) */
+        load("hp-hurt", g);
+        assert(match_audio_begin() != 0);
 
         /* P1 health 4260 of max 11520; P2 8216 of 11200 -- real captured
          * values. Max health is B+0x170. */
@@ -362,16 +388,35 @@ int main(void)
         assert(!ga_seen[1][0] && !ga_seen[1][1]);    /* health not fed here */
         assert(ga_seen[0][0] && ga_seen[0][1]);      /* meter still is      */
 
-        /* 0xFFFF is the KO/round-end sentinel: reject, never announce. */
-        g[b0+0x16c]=0xff; g[b0+0x16d]=0xff;
-        memset(ga_seen,0,sizeof ga_seen); ga_resets=0;
+        /* An unchanged sample touches nothing: the change rule is what keeps
+         * the mixer lock off the hot path. */
+        ga_sets=0;
         cvs2_gauges_observe(g,sizeof g,0x15ba1000ULL);
-        assert(ga_resets>0);       /* the sentinel still forces a reset */
+        assert(ga_sets==0);
 
-        /* A relocated state block must reset, not read as a huge change. */
+        /* 0xFFFF is the KO/round-end sentinel: the shipping FRAME decode must
+         * mark it invalid (the controller then resets, never sweeps to it). */
+        {
+            match_audio_sample m;
+            cvs2_frame_decode(g,&m);
+            assert(m.in_match && m.owner[0].health.valid);
+            assert(m.owner[0].health.value==4260 && m.owner[0].health.maximum==11520);
+            assert(m.owner[1].health.valid && m.owner[1].health.value==8216);
+            g[b0+0x16c]=0xff; g[b0+0x16d]=0xff;
+            cvs2_frame_decode(g,&m);
+            assert(!m.owner[0].health.valid);
+            assert(m.owner[1].health.valid);           /* per player */
+        }
+
+        /* A relocated block / new owner is a new epoch: the old owner is
+         * stopped (every gauge silenced) and the meter reseeds, rather than
+         * reading as a huge change. */
         before=ga_resets;
-        cvs2_gauges_observe(g,sizeof g,0x16000000ULL);
+        memset(ga_seen,0,sizeof ga_seen);
+        assert(match_audio_begin() != 0);
         assert(ga_resets>before);
+        cvs2_gauges_observe(g,sizeof g,0x16000000ULL);
+        assert(ga_seen[0][0] && ga_seen[0][1]);
 
         /* Leaving CVS2 resets and feeds nothing. */
         ga_sets=0;
@@ -471,6 +516,16 @@ int main(void)
             cvs2_gauges_observe(wq,sizeof wq,0x145f1000ULL);
             assert(!ga_seen[0][0] && !ga_seen[0][1]);
             assert(!ga_seen[1][0] && !ga_seen[1][1]);
+            /* The meter was live just before: the observed exit silences it
+             * once, rather than holding a tone over the quote. */
+            assert(ga_resets>0);
+            /* ⭐ And the FRAME decode, which feeds the clock, reports no match
+             * -- so R+0x184's live-looking 74 here can never tick. */
+            {
+                match_audio_sample m;
+                cvs2_frame_decode(wq,&m);
+                assert(!m.in_match && !m.clock_valid);
+            }
 
             /* No match/round speech over a quote either. */
             {
@@ -613,6 +668,30 @@ int main(void)
             load("crouch-01", other);
             assert(other[0x05931] == 16);
         }
+    }
+
+    /* ---- frame decode: stance ladder, pan and clock from real captures ----
+     * The labels are the user's own (crouch, jump, knockdown, right side). */
+    {
+        static BYTE f[CVS2_STATE_SIZE];
+        match_audio_sample m;
+        load("crouch-01", f); cvs2_frame_decode(f,&m);
+        assert(m.in_match && m.owner[0].stance==AUDIO_STANCE_CROUCH);
+        assert(m.owner[1].stance==AUDIO_STANCE_STAND);
+        load("jump-01", f); cvs2_frame_decode(f,&m);
+        assert(m.owner[0].stance>=AUDIO_STANCE_AIR &&
+               m.owner[0].stance<=AUDIO_STANCE_AIR_TOP);
+        load("knockdown-01", f); cvs2_frame_decode(f,&m);
+        assert(m.owner[1].stance==AUDIO_STANCE_DOWN);
+        load("pos-right-01", f); cvs2_frame_decode(f,&m);
+        for (int p=0; p<2; p++)
+            assert(m.owner[p].beacon_valid &&
+                   m.owner[p].screen_pan>=-1.0f && m.owner[p].screen_pan<=1.0f);
+        load("hp-hurt", f); cvs2_frame_decode(f,&m);
+        assert(m.clock_valid && m.clock>=0 && m.clock<=99 && m.motion_valid);
+        /* The selection screen is not a match. */
+        cvs2_frame_decode(ryu,&m);
+        assert(!m.in_match);
     }
 
     /* ---- in-match announcements: team/groove, then per-round fighter ----

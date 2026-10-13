@@ -1,4 +1,5 @@
 #include "selection_channel.h"
+#include "match_audio.h"
 /* CVS2 native-state evidence: docs/cvs2-state-access-trace.md.
  * No keyboard history, guest-address assumption, or game-memory writes. */
 #include "cvs2_select.h"
@@ -297,6 +298,29 @@ static BOOL read_at(void *out, ULONGLONG address, SIZE_T size)
  * calls mem_copy(). */
 #define SELECT_POLL_MS 33u
 
+/* Match-audio ownership, worker only. A new epoch per presentation owner --
+ * the same compatibility identity the selection channel uses (root + ROM), so
+ * leaving CVS2, a relocated block or a ROM change silences every cue the old
+ * owner fed, including frame-thread writes racing the switch (audio.c drops
+ * any write stamped with a replaced epoch). Not a native lifetime claim. */
+static void cvs2_audio_route(ULONGLONG root, unsigned rom)
+{
+    static uint64_t epoch;
+    static ULONGLONG owner_root;
+    static unsigned owner_rom;
+    if (!root) {
+        if (epoch) match_audio_depart(epoch);
+        epoch = 0;
+        return;
+    }
+    if (!epoch || root != owner_root || rom != owner_rom ||
+        match_audio_current() != epoch) {
+        epoch = match_audio_begin();
+        owner_root = root;
+        owner_rom = rom;
+    }
+}
+
 void cvs2_select_tick(void)
 {
     static BYTE state[CVS2_STATE_SIZE];
@@ -370,6 +394,7 @@ void cvs2_select_tick(void)
         !read_at(&again,0x1422debd0ULL,8) || again != root ||
         !read_at(&again,0x141c14f98ULL,8) || again != session)
         goto inactive;
+    cvs2_audio_route(root,rom);
     cvs2_select_observe(state,sizeof state,root,rom);
     cvs2_gauges_observe(state,sizeof state,root);
     cvs2_announce_observe(state,sizeof state,root);
@@ -379,6 +404,7 @@ void cvs2_select_tick(void)
     return;
 inactive:
     last_poll = 0;
+    cvs2_audio_route(0,0);
     cvs2_select_observe(NULL,0,0,0);
     cvs2_gauges_observe(NULL,0,0);
     cvs2_announce_observe(NULL,0,0);
@@ -468,7 +494,6 @@ inactive:
 #define GA_GROOVE    0x22du
 static const unsigned meter_cap[6] = { 168, 144, 192, 100, 216, 72 };
 
-static ULONGLONG g_ga_root;
 /* ⭐ Liveness: without these the log cannot tell "never ran" from "ran and
  * everything was rejected", which is exactly the ambiguity that hid the bug
  * above. Reported by cvs2_gauges_log_stats(). */
@@ -511,54 +536,53 @@ void cvs2_gauges_log_stats(void)
     last_tick = now; last_fed = fed; last_rej = rej;
 }
 
+/* The worker-side producer: the super meter only. Health, beacons and the
+ * clock are fed by the frame hook (cvs2_frame.c) on the frame they change;
+ * feeding health here too would overwrite that with a value up to a frame
+ * stale. Edge, exit and reset POLICY is shared -- src/match_audio.c. */
+static match_audio_producer g_ga_prod = { .feeds = MATCH_AUDIO_FEED_RESOURCE };
+
 void cvs2_gauges_observe(const BYTE *state, SIZE_T size, ULONGLONG root)
 {
+    match_audio_sample m;
+    uint64_t epoch = match_audio_current();
     unsigned p;
 
-    /* Not in CVS2, or the block moved: forget history. A relocation must not
-     * read as every gauge changing at once, and a stale value must never be
-     * announced as current. */
-    if (!state || size != CVS2_STATE_SIZE || root != g_ga_root) {
-        g_ga_root = state ? root : 0;
-        audio_gauge_reset_all();
-        if (!state) return;
-    }
+    /* Owner changes (leaving CVS2, a relocated block, another ROM) are new
+     * epochs from cvs2_select_tick(); audio.c already silenced the old one. */
+    (void)root;
+    if (!state || size != CVS2_STATE_SIZE || !epoch) return;
 
-    for (p = 0; p < 2; p++) {
+    memset(&m, 0, sizeof m);
+    /* ⭐ Guard on the STATE, as the frame hook does: the meter field holds
+     * whatever it last held on selection and quote screens, and the gauges
+     * belong to the match. An observed non-match phase silences once. */
+    m.in_match = memcmp(state + 0x78, "\x02\x01\x02\x02", 4) == 0;
+    if (m.in_match) for (p = 0; p < 2; p++) {
         unsigned b = GA_B(p);
-        unsigned hp, maxhp;
+        unsigned hp, maxhp, meter, groove;
         memcpy(&hp,    state + b + GA_HEALTH, 2); hp    &= 0xffff;
         memcpy(&maxhp, state + b + GA_MAXHP,  2); maxhp &= 0xffff;
 
-        /* ⚠ 0xFFFF is the KO/round-end sentinel, not a value -- the field
-         * reads -1 in substate 5. Announcing it would sweep the tone to full
-         * every time a round ends. A zero max would also divide by zero. */
-        if (hp == 0xffffu || maxhp == 0 || maxhp == 0xffffu || hp > maxhp) {
+        /* Health is READ, not fed: the counters and the KO-sentinel guard
+         * stay honest, so the log can tell "never ran" from "all rejected". */
+        if (hp == 0xffffu || maxhp == 0 || maxhp == 0xffffu || hp > maxhp)
             g_ga_rejected++;
-            audio_gauge_reset(AUDIO_GAUGE_HEALTH, p);
-            continue;
-        }
-        g_ga_fed++;
-        /* ⛔ HEALTH IS NOT FED HERE. The frame hook (cvs2_frame.c) feeds it on
-         * the frame it changes; this poll runs asynchronously and would
-         * overwrite that with a value up to a frame stale, re-introducing the
-         * exact lag the hook exists to remove. The read above still runs so
-         * the fed/rejected counters and the KO-sentinel guard stay honest. */
+        else
+            g_ga_fed++;
 
-        /* Super meter, scaled by this player's groove cap. */
-        {
-            unsigned meter, groove;
-            memcpy(&meter, state + b + GA_METER, 2); meter &= 0xffff;
-            groove = state[b + GA_GROOVE];
-            /* An unknown groove has no known ceiling, so scaling would be a
-             * guess. Stay silent rather than report a wrong fill. */
-            if (groove < 6 && meter != 0xffffu && meter <= meter_cap[groove])
-                audio_gauge_set(AUDIO_GAUGE_SUPER, p, (int)meter,
-                                (int)meter_cap[groove]);
-            else
-                audio_gauge_reset(AUDIO_GAUGE_SUPER, p);
-        }
+        /* Super meter, scaled by this player's groove cap. An unknown groove
+         * has no known ceiling, so scaling would be a guess: stay silent
+         * rather than report a wrong fill. */
+        memcpy(&meter, state + b + GA_METER, 2); meter &= 0xffff;
+        groove = state[b + GA_GROOVE];
+        m.owner[p].present = true;
+        m.owner[p].resource.valid = groove < 6 && meter != 0xffffu &&
+                                    meter <= meter_cap[groove];
+        m.owner[p].resource.value = (int)meter;
+        m.owner[p].resource.maximum = groove < 6 ? (int)meter_cap[groove] : 0;
     }
+    match_audio_feed(&g_ga_prod, epoch, &m);
 }
 
 /* ---- In-match announcements --------------------------------------------

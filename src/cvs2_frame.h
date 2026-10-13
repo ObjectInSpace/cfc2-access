@@ -22,8 +22,9 @@
  *   - NO locks, NO allocation, NO logging, NO speech.
  *   - Bounds are checked with plain arithmetic against the known block size.
  *
- * ⚠ The values are published for the AUDIO layer, which is lock-free and
- * wait-free by construction (a seqlock). Speech never runs here.
+ * ⚠ The detour decodes an owned sample and hands it to match_audio, whose
+ * frame-thread calls into audio.c are lock-free except on a gauge CHANGE.
+ * Speech never runs here.
  *
  * Installed whenever the audio device opens; `cfc2_hook.off` disables it
  * like every other hook.
@@ -32,6 +33,7 @@
 #define CFC2_FRAME_H
 
 #include <windows.h>
+#include "match_audio.h"
 
 BOOL cvs2_frame_install(void);
 void cvs2_frame_remove(void);
@@ -39,5 +41,11 @@ void cvs2_frame_remove(void);
 /* Frames seen, and frames on which a health value actually changed. Liveness
  * before findings: "no tones" means nothing unless we know the detour ran. */
 void cvs2_frame_log_stats(void);
+
+/* Decode CVS2 state `s` (CVS2_STATE_SIZE bytes) into an owned audio sample:
+ * health/max, projected beacon pan, stance ladder, round clock and the pause
+ * motion signature. Outside the in-match phase it returns in_match = false.
+ * Pure arithmetic; no reads beyond `s`, no audio calls. */
+void cvs2_frame_decode(const unsigned char *s, match_audio_sample *m);
 
 #endif /* CFC2_FRAME_H */

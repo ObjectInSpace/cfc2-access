@@ -307,10 +307,15 @@ typedef struct {
     float pan;                          /* -1..+1, fighter's screen X        */
     float stance;                       /* pitch multiplier, see ladder      */
     BOOL  live;                         /* in a match: sound continuously    */
+    /* Owner epoch that wrote this slot, stored LAST by the producer. The
+     * mixer ignores a slot whose stamp is not the current legacy owner, so a
+     * frame-thread write that passed its check just before a switch cannot
+     * sound after it. 0 = written by an unowned legacy caller. */
+    volatile LONG64 stamp;
 } beacon_state;
 /* Defaults match the HUD placement so anything before a match is sensible. */
 static beacon_state g_beacon[AUDIO_PARTICIPANTS] = {
-    { -0.85f, 1.0f, FALSE }, { 0.85f, 1.0f, FALSE }
+    { -0.85f, 1.0f, FALSE, 0 }, { 0.85f, 1.0f, FALSE, 0 }
 };
 
 /* ---- gauge tracking -----------------------------------------------------
@@ -354,6 +359,44 @@ static audio_scene g_scene;
 static audio_scene_participant g_scene_previous[AUDIO_PARTICIPANTS];
 static beacon_state g_scene_beacons[AUDIO_PARTICIPANTS];
 static INIT_ONCE g_lock_once = INIT_ONCE_STATIC_INIT;
+
+/* ---- legacy-path owner routing ------------------------------------------
+ * The two-player setters below predate any notion of WHICH game feeds them.
+ * match_audio claims them with a strictly increasing epoch per presentation
+ * owner; every owned call names its epoch and is ignored unless it is the
+ * current, running one. Unowned calls keep their old behaviour only until the
+ * first claim, so a stray legacy producer cannot leak across a switch.
+ *
+ * Gauges check under g_lock. Beacons and ticks stay LOCK-FREE (the frame
+ * thread feeds them; taking g_lock there is what made the health tone
+ * crackle), so they are STAMPED instead and the mixer checks the stamp. */
+static volatile LONG64 g_owner_epoch;    /* 0 = never claimed            */
+static volatile LONG   g_owner_live;     /* current epoch not stopped    */
+static uint64_t        g_owner_last;     /* under g_lock                 */
+
+/* Test seam: runs between a lock-free setter's owner check and its write, so
+ * the offline suite can force the race the stamps exist for. */
+#ifdef AUDIO_OWNER_TEST
+extern void audio_owner_test_race(void);
+#define OWNER_RACE() audio_owner_test_race()
+#else
+#define OWNER_RACE() ((void)0)
+#endif
+
+/* Mixer-side: may a stamped legacy beacon/tick sound now? */
+static BOOL legacy_stamp_ok(LONG64 stamp)
+{
+    LONG64 owner = g_owner_epoch;
+    if (!owner) return stamp == 0;
+    return g_owner_live && stamp == owner;
+}
+
+/* Producer-side fast check, no lock. For beacons and ticks it is only a
+ * filter; the stamp check above is what makes a lost race inaudible. */
+static BOOL owner_current(uint64_t epoch)
+{
+    return epoch && (LONG64)epoch == g_owner_epoch && g_owner_live;
+}
 
 #ifdef AUDIO_SCENE_TEST
 extern ULONGLONG audio_scene_test_now(void);
@@ -468,7 +511,7 @@ static void scene_consume(void)
         audio_scene_participant *old = &g_scene_previous[p];
         BOOL replacement = !old->present || a->incarnation != old->incarnation;
         g_scene_beacons[p] = (beacon_state){ a->screen_pan, a->stance,
-                                              a->present && a->beacon_valid };
+                                              a->present && a->beacon_valid, 0 };
         for (int g = 0; g < AUDIO_GAUGE_COUNT; g++) {
             gauge_state *st = &g_gauge[g][p];
             const audio_scene_gauge *v = &a->gauges[g];
@@ -625,14 +668,9 @@ static void pan_gains(float pan, float *gl, float *gr)
 }
 
 /* ---- public API --------------------------------------------------------- */
-void audio_gauge_set(audio_gauge g, unsigned player, int value, int maxv)
+/* Under g_lock, after the ownership checks. */
+static void gauge_set_locked(audio_gauge g, unsigned player, int value, int maxv)
 {
-    if ((int)g < 0 || g >= AUDIO_GAUGE_COUNT || player > 1 || maxv <= 0)
-        return;
-    lock_ensure();
-
-    EnterCriticalSection(&g_lock);
-    if (g_scene_owned) { LeaveCriticalSection(&g_lock); return; }
     gauge_state *st = &g_gauge[g][player];
     st->pan = (player == 0) ? -0.85f : 0.85f;
     float lvl = (float)value / (float)maxv;
@@ -651,7 +689,35 @@ void audio_gauge_set(audio_gauge g, unsigned player, int value, int maxv)
         st->last = value;
         st->hold = HOLD_BLOCKS;
     }
+}
+
+void audio_gauge_set(audio_gauge g, unsigned player, int value, int maxv)
+{
+    if ((int)g < 0 || g >= AUDIO_GAUGE_COUNT || player > 1 || maxv <= 0)
+        return;
+    lock_ensure();
+    EnterCriticalSection(&g_lock);
+    if (!g_scene_owned && !g_owner_epoch)
+        gauge_set_locked(g, player, value, maxv);
     LeaveCriticalSection(&g_lock);
+}
+
+void audio_gauge_set_owned(uint64_t epoch, audio_gauge g, unsigned player,
+                           int value, int maxv)
+{
+    if ((int)g < 0 || g >= AUDIO_GAUGE_COUNT || player > 1 || maxv <= 0)
+        return;
+    lock_ensure();
+    EnterCriticalSection(&g_lock);
+    if (!g_scene_owned && owner_current(epoch))
+        gauge_set_locked(g, player, value, maxv);
+    LeaveCriticalSection(&g_lock);
+}
+
+static void gauge_reset_locked(audio_gauge g, unsigned player)
+{
+    g_gauge[g][player].seeded = FALSE;
+    g_gauge[g][player].hold = 0;
 }
 
 void audio_gauge_reset(audio_gauge g, unsigned player)
@@ -659,9 +725,56 @@ void audio_gauge_reset(audio_gauge g, unsigned player)
     if ((int)g < 0 || g >= AUDIO_GAUGE_COUNT || player > 1) return;
     lock_ensure();
     EnterCriticalSection(&g_lock);
-    if (g_scene_owned) { LeaveCriticalSection(&g_lock); return; }
-    g_gauge[g][player].seeded = FALSE;
-    g_gauge[g][player].hold = 0;
+    if (!g_scene_owned && !g_owner_epoch) gauge_reset_locked(g, player);
+    LeaveCriticalSection(&g_lock);
+}
+
+void audio_gauge_reset_owned(uint64_t epoch, audio_gauge g, unsigned player)
+{
+    if ((int)g < 0 || g >= AUDIO_GAUGE_COUNT || player > 1) return;
+    lock_ensure();
+    EnterCriticalSection(&g_lock);
+    if (!g_scene_owned && owner_current(epoch)) gauge_reset_locked(g, player);
+    LeaveCriticalSection(&g_lock);
+}
+
+/* Under g_lock. Silences every legacy gauge (a fade, never a click) and every
+ * beacon. Armed ticks are handled by their stamps. */
+static void legacy_silence_locked(void)
+{
+    for (int g = 0; g < AUDIO_GAUGE_COUNT; g++)
+        for (unsigned p = 0; p < AUDIO_PARTICIPANTS; p++)
+            gauge_reset_locked((audio_gauge)g, p);
+    for (unsigned p = 0; p < AUDIO_PARTICIPANTS; p++)
+        g_beacon[p].live = FALSE;
+}
+
+BOOL audio_owner_begin(uint64_t epoch)
+{
+    lock_ensure();
+    EnterCriticalSection(&g_lock);
+    BOOL accepted = epoch && epoch > g_owner_last;
+    if (accepted) {
+        g_owner_last = epoch;
+        /* Ticks and beacons written under the old epoch become inaudible the
+         * moment this store lands, whatever their producer does next. */
+        InterlockedExchange64(&g_owner_epoch, (LONG64)epoch);
+        InterlockedExchange(&g_owner_live, 1);
+        legacy_silence_locked();
+    }
+    LeaveCriticalSection(&g_lock);
+    return accepted;
+}
+
+void audio_owner_stop(uint64_t epoch)
+{
+    lock_ensure();
+    EnterCriticalSection(&g_lock);
+    /* A late stop from an older owner must not silence its successor. */
+    if (epoch && (LONG64)epoch == g_owner_epoch) {
+        InterlockedExchange(&g_owner_live, 0);
+        legacy_silence_locked();
+    }
     LeaveCriticalSection(&g_lock);
 }
 
@@ -685,16 +798,36 @@ void audio_gauge_reset_all(void)
  * ⚠ Aligned 4-byte stores are atomic in practice on x86-64. `volatile` stops
  * the compiler caching or reordering them; no barrier is needed because
  * nothing depends on their ordering against other state. */
-void audio_beacon_set(unsigned player, float pan, float stance)
+static void beacon_write(unsigned player, BOOL live, float pan, float stance,
+                         uint64_t stamp)
 {
-    if (player > 1 || g_scene_owned || !isfinite(pan) || !isfinite(stance)) return;
     if (pan < -1.0f) pan = -1.0f;
     if (pan >  1.0f) pan =  1.0f;
     if (stance < 0.5f) stance = 0.5f;      /* keep it a musical multiplier */
     if (stance > 2.0f) stance = 2.0f;
     g_beacon[player].pan    = pan;
     g_beacon[player].stance = stance;
-    g_beacon[player].live   = TRUE;
+    g_beacon[player].live   = live;
+    /* LAST: the mixer trusts the slot only once the stamp names the owner. */
+    InterlockedExchange64(&g_beacon[player].stamp, (LONG64)stamp);
+}
+
+void audio_beacon_set(unsigned player, float pan, float stance)
+{
+    if (player > 1 || g_scene_owned || g_owner_epoch ||
+        !isfinite(pan) || !isfinite(stance)) return;
+    beacon_write(player, TRUE, pan, stance, 0);
+}
+
+void audio_beacon_set_owned(uint64_t epoch, unsigned player, BOOL live,
+                            float pan, float stance)
+{
+    if (player > 1 || g_scene_owned || !owner_current(epoch)) return;
+    /* Off returns placement to the HUD default, as audio_beacons_off does. */
+    if (!live) { pan = player == 0 ? -0.85f : 0.85f; stance = 1.0f; }
+    if (!isfinite(pan) || !isfinite(stance)) return;
+    OWNER_RACE();
+    beacon_write(player, live, pan, stance, epoch);
 }
 
 void audio_beacons_off(void)
@@ -762,6 +895,7 @@ static void update_voices(void)
     for (unsigned p = 0; p < AUDIO_PARTICIPANTS; p++) {
         voice *v = &g_voice[BEACON_VOICE(p)];
         beacon_state b = g_scene_owned ? g_scene_beacons[p] : g_beacon[p];
+        if (!g_scene_owned && !legacy_stamp_ok(b.stamp)) b.live = FALSE;
         v->timbre = 3;                         /* pluck -- see osc()        */
         v->pan    = b.pan;
         /* ⚠ For the pluck, `freq` is the PULSE RATE, not a pitch: the
@@ -798,19 +932,33 @@ static void update_voices(void)
  * -- so reading the live level mid-decay would step the amplitude of a blip
  * already sounding. Latching it means a level change takes effect on the NEXT
  * tick, which is inaudible at ~40 ms per blip and cannot produce a click. */
-typedef struct { volatile LONG armed; float phase, env, vol; } tick_voice;
+typedef struct { volatile LONG armed; float phase, env, vol;
+                 volatile LONG64 stamp; } tick_voice;
 static tick_voice g_tick[TICK_SLOTS];
 static volatile LONG g_tick_next;
 
-void audio_tick(void)
+static void tick_arm(uint64_t stamp)
 {
-    if (g_scene_owned) return;
     LONG i = InterlockedIncrement(&g_tick_next) - 1;
     tick_voice *t = &g_tick[((unsigned)i) % TICK_SLOTS];
     t->phase = 0.0f;
     t->env   = 1.0f;
     t->vol   = cue_gain(AUDIO_CUE_TICK);
+    InterlockedExchange64(&t->stamp, (LONG64)stamp);
     InterlockedExchange(&t->armed, 1);
+}
+
+void audio_tick(void)
+{
+    if (g_scene_owned || g_owner_epoch) return;
+    tick_arm(0);
+}
+
+void audio_tick_owned(uint64_t epoch)
+{
+    if (g_scene_owned || !owner_current(epoch)) return;
+    OWNER_RACE();
+    tick_arm(epoch);
 }
 
 static void render(int16_t *out)
@@ -892,6 +1040,9 @@ static void render(int16_t *out)
              * across its boundary, including ticks armed before the claim. */
             if (g_scene_owned) { InterlockedExchange(&t->armed, 0); continue; }
             if (!t->armed) continue;
+            /* A tick armed by an owner that has since been replaced or
+             * stopped is dropped, never finished. */
+            if (!legacy_stamp_ok(t->stamp)) { InterlockedExchange(&t->armed, 0); continue; }
             t->phase += 1200.0f / (float)AUDIO_SR;
             if (t->phase >= 1.0f) t->phase -= 1.0f;
             /* ⚠ 0.9965, not 0.9994. I wrote 0.9994 with the comment "~40 ms"
