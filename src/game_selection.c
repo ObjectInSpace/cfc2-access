@@ -48,6 +48,13 @@ bool game_selection_offer(game_selection *p, const game_session *session,
                 memset(&p->accepted[i], 0, sizeof p->accepted[i]);
             continue;
         }
+        /* A newly observed visit rearms speech even if that visit never
+         * settles before returning to the old slot. Preserve this identity
+         * across revision-only invalidation, independently of pending data. */
+        if ((p->visited & (1u << i)) && p->visit[i] != c->visit)
+            memset(&p->accepted[i], 0, sizeof p->accepted[i]);
+        p->visited |= 1u << i;
+        p->visit[i] = c->visit;
         if (same(c, &p->pending[i]) && !same(c, &p->accepted[i]))
             p->ready |= 1u << i;
         p->pending[i] = *c;

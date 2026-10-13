@@ -18,7 +18,8 @@ int cvs2_stage_decode(const BYTE *state, SIZE_T size);
  * Unused owner slots are explicitly inactive. */
 void cvs2_selection_copy(const BYTE *state, SIZE_T size,
                          game_selection_choice out[GAME_SELECTION_OWNERS]);
-void cvs2_select_observe(const BYTE *state, SIZE_T size, ULONGLONG root);
+/* Owned state only; ROM supplied by the existing admitted acquisition path. */
+void cvs2_select_observe(const BYTE *state, SIZE_T size, ULONGLONG root, unsigned rom);
 void cvs2_select_tick(void);
 #endif
 

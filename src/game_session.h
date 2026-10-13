@@ -6,7 +6,7 @@
 /* Serialized state machine for the first shared selection path. No native
  * pointers, hooks, memory reads, output calls or inferred lifecycle authority.
  * All operations require one externally serialized owner. Native callbacks
- * must NOT call these concurrently. This is not yet a production router.
+ * must NOT call these concurrently. This is not a native lifecycle authority or collection-wide router.
  * Zero-initialize once; never reinitialize while tokens can still exist. */
 typedef struct {
     uint64_t generation, revision, sequence;

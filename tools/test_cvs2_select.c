@@ -45,7 +45,7 @@ static void load(const char *name, BYTE *out)
     assert(fread(out,1,CVS2_STATE_SIZE,f)==CVS2_STATE_SIZE);
     assert(fgetc(f)==EOF); fclose(f);
 }
-static void observe(const BYTE *s) { cvs2_select_observe(s,CVS2_STATE_SIZE,1); }
+static void observe(const BYTE *s) { cvs2_select_observe(s,CVS2_STATE_SIZE,1,3); }
 static bool shared_emit(void *context, const wchar_t *text)
 { (void)context; return tc_say(text, TRUE, "shared-selection-replay"); }
 static unsigned shared_sample(game_session *session, game_selection *presenter,
@@ -145,8 +145,8 @@ int main(void)
     speech_accepts=0; observe(yun); observe(yun); assert(calls==4);
     speech_accepts=1; observe(yun); assert(calls==5 && !wcscmp(last,L"Yun"));
     observe(yun); assert(calls==5);
-    cvs2_select_observe(yun,sizeof yun,2); assert(calls==5);
-    cvs2_select_observe(yun,sizeof yun,2); assert(calls==6);
+    cvs2_select_observe(yun,sizeof yun,2,3); assert(calls==5);
+    cvs2_select_observe(yun,sizeof yun,2,3); assert(calls==6);
     cvs2_select_tick(); /* failed guarded read clears selection */
     observe(ryu); observe(ryu); assert(calls==7);
     /* P2 alone, all three slots, including unchanged ID at the next slot. */
@@ -163,7 +163,7 @@ int main(void)
         observe(altered); assert(calls==before+1);
     }
     /* Both players change: deliver one utterance containing both names. */
-    cvs2_select_observe(NULL,0,0);
+    cvs2_select_observe(NULL,0,0,3);
     altered[0x17c]=altered[0x1ffec]=3;
     observe(altered); observe(altered);
     assert(!wcscmp(last,L"Ryu. Sagat"));
@@ -181,7 +181,7 @@ int main(void)
     assert(cvs2_groove_decode(groove,sizeof groove,0)==0);
     assert(cvs2_groove_decode(groove,sizeof groove,1)==-1);
     assert(cvs2_groove_decode(ryu,sizeof ryu,0)==-1);
-    cvs2_select_observe(NULL,0,0);
+    cvs2_select_observe(NULL,0,0,3);
     observe(groove); observe(groove); assert(!wcscmp(last,L"C Groove"));
     {
         int before=calls;
@@ -205,7 +205,7 @@ int main(void)
     load("ratio-12",altered);
     assert(cvs2_ratio_decode(altered,sizeof altered,0)==3);
     assert(cvs2_ratio_decode(altered,sizeof altered,1)==-1);
-    cvs2_select_observe(NULL,0,0);
+    cvs2_select_observe(NULL,0,0,3);
     observe(altered); observe(altered);
     assert(!wcscmp(last,L"Ratios: Ryu 2, Ken 1, Yun 1"));
     altered[0x1ffe6]=2;
@@ -234,7 +234,7 @@ int main(void)
         altered[0x64c]=(BYTE)stage;
         assert(cvs2_stage_decode(altered,sizeof altered)==(int)stage);
     }
-    cvs2_select_observe(NULL,0,0);
+    cvs2_select_observe(NULL,0,0,3);
     {
         int before=calls;
         observe(altered); observe(altered);
@@ -260,7 +260,7 @@ int main(void)
         altered[0x1ffd4+p]=1; altered[b+0x5d0]=4;
         assert(cvs2_groove_decode(altered,sizeof altered,p)==4);
         assert(cvs2_select_decode(altered,sizeof altered,p)==-1);
-        cvs2_select_observe(NULL,0,0); observe(altered); observe(altered);
+        cvs2_select_observe(NULL,0,0,3); observe(altered); observe(altered);
         assert(!wcscmp(last,L"N Groove"));
         altered[b+4]=2;
         assert(cvs2_groove_decode(altered,sizeof altered,p)==-1);
@@ -291,7 +291,7 @@ int main(void)
         altered[0x1ffec]=(BYTE)(1u<<p); altered[0x1ffd4+p]=3;
         altered[b+4]=1; altered[b+0x5ec]=(BYTE)p; altered[0x1ffe4+p]=0;
         altered[0x1ffda]=altered[0x1ffdb]=0;
-        cvs2_select_observe(NULL,0,0);
+        cvs2_select_observe(NULL,0,0,3);
         for (unsigned c=0; c<4; c++) {
             wchar_t expected[32];
             int before=calls;
@@ -316,7 +316,7 @@ int main(void)
         altered[b+0x5d1]=3;
         altered[b+0x5c0]=0; altered[b+0x5c1]=1; altered[b+0x5c2]=44;
         assert(cvs2_ratio_decode(altered,sizeof altered,p)==4);
-        cvs2_select_observe(NULL,0,0); observe(altered); observe(altered);
+        cvs2_select_observe(NULL,0,0,3); observe(altered); observe(altered);
         assert(!wcscmp(last,L"Ratios: Ryu 1, Ken 2, Yun 1"));
         altered[0x1a3]=1;
         assert(cvs2_ratio_decode(altered,sizeof altered,p)==-1);
@@ -328,7 +328,7 @@ int main(void)
     load("handicap-confirmed-02",altered);
     assert(cvs2_ratio_decode(altered,sizeof altered,0)==7);
     assert(cvs2_ratio_decode(altered,sizeof altered,1)==-1);
-    cvs2_select_observe(NULL,0,0); observe(altered); observe(altered);
+    cvs2_select_observe(NULL,0,0,3); observe(altered); observe(altered);
     assert(!wcscmp(last,L"Level 2"));
     load("handicap-right-03",altered);
     assert(cvs2_ratio_decode(altered,sizeof altered,0)==8);
@@ -690,6 +690,16 @@ int main(void)
         assert(calls==before);
     }
 
+    /* ROM changes at a reused root must rearm the common presentation owner. */
+    cvs2_select_observe(NULL,0,0,0);
+    int before_rom_switch = calls;
+    cvs2_select_observe(ryu,sizeof ryu,1,3);
+    cvs2_select_observe(ryu,sizeof ryu,1,3);
+    assert(calls == before_rom_switch + 1 && !wcscmp(last,L"Ryu"));
+    cvs2_select_observe(ryu,sizeof ryu,1,2);
+    assert(calls == before_rom_switch + 1);
+    cvs2_select_observe(ryu,sizeof ryu,1,2);
+    assert(calls == before_rom_switch + 2 && !wcscmp(last,L"Ryu"));
     shared_replay();
     puts("PASS: Arcade and alternate character/groove, team/P2, ratio/stage, transitions, speech without prefixes, gauge feed + KO sentinel, super meter per-groove caps, match/round speech");
     return 0;

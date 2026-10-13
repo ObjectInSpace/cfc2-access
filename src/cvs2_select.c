@@ -1,3 +1,4 @@
+#include "selection_channel.h"
 /* CVS2 native-state evidence: docs/cvs2-state-access-trace.md.
  * No keyboard history, guest-address assumption, or game-memory writes. */
 #include "cvs2_select.h"
@@ -209,52 +210,35 @@ void cvs2_selection_copy(const BYTE *s, SIZE_T size,
     }
 }
 
-void cvs2_select_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
+void cvs2_select_observe(const BYTE *s, SIZE_T size, ULONGLONG root, unsigned rom)
 {
+    static selection_channel channel;
     static ULONGLONG previous_root;
-    static int pending[2] = {-1,-1}, spoken[2] = {-1,-1};
-    static int previous_step[2] = {-1,-1};
-    int ids[2], changed[2] = {0,0}, p;
-    wchar_t message[600] = L"";
+    static unsigned previous_rom;
     game_selection_choice choices[GAME_SELECTION_OWNERS];
-    cvs2_selection_copy(s, size, choices);
-    if (root != previous_root) {
-        pending[0] = pending[1] = spoken[0] = spoken[1] = -1;
-        previous_step[0] = previous_step[1] = -1;
+    if (!s || size != CVS2_STATE_SIZE || !root) {
+        selection_channel_depart(&channel);
+        previous_root = 0;
+        return;
+    }
+    /* Compatibility identity only: preserves the existing root-based reset.
+     * It does NOT detect same-address replacement or protect native lifetime. */
+    if (!channel.session.owned || root != previous_root || rom != previous_rom) {
+        if (!selection_channel_begin(&channel, 1, rom, "cvs2-select")) return;
         previous_root = root;
+        previous_rom = rom;
     }
-    for (p=0; p<2; p++) {
-        ids[p] = choices[p].status == GAME_SELECTION_VALID ? (int)choices[p].value :
-            choices[p].status == GAME_SELECTION_INACTIVE ? -1 : -2;
-        int id = ids[p];
-        if (id < 0) {
-            pending[p] = -1;
-            if (id == -1) spoken[p] = -1;
-            continue;
-        }
-        int selection_step = (int)choices[p].visit;
-        if (previous_step[p] != selection_step) {
-            pending[p] = spoken[p] = -1;
-            previous_step[p] = selection_step;
-        }
-        if (pending[p] != id) { pending[p] = id; continue; }
-        if (spoken[p] == id) continue;
-        const wchar_t *part = choices[p].label;
-        if (message[0]) wcscat(message,L". ");
-        wcscat(message,part);
-        changed[p] = 1;
-    }
-    /* One utterance for simultaneous changes; no queued stream of obsolete
-     * P2 positions. Only record names actually accepted by the backend. */
-    if (message[0] && tc_say(message,TRUE,"cvs2-select")) {
-        for (p=0; p<2; p++) if (changed[p]) {
-            spoken[p] = ids[p];
-            log_line("cvs2-select: accepted player=%d kind=%s id=%d",p+1,
-                     ids[p] < 48 ? "character" : ids[p] < 54 ? "groove" :
-                     ids[p] < 60 ? "ratio" : ids[p] < 72 ? "stage" : "individual-ratio",
-                     ids[p] < 48 ? ids[p] : ids[p] < 54 ? ids[p]-48 :
-                     ids[p] < 60 ? ids[p]-54 : ids[p] < 72 ? ids[p]-60 : ids[p]-72);
-        }
+    cvs2_selection_copy(s, size, choices);
+    ULONGLONG now = GetTickCount64();
+    selection_channel_offer(&channel, choices, true, now, now);
+    unsigned accepted = selection_channel_drain(&channel, now);
+    for (unsigned p = 0; p < 2; ++p) if (accepted & (1u << p)) {
+        unsigned id = choices[p].value;
+        log_line("cvs2-select: accepted player=%u kind=%s id=%u", p+1,
+                 id < 48 ? "character" : id < 54 ? "groove" :
+                 id < 60 ? "ratio" : id < 72 ? "stage" : "individual-ratio",
+                 id < 48 ? id : id < 54 ? id-48 : id < 60 ? id-54 :
+                 id < 72 ? id-60 : id-72);
     }
 }
 
@@ -386,7 +370,7 @@ void cvs2_select_tick(void)
         !read_at(&again,0x1422debd0ULL,8) || again != root ||
         !read_at(&again,0x141c14f98ULL,8) || again != session)
         goto inactive;
-    cvs2_select_observe(state,sizeof state,root);
+    cvs2_select_observe(state,sizeof state,root,rom);
     cvs2_gauges_observe(state,sizeof state,root);
     cvs2_announce_observe(state,sizeof state,root);
     cvs2_quote_observe(state,sizeof state,root);
@@ -395,7 +379,7 @@ void cvs2_select_tick(void)
     return;
 inactive:
     last_poll = 0;
-    cvs2_select_observe(NULL,0,0);
+    cvs2_select_observe(NULL,0,0,0);
     cvs2_gauges_observe(NULL,0,0);
     cvs2_announce_observe(NULL,0,0);
     cvs2_quote_observe(NULL,0,0);

@@ -1,5 +1,20 @@
 # CFC2 Access
 
+## Implementation update, 2026-10-13
+
+The user wants the required reusable mechanisms completed before handing their
+ports to Opus, not an infrastructure demonstration. See the
+[implemented interfaces and remaining shared work](docs/collection-porting-interfaces.md). CVS2 now uses the
+worker-owned selection channel, shared presenter and existing speech backend
+in the DLL build; its native acquisition is retained. Earlier descriptions of
+those selection components as offline-only are historical. Opus should reuse
+this implemented selection path instead of rebuilding it. Shared gameplay,
+transition and arena-audio work still has explicit gaps; do not claim all
+feature families are ready. Finish the mechanism needed for the next feature
+without reopening the optional protected-reader redesign. This update governs
+conflicting implementation status and next actions below. Live acceptance of
+the changed DLL is not yet claimed.
+
 ## Current direction, 2026-10-13: deliver CVS1 selection speech
 
 The [corrected Opus execution plan](docs/port-tasks/opus-shared-selection-execution.md) supersedes conflicting sequencing

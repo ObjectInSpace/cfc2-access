@@ -39,6 +39,7 @@ New-Item -ItemType Directory -Force -Path "$root\build" | Out-Null
     "$root\src\cvs2_select.c" "$root\src\cvs2_hit.c" "$root\src\cvs2_frame.c" "$root\src\cvs2_story.c" "$root\src\cvs2_text.c" `
     "$root\src\text_channel.c" "$root\src\text_capture.c" "$root\src\audio.c" `
     "$root\src\collection_probe.c" `
+    "$root\src\selection_channel.c" "$root\src\game_selection.c" "$root\src\game_session.c" `
     @minhookSrc `
     -I "$root\libs\minhook\include" `
     -luser32 -lpsapi -lwinmm -s -static

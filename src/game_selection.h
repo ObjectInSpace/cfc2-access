@@ -5,7 +5,7 @@
 
 /* Copied selection observations only, externally serialized worker use.
  * Native labels/visits are supplied by adapters, never guessed here. This
- * offline component is not yet linked into the DLL or a lifecycle authority. */
+ * component is shared by the DLL and replay tests, not a lifecycle authority. */
 #define GAME_SELECTION_OWNERS 4
 #define GAME_SELECTION_LABEL 256
 #define GAME_SELECTION_TEXT (GAME_SELECTION_OWNERS * (GAME_SELECTION_LABEL + 2))
@@ -28,6 +28,8 @@ typedef struct {
     uint64_t generation, revision, seen_sequence;
     game_selection_choice pending[GAME_SELECTION_OWNERS];
     game_selection_choice accepted[GAME_SELECTION_OWNERS];
+    uint64_t visit[GAME_SELECTION_OWNERS];
+    unsigned visited;
     game_selection_observation latest;
     unsigned ready;
     bool in_output;
