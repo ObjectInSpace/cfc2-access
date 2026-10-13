@@ -1,5 +1,9 @@
 # CFC2 Access
 
+**Start here (2026-10-13): [docs/port-tasks/handoff-2026-10-13.md](docs/port-tasks/handoff-2026-10-13.md)**
+covers what is shipped and confirmed, what awaits listening, what is parked,
+how captures are run with the user, and the next port (CFJ).
+
 ## Current execution owner and sequence, 2026-10-13
 
 The [complete Opus execution plan](docs/port-tasks/opus-shared-selection-execution.md) governs conflicting sequencing and

@@ -1,5 +1,8 @@
 # Opus execution plan: shared groundwork, then collection ports
 
+Progress as of 2026-10-13: steps 1 to 5 are done, and step 6 has CVS1 largely
+ported. See [handoff-2026-10-13.md](handoff-2026-10-13.md).
+
 Current direction, 2026-10-13, implementation baseline `a800114`. This replaces
 the earlier CVS1-only execution sequence. Opus owns both the remaining shared
 implementation and subsequent game adapters. Astra is optional escalation for
