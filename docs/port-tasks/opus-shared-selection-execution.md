@@ -1,200 +1,163 @@
-# Opus execution plan: shared selection and the CVS1 pilot
+# Opus execution plan: deliver CVS1 selection speech
 
-Prepared 2026-10-13 against clean `a936faa`, following the user's request for
-an implementation handoff. This is a plan, not completed implementation or
-authorization to declare native acquisition safe. Follow AGENTS.md: commit
-completed, validated task code, tests, documentation and retained evidence
-together; keep unrelated work out. Use lists and screen-reader-friendly prose.
+Corrected 2026-10-13 after `c70c565`. This replaces the previous execution plan.
+The previous plan incorrectly made an optional CVS2 acquisition redesign and
+collection-wide output machinery prerequisites for useful game-port delivery.
 
-## Outcome and scope
+## Objective and boundaries
 
-The next delivery milestone is existing CVS2 selection behavior through shared
-session/presentation mechanisms, followed by a bounded CVS1 character-highlight
-feature using the same mechanisms. Preserve CVS2 Arcade, Versus and Training,
-including adjacent stage, groove, ratio and level speech. The full collection
-objective remains applicable F01-F19 support in all eight titles.
+Deliver usable, explicitly scoped CVS1 character-highlight speech, preserving
+working CVS2 behavior in Arcade, Versus and Training. Reuse existing shared
+presentation and speech mechanisms. Build only the integration this feature
+needs. The wider goal remains applicable F01-F19 support across all eight games.
 
-Execute steps 1-5 below now. Steps 6-8 are conditional delivery steps, not
-permission to bypass their evidence gates. If a gate remains unresolved,
-commit the completed offline work and give the exact missing dependency.
-Continue independent ready work; do not start another broad lifetime campaign.
-Do not claim that the offline milestone itself delivers a new playable game.
+CVS2 already has a native reader. Keep its current acquisition path; the proposed
+protected replacement is deferred. Completing native lifetime research, a new
+application-return producer, or the global atomic output dispatcher is not a
+prerequisite for sharing already-copied selection data or implementing this pilot.
+Existing contracts still describe the stronger designs if those are later chosen;
+do not claim their guarantees for a smaller implementation.
 
-## 1. Establish the current baseline once
+This does not establish that the existing reader is safe or that another game's
+addresses can be read by analogy. Justify the actual CVS1 access path, bounds,
+identity and lifecycle behavior needed for this feature. Address demonstrated
+hazards in that path. Do not turn an unresolved local question into a requirement
+to prove every callback and wait in the collection.
 
-Read this plan, AGENTS.md, CLAUDE.md, and these current contracts:
+## 1. Inspect the implementation and define the pilot
 
-- `docs/port-tasks/cvs2-shared-selection-handoff.md`, including its latest
-  continuation, for implementation and mode requirements.
-- `docs/port-tasks/shared-selection-milestone.md` for the scoped CVS1 target.
-- `docs/shared-output-dispatch-contract.md` for output race semantics.
-- `docs/collection-lifetime-probe.md` for the latest evidence and its limits.
-- `docs/collection-workflow.md` for shared-first delivery; historical model
-  assignments are task allocation, not proof that only Astra can solve a task.
+Read AGENTS.md, the current-direction notice in CLAUDE.md, this plan,
+`docs/port-tasks/cvs1-branch-a-names.md` (including its completion record),
+`docs/cvs1-selection-visits.md`, and the referenced acquisition evidence.
+Inspect the working tree and later commits before editing. Reuse
+`src/cvs2_select.{h,c}`, `src/game_selection.{h,c}`, `src/game_session.{h,c}`,
+`src/text_channel.{h,c}` and their existing tests where appropriate.
 
-Inspect `git status`, later commits, `build.ps1`, `src/game_session.{h,c}`,
-`src/game_selection.{h,c}`, `src/cvs2_select.{h,c}`, `src/text_channel.{h,c}`
-and their test runners. Reuse existing code and decoders. Shared session and
-presentation are currently offline components, absent from the DLL build.
+The starting CVS1 evidence is scoped to game 0, ROM 1/cvs1u, branch A,
+mode P+0x48=0, phase prefix 2,1,1,6,6, side 0, catalog selector 0.
+Do not silently expand that scope. The names packet currently records no
+certified ID/name associations. A scoped pilot is not full CVS1 completion.
 
-Recorded baseline: 121 collection Python tests; 35 native runners and build/
-import checks passed for `e7456b5`. At `a936faa`, the 121 tests were rerun and
-the retained live artifact hashes and full report reproduction verified.
-These are historical checks until rerun; don't repeat every audit merely to
-resume. Run the three relevant native runners before changing their behavior:
-`run_cvs2_test.ps1`, `run_game_session_test.ps1`, `run_game_selection_test.ps1`.
-Inspect each process exit code; an enclosing PowerShell command can hide a
-failed child. Preserve existing unrelated compiler warnings accurately.
+Write the acceptance checklist for this feature: correctly named highlights,
+settling, repeated selection in a new slot, leave/re-entry, backend rejection
+retry, and no continued CVS1 announcements after leaving its supported context.
+Preserve current CVS2 and shell speech. State unsupported owners/modes/ROMs.
 
-The deployed DLL remains the tested diagnostic build, SHA256
-`f5fa279ec1c47fb9c251c64beb7f62ce77e52be3f101aed01c28997596a135aa`.
-The lifetime marker was removed after the completed capture. Do not reinstall
-or enable diagnostics as part of the offline steps.
+## 2. Resolve only the CVS1 facts needed to speak correct choices
 
-## 2. Implement the worker-owned offline bridge
+Reuse the selected-ID writer/consumer traces and retained captures. Establish
+ID-to-name associations from the actual resources or labelled independent
+observations; never infer them from roster order. Keep unknown IDs and 0xff
+unmapped. Check visit and phase rules for the scoped feature.
 
-Use the existing handoff's step 1 to add `collection_session.{h,c}` or an
-equivalently small module. Own `game_session` and `game_selection` under one
-serialized worker. Inputs are bounded owned lifecycle/selection records;
-there are no native reads, hooks, pointer retention or direct speech calls.
+Use the existing bounded names packet, not a new collection-wide research
+campaign. If required runtime assets are absent offline, prepare one short
+capture request that identifies the exact missing associations. Do not repeat
+the already-explained four-tap experiment. Retain provenance and honest limits.
 
-Specify record bounds and adapter/ROM/mode, revocation identity, enclosing
-invocation, sequence/time, completion and loss fields. Keep native revocation
-labels separate from session generation/revision. Process invalidation before
-eligible records, reject stale acquisition, and resume only matching completion.
-Do not assign a new identity to an old observation on arrival. Reuse existing
-transport mechanisms; do not introduce a speech FIFO for selection.
+Exit: the supported choices have reproducible names and visit semantics.
+A partial map may be committed as progress, but cannot be called a complete
+character-selection feature. Keep progressing on independent implementation.
 
-Preserve two distinct settling samples, 500-ms age limits, owner grouping,
-backend retries and generation-versus-revision history. INACTIVE rearms an
-owner; UNAVAILABLE breaks settling without erasing accepted history. Invalid
-or short capture is suspension/unavailability, not a NULL decoder call that
-manufactures INACTIVE. Add meaningful lifecycle, reordering, loss, overflow,
-counter exhaustion and stale-publication tests with a fake backend.
+## 3. Implement the smallest reusable presentation integration
 
-Exit: deterministic bridge tests pass; production CVS2 behavior is unchanged.
-Commit this bounded implementation before expanding the work.
+Decode owned CVS1 fixture bytes into bounded copied selection choices. Keep
+native offsets, names and phase rules in the game adapter. Reuse `game_selection`
+and `tc_say` where they fit; use worker-owned session bookkeeping only to the
+extent required by the actual path. Do not invent native completion evidence
+or pretend worker labels protect memory from concurrent destruction.
 
-## 3. Extend decoder-to-presenter parity
+Use one selection presenter per active path, two distinct samples for settling,
+accepted-output history, bounded labels and backend retries. Distinguish an
+unavailable observation from a real exit from selection. Do not add a speech
+FIFO, second text channel, global dispatcher or native hook framework merely
+to deliver this feature.
 
-Extend `shared_sample`/`shared_replay` in `tools/test_cvs2_select.c` to use the
-bridge. Preserve legacy assertions as an independent wording/behavior baseline.
-Cover alternate selection, P2, simultaneous changes, repeated characters in
-new slots, cancel/re-entry, busy or inconsistent samples and backend rejection.
-Preserve stage/groove/ratio/level wording as well as character names.
+Validate common behavior against the existing CVS2 decoder/replay fixtures.
+If a small CVS2 presentation refactor makes reuse concrete, keep its acquisition
+unchanged and preserve wording, P2/grouped speech, stage, groove, ratio and level
+behavior. Do not remove sibling quote/text/audio work from its worker path.
+A wholesale CVS2 runtime migration is not a prerequisite for the CVS1 pilot.
 
-Verify the four local replay inputs against the hashes in the existing handoff.
-If a required fixture is absent, report that specific gap; do not silently
-replace recorded evidence with synthetic data. Clearly label synthetic mode,
-lifecycle and timing inputs. No additional live character-navigation capture
-is needed merely to implement this parity step.
+Exit: the scoped CVS1 decoder and shared presentation work on retained inputs,
+with relevant parity, invalid-data and acceptance/retry tests passing.
 
-Exit: shared output matches the existing behavior on the supported fixtures;
-tests distinguish lost/unavailable data from an observed selection exit.
+## 4. Connect the scoped CVS1 acquisition and deliver the feature
 
-## 4. Implement the output dispatcher behind a fake backend
+Use the traced CVS1 acquisition path and existing capture infrastructure as
+inputs to the implementation, not as automatic lifetime certification. Document
+the actual build/ROM admission, pointer chain, bounds, read cadence, phase checks,
+owned copy and exit/reset behavior. No native pointers may escape into delayed
+presentation. Add guards appropriate to the actual implementation and keep
+unsupported contexts inactive. Test invalid reads and stale observations.
 
-Implement `docs/shared-output-dispatch-contract.md` as a bounded standalone
-module before wiring it into shipping speech. Inventory actual `speech_say`
-and `speech_stop` callers. Preserve `tc_say` acceptance semantics and existing
-text policies; do not build another text channel or queue.
+If a concrete acquisition hazard blocks this feature, identify the exact read,
+allocation or mutation edge and the smallest needed fix or observation. Continue
+independent work. Do not resume the parked CVS2 lifetime campaign, enable an
+unapproved application-return producer, or demand universal scheduler proof.
+Escalation to Astra is optional for a specific difficult blocker, not a scheduled
+phase of every port. Do not conceal a blocker by claiming unproved safety.
 
-Use actual target-supported atomics and barrier-controlled concurrency tests.
-Test reservation versus revocation, acceptance versus revision/generation
-change, shell takeover, delayed old stops, rejected backend attempts, loss,
-bounded CAS failure and exhausted versions. Native callbacks must never wait
-for speech. Document the contract's permitted already-reserved attempt; do
-not claim immediate cancellation of audio already accepted by NVDA.
+Integrate the needed sources in `build.ps1`; preserve existing CVS2 acquisition
+and working features. The exit is a build that can speak the scoped CVS1 choices,
+not merely more standalone infrastructure tests.
 
-Keep dispatch IDs/leases and retirement bookkeeping attached to their original
-owners. Integrate the bridge with the fake dispatcher in offline tests. Do not
-partially route production speech while claiming that every backend call is
-ordered. Any production routing change requires the complete caller inventory
-and regression coverage. Audio scene activation is separate: its clock-event
-path must exist before enabling ownership that rejects legacy clock ticks.
+## 5. Validate, then perform a focused listening check
 
-Exit: deterministic concurrency controls and bridge/dispatcher integration
-tests pass. Commit the tested component even if native admission remains open.
+Run the relevant CVS1 decoder/acquisition and shared presentation tests. Reuse
+`tools/run_cvs2_test.ps1`, `tools/run_game_selection_test.ps1` and
+`tools/run_game_session_test.ps1` when those components change. Verify retained
+fixture hashes rather than silently substituting synthetic samples.
 
-## 5. Complete the bounded CVS1 name prerequisite
+For common speech or runtime wiring changes, run all native runners with each
+exit code checked, the collection Python suite, affected CVS1 tests, and the DLL
+build/import checks. Run `git diff --check`. Do not repeatedly run full suites
+without changes or failures that justify it. Baseline counts are historical:
+121 collection tests, 35 native runners; the CVS1 packet records 28 Python tests.
 
-Follow `docs/port-tasks/cvs1-branch-a-names.md` and its completion record.
-Reuse the acquisition/selection/visit traces and retained control/movement
-fixtures. The latest packet records 28 passing CVS1 Python tests, 67 pinned
-spans and 19 dispatch edges, but no certified ID/name associations.
+Prepare the tested build before requesting a short live exercise. Verify the game
+is closed before DLL replacement and retain a verified backup/hash. Ask for the
+specific CVS1 choices and transitions needed for acceptance, with plain-language
+instructions. Check preserved CVS2 behavior for any affected presentation path.
+Do not require more CVS2 diagnostic captures for an unrelated CVS1 feature.
 
-Trace native selected IDs to their displayed resources or use explicitly
-labelled independent evidence. Do not infer names from roster order. Unknown
-IDs and 0xff stay unmapped. Preserve exact scope: game 0, ROM 1/cvs1u, branch A,
-mode P+0x48=0, phase prefix 2,1,1,6,6, side 0, catalog selector 0. Other scopes
-remain pending. Deliver a reproducible map with provenance and negative tests.
+Separate offline validation from actual audible acceptance. No broad proof of
+native memory safety is implied by successful playback or passing tests.
 
-If assets needed for association are absent offline, prepare one small capture
-request naming the missing associations. Do not repeat the old four-tap test
-or solve unrelated renderer questions. A partial verified map is useful research
-but not a complete F02 port. A decoder for owned fixture bytes can proceed once
-its needed names and visit semantics are established; native activation cannot.
+## 6. Commit and continue toward all games
 
-## 6. Review the smallest runtime activation gate
+Commit cohesive validated code, tests, documentation and retained evidence before
+handoff, as AGENTS.md requires. Report delivered behavior, precise supported
+scope, checks, commit hash and remaining user-visible gaps. If blocked, name the
+specific dependency and retain completed work; do not describe infrastructure
+progress as a playable port.
 
-Before enabling a replacement producer, explicitly assess the lifetime and
-per-mode requirements in the CVS2 handoff. The existing shipping reader is a
-compatibility baseline, not proof of protected native access. Neither pointer
-brackets, guarded reads, thread identity nor passing tests prove exclusion.
+After the pilot, expand CVS1 owners, modes and applicable features, then continue
+CFJ, Alpha 3 Upper, Project Justice, Plasma Sword and Power Stone 1/2 according
+to `docs/collection-port-plan.md`. Reuse shared mechanisms as each feature needs
+them. Track per-game selection, announcements, gauges, position, clock and text
+coverage. Arena/four-player audio is work for those games, not this pilot's gate.
 
-The latest live capture confirms Free Play Training Change Character returns
-to stage selection, then groove, then character. Application invocation 24189
-contains matched cleanup/init/pause/application returns and five successful
-batch joins. The window dropped 11,225 records. Reset was not exercised;
-generic/retirement outcomes, signal outcomes and full arena-mutating descendant
-coverage remain open. The 4096 bypass is conditional, never an observed failure.
+## Parked work and retained evidence
 
-Do not repeat that exercise by default. If native admission still depends on
-unproved exclusion, stop activation and present a focused review packet: the
-exact proposed reader, ownership boundary, unresolved code edge and smallest
-needed observation. Astra is optional escalation for this difficult review,
-not a dependency for steps 2-5. No new native copy boundary is approved by this
-plan. Do not quietly relax an existing contract to make the milestone pass.
+The optional CVS2 protected-reader redesign, complete arena-mutating callback
+coverage, generic/retirement wait research, loss-reduction capture work and global
+atomic output dispatcher are deferred unless a concrete delivered feature or
+observed defect requires them. Do not restart them merely because older documents
+list them as next actions. Preserve their evidence and design contracts.
 
-## 7. Integrate and validate only admitted paths
+The retained Training capture establishes Change Character returning to stage
+selection and matched successful batch waits, with 11,225 dropped records. It
+neither exercises reset nor proves lifetime safety. The 4096 bypass remains a
+conditional counterexample, not an observed failure. The lifetime marker was
+removed; no diagnostic deployment is requested by this plan.
 
-When the activation and dispatcher gates are satisfied, link the relevant
-modules in `build.ps1` and route the admitted producer through the bridge.
-Exactly one selection presenter emits. Preserve sibling quote/text/audio calls
-currently sharing the CVS2 worker path. Keep native offsets and name tables
-inside adapters. Deliver the bounded CVS1 feature through the same presenter.
+## Instruction to Opus
 
-Run relevant tests after each change. Changes to common speech, guards or
-runtime wiring require the full native runner sweep with checked exit codes,
-collection Python tests, affected CVS1 tests, DLL build and import checks.
-Run `git diff --check`. Retain evidence of actual commands/results.
-
-Prepare a tested build and a short, plain-language live run card before asking
-the user to exercise it. Verify the game is closed before replacing its DLL;
-retain a verified backup and installed hash. Test CVS2 Arcade, Versus and
-Training, re-entry, rejection/retry and shell takeover. For CVS1, state the
-supported ROM/mode/owner/choices plainly. Offline tests are not live acceptance.
-
-## 8. Close the milestone and continue the collection ports
-
-Report separately: implemented behavior, offline validation, audible live
-acceptance, and remaining restrictions. Commit before handoff and give the
-hash. If only offline work is complete, say so explicitly and name the exact
-runtime blocker. Update existing handoffs instead of creating conflicting status.
-
-After validated CVS2/shared plus CVS1 character speech, extend CVS1's applicable
-features, then follow `docs/collection-port-plan.md` for CFJ, Alpha 3 Upper,
-Project Justice, Plasma Sword and Power Stone 1/2. Track features per game.
-Keep PWS2 renderer/four-player audio work out of the first selection milestone.
-Resolve game-specific facts when their next delivered feature needs them.
-
-## Suggested first instruction to Opus
-
-Read `docs/port-tasks/opus-shared-selection-execution.md` at `a936faa` or its
-descendant and execute steps 1-5 in order, committing validated increments.
-Start with the offline bridge and CVS2 parity, then the fake-backend output
-dispatcher and bounded CVS1 names work. Preserve shipping CVS2 in all three
-modes. Do not enable a new native producer, redeploy, or repeat broad lifetime
-research to complete those offline tasks. Review steps 6-8 for the eventual
-delivery gates. Continue independent ready work when one evidence item blocks;
-report any remaining blocker with its smallest concrete evidence request.
+Read `docs/port-tasks/opus-shared-selection-execution.md` and execute its corrected
+CVS1 feature-delivery sequence. Preserve the working CVS2 acquisition path. Reuse
+shared presentation with only the integration needed for usable CVS1 selection
+speech. Commit validated increments. Do not make the optional CVS2 reader
+replacement, global dispatcher or further collection-wide lifetime research a
+prerequisite. Report a concrete local blocker if one arises and continue
+independent work.

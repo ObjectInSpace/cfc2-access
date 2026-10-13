@@ -1,5 +1,19 @@
 # Next Astra session: upfront investigation and proof
 
+## Current direction, 2026-10-13: deliver CVS1 selection speech
+
+The [corrected Opus execution plan](port-tasks/opus-shared-selection-execution.md) supersedes conflicting sequencing
+and model assignments below. Preserve the existing CVS2 native acquisition
+path. Reuse shared presentation and implement only what the scoped CVS1 feature
+needs. The optional protected CVS2 reader replacement, global atomic output
+dispatcher and complete collection-wide lifetime investigation are deferred;
+they are not prerequisites for this pilot or sharing already-copied data.
+CVS1 still needs evidence-backed names and an appropriately justified acquisition
+path. Resolve concrete feature blockers without claiming unproved safety.
+Existing stronger-design contracts remain valid for those designs if pursued,
+but do not govern a smaller compatibility-preserving presentation integration.
+Historical research and captures remain evidence, not automatic next actions.
+
 Delivery objective: port CVS2's applicable F01–F19 accessibility features to
 the other seven games. Shared-first work must enable those deliveries and be
 validated by features working in other games. Do not replace the porting goal

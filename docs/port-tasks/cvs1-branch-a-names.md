@@ -1,5 +1,19 @@
 # CVS1 branch-A native ID/name provenance
 
+## Current direction, 2026-10-13: deliver CVS1 selection speech
+
+The [corrected Opus execution plan](opus-shared-selection-execution.md) supersedes conflicting sequencing
+and model assignments below. Preserve the existing CVS2 native acquisition
+path. Reuse shared presentation and implement only what the scoped CVS1 feature
+needs. The optional protected CVS2 reader replacement, global atomic output
+dispatcher and complete collection-wide lifetime investigation are deferred;
+they are not prerequisites for this pilot or sharing already-copied data.
+CVS1 still needs evidence-backed names and an appropriately justified acquisition
+path. Resolve concrete feature blockers without claiming unproved safety.
+Existing stronger-design contracts remain valid for those designs if pursued,
+but do not govern a smaller compatibility-preserving presentation integration.
+Historical research and captures remain evidence, not automatic next actions.
+
 ## Identity and scope
 
 - Task ID: CVS1-R01. Kind: bounded research. Status: ready for research.
