@@ -26,6 +26,10 @@ silent on pause. Field evidence: [cvs1-match-fields.md](cvs1-match-fields.md).
 
 ## Added after the Arcade capture (listening pending)
 
+Installed from `4846bc2`: DLL SHA256 `dacefdc898d265bb94dcb7da4fab7c099d86de1a95543ae45e97d8a1ad7b8f90`. The previous
+DLL, with health and position accepted, is kept as
+`dinput8.dll.pre-cvs1-meter-20261013.bak` (SHA256 `29245559...`).
+
 - A power-gauge tone as the gauge builds and when a super spends it, on the
   owner's side.
 - Clock ticks at 30, 15 and the last five seconds, when the clock counts
