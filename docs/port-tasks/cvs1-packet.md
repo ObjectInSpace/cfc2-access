@@ -55,6 +55,13 @@ map. Every other feature needs bounded discovery. No CVS1 runtime code exists.
 - F18 read-current: register one `tc_register` source once F17's queue is
   decoded.
 
+## Status update
+
+The capture for steps 1 and 3 below is built: `tools/cvs1_name_capture.py`,
+with 6 synthetic tests, three of them shown to fail under sabotage. The user
+session is described in [the run card](cvs1-name-capture-run-card.md). It
+has not been run yet.
+
 ## Next steps, in order
 
 1. Close the name map with labelled visual evidence. Extend the existing
