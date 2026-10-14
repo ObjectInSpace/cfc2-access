@@ -64,6 +64,11 @@ selection channel. Built and replay-tested; waiting on listening.
 
 ## Listening check
 
+Deployed `dinput8.dll` SHA-256
+`8d0c1dac3c5fdc563b22af4ebd017f1c67e6909c95a523a29e1606f7d997236f`
+(build of `e67f357`); the previous DLL is kept as
+`dinput8.dll.20261014-menus.bak`.
+
 1. In CVS1 Arcade, the groove screen says "Capcom Groove" on arrival, and
    up and down switch it.
 2. After the characters, the speed menu says "Turbo" on arrival, and down
