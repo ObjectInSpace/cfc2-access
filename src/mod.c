@@ -19,10 +19,12 @@
 #include "speech.h"
 #include "cvs2_select.h"
 #include "cvs1_select.h"
+#include "cfj_select.h"
 #include "cvs2_hit.h"
 #include "audio.h"
 #include "cvs2_frame.h"
 #include "cvs1_frame.h"
+#include "cfj_frame.h"
 #include "cvs2_story.h"
 #include "cvs2_text.h"
 #include "text_channel.h"
@@ -1747,8 +1749,9 @@ static DWORD WINAPI worker(LPVOID param)
         /* Health must be read ON the game's frame, not on our poll. */
         if (audio_ready() && hook_enabled) {
             cvs2_frame_install();
-            /* CVS1 cues through the same shared controller (cvs1_frame.h). */
+            /* CVS1 and CFJ cues through the same shared controller (cvs1_frame.h, cfj_frame.h). */
             cvs1_frame_install();
+            cfj_frame_install();
         }
     }
 
@@ -2025,9 +2028,10 @@ static DWORD WINAPI worker(LPVOID param)
 
             /* Read actual CVS2 selection on the speech worker, never a hook. */
             cvs2_select_tick();
-            /* CVS1 highlights through the same shared channel; each tick admits
-             * only its own game, so at most one of the two ever speaks. */
+            /* CVS1 and CFJ highlights through the same shared channel; each tick
+             * admits only its own game, so at most one of them ever speaks. */
             cvs1_select_tick();
+            cfj_select_tick();
             collection_probe_tick();
 
             /* ⚠ AFTER cvs2_select_tick(), not beside the keypress. That tick is
@@ -2038,6 +2042,7 @@ static DWORD WINAPI worker(LPVOID param)
             cvs2_gauges_log_stats();
             cvs2_frame_log_stats();
             cvs1_frame_log_stats();
+            cfj_frame_log_stats();
             cvs2_hit_poll_and_log();
 
             /* ⭐⭐⭐ THE MODAL CHECK RUNS AT 100 ms, NOT ON THE 2 s BEAT.

@@ -1,7 +1,12 @@
 # CFJ port packet: Capcom Fighting Evolution
 
 Audited 2026-10-13 against `9ecc31c`. Status: BOUNDED DISCOVERY NEEDED for
-every game-specific feature. No CFJ runtime code or capture exists.
+every game-specific feature.
+
+**2026-10-14: F02 character select is built** (`src/cfj_select.c`) from one
+live capture and the code that writes it. The user confirmed it in the game
+the same day. Evidence: [cfj-selection.md](cfj-selection.md). Match audio is
+built and confirmed by the user: [cfj-match-fields.md](cfj-match-fields.md).
 
 ## Identity and traced acquisition
 
@@ -12,7 +17,10 @@ every game-specific feature. No CFJ runtime code or capture exists.
 - Root slot `0x1422F3A80`, primary block 0x26E80, setup `0x1407CB660`, update
   wrapper `0x1407CAEE0` calling `0x1407CB8B0`. Cleanup callback `0x1407CB000`
   (it owns `0x1407CC090` and `0x1407D3200`, which are not update calls).
-- Nothing below the root is traced: no phase, player, text or camera field.
+- Traced below the root: phase R+0x21960, select sub-state R+0x21961, human
+  mask R+0x2197C and the select records at R+0x26E00. Fighter records start
+  near R+0x1E678, stride 0x660, with committed IDs at +0x5A0 (R+0x1EC18).
+  No player-health, text or camera field is traced yet.
 
 ## Feature mapping to the shared interfaces
 
