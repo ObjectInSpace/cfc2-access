@@ -14,6 +14,7 @@ MH_STATUS WINAPI MH_CreateHook(LPVOID t, LPVOID d, LPVOID *o) { (void)t; (void)d
 MH_STATUS WINAPI MH_EnableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
 MH_STATUS WINAPI MH_DisableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
 void z3u_text_capture(void) {}   /* run_z3u_text_test */
+void z3u_text_collect(void) {}
 
 #define SIZE 0x12F98u
 #define P0 0x1B0u

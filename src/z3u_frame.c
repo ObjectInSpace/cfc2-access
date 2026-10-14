@@ -40,8 +40,18 @@ static const unsigned char FRAME_SIG[] = {
 #define SCREEN_HALF 192.0f
 #define GROUND      40.0f
 
+/* Attract walker: the opening screens (task modes 1 and 2, 0x14089A540 and
+ * 0x14089A650) print through it, and it draws and CLEARS each record inside
+ * the update, so the text is collected on its entry. mov rax,rsp ;
+ * mov [rax+0x10],rbx ; mov [rax+0x18],rbp ; mov [rax+0x20],rsi */
+#define WALKER_FN  0x1408797D0ull
+static const unsigned char WALKER_SIG[] = {
+    0x48,0x8B,0xC4, 0x48,0x89,0x58,0x10, 0x48,0x89,0x68,0x18, 0x48,0x89,0x70,0x20
+};
+
 typedef void (*pfn_frame)(void);
-static pfn_frame g_real_frame;
+static pfn_frame g_real_frame, g_real_walker;
+static volatile LONG g_walker_installed;
 static volatile LONG g_frames, g_changes, g_installed, g_pauses;
 static int g_last_hp[2] = { -1, -1 };
 static match_audio_producer g_prod = {
@@ -136,6 +146,12 @@ static void frame_detour(void)
     z3u_text_capture();
 }
 
+static void walker_detour(void)
+{
+    z3u_text_collect();
+    g_real_walker();
+}
+
 static BOOL beside_exe(const char *leaf)
 {
     char path[MAX_PATH];
@@ -173,6 +189,17 @@ BOOL z3u_frame_install(void)
     }
     InterlockedExchange(&g_installed, 1);
     log_line("z3u-frame: hooked Alpha 3's per-frame update at 0x%llx", FRAME_FN);
+    /* Text only: the frame hook stands without it. */
+    if (memcmp((const void *)(ULONG_PTR)WALKER_FN, WALKER_SIG, sizeof WALKER_SIG)) {
+        log_line("z3u-frame: ⛔ attract walker bytes differ; opening-screen text is off");
+    } else if (MH_CreateHook((LPVOID)(ULONG_PTR)WALKER_FN, (LPVOID)walker_detour,
+                             (LPVOID *)&g_real_walker) != MH_OK ||
+               MH_EnableHook((LPVOID)(ULONG_PTR)WALKER_FN) != MH_OK) {
+        log_line("z3u-frame: ⛔ MinHook refused 0x%llx; opening-screen text is off", WALKER_FN);
+    } else {
+        InterlockedExchange(&g_walker_installed, 1);
+        log_line("z3u-frame: hooked the attract text walker at 0x%llx", WALKER_FN);
+    }
     return TRUE;
 }
 
@@ -180,6 +207,8 @@ void z3u_frame_remove(void)
 {
     if (InterlockedCompareExchange(&g_installed, 0, 1) == 1)
         MH_DisableHook((LPVOID)(ULONG_PTR)FRAME_FN);
+    if (InterlockedCompareExchange(&g_walker_installed, 0, 1) == 1)
+        MH_DisableHook((LPVOID)(ULONG_PTR)WALKER_FN);
 }
 
 LONG z3u_frame_count(void) { return InterlockedCompareExchange(&g_frames, 0, 0); }
