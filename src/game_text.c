@@ -28,8 +28,27 @@ static void note_refused(game_text_source *s, const tc_row *r)
     log_line("%s: refused row style=%d bytes: %s", s->tag, r->style, hex);
 }
 
-/* Automatic narration speaks new lines with letters; the ` key reads the
- * whole current frame, digits included, ignoring de-duplication. */
+/* The arcade board's credit display: FREE PLAY, or CREDIT(S) and a count.
+ * Every game draws it on every screen between fights, so with the 2 s re-arm
+ * it was narrated at each screen change -- seven times in one CVS1 session,
+ * user-reported as "saying free play sometimes and it's not clear why"
+ * (2026-10-14). It is board status, not screen content: never narrated,
+ * still read by the ` key. */
+static BOOL coin_status(const wchar_t *t)
+{
+    if (!wcscmp(t, L"FREE PLAY")) return TRUE;
+    if (wcsncmp(t, L"CREDIT", 6)) return FALSE;
+    t += 6;
+    if (*t == L'S') ++t;
+    while (*t == L' ' || *t == L':') ++t;
+    if (!*t) return FALSE;
+    while (*t >= L'0' && *t <= L'9') ++t;
+    return !*t;
+}
+
+/* Automatic narration speaks new lines with letters, except the credit
+ * display; the ` key reads the whole current frame, digits included,
+ * ignoring de-duplication. */
 static tc_read_result assemble(game_text_source *s, BOOL manual, wchar_t *say, SIZE_T say_cap)
 {
     static tc_frame frame;                /* worker only */
@@ -57,7 +76,7 @@ static tc_read_result assemble(game_text_source *s, BOOL manual, wchar_t *say, S
         for (j = 0; j < i; ++j) if (!wcscmp(decoded[j], decoded[i])) break;
         if (j < i) continue;
         if (!manual) {
-            if (!tc_has_letters(decoded[i])) continue;
+            if (!tc_has_letters(decoded[i]) || coin_status(decoded[i])) continue;
             slot = tc_textdedup_note(&s->dedup, decoded[i], now, REARM_MS, &suppress);
             if (suppress) continue;
         }

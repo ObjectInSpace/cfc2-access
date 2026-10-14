@@ -66,6 +66,24 @@ int main(void)
     game_text_observe(&src, 0x1000);
     assert(calls == 1);                              /* digits are not narrated */
 
+    /* 2b. The board's credit display is never narrated; real prompts that
+     *     merely contain the words still are. */
+    frame("FREE PLAY", 1, "CREDITS: 03", 1);
+    game_text_observe(&src, 0x1000);
+    frame("CREDIT 1", 1, NULL, 0);
+    game_text_observe(&src, 0x1000);
+    assert(calls == 1);
+    frame("FREE PLAY MODE", 1, NULL, 0);
+    game_text_observe(&src, 0x1000);
+    assert(calls == 2 && !wcscmp(last, L"FREE PLAY MODE"));
+    frame("CREDITS", 1, NULL, 0);
+    game_text_observe(&src, 0x1000);
+    assert(calls == 3 && !wcscmp(last, L"CREDITS"));     /* the roll's title */
+    frame("FREE PLAY", 1, NULL, 0);
+    game_text_observe(&src, 0x1000);
+    assert(game_text_read_current(&src) == TC_READ_SPOKE);
+    assert(calls == 4 && !wcscmp(last, L"FREE PLAY"));   /* ` still reads it */
+
     /* 3. The ` key reads the whole frame, digits included. */
     frame("CONTINUE?", 1, "9", 1);
     game_text_observe(&src, 0x1000);
@@ -104,7 +122,7 @@ int main(void)
     game_text_observe(&src, 0);
     assert(game_text_read_current(&src) == TC_READ_INACTIVE);
 
-    printf("PASS: shared game text -- speak once, in-frame repeats, digits, ` read, "
+    printf("PASS: shared game text -- speak once, in-frame repeats, digits, credit display, ` read, "
            "retry after refusal, refused rows logged once, quiet rows, session reset\n");
     return 0;
 }
