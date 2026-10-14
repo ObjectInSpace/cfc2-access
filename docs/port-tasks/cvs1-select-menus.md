@@ -3,7 +3,11 @@
 User report the same day: the groove menu, a second menu after choosing a
 character in Arcade, and the "choose the order of the bout" screen all read
 nothing. All three are now spoken by `src/cvs1_select.c` through the shared
-selection channel. Built and replay-tested; waiting on listening.
+selection channel.
+
+✅ Confirmed by the user in the game, 2026-10-14, after v0.5.0: "Everything's
+tested in game and works fine." A general acceptance covering this release,
+not a pass of each item in the listening check below.
 
 ## Evidence
 
