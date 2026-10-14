@@ -14,14 +14,15 @@
  * log rather than silently missing from speech. Worker only. */
 static void note_refused(game_text_source *s, const tc_row *r)
 {
+    game_text_state *st = s->state;
     unsigned h = 2166136261u, i;
     char hex[3 * TC_RAW_CAP + 1];
     SIZE_T n = 0;
     for (i = 0; i < TC_RAW_CAP && r->raw[i]; ++i) h = (h ^ (unsigned char)r->raw[i]) * 16777619u;
     h ^= (unsigned)r->style;
-    for (i = 0; i < s->refused_used; ++i) if (s->refused_hash[i] == h) return;
-    if (s->refused_used == 32) return;
-    s->refused_hash[s->refused_used++] = h;
+    for (i = 0; i < st->refused_used; ++i) if (st->refused_hash[i] == h) return;
+    if (st->refused_used == 32) return;
+    st->refused_hash[st->refused_used++] = h;
     for (i = 0; i < TC_RAW_CAP && r->raw[i] && n + 4 < sizeof hex; ++i)
         n += (SIZE_T)snprintf(hex + n, sizeof hex - n, "%02x ", (unsigned char)r->raw[i]);
     hex[n] = 0;
@@ -53,6 +54,7 @@ static tc_read_result assemble(game_text_source *s, BOOL manual, wchar_t *say, S
 {
     static tc_frame frame;                /* worker only */
     static wchar_t decoded[TC_ROW_CAP][TC_LINE_CAP];
+    game_text_state *st = s->state;
     int accepted[TC_ROW_CAP];
     unsigned i, j, count = 0;
     ULONGLONG now = GetTickCount64();
@@ -60,7 +62,7 @@ static tc_read_result assemble(game_text_source *s, BOOL manual, wchar_t *say, S
     char source[64];
 
     say[0] = 0;
-    if (!tc_frame_take(&s->publisher, &frame, &s->consumed, manual, FRESH_MS))
+    if (!tc_frame_take(&st->publisher, &frame, &st->consumed, manual, FRESH_MS))
         return TC_READ_STALE;
     memset(decoded, 0, sizeof decoded);
     for (i = 0; i < frame.count; ++i) {
@@ -77,7 +79,7 @@ static tc_read_result assemble(game_text_source *s, BOOL manual, wchar_t *say, S
         if (j < i) continue;
         if (!manual) {
             if (!tc_has_letters(decoded[i]) || coin_status(decoded[i])) continue;
-            slot = tc_textdedup_note(&s->dedup, decoded[i], now, REARM_MS, &suppress);
+            slot = tc_textdedup_note(&st->dedup, decoded[i], now, REARM_MS, &suppress);
             if (suppress) continue;
         }
         length = wcslen(decoded[i]);
@@ -92,7 +94,7 @@ static tc_read_result assemble(game_text_source *s, BOOL manual, wchar_t *say, S
     if (!tc_say(say, manual, source))
         return TC_READ_REFUSED;
     if (!manual)
-        for (i = 0; i < count; ++i) tc_textdedup_mark(&s->dedup, accepted[i]);
+        for (i = 0; i < count; ++i) tc_textdedup_mark(&st->dedup, accepted[i]);
     if (frame.overflow)
         log_line("%s: capture limit reached; some rows were dropped", s->tag);
     return TC_READ_SPOKE;
@@ -101,17 +103,18 @@ static tc_read_result assemble(game_text_source *s, BOOL manual, wchar_t *say, S
 tc_read_result game_text_read_current(game_text_source *s)
 {
     wchar_t say[TC_SAY_CAP];
-    if (!s->active_root) return TC_READ_INACTIVE;
+    if (!s->state->active_root) return TC_READ_INACTIVE;
     return assemble(s, TRUE, say, TC_SAY_CAP);
 }
 
 void game_text_observe(game_text_source *s, ULONGLONG root)
 {
+    game_text_state *st = s->state;
     wchar_t say[TC_SAY_CAP];
-    if (root != s->active_root) {
-        tc_textdedup_reset(&s->dedup);
-        s->active_root = root;
-        tc_frame_invalidate(&s->publisher);
+    if (root != st->active_root) {
+        tc_textdedup_reset(&st->dedup);
+        st->active_root = root;
+        tc_frame_invalidate(&st->publisher);
     }
     if (!root) return;
     assemble(s, FALSE, say, TC_SAY_CAP);

@@ -34,14 +34,15 @@ static BOOL decode(int style, const char *raw, wchar_t *out, SIZE_T cap)
     return tc_squeeze(out) > 0;
 }
 static BOOL quiet(const tc_row *r) { return r->style == 0; }
-static game_text_source src = GAME_TEXT_SOURCE("fake-text", "Fake", decode, quiet);
+static game_text_state state;
+static game_text_source src = GAME_TEXT_SOURCE("fake-text", "Fake", decode, quiet, &state);
 static tc_frame collecting;
 
 static void frame(const char *a, int sa, const char *b, int sb)
 {
     if (a) tc_frame_add(&collecting, 0.0f, 0.0f, sa, 0, a, TC_RAW_CAP);
     if (b) tc_frame_add(&collecting, 0.0f, 1.0f, sb, 0, b, TC_RAW_CAP);
-    tc_frame_publish(&src.publisher, &collecting);
+    tc_frame_publish(&state.publisher, &collecting);
 }
 
 int main(void)

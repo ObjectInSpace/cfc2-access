@@ -59,6 +59,16 @@ $foreign = @($imports | Where-Object { $_ -notmatch $system })
 if ($foreign.Count) { throw "dinput8.dll imports non-system DLL(s): $($foreign -join ', ')" }
 Write-Host "Imports OK: $($imports -join ', ')"
 
+# ⛔ v0.5.0 was 900 KB, 546 KB of it zeros: each game text reader's buffers
+# sat inside a statically INITIALISED struct, and an initialised object is
+# stored whole in the DLL. Buffers belong in zeroed statics (.bss, free on
+# disk); see game_text.h. Real tables are tens of KB, so 128 KB of .data
+# means a buffer has slipped back in.
+$dataLine = & $objdump -h "$root\build\dinput8.dll" | Select-String '^\s*\d+\s+\.data\s+([0-9a-f]+)'
+$dataSize = [Convert]::ToInt64($dataLine.Matches[0].Groups[1].Value, 16)
+if ($dataSize -gt 128KB) { throw ".data is $([int]($dataSize / 1KB)) KB: a zero buffer is in an initialised static (see game_text.h)" }
+Write-Host "Initialised data OK: $([int]($dataSize / 1KB)) KB"
+
 # nvdaControllerClient.dll is REQUIRED for NVDA output: UniversalSpeech
 # loads it by that exact (unsuffixed) name and silently falls back to SAPI5
 # if it is absent. ZDSRAPI.dll likewise backs the ZDSR reader.

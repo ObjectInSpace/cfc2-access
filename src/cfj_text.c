@@ -18,6 +18,7 @@
 
 
 static game_text_source source;
+static game_text_state state;       /* zeroed, so .bss: see game_text.h */
 static tc_frame collecting;            /* the CFJ update's thread only */
 
 void cfj_text_capture(void)
@@ -33,7 +34,7 @@ void cfj_text_capture(void)
         memcpy(&style, r + 4, 4);
         tc_frame_add(&collecting, (float)x, (float)y, style, 0, (const char *)r + 8, TEXT_CAP);
     }
-    tc_frame_publish(&source.publisher, &collecting);
+    tc_frame_publish(&state.publisher, &collecting);
 }
 
 /* Renderer 0x1407DB720: style 0 returns before drawing. '^' consumes the
@@ -70,7 +71,7 @@ BOOL cfj_text_decode(int style, const char *raw, wchar_t *out, SIZE_T cap)
 static BOOL quiet_style0(const tc_row *r) { return r->style == 0; }
 
 static game_text_source source =
-    GAME_TEXT_SOURCE("cfj-text", "CFJ", cfj_text_decode, quiet_style0);
+    GAME_TEXT_SOURCE("cfj-text", "CFJ", cfj_text_decode, quiet_style0, &state);
 
 static tc_read_result read_current(void) { return game_text_read_current(&source); }
 

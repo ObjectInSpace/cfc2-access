@@ -25,6 +25,7 @@
  * per blink but must speak on a later visit: CVS2's measured policy. */
 
 static game_text_source source;
+static game_text_state state;       /* zeroed, so .bss: see game_text.h */
 static tc_frame collecting;            /* the CVS1 update's thread only */
 
 void cvs1_text_capture(void)
@@ -38,7 +39,7 @@ void cvs1_text_capture(void)
         tc_frame_add(&collecting, (float)r[0], (float)r[1], r[2], 0,
                      (const char *)r + 3, TEXT_CAP);
     }
-    tc_frame_publish(&source.publisher, &collecting);
+    tc_frame_publish(&state.publisher, &collecting);
 }
 
 /* 0x1405C8F40: '^' consumes the next byte -- "^Z" draws byte 0x5C, any
@@ -68,7 +69,7 @@ BOOL cvs1_text_decode(int style, const char *raw, wchar_t *out, SIZE_T cap)
 }
 
 static game_text_source source =
-    GAME_TEXT_SOURCE("cvs1-text", "CVS1", cvs1_text_decode, NULL);
+    GAME_TEXT_SOURCE("cvs1-text", "CVS1", cvs1_text_decode, NULL, &state);
 
 static tc_read_result read_current(void) { return game_text_read_current(&source); }
 

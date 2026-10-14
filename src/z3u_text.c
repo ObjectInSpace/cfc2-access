@@ -37,6 +37,7 @@
 #define ENTRY_CAP    (TC_RAW_CAP - 1)
 
 static game_text_source source;
+static game_text_state state;       /* zeroed, so .bss: see game_text.h */
 static tc_frame collecting;            /* the Alpha 3 update's thread only */
 
 static SIZE_T room(ULONGLONG p, ULONGLONG root)
@@ -125,7 +126,7 @@ void z3u_text_capture(void)
     ULONGLONG root = *(volatile ULONGLONG *)(ULONG_PTR)ROOT_PTR;
     z3u_text_collect();
     if (root && root < 0x00007FFF00000000ull) collect_messages(root);
-    tc_frame_publish(&source.publisher, &collecting);
+    tc_frame_publish(&state.publisher, &collecting);
 }
 
 /* In-game drawer 0x14087F5B0 and attract walker 0x1408797D0: each byte above
@@ -155,7 +156,7 @@ BOOL z3u_text_decode(int font, const char *raw, wchar_t *out, SIZE_T cap)
 }
 
 static game_text_source source =
-    GAME_TEXT_SOURCE("z3u-text", "Alpha 3", z3u_text_decode, NULL);
+    GAME_TEXT_SOURCE("z3u-text", "Alpha 3", z3u_text_decode, NULL, &state);
 
 static tc_read_result read_current(void) { return game_text_read_current(&source); }
 

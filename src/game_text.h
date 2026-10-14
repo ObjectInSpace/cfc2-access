@@ -22,23 +22,34 @@ typedef BOOL (*game_text_decode_fn)(int style, const char *raw, wchar_t *out, SI
  * line (CFJ's style 0, which its renderer never draws). */
 typedef BOOL (*game_text_quiet_fn)(const tc_row *row);
 
+/* Everything that changes at run time. The game declares one as a plain
+ * `static game_text_state` and never initialises it: zero is a valid empty
+ * state (SRWLOCK_INIT is zero).
+ *
+ * ⚠ KEPT OUT OF game_text_source ON PURPOSE. That struct is statically
+ * initialised (tag, decoder), and an initialised object is stored whole in
+ * the DLL, zeros included. With the 182 KB of buffers below embedded in it,
+ * the three text readers were 546 KB of zeros, most of the v0.5.0 DLL. As a
+ * separate zeroed static it is .bss and costs nothing on disk. */
 typedef struct {
-    /* Set by the game. */
+    tc_publisher publisher;           /* the capture publishes here (game thread) */
+    tc_textdedup dedup;               /* the rest is worker state                 */
+    ULONGLONG active_root;
+    unsigned consumed;
+    unsigned refused_hash[32], refused_used;
+} game_text_state;
+
+typedef struct {
     const char *tag;                  /* log and speech source, "cfj-text"   */
     const char *name;                 /* the ` key source name, "CFJ"        */
     game_text_decode_fn decode;
     game_text_quiet_fn quiet;         /* may be NULL                         */
-    /* The capture publishes here (game thread); the rest is worker state. */
-    tc_publisher publisher;
-    tc_textdedup dedup;
-    ULONGLONG active_root;
-    unsigned consumed;
-    unsigned refused_hash[32], refused_used;
+    game_text_state *state;           /* the game's zeroed static            */
 } game_text_source;
 
-#define GAME_TEXT_SOURCE(tag_, name_, decode_, quiet_) \
+#define GAME_TEXT_SOURCE(tag_, name_, decode_, quiet_, state_) \
     { .tag = (tag_), .name = (name_), .decode = (decode_), .quiet = (quiet_), \
-      .publisher = { .lock = SRWLOCK_INIT } }
+      .state = (state_) }
 
 /* Worker. Root of the admitted game block, or 0 when the game is not running.
  * A new root forgets what was spoken and discards the old session's frame. */
