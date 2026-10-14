@@ -39,13 +39,64 @@ reads the whole current frame, digits included.
     - The trace shows four entries, one at a time, about 3.8 s each. The format is checked against Ryu's entries in the shipped `bin/z3u` (file offset 0x4C3C8F6): "Ryu is a man following the path to become a true martial artist."
 
 Rows a decoder refuses are logged once each, at most 32 per run, as
-`cvs1-text: refused row` or `cfj-text: refused row`, with their bytes. That is
-how unmapped glyphs are found.
+`cvs1-text: refused row`, `cfj-text: refused row` or `z3u-text: refused row`,
+with their bytes. That is how unmapped glyphs are found.
 
-Tests: `run_cvs1_text_test.ps1` and `run_cfj_text_test.ps1`. They use the
-producer literals and each renderer's rules, and the sabotages are recorded in
-the commit. ⚠ No live capture of either queue yet: the first run's log is the
-live evidence.
+## One shared reader, per-game capture and decode (2026-10-14)
+
+`src/game_text.c` is the worker half all three readers share:
+- taking the published frame;
+- decoding each row with the game's decoder;
+- dropping repeats within a frame;
+- narrating new lines with letters, with the 2-second re-arm;
+- the `` ` `` key;
+- refused-row logging;
+- session reset.
+
+Each game's file keeps only two things:
+- its capture (where the text lives and when to copy it, on the game thread);
+- its decoder (how its bytes read).
+
+Before this, the same ~90 lines were copied into each reader. A new game adds
+a capture, a decoder and one `GAME_TEXT_SOURCE`; it does not copy the policy.
+
+Tests:
+- `run_game_text_test.ps1` drives the shared half through a fake game. Eight
+  sabotages each fail it:
+  - in-frame repeats kept;
+  - digits narrated;
+  - no de-dup;
+  - marking a line spoken before the backend accepted it;
+  - refusals logged every time;
+  - quiet rows logged;
+  - no session reset;
+  - inactive not reported.
+- `run_cvs1_text_test.ps1`, `run_cfj_text_test.ps1` and
+  `run_z3u_text_test.ps1` test each game's decoder against its own literals.
+- ⚠ CVS1's and CFJ's queues have still not been captured live.
+
+## Cross-game audit of Alpha 3's two text patterns (2026-10-14)
+
+- **A drawer that clears its records inside the frame** (Alpha 3's attract
+  walker). This is not the case in CVS1 or CFJ. Each has one reset, called
+  before its drain in the update: CVS1 reset `0x1405AE5F0` at `0x1405A6640`,
+  then the drain at `0x1405A664A`; CFJ's reset path at `0x1407CB8C3`, then the
+  drain at `0x1407CB8FD`. The drains draw without clearing, so the
+  after-update capture sees every queued line on every screen.
+- **Text typed from the game's data through a pointer** (Alpha 3's story
+  screen).
+  - CVS1's shipped data holds about 365 lines of win quotes (from file offset
+    0x43E51A0 in `bin/cvs1`), plus boss dialogue such as "Welcome to the
+    'Shadaloo' laboratory." (0x43E9870). How CVS1 draws them is not traced,
+    and no capture has reached those screens, so whether the queue reader
+    speaks them is unknown. CVS1's queue does have six producer sites that
+    print a `%s`; tracing what they pass is the next step.
+  - CFJ's data holds no English prose as ASCII or UTF-16. Its quotes or
+    stories, if any, are stored another way and need a capture of those
+    screens first.
+  - An inventory of every `[context+8] + constant` data access shows only 5
+    sites in CVS1 and 4 in Alpha 3 (two of them the story table), so this
+    addressing is rare. It is not how CVS1's quotes are reached.
 
 ## Not covered yet
 

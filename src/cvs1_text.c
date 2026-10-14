@@ -2,6 +2,7 @@
  * record layout, and the renderer's byte syntax. Buffering, publication,
  * de-duplication, speech and the ` key are shared (src/text_channel.h). */
 #include "cvs1_text.h"
+#include "game_text.h"
 #include "log.h"
 #include <string.h>
 #include <wchar.h>
@@ -22,11 +23,9 @@
 
 /* A blinking prompt ("PRESS START BUTTON", "INSERT COIN(S)") must not repeat
  * per blink but must speak on a later visit: CVS2's measured policy. */
-#define REARM_MS 2000
-#define FRESH_MS 500
 
+static game_text_source source;
 static tc_frame collecting;            /* the CVS1 update's thread only */
-static tc_publisher publisher = { SRWLOCK_INIT, {0}, 0, 0 };
 
 void cvs1_text_capture(void)
 {
@@ -39,7 +38,7 @@ void cvs1_text_capture(void)
         tc_frame_add(&collecting, (float)r[0], (float)r[1], r[2], 0,
                      (const char *)r + 3, TEXT_CAP);
     }
-    tc_frame_publish(&publisher, &collecting);
+    tc_frame_publish(&source.publisher, &collecting);
 }
 
 /* 0x1405C8F40: '^' consumes the next byte -- "^Z" draws byte 0x5C, any
@@ -68,96 +67,11 @@ BOOL cvs1_text_decode(int style, const char *raw, wchar_t *out, SIZE_T cap)
     return tc_squeeze(out) > 0;
 }
 
-#define TAG "cvs1-text"
+static game_text_source source =
+    GAME_TEXT_SOURCE("cvs1-text", "CVS1", cvs1_text_decode, NULL);
 
-/* Rows the decoder refused, logged once each (at most 32 per run) with
- * their raw bytes, so an unmapped glyph is visible in the log rather than
- * silently missing from speech. Worker only. */
-static void note_refused(const tc_row *r)
-{
-    static unsigned hashes[32], used;
-    unsigned h = 2166136261u, i;
-    char hex[3 * TC_RAW_CAP + 1];
-    SIZE_T n = 0;
-    for (i = 0; i < TC_RAW_CAP && r->raw[i]; ++i) h = (h ^ (unsigned char)r->raw[i]) * 16777619u;
-    h ^= (unsigned)r->style;
-    for (i = 0; i < used; ++i) if (hashes[i] == h) return;
-    if (used == 32) return;
-    hashes[used++] = h;
-    for (i = 0; i < TC_RAW_CAP && r->raw[i] && n + 4 < sizeof hex; ++i)
-        n += (SIZE_T)snprintf(hex + n, sizeof hex - n, "%02x ", (unsigned char)r->raw[i]);
-    hex[n] = 0;
-    log_line("%s: refused row style=%d bytes: %s", TAG, r->style, hex);
-}
+static tc_read_result read_current(void) { return game_text_read_current(&source); }
 
-static tc_textdedup dedup;
-static ULONGLONG active_root;
-static unsigned consumed;
-
-/* Automatic narration speaks new lines with letters; the ` key reads the
- * whole current frame, digits included, ignoring de-duplication. */
-static tc_read_result assemble(BOOL manual, wchar_t *say, SIZE_T say_cap)
-{
-    static tc_frame frame;                /* worker only */
-    static wchar_t decoded[TC_ROW_CAP][TC_LINE_CAP];
-    int accepted[TC_ROW_CAP];
-    unsigned i, j, count = 0;
-    ULONGLONG now = GetTickCount64();
-    SIZE_T used = 0;
-
-    say[0] = 0;
-    if (!tc_frame_take(&publisher, &frame, &consumed, manual, FRESH_MS))
-        return TC_READ_STALE;
-    memset(decoded, 0, sizeof decoded);
-    for (i = 0; i < frame.count; ++i) {
-        BOOL suppress = FALSE;
-        int slot = -1;
-        SIZE_T length;
-        if (!cvs1_text_decode(frame.rows[i].style, frame.rows[i].raw, decoded[i], TC_LINE_CAP)) {
-            if (frame.rows[i].raw[0]) note_refused(&frame.rows[i]);
-            continue;
-        }
-        for (j = 0; j < i; ++j) if (!wcscmp(decoded[j], decoded[i])) break;
-        if (j < i) continue;
-        if (!manual) {
-            if (!tc_has_letters(decoded[i])) continue;
-            slot = tc_textdedup_note(&dedup, decoded[i], now, REARM_MS, &suppress);
-            if (suppress) continue;
-        }
-        length = wcslen(decoded[i]);
-        if (used + length + 3 >= say_cap) break;
-        if (used) { say[used++] = L' '; say[used++] = L'\n'; }
-        memcpy(say + used, decoded[i], (length + 1) * sizeof(wchar_t));
-        used += length;
-        accepted[count++] = slot;
-    }
-    if (!used) return TC_READ_EMPTY;
-    if (!tc_say(say, manual, manual ? "cvs1-text (read current)" : "cvs1-text"))
-        return TC_READ_REFUSED;
-    if (!manual)
-        for (i = 0; i < count; ++i) tc_textdedup_mark(&dedup, accepted[i]);
-    if (frame.overflow)
-        log_line("cvs1-text: capture limit reached; some rows were dropped");
-    return TC_READ_SPOKE;
-}
-
-static tc_read_result read_current(void)
-{
-    wchar_t say[TC_SAY_CAP];
-    if (!active_root) return TC_READ_INACTIVE;
-    return assemble(TRUE, say, TC_SAY_CAP);
-}
-
-void cvs1_text_observe(ULONGLONG root)
-{
-    wchar_t say[TC_SAY_CAP];
-    if (root != active_root) {
-        tc_textdedup_reset(&dedup);
-        active_root = root;
-        tc_frame_invalidate(&publisher);
-    }
-    if (!root) return;
-    assemble(FALSE, say, TC_SAY_CAP);
-}
+void cvs1_text_observe(ULONGLONG root) { game_text_observe(&source, root); }
 
 void cvs1_text_register(void) { tc_register("CVS1", read_current); }
