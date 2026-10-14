@@ -28,6 +28,7 @@
 #include "cvs1_text.h"
 #include "cfj_text.h"
 #include "cfj_frame.h"
+#include "z3u_frame.h"
 #include "cvs2_story.h"
 #include "cvs2_text.h"
 #include "text_channel.h"
@@ -1755,9 +1756,11 @@ static DWORD WINAPI worker(LPVOID param)
         /* Health must be read ON the game's frame, not on our poll. */
         if (audio_ready() && hook_enabled) {
             cvs2_frame_install();
-            /* CVS1 and CFJ cues through the same shared controller (cvs1_frame.h, cfj_frame.h). */
+            /* CVS1, CFJ and Alpha 3 cues through the same shared controller
+             * (cvs1_frame.h, cfj_frame.h, z3u_frame.h). */
             cvs1_frame_install();
             cfj_frame_install();
+            z3u_frame_install();
         }
     }
 
@@ -2050,6 +2053,7 @@ static DWORD WINAPI worker(LPVOID param)
             cvs2_frame_log_stats();
             cvs1_frame_log_stats();
             cfj_frame_log_stats();
+            z3u_frame_log_stats();
             cvs2_hit_poll_and_log();
 
             /* ⭐⭐⭐ THE MODAL CHECK RUNS AT 100 ms, NOT ON THE 2 s BEAT.

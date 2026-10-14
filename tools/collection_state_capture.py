@@ -57,6 +57,7 @@ OWN_HOOKS = {
     0x1406AA7A0: bytes.fromhex('48895c2408'),   # cvs2_frame.c
     0x1405A65F0: bytes.fromhex('4883ec28e8'),   # cvs1_frame.c
     0x1407CB8B0: bytes.fromhex('4883ec28e8'),   # cfj_frame.c
+    0x14086D160: bytes.fromhex('48895c2408'),   # z3u_frame.c
 }
 
 

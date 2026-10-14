@@ -5,6 +5,9 @@
 #include "selection_channel.h"
 #include "character_name_table.h"
 #include "memsafe.h"
+#include "match_audio.h"
+#include "z3u_frame.h"
+#include "audio.h"
 #include "log.h"
 #include <string.h>
 #include <stdio.h>
@@ -186,6 +189,47 @@ static BOOL data_matches(void)
     return TRUE;
 }
 
+/* Match-audio ownership for Alpha 3, worker only, as cfj_audio_route: a new
+ * epoch per presentation owner (root + ROM); the frame hook feeds only an
+ * epoch that names game 3. The whole block froze while paused in the
+ * capture (the update did not run), so the worker turns the beacons off
+ * after STALL_MS without frames. */
+#define STALL_MS 250u
+static void z3u_audio_route(ULONGLONG root, unsigned rom)
+{
+    static uint64_t epoch;
+    static ULONGLONG owner_root;
+    static unsigned owner_rom;
+    static LONG last_frames;
+    static ULONGLONG last_change;
+    static BOOL silenced;
+    ULONGLONG now = GetTickCount64();
+    LONG frames;
+    if (!root) {
+        if (epoch) match_audio_depart(epoch);
+        epoch = 0;
+        return;
+    }
+    if (!epoch || root != owner_root || rom != owner_rom ||
+        match_audio_current() != epoch) {
+        epoch = match_audio_begin(3);
+        owner_root = root;
+        owner_rom = rom;
+        last_change = now;
+        silenced = FALSE;
+    }
+    frames = z3u_frame_count();
+    if (frames != last_frames) {
+        last_frames = frames;
+        last_change = now;
+        silenced = FALSE;
+    } else if (epoch && !silenced && now - last_change >= STALL_MS) {
+        for (unsigned p = 0; p < 2; p++)
+            audio_beacon_set_owned(epoch, p, FALSE, 0.0f, 1.0f);
+        silenced = TRUE;
+    }
+}
+
 void z3u_select_tick(void)
 {
     static int guard_ready, sig_ok;
@@ -272,8 +316,10 @@ void z3u_select_tick(void)
                      rom, rom == 7 ? "a3u" : "z3u", sample.variant);
         }
     }
+    z3u_audio_route(root, rom);
     z3u_select_observe(&sample, root, rom);
     return;
 inactive:
+    z3u_audio_route(0, 0);
     z3u_select_observe(NULL, 0, 0);
 }

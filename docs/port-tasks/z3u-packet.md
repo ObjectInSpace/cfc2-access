@@ -10,6 +10,8 @@ that writes each field. Not yet heard in the game. Evidence:
 `a3u`/`z3u`, both on the ordinary branch; what selects the alternate branch
 is still unknown.
 
+Match audio is built the same day: [z3u-match-fields.md](z3u-match-fields.md).
+
 ## Identity and traced acquisition
 
 - Game 3, four ROM identities on two branches, chosen by session `+0x2B4`:
