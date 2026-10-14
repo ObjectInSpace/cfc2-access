@@ -25,6 +25,8 @@ typedef struct {
 
 /* Native ID for `side`, or -1 not selecting / -2 selecting but unreadable. */
 int cvs1_select_decode(const cvs1_select_sample *s, unsigned side);
+/* Groove for `side`: 0 Capcom, 1 SNK, or -1 not choosing / -2 unreadable. */
+int cvs1_groove_decode(const cvs1_select_sample *s, unsigned side);
 /* Owned labels and visits for the shared selection channel. */
 void cvs1_selection_copy(const cvs1_select_sample *s,
                          game_selection_choice out[GAME_SELECTION_OWNERS]);

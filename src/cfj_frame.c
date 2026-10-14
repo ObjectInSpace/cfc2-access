@@ -3,6 +3,7 @@
 
 #include "cfj_frame.h"
 #include "audio.h"
+#include "cfj_text.h"
 #include "log.h"
 
 #include "../libs/minhook/include/MinHook.h"
@@ -142,6 +143,8 @@ static void frame_detour(void)
         InterlockedExchange(&g_pauses, (LONG)g_prod.pauses);
     }
     g_real_frame();
+    /* The update has reset, filled and drained its text queue: copy it now. */
+    cfj_text_capture();
 }
 
 static BOOL beside_exe(const char *leaf)

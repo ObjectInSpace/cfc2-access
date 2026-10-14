@@ -7,6 +7,7 @@
 #include "memsafe.h"
 #include "match_audio.h"
 #include "cfj_frame.h"
+#include "cfj_text.h"
 #include "audio.h"
 #include "log.h"
 #include <string.h>
@@ -254,8 +255,10 @@ void cfj_select_tick(void)
     }
     cfj_audio_route(root, rom);
     cfj_select_observe(&sample, root, rom);
+    cfj_text_observe(root);
     return;
 inactive:
     cfj_audio_route(0, 0);
     cfj_select_observe(NULL, 0, 0);
+    cfj_text_observe(0);
 }

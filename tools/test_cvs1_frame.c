@@ -13,6 +13,7 @@
 MH_STATUS WINAPI MH_CreateHook(LPVOID t, LPVOID d, LPVOID *o) { (void)t; (void)d; (void)o; return MH_UNKNOWN; }
 MH_STATUS WINAPI MH_EnableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
 MH_STATUS WINAPI MH_DisableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
+void cvs1_text_capture(void) {}   /* run_cvs1_text_test */
 
 #define P_OFF 0x3E58u
 #define P_SIZE 0x112u

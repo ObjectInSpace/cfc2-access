@@ -13,6 +13,7 @@
 MH_STATUS WINAPI MH_CreateHook(LPVOID t, LPVOID d, LPVOID *o) { (void)t; (void)d; (void)o; return MH_UNKNOWN; }
 MH_STATUS WINAPI MH_EnableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
 MH_STATUS WINAPI MH_DisableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
+void cfj_text_capture(void) {}   /* run_cfj_text_test */
 
 #define LOW_OFF 0xC8u
 #define LOW_SIZE 0x110u

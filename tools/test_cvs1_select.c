@@ -21,6 +21,7 @@ uint64_t match_audio_begin(unsigned a) { (void)a; return 0; }
 void match_audio_depart(uint64_t e) { (void)e; }
 uint64_t match_audio_current(void) { return 0; }
 LONG cvs1_frame_count(void) { return 0; }
+void cvs1_text_observe(ULONGLONG root) { (void)root; }   /* own suite */
 void audio_beacon_set_owned(uint64_t e, unsigned p, BOOL l, float x, float s)
 { (void)e; (void)p; (void)l; (void)x; (void)s; }
 
@@ -150,7 +151,53 @@ int main(void)
         assert(cvs1_select_decode(NULL, 0) == -1 && cvs1_select_decode(&s, 2) == -1);
     }
 
+    /* 5. Groove choice, actor state 3. Synthetic from a live record: no
+     *    capture has the groove screen yet. */
+    {
+        cvs1_select_sample g = rec[0];
+        game_selection_choice c[GAME_SELECTION_OWNERS];
+        g.actor[0][4] = 3;
+        g.phase[0x76] = 0;
+        assert(cvs1_select_decode(&g, 0) == -1);          /* not the grid */
+        assert(cvs1_groove_decode(&g, 0) == 0);
+        cvs1_selection_copy(&g, c);
+        assert(c[0].status == GAME_SELECTION_VALID && c[0].kind == 1 &&
+               !wcscmp(c[0].label, L"Capcom Groove"));
+        assert(c[1].status == GAME_SELECTION_INACTIVE);     /* CPU side */
+        g.phase[0x76] = 1;
+        cvs1_selection_copy(&g, c);
+        assert(c[0].value == 1 && !wcscmp(c[0].label, L"SNK Groove"));
+        g.phase[0x76] = 2;
+        assert(cvs1_groove_decode(&g, 0) == -2);
+        cvs1_selection_copy(&g, c);
+        assert(c[0].status == GAME_SELECTION_UNAVAILABLE);
+        g.phase[0x76] = 1;
+        { cvs1_select_sample h = g; h.owner[0] = 1;   assert(cvs1_groove_decode(&h, 0) == -1); }
+        { cvs1_select_sample h = g; h.phase[0x48] = 1; assert(cvs1_groove_decode(&h, 0) == -1); }
+        { cvs1_select_sample h = g; h.phase[3] = 7;    assert(cvs1_groove_decode(&h, 0) == -1); }
+        /* Side 1 reads its own byte. */
+        g.actor[1][4] = 3; g.owner[1] = 1; g.phase[0x77] = 0;
+        assert(cvs1_groove_decode(&g, 1) == 0 && cvs1_groove_decode(&g, 0) == 1);
+
+        /* Spoken: groove, the toggle, then the grid's first character. */
+        g = rec[0]; g.actor[0][4] = 3; g.phase[0x76] = 0;
+        cvs1_select_observe(NULL, 0, 0);
+        int before = calls;
+        settle(&g, 0x15d11000ULL);
+        assert(calls == before + 1 && !wcscmp(last, L"Capcom Groove"));
+        g.phase[0x76] = 1;
+        settle(&g, 0x15d11000ULL);
+        assert(calls == before + 2 && !wcscmp(last, L"SNK Groove"));
+        settle(&rec[0], 0x15d11000ULL);
+        assert(calls == before + 3);
+        {
+            wchar_t want[64];
+            swprintf(want, 64, L"%hs", character_name(0, id_of[0], 1));
+            assert(!wcscmp(last, want));
+        }
+    }
+
     printf("PASS: %u live CVS1 highlights decoded, names by game version, shared-channel "
-           "speech/retry/visit/depart, every gate\n", count);
+           "speech/retry/visit/depart, every gate, groove choice\n", count);
     return 0;
 }

@@ -7,6 +7,7 @@
 #include "memsafe.h"
 #include "match_audio.h"
 #include "cvs1_frame.h"
+#include "cvs1_text.h"
 #include "audio.h"
 #include "log.h"
 #include <string.h>
@@ -42,6 +43,25 @@ int cvs1_select_decode(const cvs1_select_sample *s, unsigned side)
     return (int)id;
 }
 
+/* Groove choice, actor state 3 (table 0x141237DC0 entry 3 = 0x1405D9D40),
+ * same phase and mode as the character grid, which follows it (state 4).
+ * The handler toggles P+0x76+owner between 0 and 1, and on confirm copies it
+ * to actor+0x62C, which 0x1405BF182 copies to the gauge's groove flag +0x2C1:
+ * 0 caps the gauge at 144 (three levels), 1 at 100. The shell's groove-name
+ * function 0x14004AE30 names game 0's grooves 0 CAPCOM, 1 SNK. */
+static const wchar_t *const g_groove[2] = { L"Capcom Groove", L"SNK Groove" };
+
+int cvs1_groove_decode(const cvs1_select_sample *s, unsigned side)
+{
+    static const BYTE prefix[5] = { 2, 1, 1, 6, 6 };
+    unsigned groove;
+    if (!s || side > 1 || memcmp(s->phase, prefix, sizeof prefix) || s->phase[0x48] != 0 ||
+        s->actor[side][4] != 3 || s->owner[side] != side)
+        return -1;
+    groove = s->phase[0x76 + side];
+    return groove < 2 ? (int)groove : -2;
+}
+
 void cvs1_selection_copy(const cvs1_select_sample *s,
                          game_selection_choice out[GAME_SELECTION_OWNERS])
 {
@@ -51,6 +71,17 @@ void cvs1_selection_copy(const cvs1_select_sample *s,
         out[i].status = GAME_SELECTION_INACTIVE;
     for (unsigned side = 0; side < 2; ++side) {
         int id = cvs1_select_decode(s, side);
+        if (id == -1) {
+            int groove = cvs1_groove_decode(s, side);
+            if (groove >= 0) {
+                out[side].status = GAME_SELECTION_VALID;
+                out[side].kind = 1;
+                out[side].value = (unsigned)groove;
+                swprintf(out[side].label, GAME_SELECTION_LABEL, L"%ls", g_groove[groove]);
+                continue;
+            }
+            id = groove;
+        }
         if (id < 0) {
             out[side].status = id == -1 ? GAME_SELECTION_INACTIVE : GAME_SELECTION_UNAVAILABLE;
             continue;
@@ -235,8 +266,10 @@ void cvs1_select_tick(void)
     }
     cvs1_audio_route(root, rom);
     cvs1_select_observe(&sample, root, rom);
+    cvs1_text_observe(root);
     return;
 inactive:
     cvs1_audio_route(0, 0);
     cvs1_select_observe(NULL, 0, 0);
+    cvs1_text_observe(0);
 }

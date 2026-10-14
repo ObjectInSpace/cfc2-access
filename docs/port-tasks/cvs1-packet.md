@@ -104,3 +104,25 @@ has not been run yet.
 Per feature: replay tests on the labelled fixtures, a CVS1 adapter suite, all
 native runners, and a listening check. A partial name map ships only labelled
 partial. Side 1, ROM 0, branch B and other modes stay listed as open.
+
+## Groove choice, 2026-10-14
+
+F03 is implemented in `src/cvs1_select.c` as selection kind 1. It is built
+and offline-tested, and is waiting on listening.
+
+- Actor state 3 is the groove handler `0x1405D9D40`, entry 3 of
+  `0x141237DC0`. It runs under the same branch-A phase and mode as the
+  character grid, which follows it as state 4.
+- The handler toggles P+0x76+owner between 0 and 1 on input bits 0x1000 and
+  0x2000. On confirm, or when the timer runs out, it copies the value to
+  actor+0x62C and advances to state 4.
+- `0x1405BF182` copies actor+0x62C to the gauge's groove flag +0x2C1. That
+  flag caps the gauge at 144 (three levels) for 0 and at 100 for 1. The
+  user's listening check of CVS1 match audio already accepted that cap rule.
+- The shell's groove-name function `0x14004AE30` names game 0's grooves:
+  0 CAPCOM GROOVE, 1 SNK GROOVE. They are spoken as "Capcom Groove" and
+  "SNK Groove".
+- ⚠ No capture has the groove screen. The test cases are synthetic, built
+  from a live grid record with the actor state set to 3.
+- Deployed `dinput8.dll` SHA-256 `d4805ec984154dd3a670e73215761babc34edec009e1a0955a3547679363f7ca`.
+- Ratio and EX choices are still not spoken.
