@@ -43,24 +43,86 @@ int cvs1_select_decode(const cvs1_select_sample *s, unsigned side)
     return (int)id;
 }
 
-/* Groove choice, actor state 3 (table 0x141237DC0 entry 3 = 0x1405D9D40),
- * same phase and mode as the character grid, which follows it (state 4).
- * The handler toggles P+0x76+owner between 0 and 1, and on confirm copies it
- * to actor+0x62C, which 0x1405BF182 copies to the gauge's groove flag +0x2C1:
- * 0 caps the gauge at 144 (three levels), 1 at 100. The shell's groove-name
- * function 0x14004AE30 names game 0's grooves 0 CAPCOM, 1 SNK. */
+/* Groove choice: P+0x76+side, 0 Capcom, 1 SNK. The shell's groove-name
+ * function 0x14004AE30 names game 0's grooves 0 CAPCOM, 1 SNK, and the value
+ * reaches the gauge's groove flag +0x2C1 through actor+0x62C (0x1405BF182):
+ * 0 caps the gauge at 144 (three levels), 1 at 100.
+ *
+ * ⛔ The first version (2026-10-14) gated on actor state 3 (0x1405D9D40) and
+ * never spoke: in the live Arcade capture that state never ran, and the
+ * groove screen is the select phase's step 02 01 01 02 05 instead -- handler
+ * 0x1405D8FF0 (table 0x141237D80 entry 2), step 5 at 0x1405D9340. Up (0x2000)
+ * sets 0, down (0x1000) sets 1; confirm copies the byte to actor+0x62C
+ * (R+0x45E4 / R+0x4CE4) and clears the side's bit in P+0x113. A side is still
+ * choosing while its bit is set in both P+0x113 and P+0x65, the handler's own
+ * test. Both paths write the same byte, so both are accepted. */
 static const wchar_t *const g_groove[2] = { L"Capcom Groove", L"SNK Groove" };
 
 int cvs1_groove_decode(const cvs1_select_sample *s, unsigned side)
 {
-    static const BYTE prefix[5] = { 2, 1, 1, 6, 6 };
+    static const BYTE grid[5] = { 2, 1, 1, 6, 6 }, screen[5] = { 2, 1, 1, 2, 5 };
     unsigned groove;
-    if (!s || side > 1 || memcmp(s->phase, prefix, sizeof prefix) || s->phase[0x48] != 0 ||
-        s->actor[side][4] != 3 || s->owner[side] != side)
-        return -1;
+    BOOL active;
+    if (!s || side > 1) return -1;
+    active = !memcmp(s->phase, screen, sizeof screen) &&
+             (s->phase[0x113] & s->phase[0x65] & (1u << side));
+    if (!active)
+        active = !memcmp(s->phase, grid, sizeof grid) && s->phase[0x48] == 0 &&
+                 s->actor[side][4] == 3 && s->owner[side] == side;
+    if (!active) return -1;
     groove = s->phase[0x76 + side];
     return groove < 2 ? (int)groove : -2;
 }
+
+/* Free Select speed, actor state 5 (table 0x141237DC0 entry 5 = 0x1405DAF10),
+ * after the grid. Up (0x2000) sets actor+0x58E to 1, down (0x1000) to 0;
+ * state 2 defaults it to 1. The value sets P+0xC7 to 5 or 3, the same field
+ * the Speed Select setting P+0x3C fills (0x1405B3E2D: Normal 0, Turbo 1-4 =
+ * 3/5/6/7), and P+0xC7 schedules an extra frame every 9-C7 frames
+ * (0x1405B1D46), so 1 is the faster choice. The live capture saw down, then
+ * up, on this screen. ⚠ Names inferred from the rate, as for Alpha 3:
+ * listening confirms the menu's own words. */
+static const wchar_t *const g_speed[2] = { L"Normal", L"Turbo" };
+
+int cvs1_speed_decode(const cvs1_select_sample *s, unsigned side)
+{
+    static const BYTE grid[5] = { 2, 1, 1, 6, 6 };
+    if (!s || side > 1 || memcmp(s->phase, grid, sizeof grid) || s->phase[0x48] != 0 ||
+        s->actor[side][4] != 5 || s->owner[side] != side)
+        return -1;
+    return s->speed[side] < 2 ? (int)s->speed[side] : -2;
+}
+
+/* Order screen, phase 02 01 02 01 02 01, handler around 0x1405E7BB2. Left
+ * (0x0400) and right (0x0800) step P+0x10C+side through the remaining
+ * members, wrapping at P+0x104+4*side + 1; confirm takes the member the order
+ * list R+0x31AD0+side*16 holds at the cursor, and its native ID is
+ * actor+0x618+member. P+0x106+4*side counts the members already placed. With
+ * one member left there is no choice and nothing is spoken. Only a side whose
+ * bit is set in P+0x64 runs this input handler (0x1405E7790); the others run
+ * the CPU picker 0x1405E67F0 (dispatch at 0x1405E750B). ⚠ Not P+0x65, the
+ * groove screen's mask: it reads 0 here. Live: the cursor flipped Ryu/Ken on
+ * every press, and confirm placed Ken first. */
+int cvs1_order_decode(const cvs1_select_sample *s, unsigned side)
+{
+    static const BYTE screen[6] = { 2, 1, 2, 1, 2, 1 };
+    int last, cursor, member;
+    unsigned id;
+    if (!s || side > 1 || memcmp(s->phase, screen, sizeof screen) ||
+        !(s->phase[0x64] & (1u << side)))
+        return -1;
+    last = (signed char)s->phase[0x104 + 4 * side];
+    if (last < 1) return -1;                         /* nothing to choose */
+    cursor = (signed char)s->phase[0x10C + side];
+    if (last > 3 || cursor < 0 || cursor > last) return -2;
+    member = s->order[side][cursor];
+    if (member < 0 || member > 3) return -2;
+    id = s->team[side][member];
+    if (!character_name(0, id, s->variant)) return -2;
+    return (int)id;
+}
+
+static const wchar_t *const g_place[4] = { L"first", L"second", L"third", L"fourth" };
 
 void cvs1_selection_copy(const cvs1_select_sample *s,
                          game_selection_choice out[GAME_SELECTION_OWNERS])
@@ -70,30 +132,38 @@ void cvs1_selection_copy(const cvs1_select_sample *s,
     for (unsigned i = 0; i < GAME_SELECTION_OWNERS; ++i)
         out[i].status = GAME_SELECTION_INACTIVE;
     for (unsigned side = 0; side < 2; ++side) {
-        int id = cvs1_select_decode(s, side);
-        if (id == -1) {
-            int groove = cvs1_groove_decode(s, side);
-            if (groove >= 0) {
-                out[side].status = GAME_SELECTION_VALID;
-                out[side].kind = 1;
-                out[side].value = (unsigned)groove;
-                swprintf(out[side].label, GAME_SELECTION_LABEL, L"%ls", g_groove[groove]);
-                continue;
-            }
-            id = groove;
-        }
-        if (id < 0) {
-            out[side].status = id == -1 ? GAME_SELECTION_INACTIVE : GAME_SELECTION_UNAVAILABLE;
+        game_selection_choice *o = &out[side];
+        int v;
+        if ((v = cvs1_select_decode(s, side)) != -1) {
+            if (v < 0) { o->status = GAME_SELECTION_UNAVAILABLE; continue; }
+            o->kind = CVS1_KIND_CHARACTER;
+            /* A confirmed pick advances the slot, so the same character in
+             * the next team slot is a new visit and is spoken again. */
+            o->visit = s->phase[0xA0 + side];
+            swprintf(o->label, GAME_SELECTION_LABEL, L"%hs",
+                     character_name(0, (unsigned)v, s->variant));
+        } else if ((v = cvs1_groove_decode(s, side)) != -1) {
+            if (v < 0) { o->status = GAME_SELECTION_UNAVAILABLE; continue; }
+            o->kind = CVS1_KIND_GROOVE;
+            swprintf(o->label, GAME_SELECTION_LABEL, L"%ls", g_groove[v]);
+        } else if ((v = cvs1_speed_decode(s, side)) != -1) {
+            if (v < 0) { o->status = GAME_SELECTION_UNAVAILABLE; continue; }
+            o->kind = CVS1_KIND_SPEED;
+            swprintf(o->label, GAME_SELECTION_LABEL, L"%ls", g_speed[v]);
+        } else if ((v = cvs1_order_decode(s, side)) != -1) {
+            unsigned placed = s->phase[0x106 + 4 * side];
+            if (v < 0 || placed > 3) { o->status = GAME_SELECTION_UNAVAILABLE; continue; }
+            o->kind = CVS1_KIND_ORDER;
+            /* Each placement is a new visit: the same fighter highlighted for
+             * the next fight is spoken again, with the new place. */
+            o->visit = placed;
+            swprintf(o->label, GAME_SELECTION_LABEL, L"%hs %ls",
+                     character_name(0, (unsigned)v, s->variant), g_place[placed]);
+        } else {
             continue;
         }
-        out[side].status = GAME_SELECTION_VALID;
-        out[side].kind = 0;
-        out[side].value = (unsigned)id;
-        /* A confirmed pick advances the slot, so the same character in the
-         * next team slot is a new visit and is spoken again. */
-        out[side].visit = s->phase[0xA0 + side];
-        swprintf(out[side].label, GAME_SELECTION_LABEL, L"%hs",
-                 character_name(0, (unsigned)id, s->variant));
+        o->status = GAME_SELECTION_VALID;
+        o->value = (unsigned)v;
     }
 }
 
@@ -120,7 +190,8 @@ void cvs1_select_observe(const cvs1_select_sample *s, ULONGLONG root, unsigned r
     selection_channel_offer(&channel, choices, true, now, now);
     unsigned accepted = selection_channel_drain(&channel, now);
     for (unsigned p = 0; p < 2; ++p) if (accepted & (1u << p))
-        log_line("cvs1-select: accepted side=%u id=%u", p + 1, choices[p].value);
+        log_line("cvs1-select: accepted side=%u kind=%u value=%u", p + 1,
+                 choices[p].kind, choices[p].value);
 }
 
 /* ---- acquisition (worker thread) ---------------------------------------- */
@@ -143,6 +214,12 @@ static const struct { ULONGLONG address; BYTE bytes[16]; unsigned n; } g_sig[] =
     { 0x14004B340ULL, { 0x83,0xff,0x23 }, 3 },                        /* name fn: CVS1 limit   */
     { 0x14004B485ULL, { 0x49,0x8d,0x14,0x7e,0x49,0x8b,0x94,0xd4,0x40,0x66,0x1f,0x01 }, 12 }, /* name table */
     { 0x14007FF39ULL, { 0x8b,0x88,0xb0,0x01,0x00,0x00 }, 6 },         /* version at +0x1B0     */
+    { 0x1405D93ABULL, { 0x40,0x88,0x7a,0x76 }, 4 },                   /* groove: P+0x76 store  */
+    { 0x1405D940AULL, { 0x88,0x88,0xe4,0x45,0x00,0x00 }, 6 },         /* groove -> actor+0x62C */
+    { 0x1405DAF88ULL, { 0xc6,0x83,0x8e,0x05,0x00,0x00,0x01 }, 7 },    /* speed: actor+0x58E    */
+    { 0x1405E7BCFULL, { 0x41,0xfe,0x84,0x06,0x0c,0x01,0x00,0x00 }, 8 }, /* order: P+0x10C cursor */
+    { 0x1405E7CE2ULL, { 0x49,0x63,0x84,0x89,0xd0,0x1a,0x03,0x00 }, 8 }, /* order list R+0x31AD0 */
+    { 0x1405E7CF6ULL, { 0x42,0x0f,0xbe,0x84,0x08,0xd0,0x45,0x00,0x00 }, 9 }, /* team IDs +0x618 */
 };
 
 /* Match-audio ownership for CVS1, worker only: a new epoch per presentation
@@ -242,12 +319,19 @@ void cvs1_select_tick(void)
         !read_at(&sample.variant, shell + 0x1B0, 4) || sample.variant > 1)
         goto inactive;
 
-    if (!read_at(sample.phase, root + CVS1_PHASE_OFF, CVS1_PHASE_SIZE)) goto inactive;
+    if (!read_at(sample.phase, root + CVS1_PHASE_OFF, CVS1_PHASE_SIZE) ||
+        !read_at(sample.order, root + CVS1_ORDER_OFF, sizeof sample.order))
+        goto inactive;
     for (unsigned side = 0; side < 2; side++) {
-        ULONGLONG actor = root + CVS1_ACTOR_OFF + side * CVS1_ACTOR_STEP;
-        if (!read_at(sample.actor[side], actor, CVS1_ACTOR_HEAD) ||
-            !read_at(&sample.owner[side], actor + CVS1_ACTOR_OWNER, 1))
+        /* One copy per actor through the owner byte (header, speed cursor,
+         * team IDs, owner): fewer guarded reads than one per field. */
+        static BYTE actor[CVS1_ACTOR_OWNER + 1];
+        if (!read_at(actor, root + CVS1_ACTOR_OFF + side * CVS1_ACTOR_STEP, sizeof actor))
             goto inactive;
+        memcpy(sample.actor[side], actor, CVS1_ACTOR_HEAD);
+        memcpy(sample.team[side], actor + CVS1_ACTOR_TEAM, 4);
+        sample.speed[side] = actor[CVS1_ACTOR_SPEED];
+        sample.owner[side] = actor[CVS1_ACTOR_OWNER];
     }
     /* Bracket: the block and session must still be the ones we validated. */
     if (!read_at(&again, ROOT_SLOT, 8) || again != root ||

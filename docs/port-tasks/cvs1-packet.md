@@ -126,3 +126,6 @@ and offline-tested, and is waiting on listening.
   from a live grid record with the actor state set to 3.
 - Deployed `dinput8.dll` SHA-256 `d4805ec984154dd3a670e73215761babc34edec009e1a0955a3547679363f7ca`.
 - Ratio and EX choices are still not spoken.
+- ⛔ Superseded the same day: that state 3 gate never matched live. The real
+  groove screen, the speed menu and the order screen are recorded in
+  [cvs1-select-menus.md](cvs1-select-menus.md).
