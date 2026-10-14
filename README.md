@@ -31,7 +31,7 @@ like it worked, but it ignores your configured voice, rate, punctuation level
 and braille display. The mod logs a warning when it detects this; see
 `CFC2Access.log` in the game directory if speech sounds wrong.
 
-## In-match audio (CVS2 and CVS1)
+## In-match audio (CVS2, CVS1, Capcom Fighting Evolution, Street Fighter Alpha 3)
 
 Everything during a match is an audio cue; speech is used only on character
 select. Each player has a persistent beacon whose stereo position follows the
@@ -39,7 +39,7 @@ fighter across the screen, and the two beacons are told apart by how fast they
 pluck — so they stay distinct even when both fighters are near the centre.
 Health and super are continuous tones, low and hollow for health, soft and
 high for super. The round clock ticks at 30, 15 and each of the last five
-seconds. The same cues and keys work in CVS1 and CVS2.
+seconds. The same cues and keys work in every supported game.
 
 ### Volume keys
 
@@ -67,19 +67,29 @@ side is which.
   position beacons, and the round clock. Match start and new fighters are
   announced; in Training these say "Player 1" and "Player 2", since the game
   gives no sign of which side you control.
-- CVS1 in-game: **new in this version.** Character select speaks each
-  highlighted character by name. In a match: health tones, position beacons,
-  pitch rising and falling through a jump, and silence on pause, all tested in
-  play. The power gauge tone and clock ticks are new and not yet confirmed in
-  play. Not yet: groove, ratio and EX choices at character select, and a
-  pitch change for crouching or being knocked down.
-- CVS2 text: new in this version and **not yet tested in play** — win quotes,
-  story pages, credits and on-screen prompts are spoken, and the **`` ` ``**
-  key (the key left of 1) reads the current text again. In the menus it
-  repeats the last thing the mod said.
-- The other six arcade games (CFJ, Z3U, PWS1, PWS2, MJUS, STG2): in
-  progress, not yet playable with the mod. The plan for porting the CVS2
-  features to them is in `docs/collection-port-plan.md` in the repository.
+- CVS1 in-game: character select speaks each highlighted character by name.
+  In a match: health tones, position beacons, pitch rising and falling
+  through a jump, and silence on pause, all tested in play; the power gauge
+  tone and clock ticks are not yet confirmed in play. **New in this
+  version, not yet tested in play:** the groove screen ("Capcom Groove" /
+  "SNK Groove"), the speed menu after character select ("Normal" /
+  "Turbo"), and the order screen ("Ryu first"). On-screen system text is
+  spoken, except the "Free Play" credit display. Not yet: ratio and EX
+  choices, and a pitch change for crouching or being knocked down.
+- Capcom Fighting Evolution in-game: **new in this version.** Character
+  select speaks each highlighted name, and match audio has the same cues as
+  CVS2; both tested in play. On-screen system text is new and not yet tested.
+- Street Fighter Alpha 3 in-game: **new in this version, not yet tested in
+  play.** Character, ism and speed select are spoken, match audio has the
+  same cues, and the opening screens, pre-fight story and on-screen system
+  text are spoken.
+- CVS2 text: win quotes, story pages, credits and on-screen prompts are
+  spoken, and the **`` ` ``** key (the key left of 1) reads the current text
+  again, in every supported game. In the menus it repeats the last thing the
+  mod said.
+- The other four arcade games (PWS1, PWS2, MJUS, STG2): in progress, not yet
+  playable with the mod. The plan for porting the CVS2 features to them is in
+  `docs/collection-port-plan.md` in the repository.
 
 ## Source
 
@@ -87,4 +97,4 @@ Source, build script (`build.ps1`), and design docs are in the repository:
 https://github.com/ObjectInSpace/cfc2-access
 
 `.\build.ps1 -Deploy` builds and copies the mod into the game folder;
-`.\build.ps1 -Package 0.4.0` builds the release zip from a clean checkout.
+`.\build.ps1 -Package 0.5.0` builds the release zip from a clean checkout.
