@@ -1,8 +1,14 @@
 # Z3U port packet: Street Fighter Alpha 3 Upper
 
 Audited 2026-10-13 against `9ecc31c`. Status: BOUNDED DISCOVERY NEEDED for
-every game-specific feature, on TWO runtime branches. No Z3U runtime code or
-capture exists.
+every game-specific feature, on TWO runtime branches.
+
+**2026-10-14: character, ism and speed select are built for the ordinary
+branch** (`src/z3u_select.c`) from one live capture (ROM 7 `a3u`) and the code
+that writes each field. Not yet heard in the game. Evidence:
+[z3u-selection.md](z3u-selection.md). The US/Japanese version setting picks
+`a3u`/`z3u`, both on the ordinary branch; what selects the alternate branch
+is still unknown.
 
 ## Identity and traced acquisition
 

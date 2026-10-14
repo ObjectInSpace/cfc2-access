@@ -20,6 +20,7 @@
 #include "cvs2_select.h"
 #include "cvs1_select.h"
 #include "cfj_select.h"
+#include "z3u_select.h"
 #include "cvs2_hit.h"
 #include "audio.h"
 #include "cvs2_frame.h"
@@ -2033,10 +2034,11 @@ static DWORD WINAPI worker(LPVOID param)
 
             /* Read actual CVS2 selection on the speech worker, never a hook. */
             cvs2_select_tick();
-            /* CVS1 and CFJ highlights through the same shared channel; each tick
-             * admits only its own game, so at most one of them ever speaks. */
+            /* CVS1, CFJ and Alpha 3 highlights through the same shared channel;
+             * each tick admits only its own game, so at most one of them speaks. */
             cvs1_select_tick();
             cfj_select_tick();
+            z3u_select_tick();
             collection_probe_tick();
 
             /* ⚠ AFTER cvs2_select_tick(), not beside the keypress. That tick is

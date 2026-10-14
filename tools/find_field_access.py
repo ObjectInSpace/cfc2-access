@@ -200,6 +200,7 @@ def scan(section, disp, writes_only):
 
 
 def main():
+    global CVS2_LO, CVS2_HI
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("displacements", nargs="+",
@@ -207,7 +208,15 @@ def main():
     ap.add_argument("--dump", default=DEFAULT_DUMP)
     ap.add_argument("--writes-only", action="store_true",
                     help="keep only instructions storing TO the field")
+    ap.add_argument("--lo", type=lambda v: int(v, 0), default=CVS2_LO,
+                    help="code range start (default: CVS2's)")
+    ap.add_argument("--hi", type=lambda v: int(v, 0), default=CVS2_HI,
+                    help="code range end (default: CVS2's)")
     args = ap.parse_args()
+    # Another game's code range, e.g. Alpha 3's root loads span
+    # 0x14086C000..0x140973000. The positive control is CVS2's, so a
+    # different range is a lead search, not a validated one.
+    CVS2_LO, CVS2_HI = args.lo, args.hi
 
     sections = read_manifest(args.dump)
     code = [s for s in sections
