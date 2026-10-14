@@ -27,6 +27,7 @@
 #include "cvs1_frame.h"
 #include "cvs1_text.h"
 #include "cfj_text.h"
+#include "z3u_text.h"
 #include "cfj_frame.h"
 #include "z3u_frame.h"
 #include "cvs2_story.h"
@@ -1713,9 +1714,10 @@ static DWORD WINAPI worker(LPVOID param)
     if (unpacked) cvs2_hit_install();
     if (unpacked && hook_enabled) cvs2_story_install();
     if (unpacked && hook_enabled) cvs2_text_install();
-    /* CVS1's and CFJ's text is captured by their frame hooks; these only register the ` sources. */
+    /* CVS1's, CFJ's and Alpha 3's text is captured by their frame hooks; these only register the ` sources. */
     if (unpacked && hook_enabled) cvs1_text_register();
     if (unpacked && hook_enabled) cfj_text_register();
+    if (unpacked && hook_enabled) z3u_text_register();
     if (unpacked && hook_enabled) {
         if (opt_in_file_present("cfc2_lifetime_probe.on")) collection_probe_install_lifetime();
         else if (opt_in_file_present("cfc2_collection_probe.on")) collection_probe_install();

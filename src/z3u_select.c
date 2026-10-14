@@ -7,6 +7,7 @@
 #include "memsafe.h"
 #include "match_audio.h"
 #include "z3u_frame.h"
+#include "z3u_text.h"
 #include "audio.h"
 #include "log.h"
 #include <string.h>
@@ -318,8 +319,10 @@ void z3u_select_tick(void)
     }
     z3u_audio_route(root, rom);
     z3u_select_observe(&sample, root, rom);
+    z3u_text_observe(root);
     return;
 inactive:
     z3u_audio_route(0, 0);
     z3u_select_observe(NULL, 0, 0);
+    z3u_text_observe(0);
 }

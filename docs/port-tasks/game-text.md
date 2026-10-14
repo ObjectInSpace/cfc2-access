@@ -26,6 +26,14 @@ reads the whole current frame, digits included.
   - The renderer skips style 0 entirely, so those rows are never spoken. Its named escapes are `^Z` for a backslash, `^Y` for a caret, `^M` for a double quote and `^N` for a backtick. Any other caret pair is a special glyph, omitted. Bytes from 0x90 take another glyph path and refuse the row.
   - An immediate-print path, `0x1407D1290` (one caller), draws without the queue and is not captured.
 
+- **Alpha 3** (`src/z3u_text.c`, added 2026-10-14, ordinary branch):
+  - Queue R+0x9D70 inside the Alpha 3 block, 0x60 records of 0x18 bytes: +0 in use, +1 font, +2 colour, +4 x, +6 y, +8 a POINTER to the string. The text is not copied into the record, so the capture follows the pointer, but only into the game image or the Alpha 3 block, with a fault-guarded copy.
+  - Print routine `0x140879770` (75 call sites). Every screen handler draws the queue through `0x14087E640` → `0x14087F5B0` inside the update, so the frame hook copies it after the update returns.
+  - Literals include GAME OVER, CONTINUE?, GIVE UP?, SAVE, EXIT, QUIT GAME with YES and NO, SURVIVAL MODE, TEAM VS, NEXT, WINS, SCORE, CLEAR TIME, CONGRATULATIONS!!, THANK YOU FOR PLAYING, PRESENTED BY, INSERT COIN(S) and the copyright lines. The credit line is formatted at R+5 and the score at R+0x9D58.
+  - The drawer gives each byte above 0x20 glyph (byte - 0x21) from the record's font. Fonts 1 to 3 print the game's own ASCII literals and are read as ASCII; '@' leads the copyright line and is omitted.
+  - ⚠ Font 4 draws picture words from tile codes (table `0x1412DA840`, about 23 words). Their meaning is only in the image, so they are refused, never spelled out. The two seen live: 0x91 to 0x95 blinking on the right side during select and play, and "UVWXY" on the continue screen beside the countdown digit.
+  - Live evidence: the select and match captures' traces hold the queue. They show the font 4 words, the score digits and the continue digit; the ASCII screens above were not reached in them.
+
 Rows a decoder refuses are logged once each, at most 32 per run, as
 `cvs1-text: refused row` or `cfj-text: refused row`, with their bytes. That is
 how unmapped glyphs are found.

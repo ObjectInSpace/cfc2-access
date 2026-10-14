@@ -21,6 +21,7 @@ uint64_t match_audio_begin(unsigned a) { (void)a; return 0; }
 void match_audio_depart(uint64_t e) { (void)e; }
 uint64_t match_audio_current(void) { return 0; }
 LONG z3u_frame_count(void) { return 0; }
+void z3u_text_observe(ULONGLONG root) { (void)root; }   /* run_z3u_text_test */
 void audio_beacon_set_owned(uint64_t e, unsigned p, BOOL l, float x, float s)
 { (void)e; (void)p; (void)l; (void)x; (void)s; }
 
