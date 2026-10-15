@@ -626,6 +626,44 @@ BOOL gt_column_y(const void *screen, float x, int position, float *out_y);
  * counts panels (reporting "of 3") while ten move names are on screen. */
 int gt_column_count(const void *screen, float x);
 
+/* ⭐⭐ THE WRITE STAMP: which labels belong to the page now showing.
+ *
+ * The game keeps a page's label objects alive after it stops showing them.
+ * The EX settings pages of CVS1, CFE, Power Stone and Plasma Sword are
+ * shorter than the page before them, so page 1's last labels stay -- on CVS1
+ * "Battle Type" at the same Y as the real "Default" row, with page 1's value
+ * "Normal" beside it -- and every read on those pages refused.
+ *
+ * +0x138 is the GUI frame on which the game last WROTE the label
+ * (0x1402F6170, reached from the text classes' method 0x1402F9AB0, copies the
+ * counter [[0x1422C8B70]+0x48]). It is NOT refreshed while a label merely
+ * stays on screen: the live stamps (build/captures/stamps-20261015) put the
+ * page's four rows at 1766, page 1's leftovers at 1700, the still-visible
+ * heading at 1692 and freshly changed values at 1798, with the counter at
+ * 1799.
+ *
+ * ⛔ So "old" does NOT mean hidden -- treating a label not refreshed this
+ * frame as gone silenced nearly every menu (2026-10-15). What the stamp does
+ * show is which labels a page change wrote TOGETHER. */
+#define GT_STAMP_OFF   0x138
+#define GT_PAGE_SLACK  2      /* frames one page's rows may span when written */
+
+/* The row column of the page now showing, for a screen whose cursor reports
+ * `total` rows. If the column holds exactly `total` labels it is used as it
+ * is -- every screen that read correctly before is unchanged. Otherwise only
+ * the labels written in the column's latest write (within GT_PAGE_SLACK of
+ * its newest stamp) are this page's; a value partner must have been written
+ * since then as well. The caller still refuses unless the count then equals
+ * `total`. total < 0: no row count is known, so the column is used as is. */
+int  gt_page_count(const void *screen, float x, int total);
+BOOL gt_page_item(const void *screen, float x, float pair_x, int total, int position,
+                  char *out, int outlen);
+
+/* DIAGNOSTIC, once per (screen, x, count, total): log every object in the
+ * column at `x` with its Y, text, write stamp and raw bytes. Called when a
+ * column still disagrees with the cursor after the page selection. */
+void gt_column_dump(const void *screen, float x, int total);
+
 /* Call `fn` with the current text of every LIVE object on `screen` (membership
  * by the game's own +0x088 parent pointer, as gt_widget_of). Returns how many.
  *

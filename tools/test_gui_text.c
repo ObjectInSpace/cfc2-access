@@ -1877,6 +1877,104 @@ int main(void)
                       g1 && strcmp(v1, "Health Bar") == 0, d);
             }
 
+            /* case 54x: ⭐⭐ THE PAGE NOW SHOWING, by write stamp. The live CVS1
+             * EX page (build/captures/stamps-20261015): the cursor has 4 rows,
+             * the column 6 labels. The page change wrote its four rows at frame
+             * 1766; page 1's "Battle Type" (at the SAME Y as the real "Default")
+             * and "Default" keep 1700, as does page 1's value "Normal" on the
+             * Default row. Current values were written at 1798.
+             *
+             * ⛔ The stamp is a WRITE stamp, not "drawn this frame": a visible
+             * heading carried 1692. Old does not mean hidden; only labels older
+             * than THIS column's latest write are another page's. */
+            {
+                static unsigned char ex[9][GT_CLASS_SIZE];
+                void *E = (void *)0x2C5D2A80ULL;          /* the real screen */
+                static const float EX[9] = { 320.f, 320.f, 320.f, 320.f, 320.f, 320.f,
+                                             835.f, 835.f, 835.f };
+                static const float EY[9] = { 406.f, 486.f, 566.f, 646.f, 646.f, 726.f,
+                                             486.f, 566.f, 646.f };
+                static const unsigned ES[9] = { 1766, 1766, 1766, 1766, 1700, 1700,
+                                                1798, 1798, 1700 };
+                static const char *const ET[9] = {
+                    "Coin Mode", "Boot Display", "Stage Music", "Default",
+                    "Battle Type", "Default", "None", "Original", "Normal"
+                };
+                char r3[GT_CAPTION_MAX] = { 0 }, r4[GT_CAPTION_MAX] = { 0 }, r5[GT_CAPTION_MAX] = { 0 };
+                int n_all, n_page, n_unknown, n_agrees;
+                BOOL g3, g4, g5, g_old;
+                for (int i = 0; i < 9; i++) {
+                    memset(ex[i], 0, sizeof ex[i]);
+                    *(ULONGLONG *)ex[i] = GT_VTABLE_ADDR;
+                    memcpy(ex[i] + 0x40, &EX[i], sizeof(float));
+                    memcpy(ex[i] + 0x44, &EY[i], sizeof(float));
+                    memcpy(ex[i] + 0x88, &E, sizeof(void *));
+                    memcpy(ex[i] + GT_STAMP_OFF, &ES[i], sizeof(unsigned));
+                    gt_test_settext_body(ex[i], ET[i], NULL, 0);
+                }
+                n_all = gt_column_count(E, 320.0f);             /* every label: 6 */
+                n_page = gt_page_count(E, 320.0f, 4);           /* this page's: 4 */
+                n_unknown = gt_page_count(E, 320.0f, -1);       /* no row total: as is */
+                n_agrees = gt_page_count(E, 320.0f, 6);         /* count agrees: as is */
+                g3 = gt_page_item(E, 320.0f, 835.0f, 4, 3, r3, sizeof r3);
+                g4 = gt_page_item(E, 320.0f, 835.0f, 4, 4, r4, sizeof r4);
+                g5 = gt_page_item(E, 320.0f, 835.0f, 5, 2, r5, sizeof r5);   /* 4 != 5 */
+                {
+                    char r[GT_CAPTION_MAX];
+                    g_old = gt_column_item(E, 320.0f, 835.0f, 4, r, sizeof r);  /* the tie */
+                }
+                snprintf(d, sizeof d, "all %d (want 6), page %d (want 4), no total %d "
+                         "(want 6), agreeing %d (want 6); row 3 \"%s\", row 4 \"%s\"; "
+                         "a 5-row cursor %s (want refused); the unselected read %s "
+                         "(want refused: two labels at y=646)",
+                         n_all, n_page, n_unknown, n_agrees, r3, r4,
+                         g5 ? "named" : "refused", g_old ? "named" : "refused");
+                check("54x. a shorter page's rows are the labels its page change wrote; "
+                      "the previous page's leftovers and stale value are not read",
+                      n_all == 6 && n_page == 4 && n_unknown == 6 && n_agrees == 6 &&
+                      g3 && strcmp(r3, "Stage Music, Original") == 0 &&
+                      g4 && strcmp(r4, "Default") == 0 && !g5 && !g_old, d);
+            }
+
+            /* case 54y: BACK ON PAGE 1, the EX page's Coin Mode value "Free
+             * Play" is still alive on Game Difficulty's line -- the one row
+             * whose own value is a graphic, so nothing collides with it and the
+             * row count agrees. User, 2026-10-15: Game Difficulty read "Free
+             * Play". A value written before its row label is not its value. */
+            {
+                static unsigned char pg[4][GT_CLASS_SIZE];
+                void *G = (void *)0x2C5D2A81ULL;
+                static const float GX[4] = { 320.f, 320.f, 835.f, 835.f };
+                static const float GY[4] = { 366.f, 446.f, 366.f, 446.f };
+                static const unsigned GS[4] = { 2000, 2000, 1900, 2001 };
+                static const char *const GT[4] = {
+                    "Game Difficulty", "Attack Power", "Free Play", "Normal"
+                };
+                char a1[GT_CAPTION_MAX] = { 0 }, a2[GT_CAPTION_MAX] = { 0 },
+                     o1[GT_CAPTION_MAX] = { 0 };
+                BOOL h1, h2, k1;
+                for (int i = 0; i < 4; i++) {
+                    memset(pg[i], 0, sizeof pg[i]);
+                    *(ULONGLONG *)pg[i] = GT_VTABLE_ADDR;
+                    memcpy(pg[i] + 0x40, &GX[i], sizeof(float));
+                    memcpy(pg[i] + 0x44, &GY[i], sizeof(float));
+                    memcpy(pg[i] + 0x88, &G, sizeof(void *));
+                    memcpy(pg[i] + GT_STAMP_OFF, &GS[i], sizeof(unsigned));
+                    gt_test_settext_body(pg[i], GT[i], NULL, 0);
+                }
+                h1 = gt_page_item(G, 320.0f, 835.0f, 2, 1, a1, sizeof a1);
+                h2 = gt_page_item(G, 320.0f, 835.0f, 2, 2, a2, sizeof a2);
+                k1 = gt_column_item(G, 320.0f, 835.0f, 1, o1, sizeof o1);
+                snprintf(d, sizeof d, "row 1 \"%s\" (want \"Game Difficulty\"), row 2 "
+                         "\"%s\" (want \"Attack Power, Normal\"); unstamped read \"%s\"",
+                         a1, a2, o1);
+                check("54y. a value written before its row is the previous page's, "
+                      "not this row's",
+                      h1 && strcmp(a1, "Game Difficulty") == 0 &&
+                      h2 && strcmp(a2, "Attack Power, Normal") == 0 &&
+                      k1 && strcmp(o1, "Game Difficulty, Free Play") == 0, d);
+            }
+
             /* --- cases 54m-54o: ⭐⭐ THE SCREEN SNAPSHOT --------------------
              *
              * ⛔ USER: "These tests need to be faster for me to complete."

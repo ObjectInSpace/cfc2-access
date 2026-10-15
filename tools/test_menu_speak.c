@@ -61,6 +61,7 @@
  */
 
 #include "../src/menu_speak.h"
+#include "../src/gmd_find.h"
 #include "../src/menu_cursor.h"
 /* ⚠ The generated roster table, so case 33p can check it against the exe's own
  * counts in the C build too -- a hand-edit of the generated header would
@@ -1638,6 +1639,24 @@ int main(void)
                 mc_move lm = mk(0x14009d929ULL, 3, 0, 8);   /* 4 of 9 */
                 lm.vertical = FALSE;
                 lm.screen = LS;
+                /* The level row must carry OPT_DIFFICULTY's own text (643,
+                 * level_label): plant a table that has it, for this case
+                 * only -- every other case here runs with no table. */
+                static char *lvl_blob;
+                static SIZE_T lvl_cap;
+                const int LN = gmd_test_label_count();
+                if (!lvl_blob) {
+                    lvl_cap = (SIZE_T)LN * 24 + 64;
+                    lvl_blob = (char *)VirtualAlloc(NULL, lvl_cap, MEM_COMMIT | MEM_RESERVE,
+                                                    PAGE_READWRITE);
+                }
+                {
+                    SIZE_T pos = 0;
+                    for (int i = 0; i < LN; i++)
+                        pos += (SIZE_T)_snprintf(lvl_blob + pos, lvl_cap - pos, "%s",
+                                                 i == 643 ? "Game Difficulty" : "x") + 1;
+                }
+                gmd_test_set_blob((BYTE *)lvl_blob, LN);
                 menu_speak_build(&lm, &sp);
                 check("33h. a textless value row speaks as a LEVEL, not a "
                       "missing value",
@@ -1647,6 +1666,25 @@ int main(void)
                       "named=%d is_level=%d row_name=\"%s\" %d of %d",
                       (int)sp.named, (int)sp.is_level, sp.row_name,
                       sp.position, sp.total);
+
+                /* case 33h2: the SAME row number on a page where it is not
+                 * Game Difficulty (the EX page's Coin Mode). USER 2026-10-15:
+                 * Coin Mode spoke "1, of 3" instead of "Free Play". With 643
+                 * naming a different text, row 0 is not a level. */
+                {
+                    SIZE_T pos = 0;
+                    for (int i = 0; i < LN; i++)
+                        pos += (SIZE_T)_snprintf(lvl_blob + pos, lvl_cap - pos, "%s",
+                                                 i == 643 ? "Coin Mode" : "x") + 1;
+                }
+                gmd_test_set_blob((BYTE *)lvl_blob, LN);
+                menu_speak_build(&lm, &sp);
+                check("33h2. a masked row whose label is not the level row's is "
+                      "NOT a level",
+                      !sp.is_level,
+                      "is_level=%d row_name=\"%s\" item=\"%s\"",
+                      (int)sp.is_level, sp.row_name, sp.item);
+                gmd_test_set_blob(NULL, 0);
 
                 /* ⛔⛔ AND A ROW THAT IS *NOT* MARKED MUST STILL SPEAK ITS TEXT.
                  * Marking every row a level, or letting an empty read imply

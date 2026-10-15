@@ -1654,7 +1654,7 @@ static const mc_screen g_screens[] = {
     { .caller = 0x14009d929ULL, .base_index = -1, .count = 0,
       .name = "Game Settings", .how = MC_VERIFIED_LIVE_TEXT,
       .kind = MC_ROW_VALUE_LIVE, .coord_x = 320.0f, .pair_x = 835.0f,
-      .levels = (1u << 0), .row_off = 0x35C },
+      .levels = (1u << 0), .level_label = 643 /* OPT_DIFFICULTY */, .row_off = 0x35C },
 
     /* ⭐⭐ TRAINING OPTIONS -- the VALUE axis. Same screen object as the row
      * site above; values_off 0x3F0 re-derived on a fresh screen object across
@@ -2856,12 +2856,18 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
          * Without this a tab drawing a DIFFERENT number of rows would still
          * yield the Nth label -- a perfectly-ordered wrong answer, which is the
          * failure this whole file is built to refuse. */
-        n = gt_column_count(m->screen, s->coord_x);
+        /* The page now showing (gui_text.h, GT_STAMP_OFF): a shorter page
+         * leaves the previous page's last labels alive. Remember this page's
+         * row count for left/right, which has no row total of its own. */
+        n = gt_page_count(m->screen, s->coord_x, out->total);
+        menu_speak_note_row_total(m->screen, out->total);
         if (n != out->total) {
             log_line("mcspeak: %s -- column x=%.0f holds %d label(s) but the "
                      "cursor says %d; refusing rather than naming a row.",
                      s->name ? s->name : "(unnamed)", (double)s->coord_x, n,
                      out->total);
+            if (n > out->total)
+                gt_column_dump(m->screen, s->coord_x, out->total);
             out->why = MC_UNNAMED_COUNT_MISMATCH;
             return;
         }
@@ -2876,9 +2882,9 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
          * ⚠ A row with no value (the "Default" action row) yields the label
          * alone, because the pairing is by shared Y and there is nothing at
          * that Y to append -- not a gap to fill. */
-        if (!gt_column_item(m->screen, s->coord_x,
-                            s->pair_x > 0.0f ? s->pair_x : -1.0f,
-                            out->position, text, (int)sizeof(text)) ||
+        if (!gt_page_item(m->screen, s->coord_x,
+                          s->pair_x > 0.0f ? s->pair_x : -1.0f, out->total,
+                          out->position, text, (int)sizeof(text)) ||
             !text[0]) {
             out->why = MC_UNNAMED_TEXT_UNREADABLE;
             return;
@@ -2966,7 +2972,7 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
      * quoted from the live columns, as MC_ROW_COLUMN does. */
     if (s->kind == MC_ROW_VALUE_LIVE) {
         char text[GT_CAPTION_MAX], spoken[GM_OUT_MAX];
-        int row = -1, ncol;
+        int row = -1, ncol, page_total;
 
         /* ⚠ This IS a value axis, and saying so is load-bearing: the formatter
          * picks the level form ("Game Difficulty, 4, of 9") and the
@@ -2994,7 +3000,18 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
          * row number and quote a real-looking wrong line. The column is the
          * thing being indexed, so it is the thing that decides what is in
          * range. */
-        ncol = gt_column_count(m->screen, s->coord_x);
+        /* The row total from the last up/down move on this screen, if any:
+         * with it, a shorter page's leftovers are excluded exactly as above;
+         * without it, the column is read as it always was. */
+        page_total = g_last_row_screen == m->screen ? g_last_row_total : -1;
+        ncol = gt_page_count(m->screen, s->coord_x, page_total);
+        if (page_total >= 0 && ncol != page_total) {
+            log_line("mcspeak: %s -- this page has %d row(s) but %d of its labels "
+                     "were written with it; refusing rather than quoting a row.",
+                     s->name ? s->name : "(unnamed)", page_total, ncol);
+            out->why = MC_UNNAMED_COUNT_MISMATCH;
+            return;
+        }
         if (ncol <= 0 || row < 0 || row >= ncol) {
             log_line("mcspeak: %s -- the row cursor at +0x%x reads %d but the "
                      "column x=%.0f holds %d label(s); refusing rather than "
@@ -3027,26 +3044,39 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
              * label alone (no pair_x): pairing would append nothing anyway,
              * and asking for a partner that cannot exist invites the read to
              * fail for the wrong reason. */
-            if (gt_column_item(m->screen, s->coord_x, -1.0f, row + 1,
-                               text, (int)sizeof(text)) && text[0]) {
+            BOOL other_row = FALSE;
+            if (gt_page_item(m->screen, s->coord_x, -1.0f, page_total, row + 1,
+                             text, (int)sizeof(text)) && text[0]) {
                 gm_speak(text, spoken, sizeof(spoken));
                 if (spoken[0] && !gm_has_residue(spoken)) {
-                    _snprintf(out->row_name, sizeof(out->row_name), "%s",
-                              spoken);
-                    out->row_name[sizeof(out->row_name) - 1] = '\0';
-                    out->is_level = TRUE;
-                    out->why = MC_NAMED_OK;
-                    return;
+                    /* The level row must be the row it was verified on: its
+                     * label is the game's own text for it (level_label). */
+                    char want[GT_CAPTION_MAX];
+                    if (s->level_label > 0 &&
+                        (!gmd_text_by_index(s->level_label, want, sizeof(want)) ||
+                         strcmp(want, spoken) != 0)) {
+                        other_row = TRUE;
+                    } else {
+                        _snprintf(out->row_name, sizeof(out->row_name), "%s",
+                                  spoken);
+                        out->row_name[sizeof(out->row_name) - 1] = '\0';
+                        out->is_level = TRUE;
+                        out->why = MC_NAMED_OK;
+                        return;
+                    }
                 }
             }
-            out->why = MC_UNNAMED_TEXT_UNREADABLE;
-            return;
+            if (!other_row) {
+                out->why = MC_UNNAMED_TEXT_UNREADABLE;
+                return;
+            }
+            /* Not the level row on this page: read it as a named value. */
         }
 
         /* +1: the column helper is 1-based, the cursor field is 0-based. */
-        if (!gt_column_item(m->screen, s->coord_x,
-                            s->pair_x > 0.0f ? s->pair_x : -1.0f,
-                            row + 1, text, (int)sizeof(text)) || !text[0]) {
+        if (!gt_page_item(m->screen, s->coord_x,
+                          s->pair_x > 0.0f ? s->pair_x : -1.0f, page_total,
+                          row + 1, text, (int)sizeof(text)) || !text[0]) {
             out->why = MC_UNNAMED_TEXT_UNREADABLE;
             return;
         }

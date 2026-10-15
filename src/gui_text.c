@@ -2676,7 +2676,7 @@ int gt_test_instance_text(void *obj, char *out, int outlen)
  * pointer checks, the vptr re-validation and the mem_readable_run-before-copy
  * ordering are the same five lines gt_item_at_position() uses, and a second
  * copy of them would be a second place to get them wrong. */
-typedef struct { float x, y; const char *text; } gt_widget;
+typedef struct { float x, y; const char *text; const void *obj; unsigned stamp; } gt_widget;
 
 static int widgets_of(const void *screen, float want_x, gt_widget *out, int cap)
 {
@@ -2736,6 +2736,8 @@ static int widgets_of(const void *screen, float want_x, gt_widget *out, int cap)
         out[n].x = x;
         out[n].y = y;
         out[n].text = g_inst[i].text;
+        out[n].obj = o;
+        memcpy(&out[n].stamp, buf + GT_STAMP_OFF, sizeof out[n].stamp);
         n++;
     }
     return n;
@@ -2849,6 +2851,64 @@ int gt_column_count(const void *screen, float x)
     return n;
 }
 
+void gt_column_dump(const void *screen, float x, int total)
+{
+    static struct { const void *screen; float x; int n, total; } seen[16];
+    static int nseen;
+    gt_widget w[GT_INST_MAX];
+    static char text[GT_INST_MAX][GT_TEXT_MAX];
+    static unsigned char bytes[GT_INST_MAX][GT_CLASS_SIZE];
+    BOOL ok[GT_INST_MAX];
+    int n;
+
+    if ((!g_installed && !g_focus_test_mode) || !screen)
+        return;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return;
+    n = widgets_of(screen, x, w, GT_INST_MAX);
+    for (int i = 0; i < n; i++) {
+        strncpy(text[i], w[i].text, GT_TEXT_MAX - 1);
+        text[i][GT_TEXT_MAX - 1] = 0;
+        /* mem_readable_run first, then the guarded copy (run_span_test C). */
+        ok[i] = mem_readable_run(w[i].obj, GT_CLASS_SIZE) >= GT_CLASS_SIZE &&
+                mem_copy(bytes[i], w[i].obj, GT_CLASS_SIZE);
+    }
+    InterlockedExchange(&g_inst_busy, 0);
+
+    /* Once per shape: a held key would otherwise write this every move. */
+    for (int i = 0; i < nseen; i++)
+        if (seen[i].screen == screen && seen[i].x == x && seen[i].n == n &&
+            seen[i].total == total)
+            return;
+    if (nseen < 16) {
+        seen[nseen].screen = screen; seen[nseen].x = x;
+        seen[nseen].n = n; seen[nseen].total = total;
+        nseen++;
+    } else {
+        return;
+    }
+
+    log_line("gt: column dump -- screen %p x=%.0f holds %d label(s), cursor says %d",
+             screen, (double)x, n, total);
+    for (int i = 0; i < n; i++) {
+        char hex[GT_CLASS_SIZE * 2 + 1];
+        if (ok[i])
+            for (int b = 0; b < GT_CLASS_SIZE; b++)
+                _snprintf(hex + 2 * b, 3, "%02x", bytes[i][b]);
+        else
+            strcpy(hex, "unreadable");
+        {
+            unsigned stamp = 0;
+            if (ok[i]) memcpy(&stamp, bytes[i] + GT_STAMP_OFF, sizeof stamp);
+            log_line("gt:   obj %p y=%.1f \"%s\" stamp %u bytes %s", w[i].obj,
+                     (double)w[i].y, text[i], stamp, hex);
+        }
+    }
+}
+
+static BOOL format_row(gt_widget *w, int n, const gt_widget *p, int np, int position,
+                       char *out, int outlen, BOOL by_stamp);
+
 BOOL gt_column_item(const void *screen, float x, float pair_x, int position,
                     char *out, int outlen)
 {
@@ -2866,6 +2926,82 @@ BOOL gt_column_item(const void *screen, float x, float pair_x, int position,
         np = widgets_of(screen, pair_x, p, GT_INST_MAX);
     InterlockedExchange(&g_inst_busy, 0);
 
+    return format_row(w, n, p, np, position, out, outlen, FALSE);
+}
+
+/* The page now showing (gui_text.h, GT_STAMP_OFF). TRUE when a selection
+ * was made: the column then holds only the labels written in its latest
+ * write, and *since is the earliest stamp of that write. */
+static BOOL page_select(gt_widget *w, int *n, int total, unsigned *since)
+{
+    unsigned newest;
+    int k = 0;
+
+    if (total < 0 || *n == total || *n <= 0)
+        return FALSE;
+    newest = w[0].stamp;
+    for (int i = 1; i < *n; i++)
+        if ((int)(w[i].stamp - newest) > 0)
+            newest = w[i].stamp;
+    for (int i = 0; i < *n; i++)
+        if ((int)(newest - w[i].stamp) <= GT_PAGE_SLACK)
+            w[k++] = w[i];
+    *n = k;
+    *since = newest - GT_PAGE_SLACK;
+    return TRUE;
+}
+
+int gt_page_count(const void *screen, float x, int total)
+{
+    gt_widget w[GT_INST_MAX];
+    unsigned since;
+    int n;
+
+    if (!g_installed && !g_focus_test_mode)
+        return 0;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return 0;
+    n = widgets_of(screen, x, w, GT_INST_MAX);
+    InterlockedExchange(&g_inst_busy, 0);
+    page_select(w, &n, total, &since);
+    return n;
+}
+
+BOOL gt_page_item(const void *screen, float x, float pair_x, int total, int position,
+                  char *out, int outlen)
+{
+    gt_widget w[GT_INST_MAX], p[GT_INST_MAX];
+    unsigned since = 0;
+    int n, np = 0;
+
+    if (out && outlen > 0) out[0] = 0;
+    if ((!g_installed && !g_focus_test_mode) || !out || outlen <= 0 ||
+        position < 1)
+        return FALSE;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return FALSE;
+    n = widgets_of(screen, x, w, GT_INST_MAX);
+    if (pair_x >= 0.f)
+        np = widgets_of(screen, pair_x, p, GT_INST_MAX);
+    InterlockedExchange(&g_inst_busy, 0);
+
+    if (page_select(w, &n, total, &since) && n != total)
+        return FALSE;
+    return format_row(w, n, p, np, position, out, outlen, TRUE);
+}
+
+/* One row's label, with the value sharing its Y. Shared by every column read
+ * so the pairing rules exist once.
+ *
+ * by_stamp (the settings-page reads): a value written BEFORE its row label is
+ * not that row's value. Leaving a shorter page leaves its values alive too:
+ * CVS1's page-1 "Normal" stayed on the EX page's "Default" row, and the EX
+ * page's Coin Mode "Free Play" came back on Game Difficulty -- the one row
+ * whose own value is a graphic, with no text object to collide with. Every
+ * real value in the live stamps was written with or after its row. */
+static BOOL format_row(gt_widget *w, int n, const gt_widget *p, int np, int position,
+                       char *out, int outlen, BOOL by_stamp)
+{
     if (position > n || !sort_by_y(w, n))
         return FALSE;
 
@@ -2873,7 +3009,8 @@ BOOL gt_column_item(const void *screen, float x, float pair_x, int position,
     /* ⚠ Paired by Y, never by ordinal -- the columns can differ in length. */
     const char *mate = NULL;
     for (int i = 0; i < np; i++)
-        if (p[i].y > me->y - GT_COORD_EPS && p[i].y < me->y + GT_COORD_EPS) {
+        if (p[i].y > me->y - GT_COORD_EPS && p[i].y < me->y + GT_COORD_EPS &&
+            (!by_stamp || (int)(p[i].stamp - me->stamp) >= -GT_PAGE_SLACK)) {
             if (mate) { mate = NULL; break; }   /* two partners: refuse */
             mate = p[i].text;
         }

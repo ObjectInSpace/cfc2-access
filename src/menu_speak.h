@@ -443,6 +443,15 @@ typedef struct {
      * names a roster of a different size is REFUSED, which is what stops a
      * misread field from speaking another game's characters. */
     int        roster_off;
+    /* GMD index of the label a `levels` row must carry, or 0 for the mask
+     * alone. A screen whose pages share one row cursor (Game Settings: page 1
+     * row 0 is Game Difficulty, the EX page's row 0 is Coin Mode) cannot say
+     * by row number which row is a level; the row's live label must also be
+     * this text in the current language, or the row is read as a named value.
+     * USER, 2026-10-15: Coin Mode spoke "1, of 3" instead of "Free Play".
+     * ⚠ LAST in the struct: entries initialised by position must never
+     * shift into it. */
+    int        level_label;
 } mc_screen;
 
 /* ⭐ The heading column. The shell draws a screen's own title at X=960 -- the
