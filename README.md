@@ -62,7 +62,8 @@ side is which.
 
 ## Status
 
-- MTFramework shell (menus, options, move lists): working.
+- MTFramework shell (menus, options, move lists): working, including each
+  game's EX Settings page.
 - CVS2 in-game: working — character select speech, health and super gauges,
   position beacons, and the round clock. Match start and new fighters are
   announced; in Training these say "Player 1" and "Player 2", since the game
@@ -70,19 +71,20 @@ side is which.
 - CVS1 in-game: character select speaks each highlighted character by name.
   In a match: health tones, position beacons, pitch rising and falling
   through a jump, and silence on pause, all tested in play; the power gauge
-  tone and clock ticks are not yet confirmed in play. **New in this
-  version, not yet tested in play:** the groove screen ("Capcom Groove" /
-  "SNK Groove"), the speed menu after character select ("Normal" /
-  "Turbo"), and the order screen ("Ryu first"). On-screen system text is
-  spoken, except the "Free Play" credit display. Not yet: ratio and EX
-  choices, and a pitch change for crouching or being knocked down.
-- Capcom Fighting Evolution in-game: **new in this version.** Character
-  select speaks each highlighted name, and match audio has the same cues as
-  CVS2; both tested in play. On-screen system text is new and not yet tested.
-- Street Fighter Alpha 3 in-game: **new in this version, not yet tested in
-  play.** Character, ism and speed select are spoken, match audio has the
-  same cues, and the opening screens, pre-fight story and on-screen system
-  text are spoken.
+  tone and clock ticks are not yet confirmed in play. The groove screen
+  ("Capcom Groove" / "SNK Groove"), the speed menu after character select
+  ("Normal" / "Turbo") and the order screen ("Ryu first") are spoken.
+  On-screen system text is spoken, except the "Free Play" credit display.
+  Not yet: ratio and EX choices, and a pitch change for crouching or being
+  knocked down.
+- Capcom Fighting Evolution in-game: character select speaks each
+  highlighted name, and match audio has the same cues as CVS2. On-screen
+  system text is spoken.
+- Street Fighter Alpha 3 in-game: character, ism and speed select are
+  spoken, match audio has the same cues, and the opening screens, pre-fight
+  story and on-screen system text are spoken. This works with the game's
+  **Additional Characters** setting on or off; with it on, Eagle, Maki, Yun
+  and Ingrid are named on the select screen.
 - CVS2 text: win quotes, story pages, credits and on-screen prompts are
   spoken, and the **`` ` ``** key (the key left of 1) reads the current text
   again, in every supported game. In the menus it repeats the last thing the
@@ -97,4 +99,4 @@ Source, build script (`build.ps1`), and design docs are in the repository:
 https://github.com/ObjectInSpace/cfc2-access
 
 `.\build.ps1 -Deploy` builds and copies the mod into the game folder;
-`.\build.ps1 -Package 0.5.0` builds the release zip from a clean checkout.
+`.\build.ps1 -Package 0.5.1` builds the release zip from a clean checkout.
