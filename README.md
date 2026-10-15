@@ -99,4 +99,4 @@ Source, build script (`build.ps1`), and design docs are in the repository:
 https://github.com/ObjectInSpace/cfc2-access
 
 `.\build.ps1 -Deploy` builds and copies the mod into the game folder;
-`.\build.ps1 -Package 0.5.1` builds the release zip from a clean checkout.
+`.\build.ps1 -Package 0.5.5` builds the release zip from a clean checkout.
