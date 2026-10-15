@@ -11,6 +11,7 @@
 #include "z3u_branch.h"
 #include "audio.h"
 #include "log.h"
+#include "frame_liveness.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -434,7 +435,16 @@ void z3u_select_tick(void)
         }
     }
     z3u_audio_route(root, rom);
-    z3u_select_observe(&sample, root, rom);
+    /* Only while the update runs: a quit game's block stays frozen on its
+     * last screen and passes every gate above (frame_liveness.h). A stall
+     * departs, so a resumed or restarted select speaks its highlight. */
+    {
+        static frame_liveness live;
+        if (frame_liveness_live(&live, z3u_frame_count(), GetTickCount64(), STALL_MS))
+            z3u_select_observe(&sample, root, rom);
+        else
+            z3u_select_observe(NULL, 0, 0);
+    }
     z3u_text_observe(root);
     return;
 inactive:

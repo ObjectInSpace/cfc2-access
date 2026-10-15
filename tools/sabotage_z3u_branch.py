@@ -1,6 +1,6 @@
 """Sabotages for the Alpha 3 alternate-copy layout (src/z3u_branch.h): each
 wrong entry must fail the Alpha 3 suite that covers it. Restores the header
-afterwards, also on error. Run from anywhere: python tools\sabotage_z3u_branch.py"""
+afterwards, also on error. Run from anywhere: python tools/sabotage_z3u_branch.py"""
 import os, shutil, subprocess, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 H = ROOT + r"\src\z3u_branch.h"
@@ -29,4 +29,5 @@ try:
         shutil.copy(H + ".bak", H)
 finally:
     shutil.copy(H + ".bak", H)
+    os.remove(H + ".bak")
 sys.exit(bad)

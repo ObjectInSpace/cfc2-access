@@ -4,6 +4,7 @@
 #include "../src/z3u_select.h"
 #include "../src/character_name_table.h"
 #include "../src/z3u_branch.h"
+#include "../src/frame_liveness.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -244,8 +245,23 @@ int main(void)
         assert(!wcscmp(last, L"Maki"));
     }
 
+    /* 7. Frame liveness (src/frame_liveness.h), the gate that stops a quit
+     *    game's frozen select screen speaking again ("Game: Ryu", 2026-10-15
+     *    log 02:52:04). One value is not motion; an advance is live until
+     *    the counter stalls for 250 ms; a resume is live again. */
+    {
+        frame_liveness l = { 0, 0, FALSE };
+        assert(!frame_liveness_live(&l, 500, 1000, 250));    /* first sighting  */
+        assert(!frame_liveness_live(&l, 500, 1033, 250));    /* frozen block    */
+        assert(frame_liveness_live(&l, 502, 1066, 250));     /* running         */
+        assert(frame_liveness_live(&l, 502, 1300, 250));     /* within 250 ms   */
+        assert(!frame_liveness_live(&l, 502, 1316, 250));    /* quit or paused  */
+        assert(!frame_liveness_live(&l, 502, 9000, 250));
+        assert(frame_liveness_live(&l, 503, 9033, 250));     /* resumed         */
+    }
+
     printf("PASS: %u live Alpha 3 samples, character/ism/speed path, names by version, "
            "random, shared-channel speech/retry/kind/depart, every gate, alternate-copy "
-           "extra fighters\n", count);
+           "extra fighters, frame liveness\n", count);
     return 0;
 }
