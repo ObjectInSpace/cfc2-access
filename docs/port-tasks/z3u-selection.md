@@ -11,7 +11,8 @@ field. Not yet heard in the game.
 - The user confirmed the shell's game-version setting picks US (`a3u`) or
   Japanese (`z3u`). Both are on this branch, so one adapter covers both.
 - The alternate branch (`z3uu`/`a3uu`, root `0x142C44050`) has its own code and
-  layout. What selects it is still unknown. The adapter does not admit it.
+  layout. 2026-10-15: it is the Additional Characters setting, and the
+  adapter now reads it too; see [z3u-alternate.md](z3u-alternate.md).
 
 ## The capture
 

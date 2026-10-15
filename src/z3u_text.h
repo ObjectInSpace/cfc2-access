@@ -2,8 +2,9 @@
 #define CFC2_Z3U_TEXT_H
 #include <windows.h>
 #include "text_channel.h"
+#include "z3u_branch.h"
 
-/* Alpha 3's positioned text-record queue (ordinary branch): GAME OVER,
+/* Alpha 3's positioned text-record queue (either copy, z3u_branch.h): GAME OVER,
  * CONTINUE?, GIVE UP?, QUIT GAME / YES / NO, SURVIVAL MODE, TEAM VS, NEXT,
  * WINS, SCORE, CLEAR TIME, CONGRATULATIONS!!, the credits and copyright.
  * Evidence: docs/port-tasks/game-text.md. Font 4 draws picture words from
@@ -12,12 +13,12 @@
 /* Game thread, from the Alpha 3 frame hook AFTER the original update returns:
  * every screen handler draws the queue (0x14087E640) inside the update, so it
  * holds exactly what this frame drew. */
-void z3u_text_capture(void);
+void z3u_text_capture(const z3u_branch *b);
 
-/* Game thread, from the hook on the attract walker 0x1408797D0, BEFORE it
+/* Game thread, from the hook on copy b's attract walker (0x1408797D0), BEFORE it
  * draws and clears the queue (the opening screens print through it). Adds
  * the in-use records to the frame z3u_text_capture() then publishes. */
-void z3u_text_collect(void);
+void z3u_text_collect(const z3u_branch *b);
 
 /* Style of a typewriter message row (story text), outside the fonts' 0..4. */
 #define Z3U_STYLE_MESSAGE 16

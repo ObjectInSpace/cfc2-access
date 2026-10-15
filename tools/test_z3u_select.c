@@ -3,6 +3,7 @@
  * repository root. Fixture: tools/make_z3u_select_fixture.py. */
 #include "../src/z3u_select.h"
 #include "../src/character_name_table.h"
+#include "../src/z3u_branch.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -45,6 +46,7 @@ static void load(void)
         rec[i].joined = raw[8];
         memcpy(rec[i].obj, raw + 9, 2 * Z3U_FIELDS);
         rec[i].variant = 1;                       /* the capture ran a3u */
+        rec[i].id_limit = z3u_ordinary.id_limit;
     }
     assert(fgetc(f) == EOF);
     fclose(f);
@@ -209,7 +211,41 @@ int main(void)
         assert(z3u_select_decode(&s, 0, NULL) == -1);
     }
 
+    /* 6. The alternate copy (Additional Characters on): its grid adds native
+     *    IDs 38..41, named through the shell's +1 from 0x26 (0x14008221C).
+     *    The ordinary limit still refuses them; IDs below 38 name as before. */
+    {
+        static const wchar_t *const extra[4] = { L"Eagle", L"Maki", L"Yun", L"Ingrid" };
+        unsigned i = find(0, 24), k;
+        game_selection_choice c[GAME_SELECTION_OWNERS];
+        z3u_select_sample s;
+        assert(i < count);
+        assert(z3u_branch_for_rom(6) == &z3u_ordinary && z3u_branch_for_rom(7) == &z3u_ordinary);
+        assert(z3u_branch_for_rom(16) == &z3u_alternate && z3u_branch_for_rom(17) == &z3u_alternate);
+        assert(z3u_branch_for_rom(4) == NULL && z3u_branch_for_rom(8) == NULL);
+        for (unsigned id = 38; id < 42; id++) {
+            s = rec[i]; s.id_limit = z3u_alternate.id_limit; s.obj[0][Z3U_ID] = (BYTE)id;
+            assert(z3u_select_decode(&s, 0, &k) == (int)id);
+            z3u_selection_copy(&s, c);
+            assert(c[0].status == GAME_SELECTION_VALID && !wcscmp(c[0].label, extra[id - 38]));
+            s.id_limit = z3u_ordinary.id_limit;
+            assert(z3u_select_decode(&s, 0, &k) == -2);
+        }
+        s = rec[i]; s.id_limit = z3u_alternate.id_limit; s.obj[0][Z3U_ID] = 42;
+        assert(z3u_select_decode(&s, 0, &k) == -2);
+        s = rec[i]; s.id_limit = z3u_alternate.id_limit; s.obj[0][Z3U_ID] = 37;
+        z3u_selection_copy(&s, c);
+        assert(!wcscmp(c[0].label, L"Balrog"));              /* US name, unshifted */
+        /* A spoken extra fighter through the channel, on an alternate ROM. */
+        s = rec[i]; s.id_limit = z3u_alternate.id_limit; s.obj[0][Z3U_ID] = 39;
+        z3u_select_observe(NULL, 0, 0);
+        z3u_select_observe(&s, ROOT, 17);
+        z3u_select_observe(&s, ROOT, 17);
+        assert(!wcscmp(last, L"Maki"));
+    }
+
     printf("PASS: %u live Alpha 3 samples, character/ism/speed path, names by version, "
-           "random, shared-channel speech/retry/kind/depart, every gate\n", count);
+           "random, shared-channel speech/retry/kind/depart, every gate, alternate-copy "
+           "extra fighters\n", count);
     return 0;
 }

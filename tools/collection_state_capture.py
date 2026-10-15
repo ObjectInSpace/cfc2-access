@@ -59,6 +59,8 @@ OWN_HOOKS = {
     0x1407CB8B0: bytes.fromhex('4883ec28e8'),   # cfj_frame.c
     0x14086D160: bytes.fromhex('48895c2408'),   # z3u_frame.c
     0x1408797D0: bytes.fromhex('488bc44889'),   # z3u_frame.c (attract text)
+    0x140DCC3F0: bytes.fromhex('48895c2408'),   # z3u_frame.c (alternate copy)
+    0x140DD92B0: bytes.fromhex('488bc44889'),   # z3u_frame.c (alternate attract text)
 }
 
 

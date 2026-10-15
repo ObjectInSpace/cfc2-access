@@ -13,8 +13,8 @@
 MH_STATUS WINAPI MH_CreateHook(LPVOID t, LPVOID d, LPVOID *o) { (void)t; (void)d; (void)o; return MH_UNKNOWN; }
 MH_STATUS WINAPI MH_EnableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
 MH_STATUS WINAPI MH_DisableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
-void z3u_text_capture(void) {}   /* run_z3u_text_test */
-void z3u_text_collect(void) {}
+void z3u_text_capture(const z3u_branch *b) { (void)b; }   /* run_z3u_text_test */
+void z3u_text_collect(const z3u_branch *b) { (void)b; }
 
 #define SIZE 0x12F98u
 #define P0 0x1B0u
@@ -172,8 +172,61 @@ int main(void)
         }
     }
 
+    /* 8. The alternate copy (z3uu/a3uu). No live capture of it exists yet, so
+     *    each labelled snapshot is moved into an alternate-shaped block by the
+     *    traced field map (z3u_branch.h): root words to +0x50 in place, the
+     *    clock and camera moved, each player object rebased with every byte
+     *    from +0x51 shifted by 8. The alternate decode must equal the
+     *    ordinary one, and the ordinary layout over that block must not --
+     *    a check of the plumbing against the map, not of the map itself. */
+    /*    The relocation uses the traced numbers as literals, never the
+     *    struct under test, or a wrong entry would move both sides at once. */
+    {
+        unsigned char *alt = malloc(0x1B528);
+        assert(alt && z3u_alternate.state_size == 0x1B528);
+        for (unsigned i = 0; i < RECORDS; i++) {
+            match_audio_sample a, o;
+            memset(alt, 0, 0x1B528);
+            memcpy(alt, snap[i], 0x51);
+            alt[0x129] = snap[i][0xF1];                               /* clock  */
+            memcpy(alt + 0xE4EA, snap[i] + 0xC55A, 2);                /* camera */
+            for (unsigned p = 0; p < 2; p++) {
+                const unsigned char *src = snap[i] + 0x1B0 + p * 0x550;
+                unsigned char *dst = alt + 0x1F8 + p * 0x580;
+                memcpy(dst, src, 0x51);
+                memcpy(dst + 0x59, src + 0x51, 0x550 - 0x51);
+            }
+            z3u_frame_decode(snap[i], &o);
+            z3u_frame_decode_branch(&z3u_alternate, alt, &a);
+            assert(a.in_match == o.in_match && a.clock_valid == o.clock_valid && a.clock == o.clock);
+            assert(a.motion_valid == o.motion_valid && a.motion_signature == o.motion_signature);
+            for (unsigned p = 0; p < 2; p++) {
+                assert(a.owner[p].health.valid == o.owner[p].health.valid &&
+                       a.owner[p].health.value == o.owner[p].health.value);
+                assert(a.owner[p].resource.valid == o.owner[p].resource.valid &&
+                       a.owner[p].resource.value == o.owner[p].resource.value);
+                assert(a.owner[p].screen_pan == o.owner[p].screen_pan &&
+                       a.owner[p].stance == o.owner[p].stance);
+            }
+        }
+        {
+            /* The ordinary layout reads the round-start block wrongly. */
+            match_audio_sample a, o;
+            z3u_frame_decode(snap[0], &o);
+            memset(alt, 0, 0x1B528);
+            memcpy(alt, snap[0], 0x51);
+            for (unsigned p = 0; p < 2; p++)
+                memcpy(alt + 0x1F8 + p * 0x580 + 0x59, snap[0] + 0x1B0 + p * 0x550 + 0x51,
+                       0x550 - 0x51);
+            z3u_frame_decode(alt, &a);
+            assert(a.owner[0].health.value != o.owner[0].health.value ||
+                   a.owner[1].health.value != o.owner[1].health.value);
+        }
+        free(alt);
+    }
+
     printf("PASS: 13 labelled Alpha 3 snapshots + intro fill, KO and select -- health, "
            "super gauge, clock, live-round gate, KO sentinel, camera pan, airborne pitch, "
-           "match gate\n");
+           "match gate; alternate-copy layout matches the ordinary decode\n");
     return 0;
 }

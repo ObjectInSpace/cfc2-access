@@ -2,10 +2,12 @@
  * Street Fighter Alpha 3 per-frame match audio: health, super gauge, fighter
  * position and the round clock on the frame they change, decoded into a
  * match_audio sample. The cue policy is shared (src/match_audio.c); this file
- * only reads Alpha 3's own fields (ordinary branch, ROMs z3u/a3u).
+ * only reads Alpha 3's own fields, on either copy of the game
+ * (z3u_branch.h: ordinary z3u/a3u, alternate z3uu/a3uu).
  *
  * Fields, each from a labelled capture and the code that uses it
- * (docs/port-tasks/z3u-match-fields.md). Player object = R + 0x1B0 + side*0x550:
+ * (docs/port-tasks/z3u-match-fields.md; alternate offsets in z3u_branch.h).
+ * Ordinary player object = R + 0x1B0 + side*0x550:
  *   +0x88  health, signed 16-bit, maximum 0x90 (round setup 0x14086CE72;
  *          damage 0x1408B110C floors it at 0; -1 at a KO)
  *   +0x1EE super gauge, maximum 0x90 (an X-ism super needs exactly 0x90,
@@ -22,15 +24,21 @@
 
 #include <windows.h>
 #include "match_audio.h"
+#include "z3u_branch.h"
 
+/* Hooks both copies' updates; TRUE if either is hooked. */
 BOOL z3u_frame_install(void);
 void z3u_frame_remove(void);
-/* Detour entries so far; the worker uses it to notice a stalled frame. */
+/* Detour entries so far (either copy); the worker uses it to notice a
+ * stalled frame. */
 LONG z3u_frame_count(void);
 void z3u_frame_log_stats(void);
 
-/* Decode Alpha 3 state at `root` (the published primary block). Pure
- * arithmetic on the bytes; in_match false outside the match screen. */
+/* Decode Alpha 3 state at `root` (the published primary block of copy `b`).
+ * Pure arithmetic on the bytes; in_match false outside the match screen. */
+void z3u_frame_decode_branch(const z3u_branch *b, const unsigned char *root,
+                             match_audio_sample *m);
+/* The ordinary copy (the labelled captures). */
 void z3u_frame_decode(const unsigned char *root, match_audio_sample *m);
 
 #endif

@@ -3,16 +3,11 @@
 #include <windows.h>
 #include "game_selection.h"
 
-/* Street Fighter Alpha 3 (game 3, ROMs 6 z3u / 7 a3u, the ordinary branch)
- * character, ism and speed speech. Native evidence:
- * docs/port-tasks/z3u-selection.md; names: docs/port-tasks/character-names.md.
- * Read-only, worker thread only. The alternate branch (z3uu/a3uu) has its own
- * root and layout and is not admitted. */
-
-#define Z3U_STATE_SIZE  0x12F98u
-#define Z3U_OBJ_OFF     0x1B0u       /* player objects, side 0 first           */
-#define Z3U_OBJ_STEP    0x550u
-#define Z3U_ID_LIMIT    38u          /* grid and random pool draw 0..37 only   */
+/* Street Fighter Alpha 3 (game 3) character, ism and speed speech on either
+ * copy of the game (z3u_branch.h): ROMs 6 z3u / 7 a3u, and 16 z3uu / 17 a3uu
+ * when the Additional Characters setting is on. Native evidence:
+ * docs/port-tasks/z3u-selection.md and z3u-alternate.md; names:
+ * docs/port-tasks/character-names.md. Read-only, worker thread only. */
 
 /* Per-side fields copied from the player object. */
 enum { Z3U_STATE, Z3U_SUB, Z3U_SIDE, Z3U_ID, Z3U_RANDOM, Z3U_ISM, Z3U_FIELDS };
@@ -25,6 +20,7 @@ typedef struct {
     BYTE speed;          /* low byte of R+0x3C: the speed menu's cursor         */
     BYTE obj[2][Z3U_FIELDS];
     unsigned variant;    /* shell game-version setting: 0 Japanese ROM, 1 US ROM */
+    unsigned id_limit;   /* the copy's grid IDs are 0 .. id_limit-1 (38 / 42)   */
 } z3u_select_sample;
 
 /* Selection kinds spoken through the shared channel. */

@@ -7,8 +7,12 @@ every game-specific feature, on TWO runtime branches.
 branch** (`src/z3u_select.c`) from one live capture (ROM 7 `a3u`) and the code
 that writes each field. Not yet heard in the game. Evidence:
 [z3u-selection.md](z3u-selection.md). The US/Japanese version setting picks
-`a3u`/`z3u`, both on the ordinary branch; what selects the alternate branch
-is still unknown.
+`a3u`/`z3u`, both on the ordinary branch.
+
+**2026-10-15: the alternate branch is the Additional Characters setting**, and
+select, match audio and text now read it as well, traced offline by aligning
+each function with its ordinary counterpart. Not yet heard in the game:
+[z3u-alternate.md](z3u-alternate.md).
 
 Match audio is built the same day: [z3u-match-fields.md](z3u-match-fields.md).
 
@@ -22,9 +26,9 @@ Match audio is built the same day: [z3u-match-fields.md](z3u-match-fields.md).
     `0x140DCC3F0` via wrapper `0x140DCB970`.
   - The alternate branch places its context at A+0x08B00000 (as STG2 does),
     not A+0x08000000.
-- The visible option that sets `+0x2B4` is unresolved. Original CPS-2 or NAOMI
-  addresses are not evidence for either branch.
-- Nothing below the roots is traced.
+- `+0x2B4` is Alpha 3's Additional Characters setting (see
+  [z3u-alternate.md](z3u-alternate.md)). Original CPS-2 or NAOMI addresses
+  are not evidence for either branch.
 
 ## Feature mapping to the shared interfaces
 

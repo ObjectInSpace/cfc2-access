@@ -8,6 +8,7 @@
 #include "match_audio.h"
 #include "z3u_frame.h"
 #include "z3u_text.h"
+#include "z3u_branch.h"
 #include "audio.h"
 #include "log.h"
 #include <string.h>
@@ -50,7 +51,8 @@ int z3u_select_decode(const z3u_select_sample *s, unsigned side, unsigned *kind)
         /* A random cell sets object+0x59 (0x1408AA2DB) and the ID is re-rolled
          * every frame: the cell is spoken, not the roll. */
         if (o[Z3U_RANDOM]) return 0xFF;
-        if (o[Z3U_ID] >= Z3U_ID_LIMIT || !character_name(3, o[Z3U_ID], s->variant)) return -2;
+        if (o[Z3U_ID] >= s->id_limit ||
+            !character_name(3, z3u_name_index(o[Z3U_ID]), s->variant)) return -2;
         return o[Z3U_ID];
     case 2: { /* 0x1408AA650: up/down step object+0x202 within -1..1 */
         int ism = (signed char)o[Z3U_ISM];
@@ -90,7 +92,7 @@ void z3u_selection_copy(const z3u_select_sample *s,
             swprintf(out[side].label, GAME_SELECTION_LABEL, L"Random");
         else
             swprintf(out[side].label, GAME_SELECTION_LABEL, L"%hs",
-                     character_name(3, (unsigned)value, s->variant));
+                     character_name(3, z3u_name_index((unsigned)value), s->variant));
     }
 }
 
@@ -127,13 +129,15 @@ static BOOL read_at(void *out, ULONGLONG address, SIZE_T size)
 
 #define SESSION_SLOT 0x141C14F98ULL   /* emulator session singleton          */
 #define SHELL_SLOT   0x141C14F90ULL   /* shell game-select object (+0x1AC game, +0x1B0 version) */
-#define ROOT_SLOT    0x1422FB960ULL   /* Alpha 3 published root, setup 0x14086CFC0 */
 #define POLL_MS      33u              /* faster than a 60 fps frame; see cvs2_select_tick */
-#define OBJ_READ     0x203u           /* object bytes up to +0x202            */
+#define OBJ_READ     0x20Bu           /* object bytes up to the alternate ism +0x20A */
 
-/* Code this adapter's offsets and names depend on, checked ONCE (`.text` is
- * immutable here). Bytes from the reviewed dump. */
-static const struct { ULONGLONG address; BYTE bytes[24]; unsigned n; } g_sig[] = {
+typedef struct { ULONGLONG address; BYTE bytes[24]; unsigned n; } code_sig;
+typedef struct { ULONGLONG slot, target; } table_entry;
+
+/* Code this adapter's offsets and names depend on, checked ONCE per copy
+ * (`.text` is immutable here). Bytes from the reviewed dump. */
+static const code_sig g_sig_ord[] = {
     { 0x140895C68ULL, { 0x48,0x8d,0x58,0x28 }, 4 },                          /* task block R+0x28 */
     { 0x140895CEDULL, { 0x0f,0xb7,0x43,0x02,0xff,0x94,0xc6,0x48,0x7a,0x2d,0x01 }, 11 }, /* mode +0x2A */
     { 0x140899E70ULL, { 0xe9,0xdb,0xe0,0x00,0x00 }, 5 },                     /* -> 0x1408A7F50    */
@@ -152,15 +156,45 @@ static const struct { ULONGLONG address; BYTE bytes[24]; unsigned n; } g_sig[] =
     { 0x1408AA6EFULL, { 0x88,0x81,0x02,0x02,0x00,0x00 }, 6 },                /* ism store         */
     { 0x1408AA9D0ULL, { 0x0f,0xb6,0x41,0x05,0x4c,0x8d,0x05,0xd5,0x13,0xa3,0x00 }, 11 }, /* state 3 sub */
     { 0x1408AAB3EULL, { 0x66,0x83,0x70,0x3c,0x01 }, 5 },                     /* speed toggle      */
+};
+
+/* The alternate copy's same instructions, each aligned with the ordinary
+ * one above by tools/branch_map.py: objects at +0x1F8/+0x778, the side at
+ * +0x1D9, the random marker at +0x61, the hover ID at +0x1DA, the ism at
+ * +0x20A; the grid is read through r12 = 0x1419E83F0 (lea at 0x140E0B076). */
+static const code_sig g_sig_alt[] = {
+    { 0x140DF6C68ULL, { 0x48,0x8d,0x58,0x28 }, 4 },                          /* task block R+0x28 */
+    { 0x140DF6CEDULL, { 0x0f,0xb7,0x43,0x02,0xff,0x94,0xc6,0xb8,0x3b,0x9e,0x01 }, 11 }, /* mode +0x2A */
+    { 0x140DFAEB0ULL, { 0xe9,0x3b,0xdd,0x00,0x00 }, 5 },                     /* -> 0x140E08BF0    */
+    { 0x140E08C0FULL, { 0x0f,0xb7,0x41,0x2c }, 4 },                          /* screen R+0x2C     */
+    { 0x140E0AB92ULL, { 0x41,0x0f,0xbe,0x41,0x59,0x4d,0x8d,0x81,0xf8,0x01,0x00,0x00,
+                        0x41,0x0f,0xbe,0x49,0x69,0x49,0x8d,0xb1,0x78,0x07,0x00,0x00 }, 24 }, /* masks, objects */
+    { 0x140E0ABC3ULL, { 0x0f,0xb6,0x86,0xd9,0x01,0x00,0x00,0x0f,0xa3,0xc1,0x73,0x19,
+                        0x0f,0xb6,0x46,0x04 }, 16 },                         /* side bit, state   */
+    { 0x140E0ABD9ULL, { 0x41,0xff,0x94,0xc4,0x80,0x85,0x9e,0x01 }, 8 },      /* state table       */
+    { 0x140E0AE10ULL, { 0x0f,0xb6,0x41,0x05,0x4c,0x8d,0x05,0x8d,0xd7,0xbd,0x00 }, 11 }, /* state 0 sub */
+    { 0x140E0B076ULL, { 0x4c,0x8d,0x25,0x73,0xd3,0xbd,0x00 }, 7 },           /* grid base         */
+    { 0x140E0B0EEULL, { 0x42,0x0f,0xb6,0x0c,0x20 }, 5 },                     /* grid cell read    */
+    { 0x140E0B13FULL, { 0x88,0x4b,0x61 }, 3 },                               /* random marker     */
+    { 0x140E0B161ULL, { 0x88,0x8b,0xda,0x01,0x00,0x00 }, 6 },                /* hover store       */
+    { 0x140E0B440ULL, { 0x0f,0xb6,0x41,0x05,0x4c,0x8d,0x05,0xd5,0xd1,0xbd,0x00 }, 11 }, /* state 2 sub */
+    { 0x140E0B572ULL, { 0x0f,0xbe,0x81,0x0a,0x02,0x00,0x00,0xf6,0xc2,0x08 }, 10 }, /* ism, up */
+    { 0x140E0B59FULL, { 0x88,0x81,0x0a,0x02,0x00,0x00 }, 6 },                /* ism store         */
+    { 0x140E0B8B0ULL, { 0x0f,0xb6,0x41,0x05,0x4c,0x8d,0x05,0x95,0xcd,0xbd,0x00 }, 11 }, /* state 3 sub */
+    { 0x140E0B9C1ULL, { 0x66,0x83,0x70,0x3c,0x01 }, 5 },                     /* speed toggle      */
+};
+
+/* Shell code both copies share: the name and style functions and the
+ * version field. */
+static const code_sig g_sig_shell[] = {
     { 0x14004B4E4ULL, { 0x83,0xff,0x2b,0x73,0x60,0x49,0x8d,0x04,0x7e,0x49,0x8b,0x84,
                         0xc4,0x20,0x6c,0x1f,0x01 }, 17 },                    /* name fn: Z3U case */
     { 0x14004AE6BULL, { 0x83,0xfa,0x03,0x75,0x18 }, 5 },                     /* style fn: game 3  */
     { 0x14007FF39ULL, { 0x8b,0x88,0xb0,0x01,0x00,0x00 }, 6 },                /* version at +0x1B0 */
 };
 
-/* Dispatch-table entries the gates name, the speed table and the shell's
- * style names. */
-static const struct { ULONGLONG slot, target; } g_entries[] = {
+/* Dispatch-table entries the gates name. */
+static const table_entry g_entries_ord[] = {
     { 0x1412D7A50ULL, 0x140899E70ULL },   /* game mode 1               */
     { 0x1412DBC70ULL, 0x1408AA700ULL },   /* screen 2: select          */
     { 0x1412DBCE0ULL, 0x1408A9F80ULL },   /* object state 0: character */
@@ -170,24 +204,108 @@ static const struct { ULONGLONG slot, target; } g_entries[] = {
     { 0x1412DBD88ULL, 0x1408AA650ULL },   /* state 2 sub 1             */
     { 0x1412DBDB8ULL, 0x1408AAAE0ULL },   /* state 3 sub 1             */
 };
+static const table_entry g_entries_alt[] = {
+    { 0x1419E3BC0ULL, 0x140DFAEB0ULL },   /* game mode 1               */
+    { 0x1419E8508ULL, 0x140E0B5B0ULL },   /* screen 2: select          */
+    { 0x1419E8580ULL, 0x140E0AE10ULL },   /* object state 0: character */
+    { 0x1419E8590ULL, 0x140E0B440ULL },   /* object state 2: ism       */
+    { 0x1419E8598ULL, 0x140E0B8B0ULL },   /* object state 3: speed     */
+    { 0x1419E85B0ULL, 0x140E0AFC0ULL },   /* state 0 sub 1             */
+    { 0x1419E8628ULL, 0x140E0B500ULL },   /* state 2 sub 1             */
+    { 0x1419E8658ULL, 0x140E0B960ULL },   /* state 3 sub 1             */
+};
 
-static BOOL data_matches(void)
+/* The alternate grid 0x1419E83F0, 7 by 7: the ordinary grid with native IDs
+ * 40 and 41 at the ends of row 5 and 38 and 39 in place of two of the four
+ * random cells in the bottom row (names through z3u_name_index: Eagle 38,
+ * Maki 39, Yun 40, Ingrid 41). Checked so that a grid this adapter has not
+ * seen cannot be read with the wrong limit. */
+static const BYTE g_grid_alt[49] = {
+    0x80,0x80,0x40,0x0a,0x41,0x80,0x80,
+    0x80,0x20,0x03,0x04,0x0b,0x21,0x80,
+    0x22,0x0c,0x07,0x1a,0x08,0x02,0x17,
+    0x00,0x18,0x1b,0x1d,0x1c,0x19,0x01,
+    0x1e,0x0f,0x06,0x16,0x05,0x10,0x1f,
+    0x28,0x23,0x0e,0x0d,0x11,0x25,0x29,
+    0xff,0xff,0x26,0x09,0x27,0xff,0xff,
+};
+
+typedef struct {
+    const z3u_branch *b;
+    const code_sig *sig;
+    unsigned nsig;
+    const table_entry *entries;
+    unsigned nentries;
+    ULONGLONG speed_table;
+    int checked;                 /* 0 not yet, 1 matches, -1 differs */
+} select_branch;
+
+static select_branch g_branches[2] = {
+    { &z3u_ordinary, g_sig_ord, sizeof g_sig_ord / sizeof g_sig_ord[0],
+      g_entries_ord, sizeof g_entries_ord / sizeof g_entries_ord[0], 0x1412DBDC8ULL, 0 },
+    { &z3u_alternate, g_sig_alt, sizeof g_sig_alt / sizeof g_sig_alt[0],
+      g_entries_alt, sizeof g_entries_alt / sizeof g_entries_alt[0], 0x1419E8668ULL, 0 },
+};
+
+/* 1 all match, 0 unreadable (retry later), -1 a difference. */
+static int sigs_match(const code_sig *sig, unsigned n, const char *what)
+{
+    for (unsigned i = 0; i < n; i++) {
+        BYTE got[24];
+        if (!read_at(got, sig[i].address, sig[i].n)) return 0;
+        if (memcmp(got, sig[i].bytes, sig[i].n)) {
+            log_line("z3u-select: ⛔ %s code at 0x%llx differs from the audited build -- "
+                     "Alpha 3 selection speech is disabled for it.", what, sig[i].address);
+            return -1;
+        }
+    }
+    return 1;
+}
+
+/* The data facts the decode rests on: the dispatch entries, the speed table,
+ * the shell's style names and, for the alternate copy, its grid. */
+static BOOL data_matches(const select_branch *sb)
 {
     static const char *const ism[3] = { "X-ISM", "Z-ISM", "V-ISM" };
     static const BYTE speed[3] = { 0, 6, 8 };
-    BYTE got[8];
-    for (unsigned i = 0; i < sizeof g_entries / sizeof g_entries[0]; i++) {
+    BYTE got[49];
+    for (unsigned i = 0; i < sb->nentries; i++) {
         ULONGLONG v;
-        if (!read_at(&v, g_entries[i].slot, 8) || v != g_entries[i].target) return FALSE;
+        if (!read_at(&v, sb->entries[i].slot, 8) || v != sb->entries[i].target) return FALSE;
     }
-    if (!read_at(got, 0x1412DBDC8ULL, 3) || memcmp(got, speed, 3)) return FALSE;
+    if (!read_at(got, sb->speed_table, 3) || memcmp(got, speed, 3)) return FALSE;
     for (unsigned i = 0; i < 3; i++) {
         ULONGLONG p;
         if (!read_at(&p, 0x1411F7C28ULL + 8 * i, 8) || !read_at(got, p, 6) ||
             memcmp(got, ism[i], 6))
             return FALSE;
     }
+    if (sb->b == &z3u_alternate &&
+        (!read_at(got, 0x1419E83F0ULL, sizeof g_grid_alt) || memcmp(got, g_grid_alt, sizeof g_grid_alt)))
+        return FALSE;
     return TRUE;
+}
+
+/* 1 trusted, 0 not yet readable, -1 refused (logged once). */
+static int branch_checked(select_branch *sb)
+{
+    static int shell_ok;
+    int r;
+    if (sb->checked) return sb->checked;
+    if (!shell_ok) {
+        r = sigs_match(g_sig_shell, sizeof g_sig_shell / sizeof g_sig_shell[0], "shell");
+        if (r == 0) return 0;
+        shell_ok = r;
+    }
+    if (shell_ok < 0) return sb->checked = -1;
+    r = sigs_match(sb->sig, sb->nsig, sb->b->name);
+    if (r == 0) return 0;
+    if (r > 0 && !data_matches(sb)) {
+        log_line("z3u-select: ⛔ a %s select table or style name differs from the audited "
+                 "build -- its selection speech is disabled.", sb->b->name);
+        r = -1;
+    }
+    return sb->checked = r;
 }
 
 /* Match-audio ownership for Alpha 3, worker only, as cfj_audio_route: a new
@@ -233,38 +351,21 @@ static void z3u_audio_route(ULONGLONG root, unsigned rom)
 
 void z3u_select_tick(void)
 {
-    static int guard_ready, sig_ok;
+    static int guard_ready;
     static DWORD last_poll;
     static z3u_select_sample sample;
+    static unsigned refused_rom = ~0u;
     BYTE header[0x60], published[0x0C], low[0x70], obj[OBJ_READ];
     ULONGLONG session, root, shell, again;
     unsigned game, rom, size, shell_game;
+    const z3u_branch *b;
+    select_branch *sb;
     DWORD now;
 
     if (!guard_ready) {
         if (!mem_guard_install()) return;
         guard_ready = 1;
     }
-    if (sig_ok == 0) {
-        for (unsigned i = 0; i < sizeof g_sig / sizeof g_sig[0]; i++) {
-            BYTE got[24];
-            if (!read_at(got, g_sig[i].address, g_sig[i].n)) return;   /* retry later */
-            if (memcmp(got, g_sig[i].bytes, g_sig[i].n)) {
-                sig_ok = -1;
-                log_line("z3u-select: ⛔ code at 0x%llx differs from the audited build -- "
-                         "Alpha 3 selection speech is disabled.", g_sig[i].address);
-                return;
-            }
-        }
-        if (!data_matches()) {
-            sig_ok = -1;
-            log_line("z3u-select: ⛔ a select table or style name differs from the "
-                     "audited build -- Alpha 3 selection speech is disabled.");
-            return;
-        }
-        sig_ok = 1;
-    }
-    if (sig_ok < 0) return;
 
     now = GetTickCount();
     if (last_poll && now - last_poll < POLL_MS) return;
@@ -275,19 +376,32 @@ void z3u_select_tick(void)
         goto inactive;
     memcpy(&game, header + 8, 4);
     memcpy(&rom, header + 0x44, 4);
-    if (game != 3 || (rom != 6 && rom != 7)) goto inactive;
+    if (game != 3) goto inactive;
+    b = z3u_branch_for_rom(rom);
+    if (!b) {
+        /* An Alpha 3 ROM neither copy names: say so once, not every poll. */
+        if (rom != refused_rom) {
+            refused_rom = rom;
+            log_line("z3u-select: ⚠ Alpha 3 is running ROM %u, which no traced copy covers -- "
+                     "silent.", rom);
+        }
+        goto inactive;
+    }
+    sb = &g_branches[b == &z3u_alternate];
+    if (branch_checked(sb) <= 0) goto inactive;
 
     if (!read_at(published, session + 0x1B0, sizeof published)) goto inactive;
     memcpy(&root, published, 8);
     memcpy(&size, published + 8, 4);
-    if (!root || root > 0x00007fff00000000ULL || size != Z3U_STATE_SIZE ||
-        !read_at(&again, ROOT_SLOT, 8) || again != root)
+    if (!root || root > 0x00007fff00000000ULL || size != b->state_size ||
+        !read_at(&again, b->root_slot, 8) || again != root)
         goto inactive;
 
     if (!read_at(&shell, SHELL_SLOT, 8) || !shell ||
         !read_at(&shell_game, shell + 0x1AC, 4) || shell_game != 3 ||
         !read_at(&sample.variant, shell + 0x1B0, 4) || sample.variant > 1)
         goto inactive;
+    sample.id_limit = b->id_limit;
 
     if (!read_at(low, root, sizeof low)) goto inactive;
     memcpy(sample.mode, low + 0x28, sizeof sample.mode);
@@ -296,16 +410,16 @@ void z3u_select_tick(void)
     sample.joined = low[0x69];
     for (unsigned side = 0; side < 2; side++) {
         BYTE *f = sample.obj[side];
-        if (!read_at(obj, root + Z3U_OBJ_OFF + side * Z3U_OBJ_STEP, sizeof obj)) goto inactive;
+        if (!read_at(obj, root + b->obj_off + side * b->obj_step, sizeof obj)) goto inactive;
         f[Z3U_STATE] = obj[0x04];
         f[Z3U_SUB] = obj[0x05];
-        f[Z3U_SIDE] = obj[0x1D1];
-        f[Z3U_ID] = obj[0x1D2];
-        f[Z3U_RANDOM] = obj[0x59];
-        f[Z3U_ISM] = obj[0x202];
+        f[Z3U_SIDE] = obj[b->o_side];
+        f[Z3U_ID] = obj[b->o_id];
+        f[Z3U_RANDOM] = obj[b->o_random];
+        f[Z3U_ISM] = obj[b->o_ism];
     }
     /* Bracket: the block and session must still be the ones we validated. */
-    if (!read_at(&again, ROOT_SLOT, 8) || again != root ||
+    if (!read_at(&again, b->root_slot, 8) || again != root ||
         !read_at(&again, SESSION_SLOT, 8) || again != session)
         goto inactive;
     {
@@ -313,8 +427,10 @@ void z3u_select_tick(void)
         unsigned pair = rom * 2 + sample.variant;
         if (pair != logged) {
             logged = pair;
-            log_line("z3u-select: admitted ROM %u (%s), shell game version %u",
-                     rom, rom == 7 ? "a3u" : "z3u", sample.variant);
+            log_line("z3u-select: admitted ROM %u (%s, %s copy), shell game version %u",
+                     rom, rom == b->rom_us ? (b == &z3u_alternate ? "a3uu" : "a3u")
+                                          : (b == &z3u_alternate ? "z3uu" : "z3u"),
+                     b->name, sample.variant);
         }
     }
     z3u_audio_route(root, rom);
