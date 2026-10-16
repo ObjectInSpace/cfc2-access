@@ -42,6 +42,12 @@ int main(void)
     strcpy(r.raw,"A^YB^ZC"); assert(decode_row(&r,decoded) && !wcscmp(decoded,L"A^B\\C"));
     strcpy(r.raw,"A^"); assert(!decode_row(&r,decoded));
     strcpy(r.raw,"A\x90"); assert(!decode_row(&r,decoded));
+    /* Japanese ROM rows are CP932: decoded, and a trail byte equal to '^'
+     * (0x83 0x5E = katakana TA) is part of its character, not an escape. */
+    strcpy(r.raw,"\x83\x5E\x83\x43\x83\x80"); assert(decode_row(&r,decoded) && !wcscmp(decoded,L"\x30bf\x30a4\x30e0"));
+    strcpy(r.raw,"\x95\x89\x82\xaf"); assert(decode_row(&r,decoded) && !wcscmp(decoded,L"\x8ca0\x3051"));
+    strcpy(r.raw,"\xb1\xb2"); assert(decode_row(&r,decoded) && !wcscmp(decoded,L"\xff71\xff72"));
+    strcpy(r.raw,"\xfd"); assert(!decode_row(&r,decoded));
     /* Nothing is exposed before the renderer's end-of-text-frame call. */
     record(10,10,9,"PRESS START BUTTON"); poll(); assert(calls==0);
     frame(); assert(calls==1 && !last_interrupt && !wcscmp(last,L"PRESS START BUTTON"));

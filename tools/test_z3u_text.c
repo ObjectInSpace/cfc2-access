@@ -14,8 +14,103 @@ void log_line(const char *fmt, ...) { (void)fmt; }
 static wchar_t out[TC_LINE_CAP];
 static BOOL dec(int font, const char *s) { return z3u_text_decode(font, s, out, TC_LINE_CAP); }
 
+/* The Japanese story table, from the same generated header the reader uses. */
+#include "../src/z3u_story_jp.h"
+
+/* A stand-in for memory: the English pair the reader would fetch. */
+static const unsigned char *g_english;
+static BOOL english(unsigned line, unsigned char o[16], void *ctx)
+{
+    (void)line; (void)ctx;
+    if (!g_english) return FALSE;
+    memcpy(o, g_english, 16);
+    return TRUE;
+}
+
+static int find_text(const wchar_t *t)
+{
+    for (int i = 0; i < Z3U_STORY_JP_COUNT; i++) if (!wcscmp(z3u_story_jp[i].text, t)) return i;
+    return -1;
+}
+
+/* Every row resolves to itself from its own bytes and English pair; rows
+ * whose bytes are shared resolve by the pair. */
+static void japanese_story(void)
+{
+    unsigned char entry[0x4A];
+    int shared = 0;
+    for (int i = 0; i < Z3U_STORY_JP_COUNT; i++) {
+        memcpy(entry, z3u_story_jp[i].key, sizeof entry);
+        g_english = z3u_story_jp[i].us;
+        assert(z3u_story_jp_find(entry, english, NULL, NULL) == i);
+        for (int j = 0; j < Z3U_STORY_JP_COUNT; j++)
+            if (j != i && !memcmp(z3u_story_jp[j].key, z3u_story_jp[i].key, sizeof entry)) shared++;
+    }
+    assert(shared >= 4);              /* Chun-Li/Bison and Juli/Juni, both ways */
+
+    /* The named pairs: identical glyph bytes, different stories. */
+    {
+        int chun = find_text(L"ＩＣＰＯシャドルー特別捜査官春麗‥‥");
+        int bison = find_text(L"秘密組織「シャドルー」の総帥ベガ‥‥");
+        assert(chun >= 0 && bison >= 0 &&
+               !memcmp(z3u_story_jp[chun].key, z3u_story_jp[bison].key, sizeof entry));
+        memcpy(entry, z3u_story_jp[chun].key, sizeof entry);
+        g_english = z3u_story_jp[bison].us;
+        assert(z3u_story_jp_find(entry, english, NULL, NULL) == bison);
+        g_english = z3u_story_jp[chun].us;
+        assert(z3u_story_jp_find(entry, english, NULL, NULL) == chun);
+        assert(find_text(L"その一員ユーリがベガ直々の指令を受ける") >= 0 &&
+               find_text(L"その一員ユーニがベガ直々の指令を受ける") >= 0);
+        /* No English pair, or the wrong one: nothing, never a guess. */
+        g_english = NULL;
+        assert(z3u_story_jp_find(entry, english, NULL, NULL) == -1);
+        g_english = (const unsigned char *)"Ryu is a man fol";
+        assert(z3u_story_jp_find(entry, english, NULL, NULL) == -1);
+    }
+    /* The alternate copy: no English pair beside its buffer. */
+    {
+        int chun = find_text(L"ＩＣＰＯシャドルー特別捜査官春麗‥‥");
+        int bison = find_text(L"秘密組織「シャドルー」の総帥ベガ‥‥");
+        int ryu = find_text(L"真の格闘家を目指す男‥‥リュウ");
+        int juli = find_text(L"その一員ユーリがベガ直々の指令を受ける");
+        int juni = find_text(L"その一員ユーニがベガ直々の指令を受ける");
+        const int none[2] = { -1, -1 }, p1_chun[2] = { 4, -1 }, p2_bison[2] = { 0, 10 },
+                  p1_juli[2] = { 30, 1 }, p1_juni[2] = { 31, 1 }, both[2] = { 4, 10 };
+        g_english = NULL;
+        memcpy(entry, z3u_story_jp[ryu].key, sizeof entry);
+        assert(z3u_story_jp_find(entry, english, NULL, none) == ryu);   /* unique bytes */
+        memcpy(entry, z3u_story_jp[chun].key, sizeof entry);
+        assert(z3u_story_jp_find(entry, english, NULL, none) == -1);    /* two stories */
+        assert(z3u_story_jp_find(entry, english, NULL, p1_chun) == chun);
+        assert(z3u_story_jp_find(entry, english, NULL, p2_bison) == bison);
+        assert(z3u_story_jp_find(entry, english, NULL, both) == -1);    /* still two */
+        memcpy(entry, z3u_story_jp[juli].key, sizeof entry);
+        assert(!memcmp(z3u_story_jp[juli].key, z3u_story_jp[juni].key, sizeof entry));
+        assert(z3u_story_jp_find(entry, english, NULL, p1_juli) == juli);
+        assert(z3u_story_jp_find(entry, english, NULL, p1_juni) == juni);
+    }
+    /* An English entry is text and matches no glyph key. */
+    {
+        static const unsigned char us[0x4A] = "Ryu is a man following the path";
+        g_english = z3u_story_jp[0].us;
+        assert(z3u_story_jp_find(us, english, NULL, NULL) == -1);
+    }
+    /* The row's "#n" decodes to the Japanese line; a bad index refuses. */
+    {
+        int ryu = find_text(L"真の格闘家を目指す男‥‥リュウ");
+        char raw[16];
+        assert(ryu >= 0);
+        snprintf(raw, sizeof raw, "#%d", ryu);
+        assert(dec(Z3U_STYLE_MESSAGE_JP, raw) && !wcscmp(out, L"真の格闘家を目指す男‥‥リュウ"));
+        snprintf(raw, sizeof raw, "#%d", Z3U_STORY_JP_COUNT);
+        assert(!dec(Z3U_STYLE_MESSAGE_JP, raw));
+        assert(!dec(Z3U_STYLE_MESSAGE_JP, "Ryu"));
+    }
+}
+
 int main(void)
 {
+    japanese_story();
     /* 1. Literals and the fonts their call sites pass. */
     assert(dec(2, "GAME OVER") && !wcscmp(out, L"GAME OVER"));
     assert(dec(2, "CONTINUE?") && !wcscmp(out, L"CONTINUE?"));

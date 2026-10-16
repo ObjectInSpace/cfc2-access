@@ -6,7 +6,7 @@ New-Item -ItemType Directory -Force -Path "$root\build\test" | Out-Null
 # through the shipping decoder, the generated name table and the shared channel.
 & $gcc -O2 -Wall -Wextra -Werror -o "$root\build\test\test_cvs1_select.exe" `
     "$root\tools\test_cvs1_select.c" "$root\src\cvs1_select.c" "$root\src\selection_channel.c" `
-    "$root\src\game_selection.c" "$root\src\game_session.c" "$root\src\text_channel.c"
+    "$root\src\game_selection.c" "$root\src\game_session.c" "$root\src\text_channel.c" "$root\src\mod_text.c"
 if ($LASTEXITCODE -ne 0) { throw 'CVS1 select test build failed' }
 Push-Location $root
 try {

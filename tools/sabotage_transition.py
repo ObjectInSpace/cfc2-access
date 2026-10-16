@@ -24,8 +24,8 @@ cases = [
      "if (line[0] && !c->introduced) {",
      ['8: a new opponent team is introduced']),
     ('ownership always You',
-     '    default:                        swprintf(out, cap, L"Player %u", s->player); break;',
-     '    default:                        swprintf(out, cap, L"You"); (void)s; break;',
+     '        mt_fmt(out, cap, MT_PLAYER_N, n, NULL, NULL);',
+     '        swprintf(out, cap, L"%ls", mt(MT_YOU)); (void)n;',
      ['6: unknown ownership speaks']),
     ('depart leaves channel begun',
      '    memset(c, 0, sizeof *c);\n    c->spoken = spoken; c->refused = refused;\n}\n\nstatic void member_text',
@@ -36,7 +36,8 @@ bad = 0
 for name, old, new, expect in cases:
     shutil.rmtree(scratch, ignore_errors=True)
     os.makedirs(scratch)
-    for f in ('transition_channel.c', 'transition_channel.h', 'text_channel.c', 'text_channel.h'):
+    for f in ('transition_channel.c', 'transition_channel.h', 'text_channel.c', 'text_channel.h',
+              'mod_text.c'):
         shutil.copy(os.path.join(root, 'src', f), scratch)
     for f in os.listdir(os.path.join(root, 'src')):
         if f.endswith('.h') and not os.path.exists(os.path.join(scratch, f)):
@@ -49,7 +50,8 @@ for name, old, new, expect in cases:
     open(os.path.join(scratch, 'test.c'), 'w', encoding='utf-8').write(t.replace('"../src/', '"'))
     exe = os.path.join(scratch, 't.exe')
     r = subprocess.run([gcc, '-O2', '-w', '-o', exe, os.path.join(scratch, 'test.c'), p,
-                        os.path.join(scratch, 'text_channel.c')], capture_output=True, text=True)
+                        os.path.join(scratch, 'text_channel.c'),
+                        os.path.join(scratch, 'mod_text.c')], capture_output=True, text=True)
     if r.returncode:
         print('BUILD FAILED', name, r.stderr[:500]); bad += 1; continue
     out = subprocess.run([exe], capture_output=True, text=True).stdout

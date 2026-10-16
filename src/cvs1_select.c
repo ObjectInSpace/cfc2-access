@@ -3,6 +3,7 @@
  * speech belong to selection_channel. No hooks, no game-memory writes. */
 #include "cvs1_select.h"
 #include "selection_channel.h"
+#include "mod_text.h"
 #include "character_name_table.h"
 #include "memsafe.h"
 #include "match_audio.h"
@@ -21,11 +22,32 @@
  * side's actor in state 4 -- the selection handler (actor-state table
  * 0x141237DC0 entry 4) -- and owning its own side. All four held for every
  * highlight in the 2026-10-13 live capture. Other modes are not claimed. */
+/* Branch B: modes P+0x48 1, 4, 5 and 7 (dispatch 0x1405C5E50; Versus reads 1,
+ * Training 4, live 2026-10-15), select phase 02 01 01 02 (P+3 = 2 indexes
+ * 0x141240D98 -> the actor dispatch 0x140602B70, gated per side by P+0x65),
+ * and the side's actor in `state` of table 0x141240DC0: 2 stage 0x140606E90,
+ * 4 total ratio 0x140605F80, 5 groove 0x1406060D0, 6 grid 0x140606290, 7 ratio 0x140605D20.
+ * Each handler sets actor+5 to its own state once its entry countdown ends,
+ * the frame it starts reading input, so actor+5 == state means the menu is
+ * live; a menu the handler completes by itself never sets it. ⚠ Branch A's
+ * groove screen is also 02 01 01 02, with mode 0: the mode test separates them. */
+static BOOL branch_b(const cvs1_select_sample *s, unsigned side, BYTE state)
+{
+    static const BYTE prefix[4] = { 2, 1, 1, 2 };
+    BYTE mode = s->phase[0x48];
+    return !memcmp(s->phase, prefix, sizeof prefix) &&
+           (mode == 1 || mode == 4 || mode == 5 || mode == 7) &&
+           (s->phase[0x65] & (1u << side)) &&
+           s->actor[side][4] == state && s->actor[side][5] == state &&
+           s->owner[side] == side;
+}
+
 static BOOL selecting(const cvs1_select_sample *s, unsigned side)
 {
     static const BYTE prefix[5] = { 2, 1, 1, 6, 6 };
-    return !memcmp(s->phase, prefix, sizeof prefix) && s->phase[0x48] == 0 &&
-           s->actor[side][4] == 4 && s->owner[side] == side;
+    return (!memcmp(s->phase, prefix, sizeof prefix) && s->phase[0x48] == 0 &&
+            s->actor[side][4] == 4 && s->owner[side] == side) ||
+           branch_b(s, side, 6);   /* hover store 0x14060658F, same P+0x78 bytes */
 }
 
 int cvs1_select_decode(const cvs1_select_sample *s, unsigned side)
@@ -70,6 +92,8 @@ int cvs1_groove_decode(const cvs1_select_sample *s, unsigned side)
     if (!active)
         active = !memcmp(s->phase, grid, sizeof grid) && s->phase[0x48] == 0 &&
                  s->actor[side][4] == 3 && s->owner[side] == side;
+    /* Branch B's groove state toggles the same byte on up/down (0x14060616E). */
+    if (!active) active = branch_b(s, side, 5);
     if (!active) return -1;
     groove = s->phase[0x76 + side];
     return groove < 2 ? (int)groove : -2;
@@ -83,7 +107,7 @@ int cvs1_groove_decode(const cvs1_select_sample *s, unsigned side)
  * (0x1405B1D46), so 1 is the faster choice. The live capture saw down, then
  * up, on this screen. ⚠ Names inferred from the rate, as for Alpha 3:
  * listening confirms the menu's own words. */
-static const wchar_t *const g_speed[2] = { L"Normal", L"Turbo" };
+static const mt_id g_speed[2] = { MT_NORMAL, MT_TURBO };   /* the collection's own words */
 
 int cvs1_speed_decode(const cvs1_select_sample *s, unsigned side)
 {
@@ -123,7 +147,81 @@ int cvs1_order_decode(const cvs1_select_sample *s, unsigned side)
     return (int)id;
 }
 
-static const wchar_t *const g_place[4] = { L"first", L"second", L"third", L"fourth" };
+/* Total ratio, branch-B state 4 (0x140605F80). Left/right step the image
+ * global 0x1422D3E70+4*owner through 0..3 (and eax,3 at 0x140606039);
+ * confirm sets the side's points to spend, 0x1422D3E78+4*owner, to the
+ * cursor plus one (0x1406060B4). Training (mode 4) and P+0x4B skip it. The
+ * global is outside the captured block, so the value is code-traced only. */
+int cvs1_total_ratio_decode(const cvs1_select_sample *s, unsigned side)
+{
+    if (!s || side > 1 || !branch_b(s, side, 4) || s->phase[0x48] == 4 || s->phase[0x4B])
+        return -1;
+    return s->total_cursor[side] >= 0 && s->total_cursor[side] <= 3 ? s->total_cursor[side] : -2;
+}
+
+/* A character's ratio, branch-B state 7 (0x140605D20). Left/right step
+ * P+0x98+4*owner+slot modulo the points left (0x140605E21 idiv by
+ * 0x1422D3E78+4*owner, stored at 0x140605E30); confirm subtracts value+1
+ * from the points left (0x140605EBA). So the value is ratio-1 and the choice
+ * runs from ratio 1 to the points left. P+0xDE or P+0x4B make the handler
+ * pick by itself. Live 2026-10-15: P2 stepped 2, 0, 1, 2 with 4 to spend. */
+int cvs1_ratio_decode(const cvs1_select_sample *s, unsigned side)
+{
+    int slot, left, value;
+    if (!s || side > 1 || !branch_b(s, side, 7) || s->phase[0xDE] || s->phase[0x4B])
+        return -1;
+    slot = (signed char)s->phase[0xA0 + side];
+    left = s->ratio_left[side];
+    if (slot < 0 || slot > 3 || left < 1 || left > 4) return -2;
+    value = (signed char)s->phase[0x98 + 4 * side + (unsigned)slot];
+    return value >= 0 && value < left ? value : -2;
+}
+
+/* Stage menu, branch-B state 2 (0x140606E90), before total ratio. Left and
+ * right step the image global 0x1422D3E82 modulo 16 (0x140606F32), and the
+ * table 0x141240D60 turns it into the stage R+0x529C: entry 0 is 0xF, which
+ * confirm replaces with a random stage (0x140606FCC). The first side to
+ * confirm sets 0x1422D3E80 and the other side's handler skips the menu
+ * (0x140606E9F). Live 2026-10-15: R+0x529C read 0xF, 0, 0xF, 0xE, 0xF, 0, 1,
+ * 2 as the Versus cursor moved, and Training confirmed Random and fought on
+ * stage 9.
+ *
+ * Names. The screen draws them as pictures, so each stage is named by whose
+ * stage its music says it is. The arcade plays stage k's music as code k
+ * (0x1405B2A7F -> 0x1405A8040 -> shell 0x14006D470), file BGM_kk00 of
+ * snd_cvs1_bgm_org_all; the museum's bank music.arc snd_cvs1_MP lists the
+ * same files in track order, and its track titles SOUND_CVS1_03..18 read
+ * "Stage of Ryu", "Stage of Sagat", ... Three independent checks agree:
+ * the boss stages the arcade forces (0x1405B0B61: 4, 9, 13) carry M.Bison's,
+ * Geese's and Akuma's music; stage 14, Ayutaya Iseki (Sagat's SF2 stage),
+ * reuses stage 1's (Sagat's) graphics (0x141216CA0 entry 14 == entry 1);
+ * and the menu order through 0x141240D60 is exactly the museum's track
+ * order.
+ *
+ * Those owners were then joined to the stage titles published by Arcade
+ * Quartermaster (arcadequartermaster.com/cvs1_bosses.html, all 15 stages):
+ * Ryu Suzaku Castle, Sagat Ayuthaya City, Final Fight Metro City, Capcom
+ * Expressway, Terry Pacific Express, Pao Pao Cafe, Sakazaki Dojo, SNK
+ * Neo-Geo Land, Osaka, M.Bison Psycho Drive and Geese Geese Tower (both
+ * named on that page), Morrigan Aensland Castle, Nakoruru Kamui Kotan, Akuma
+ * Gokuento Isle, Ayutaya Iseki Ayuthaya Ruins ("iseki" = ruins). Terry's is
+ * the train (a desert train stage, compared with his Fatal Fury 2 train), so
+ * the Expressway is Capcom's. Indexed by menu entry. Fan-site titles, 2026-10-15. */
+static const wchar_t *const g_stage[16] = {
+    L"Random stage", L"Suzaku Castle", L"Ayuthaya City", L"Metro City",
+    L"Expressway", L"Pacific Express", L"Pao Pao Cafe", L"Sakazaki Dojo",
+    L"Neo-Geo Land", L"Osaka", L"Psycho Drive", L"Geese Tower",
+    L"Aensland Castle", L"Kamui Kotan", L"Gokuento Isle", L"Ayuthaya Ruins",
+};
+static const BYTE g_stage_table[16] = { 15, 0, 1, 2, 3, 5, 6, 7, 8, 10, 4, 9, 12, 11, 13, 14 };
+
+int cvs1_stage_decode(const cvs1_select_sample *s)
+{
+    if (!s || s->stage_chosen || (!branch_b(s, 0, 2) && !branch_b(s, 1, 2))) return -1;
+    return s->stage_cursor >= 0 && s->stage_cursor <= 15 ? s->stage_cursor : -2;
+}
+
+static const mt_id g_place[4] = { MT_FIRST, MT_SECOND, MT_THIRD, MT_FOURTH };
 
 void cvs1_selection_copy(const cvs1_select_sample *s,
                          game_selection_choice out[GAME_SELECTION_OWNERS])
@@ -150,7 +248,7 @@ void cvs1_selection_copy(const cvs1_select_sample *s,
         } else if ((v = cvs1_speed_decode(s, side)) != -1) {
             if (v < 0) { o->status = GAME_SELECTION_UNAVAILABLE; continue; }
             o->kind = CVS1_KIND_SPEED;
-            swprintf(o->label, GAME_SELECTION_LABEL, L"%ls", g_speed[v]);
+            swprintf(o->label, GAME_SELECTION_LABEL, L"%ls", mt(g_speed[v]));
         } else if ((v = cvs1_order_decode(s, side)) != -1) {
             unsigned placed = s->phase[0x106 + 4 * side];
             if (v < 0 || placed > 3) { o->status = GAME_SELECTION_UNAVAILABLE; continue; }
@@ -158,13 +256,37 @@ void cvs1_selection_copy(const cvs1_select_sample *s,
             /* Each placement is a new visit: the same fighter highlighted for
              * the next fight is spoken again, with the new place. */
             o->visit = placed;
-            swprintf(o->label, GAME_SELECTION_LABEL, L"%hs %ls",
-                     character_name(0, (unsigned)v, s->variant), g_place[placed]);
+            {
+                wchar_t name[64];
+                swprintf(name, 64, L"%hs", character_name(0, (unsigned)v, s->variant));
+                mt_fmt(o->label, GAME_SELECTION_LABEL, MT_ORDER, name, mt(g_place[placed]), NULL);
+            }
+        } else if ((v = cvs1_total_ratio_decode(s, side)) != -1) {
+            if (v < 0) { o->status = GAME_SELECTION_UNAVAILABLE; continue; }
+            o->kind = CVS1_KIND_TOTAL_RATIO;
+            mt_fmt_n(o->label, GAME_SELECTION_LABEL, MT_TEAM_RATIO, v + 1, 4);
+        } else if ((v = cvs1_ratio_decode(s, side)) != -1) {
+            if (v < 0) { o->status = GAME_SELECTION_UNAVAILABLE; continue; }
+            o->kind = CVS1_KIND_RATIO;
+            /* Each team slot is a new visit: the next character's ratio menu
+             * is spoken even if it opens on the same value. */
+            o->visit = s->phase[0xA0 + side];
+            mt_fmt_n(o->label, GAME_SELECTION_LABEL, MT_RATIO, v + 1, s->ratio_left[side]);
         } else {
             continue;
         }
         o->status = GAME_SELECTION_VALID;
         o->value = (unsigned)v;
+    }
+    {
+        int v = cvs1_stage_decode(s);
+        game_selection_choice *o = &out[CVS1_STAGE_OWNER];
+        if (v == -1) return;
+        if (v < 0) { o->status = GAME_SELECTION_UNAVAILABLE; return; }
+        o->status = GAME_SELECTION_VALID;
+        o->kind = CVS1_KIND_STAGE;
+        o->value = (unsigned)v;
+        swprintf(o->label, GAME_SELECTION_LABEL, L"%ls", v ? g_stage[v] : mt(MT_RANDOM_STAGE));
     }
 }
 
@@ -221,6 +343,17 @@ static const struct { ULONGLONG address; BYTE bytes[16]; unsigned n; } g_sig[] =
     { 0x1405E7BCFULL, { 0x41,0xfe,0x84,0x06,0x0c,0x01,0x00,0x00 }, 8 }, /* order: P+0x10C cursor */
     { 0x1405E7CE2ULL, { 0x49,0x63,0x84,0x89,0xd0,0x1a,0x03,0x00 }, 8 }, /* order list R+0x31AD0 */
     { 0x1405E7CF6ULL, { 0x42,0x0f,0xbe,0x84,0x08,0xd0,0x45,0x00,0x00 }, 9 }, /* team IDs +0x618 */
+    /* Branch B (Versus, Training) */
+    { 0x14060658FULL, { 0x88,0x5c,0x01,0x78 }, 4 },                   /* grid: P+0x78 store    */
+    { 0x14060616EULL, { 0x80,0x74,0x01,0x76,0x01 }, 5 },              /* groove: P+0x76 xor    */
+    { 0x14060601FULL, { 0x4a,0x8d,0x0c,0x85,0x70,0x3e,0x2d,0x02 }, 8 }, /* total-ratio global */
+    { 0x140606039ULL, { 0x83,0xe0,0x03 }, 3 },                        /* total ratio 0..3      */
+    { 0x140605E01ULL, { 0x43,0x8b,0x8c,0x87,0x78,0x3e,0x2d,0x02 }, 8 }, /* points-left global */
+    { 0x140605E30ULL, { 0x88,0x94,0x01,0x98,0x00,0x00,0x00 }, 7 },    /* ratio: P+0x98 store   */
+    { 0x140606E9FULL, { 0x80,0x3d,0xda,0xcf,0xcc,0x01,0x00 }, 7 },    /* stage chosen 0x1422D3E80 */
+    { 0x140606F32ULL, { 0x81,0xe2,0x0f,0x00,0x00,0x80 }, 6 },         /* stage cursor mod 16   */
+    { 0x140606F41ULL, { 0x88,0x15,0x3b,0xcf,0xcc,0x01 }, 6 },         /* stage cursor 0x1422D3E82 */
+    { 0x140606FCCULL, { 0x80,0xb8,0x9c,0x52,0x00,0x00,0x0f }, 7 },    /* 0xF = random          */
 };
 
 /* Match-audio ownership for CVS1, worker only: a new epoch per presentation
@@ -289,6 +422,17 @@ void cvs1_select_tick(void)
                 return;
             }
         }
+        {
+            /* The stage names rest on this table's order. */
+            BYTE table[16];
+            if (!read_at(table, 0x141240D60ULL, sizeof table)) return;
+            if (memcmp(table, g_stage_table, sizeof table)) {
+                sig_ok = -1;
+                log_line("cvs1-select: ⛔ the stage menu table differs from the audited build -- "
+                         "CVS1 selection speech is disabled.");
+                return;
+            }
+        }
         sig_ok = 1;
     }
     if (sig_ok < 0) return;
@@ -333,6 +477,15 @@ void cvs1_select_tick(void)
         memcpy(sample.team[side], actor + CVS1_ACTOR_TEAM, 4);
         sample.speed[side] = actor[CVS1_ACTOR_SPEED];
         sample.owner[side] = actor[CVS1_ACTOR_OWNER];
+    }
+    {
+        /* Branch-B ratio cursors and points left: image statics, one read. */
+        BYTE g[CVS1_GLOBALS_SIZE];
+        if (!read_at(g, CVS1_RATIO_GLOBALS, sizeof g)) goto inactive;
+        memcpy(sample.total_cursor, g, 8);
+        memcpy(sample.ratio_left, g + 8, 8);
+        sample.stage_chosen = g[0x10];
+        sample.stage_cursor = (signed char)g[0x12];
     }
     /* Bracket: the block and session must still be the ones we validated. */
     if (!read_at(&again, ROOT_SLOT, 8) || again != root ||

@@ -23,7 +23,7 @@ SABS = [
   'if (wcscmp(text, s->pending)) {\n        lstrcpynW(s->pending, text, TC_LINE_CAP);\n        return FALSE;\n    }',
   'lstrcpynW(s->pending, text, TC_LINE_CAP);'),
  ("an empty registry answers with silence", S,
-  'speech_say(L"No text reader is available.", TRUE);\n        return;', 'return;'),
+  'speech_say(mt(MT_TEXT_NO_READER), TRUE);\n        return;', 'return;'),
  ("capture overflow is not flagged", C,
   'if (collecting->count >= TC_ROW_CAP) { collecting->overflow = TRUE; return; }',
   'if (collecting->count >= TC_ROW_CAP) { return; }'),

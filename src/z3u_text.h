@@ -22,6 +22,23 @@ void z3u_text_collect(const z3u_branch *b);
 
 /* Style of a typewriter message row (story text), outside the fonts' 0..4. */
 #define Z3U_STYLE_MESSAGE 16
+/* A Japanese story line: the row's raw text is "#n", n an index into
+ * z3u_story_jp (src/z3u_story_jp.h), whose text the decoder returns. */
+#define Z3U_STYLE_MESSAGE_JP 17
+/* An entry that is glyph words but no known Japanese line: its first 36
+ * bytes in hex, never spoken; the shared reader logs it once as a refused
+ * row, which is the evidence for an unmapped layout (the alternate copy). */
+#define Z3U_STYLE_MESSAGE_RAW 18
+
+/* Pure: the z3u_story_jp row for a Japanese entry, or -1. `entry` is its
+ * 0x4A raw bytes; `english(line, out16)` fetches the 16 bytes at entry +
+ * 0x802 - 5*line (the paired English line in the same loaded file) and
+ * returns FALSE if unreadable. Without a matching pair (the alternate copy),
+ * the bytes decide when unambiguous, else the story of one of `fighters`
+ * (both players' native IDs, -1 unknown). */
+int z3u_story_jp_find(const unsigned char *entry,
+                      BOOL (*english)(unsigned line, unsigned char out[16], void *ctx),
+                      void *ctx, const int fighters[2]);
 
 /* Pure: joins a message entry's lines (line NUL indent line NUL ... until a
  * zero indent) with spaces. Returns the length, 0 if unterminated or too long. */

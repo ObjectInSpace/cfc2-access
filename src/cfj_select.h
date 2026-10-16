@@ -25,6 +25,12 @@ typedef struct {
 /* Native character ID for `side`, or -1 not selecting / -2 selecting but
  * unreadable. */
 int cfj_select_decode(const cfj_select_sample *s, unsigned side);
+/* Stage select after both picks (Versus, Training): the menu entry, 0 Random
+ * or 1..10 a stage, or -1 not on it / -2 unreadable. Shared by both sides,
+ * spoken on owner CFJ_STAGE_OWNER. */
+#define CFJ_STAGE_OWNER 2u
+enum { CFJ_KIND_CHARACTER, CFJ_KIND_STAGE };
+int cfj_stage_decode(const cfj_select_sample *s);
 /* Owned labels and visits for the shared selection channel. */
 void cfj_selection_copy(const cfj_select_sample *s,
                         game_selection_choice out[GAME_SELECTION_OWNERS]);

@@ -3,6 +3,7 @@
  * speech belong to selection_channel. No hooks, no game-memory writes. */
 #include "cfj_select.h"
 #include "selection_channel.h"
+#include "mod_text.h"
 #include "character_name_table.h"
 #include "memsafe.h"
 #include "match_audio.h"
@@ -51,9 +52,54 @@ int cfj_select_decode(const cfj_select_sample *s, unsigned side)
     return (int)id;
 }
 
+/* Stage select: select sub-state 4 (jump table 0x14080C73C entry 4 =
+ * 0x14080C3E8) calls 0x14080CD70 per fighter. Left/right step the signed word
+ * R+0x26E00 (the first side record's +0x00) modulo 11 (0x14080CEC3,
+ * 0x14080CF4C), skipping 7..9 while their unlock bits are clear; confirm
+ * takes 0 as a random roll (rng % 10, 0x14080CDE6) and 1..10 through the
+ * stage table 0x1412BB4A0. Live 2026-10-15: Versus 0 <-> 1, Training 0 <-> 10
+ * (left from 0 wraps).
+ *
+ * Names. The screen draws them as pictures: CFE's string pool (around
+ * 0x141084310) holds only coin, warning and credit text, and neither the
+ * shell's text nor the ROM blob names a stage. So each entry is named
+ * through its music. Entry v is stage byte[2v] - 3 of 0x1412BB4A0 (session
+ * +0x68C); the arcade plays stage s's music as code s + 9 (0x1407D4628 ->
+ * 0x1407CBE70), bank index table[s + 9] of 0x1412B1F40 (0x1407D1C90 -> shell
+ * 0x14006D470); that file's museum track (music.arc snd_jam_MP, titles
+ * SOUND_CFJ_nn) is the stage's song, and the songs were paired with stages
+ * from the Japanese game-music wiki (Severe Way Myanmar, Goes a Syoten-Gai!
+ * Japan, At Ease!? New York, Prospered Fatherland Ruins, Night of Hong Kong
+ * Hong Kong); The Jungle of a Jungle is the Jungle, To Kill Time the one
+ * left, Under World. Checks: the arcade forces stage 7 for the final fight
+ * (0x1407D3858, "Infinity Chamber") and 9 for Shin Akuma (0x1407D3876,
+ * "Desperate Struggle"), 8 is the fallback ("Training Stage"); and the menu
+ * order comes out exactly as Japanese Wikipedia lists the stages. 2026-10-15. */
+static const wchar_t *const g_stage[11] = {
+    L"Random stage", L"Myanmar", L"Japan", L"New York", L"Under World", L"Ruins",
+    L"Jungle", L"Hong Kong", L"Infinity Chamber", L"Infinity Chamber Remains",
+    L"Training Zone",
+};
+/* ja.wikipedia.org/wiki/CAPCOM_FIGHTING_Jam, same order. */
+static const wchar_t *const g_stage_jpn[11] = {
+    L"", L"ミャンマー", L"ジャパン", L"ニューヨーク", L"アンダーワールド", L"ルーインズ",
+    L"ジャングル", L"ホンコン", L"インフィニティ・チャンバー", L"インフィニティ・チャンバー・リメインズ",
+    L"トレーニングゾーン",
+};
+static const BYTE g_stage_menu[22] = { 2,0, 9,0, 3,0, 8,0, 4,0, 5,0, 6,0, 7,0, 10,0, 12,0, 11,0 };
+
+int cfj_stage_decode(const cfj_select_sample *s)
+{
+    short v;
+    if (!s || s->phase[0] != 2 || s->phase[1] != 4) return -1;
+    memcpy(&v, s->sides, 2);
+    return v >= 0 && v <= 10 ? v : -2;
+}
+
 void cfj_selection_copy(const cfj_select_sample *s,
                         game_selection_choice out[GAME_SELECTION_OWNERS])
 {
+    int stage;
     if (!out) return;
     memset(out, 0, sizeof(*out) * GAME_SELECTION_OWNERS);
     for (unsigned i = 0; i < GAME_SELECTION_OWNERS; ++i)
@@ -72,6 +118,18 @@ void cfj_selection_copy(const cfj_select_sample *s,
         out[side].visit = s->sides[0x10 * side + 0x06];
         swprintf(out[side].label, GAME_SELECTION_LABEL, L"%hs",
                  character_name(2, (unsigned)id, s->variant));
+    }
+    if ((stage = cfj_stage_decode(s)) != -1) {
+        game_selection_choice *o = &out[CFJ_STAGE_OWNER];
+        if (stage < 0) { o->status = GAME_SELECTION_UNAVAILABLE; return; }
+        o->status = GAME_SELECTION_VALID;
+        o->kind = CFJ_KIND_STAGE;
+        o->value = (unsigned)stage;
+        /* Japanese Wikipedia's own names for the Japanese language; the
+         * English ones otherwise (Random follows the language). */
+        swprintf(o->label, GAME_SELECTION_LABEL, L"%ls",
+                 !stage ? mt(MT_RANDOM_STAGE) :
+                 mt_language() == 0 ? g_stage_jpn[stage] : g_stage[stage]);
     }
 }
 
@@ -98,6 +156,8 @@ void cfj_select_observe(const cfj_select_sample *s, ULONGLONG root, unsigned rom
     unsigned accepted = selection_channel_drain(&channel, now);
     for (unsigned p = 0; p < 2; ++p) if (accepted & (1u << p))
         log_line("cfj-select: accepted side=%u id=%u", p + 1, choices[p].value);
+    if (accepted & (1u << CFJ_STAGE_OWNER))
+        log_line("cfj-select: accepted stage entry %u", choices[CFJ_STAGE_OWNER].value);
 }
 
 /* ---- acquisition (worker thread) ---------------------------------------- */
@@ -127,15 +187,20 @@ static const struct { ULONGLONG address; BYTE bytes[16]; unsigned n; } g_sig[] =
     { 0x14004B4D1ULL, { 0x83,0xff,0x2e }, 3 },                             /* name fn: CFJ limit */
     { 0x14004B4DAULL, { 0x49,0x8b,0x84,0xc4,0x40,0x69,0x1f,0x01 }, 8 },    /* name table         */
     { 0x14007FF39ULL, { 0x8b,0x88,0xb0,0x01,0x00,0x00 }, 6 },              /* version at +0x1B0  */
+    { 0x14080C43FULL, { 0xe8,0x2c,0x09,0x00,0x00 }, 5 },                   /* sub 4 -> stage menu */
+    { 0x14080CEBEULL, { 0x6b,0xc2,0x0b,0x2b,0xc8,0x66,0x41,0x89,0x89,0x00,0x6e,0x02,0x00 }, 13 }, /* stage mod 11 */
+    { 0x14080CDC5ULL, { 0x74,0x1f }, 2 },                                  /* entry 0 = random   */
 };
 
 /* The two data facts the decode rests on: the ID table and the select entry. */
 static BOOL data_matches(void)
 {
-    BYTE table[CFJ_SELECT_COUNT];
+    BYTE table[CFJ_SELECT_COUNT], menu[sizeof g_stage_menu];
     ULONGLONG entry;
+    /* The stage names rest on the menu's order (0x1412BB4A0). */
     return read_at(table, ID_TABLE, sizeof table) && !memcmp(table, g_native_id, sizeof table) &&
-           read_at(&entry, PHASE_ENTRY, 8) && entry == SELECT_FN;
+           read_at(&entry, PHASE_ENTRY, 8) && entry == SELECT_FN &&
+           read_at(menu, 0x1412BB4A0ULL, sizeof menu) && !memcmp(menu, g_stage_menu, sizeof menu);
 }
 
 /* Match-audio ownership for CFJ, worker only, as cvs1_audio_route: a new

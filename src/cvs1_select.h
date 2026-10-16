@@ -27,10 +27,24 @@ typedef struct {
     BYTE team[2][4];     /* actor+0x618                                     */
     int order[2][4];     /* R+0x31AD0+side*16: order cursor -> team member  */
     unsigned variant;    /* shell game-version setting: 0 Japanese ROM, 1 US ROM */
+    /* Branch-B ratio globals, image statics outside the root block:
+     * 0x1422D3E70+4*side the total-ratio cursor (0..3), 0x1422D3E78+4*side
+     * the ratio points left to spend. */
+    int total_cursor[2];
+    int ratio_left[2];
+    /* Branch-B stage menu globals: 0x1422D3E80 the "stage chosen" mask,
+     * 0x1422D3E82 the menu cursor (0 Random, 1..15 stages). */
+    BYTE stage_chosen;
+    signed char stage_cursor;
 } cvs1_select_sample;
 
+#define CVS1_RATIO_GLOBALS 0x1422D3E70ULL   /* cursor[2], left[2], then the stage bytes */
+#define CVS1_GLOBALS_SIZE  0x13u            /* through the stage cursor +0x12 */
+#define CVS1_STAGE_OWNER   2u               /* shared by both sides */
+
 /* Selection kinds spoken through the shared channel. */
-enum { CVS1_KIND_CHARACTER, CVS1_KIND_GROOVE, CVS1_KIND_SPEED, CVS1_KIND_ORDER };
+enum { CVS1_KIND_CHARACTER, CVS1_KIND_GROOVE, CVS1_KIND_SPEED, CVS1_KIND_ORDER,
+       CVS1_KIND_TOTAL_RATIO, CVS1_KIND_RATIO, CVS1_KIND_STAGE };
 
 /* Native ID for `side`, or -1 not selecting / -2 selecting but unreadable. */
 int cvs1_select_decode(const cvs1_select_sample *s, unsigned side);
@@ -40,6 +54,12 @@ int cvs1_groove_decode(const cvs1_select_sample *s, unsigned side);
 int cvs1_speed_decode(const cvs1_select_sample *s, unsigned side);
 /* Order screen: native ID of the highlighted team member, or -1 / -2. */
 int cvs1_order_decode(const cvs1_select_sample *s, unsigned side);
+/* Branch B (Versus, Training): the total-ratio cursor 0..3 (ratio 1..4),
+ * and a character's ratio cursor 0..left-1 (ratio 1..left), or -1 / -2. */
+int cvs1_total_ratio_decode(const cvs1_select_sample *s, unsigned side);
+int cvs1_ratio_decode(const cvs1_select_sample *s, unsigned side);
+/* Branch B stage menu, shared: 0 Random, 1..15, or -1 / -2. */
+int cvs1_stage_decode(const cvs1_select_sample *s);
 /* Owned labels and visits for the shared selection channel. */
 void cvs1_selection_copy(const cvs1_select_sample *s,
                          game_selection_choice out[GAME_SELECTION_OWNERS]);

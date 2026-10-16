@@ -27,7 +27,9 @@ void z3u_text_observe(ULONGLONG root) { (void)root; }   /* run_z3u_text_test */
 void audio_beacon_set_owned(uint64_t e, unsigned p, BOOL l, float x, float s)
 { (void)e; (void)p; (void)l; (void)x; (void)s; }
 
-#define RECORD (6 + 3 + 2 * Z3U_FIELDS)
+/* The 2026-10-14 fixture predates the mode field: six fields per side. */
+#define OLD_FIELDS 6
+#define RECORD (6 + 3 + 2 * OLD_FIELDS)
 #define ROOT 0x16c71000ULL
 static unsigned count;
 static z3u_select_sample rec[512];
@@ -45,7 +47,9 @@ static void load(void)
         rec[i].speed = raw[6];
         rec[i].entered = raw[7];
         rec[i].joined = raw[8];
-        memcpy(rec[i].obj, raw + 9, 2 * Z3U_FIELDS);
+        memset(rec[i].obj, 0, sizeof rec[i].obj);
+        memcpy(rec[i].obj[0], raw + 9, OLD_FIELDS);
+        memcpy(rec[i].obj[1], raw + 9 + OLD_FIELDS, OLD_FIELDS);
         rec[i].variant = 1;                       /* the capture ran a3u */
         rec[i].id_limit = z3u_ordinary.id_limit;
     }
@@ -260,8 +264,106 @@ int main(void)
         assert(frame_liveness_live(&l, 503, 9033, 250));     /* resumed         */
     }
 
+    /* 8. EX Mode Select, live on the alternate copy (2026-10-15,
+     *    tools/make_z3u_mode_fixture.py): every moment decodes to its
+     *    hand-read expectation on both sides and to nothing else. */
+    static unsigned mode_count;
+    {
+        FILE *f = fopen("tools/fixtures/z3u-mode-select-20261015.bin", "rb");
+        BYTE magic[4], raw[8 + 4 + 9 + 2 * 7];
+        static z3u_select_sample m[32];
+        static double mt[32];
+        static BYTE want[32][2][2];
+        assert(f);
+        assert(fread(magic, 1, 4, f) == 4 && !memcmp(magic, "Z3UM", 4));
+        assert(fread(&mode_count, 4, 1, f) == 1 && mode_count > 0 && mode_count <= 32);
+        for (unsigned i = 0; i < mode_count; i++) {
+            z3u_select_sample *s = &m[i];
+            assert(fread(raw, 1, sizeof raw, f) == sizeof raw);
+            memset(s, 0, sizeof *s);
+            memcpy(&mt[i], raw, 8);
+            want[i][0][0] = raw[8];  want[i][0][1] = raw[9];
+            want[i][1][0] = raw[10]; want[i][1][1] = raw[11];
+            memcpy(s->mode, raw + 12, 6);
+            s->speed = raw[18]; s->entered = raw[19]; s->joined = raw[20];
+            memcpy(s->obj[0], raw + 21, 7);
+            memcpy(s->obj[1], raw + 28, 7);
+            s->variant = 1;                               /* a3uu */
+            s->id_limit = z3u_alternate.id_limit;
+        }
+        assert(fgetc(f) == EOF);
+        fclose(f);
+
+        for (unsigned i = 0; i < mode_count; i++) {
+            game_selection_choice c[GAME_SELECTION_OWNERS];
+            z3u_selection_copy(&m[i], c);
+            for (unsigned side = 0; side < 2; side++) {
+                if (want[i][side][0] == 0xFF) {
+                    if (c[side].status != GAME_SELECTION_INACTIVE)
+                        fprintf(stderr, "mode moment %.2f side %u: expected inactive, got '%ls'\n",
+                                mt[i], side, c[side].label);
+                    assert(c[side].status == GAME_SELECTION_INACTIVE);
+                } else {
+                    if (c[side].status != GAME_SELECTION_VALID || c[side].kind != want[i][side][0] ||
+                        c[side].value != want[i][side][1])
+                        fprintf(stderr, "mode moment %.2f side %u: expected %u/%u, got %d %u/%u\n",
+                                mt[i], side, want[i][side][0], want[i][side][1],
+                                (int)c[side].status, c[side].kind, c[side].value);
+                    assert(c[side].status == GAME_SELECTION_VALID);
+                    assert(c[side].kind == want[i][side][0] && c[side].value == want[i][side][1]);
+                }
+            }
+        }
+
+        /* 9. The words, and the mode gate. */
+        {
+            static const wchar_t *const names[4] = {
+                L"Normal mode", L"Mazi mode", L"Saikyo mode", L"Classical mode" };
+            game_selection_choice c[GAME_SELECTION_OWNERS];
+            unsigned k;
+            for (unsigned v = 0; v < 4; v++) {
+                z3u_select_sample s = m[0];
+                s.obj[0][Z3U_MODE] = (BYTE)v;
+                z3u_selection_copy(&s, c);
+                assert(c[0].kind == Z3U_KIND_MODE && !wcscmp(c[0].label, names[v]));
+            }
+            z3u_select_sample s = m[0];
+            s.obj[0][Z3U_MODE] = 4;      assert(z3u_select_decode(&s, 0, &k) == -2);  /* masked */
+            s.obj[0][Z3U_MODE] = 0xFF;   assert(z3u_select_decode(&s, 0, &k) == -2);
+            s = m[0]; s.obj[0][Z3U_SUB] = 2; assert(z3u_select_decode(&s, 0, &k) == -1);  /* confirmed */
+            s = m[0]; s.obj[0][Z3U_SIDE] = 1; assert(z3u_select_decode(&s, 0, &k) == -1); /* owner */
+        }
+
+        /* 10. Spoken in the live order: both sides at the first moment, then
+         *     only what changed. */
+        {
+            static const wchar_t *const spoken[] = {
+                L"Normal mode. Ken", L"Mazi mode", L"Normal mode", L"Classical mode",
+                L"Saikyo mode", L"Mazi mode", L"Normal mode", L"Turbo",
+                L"Normal mode", L"Mazi mode", L"Normal mode", L"Classical mode",
+                L"Saikyo mode", L"Mazi mode", L"Saikyo mode", L"Normal mode", L"A-ism" };
+            unsigned n = 0;
+            z3u_select_observe(NULL, 0, 0);
+            int before = calls;
+            for (unsigned i = 0; i < mode_count; i++) {
+                int was = calls;
+                z3u_select_observe(&m[i], ROOT, 17);
+                z3u_select_observe(&m[i], ROOT, 17);
+                if (calls != was) {
+                    assert(n < sizeof spoken / sizeof spoken[0]);
+                    if (wcscmp(last, spoken[n]))
+                        fprintf(stderr, "mode spoken %u at %.2f: '%ls', want '%ls'\n", n, mt[i], last, spoken[n]);
+                    assert(!wcscmp(last, spoken[n]));
+                    n++;
+                }
+            }
+            assert(n == sizeof spoken / sizeof spoken[0] && calls == before + (int)n);
+        }
+    }
+
     printf("PASS: %u live Alpha 3 samples, character/ism/speed path, names by version, "
            "random, shared-channel speech/retry/kind/depart, every gate, alternate-copy "
-           "extra fighters, frame liveness\n", count);
+           "extra fighters, frame liveness; %u live EX Mode Select moments, mode names, "
+           "gates and spoken order\n", count, mode_count);
     return 0;
 }

@@ -73,22 +73,31 @@ side is which.
   through a jump, and silence on pause, all tested in play; the power gauge
   tone and clock ticks are not yet confirmed in play. The groove screen
   ("Capcom Groove" / "SNK Groove"), the speed menu after character select
-  ("Normal" / "Turbo") and the order screen ("Ryu first") are spoken.
+  ("Normal" / "Turbo") and the order screen ("Ryu first") are spoken. In
+  Versus and Training, the stage select ("Suzaku Castle"), team ratio, each
+  character's ratio, groove and character grid are spoken too.
   On-screen system text is spoken, except the "Free Play" credit display.
-  Not yet: ratio and EX choices, and a pitch change for crouching or being
-  knocked down.
+  Not yet: a pitch change for crouching or being knocked down.
 - Capcom Fighting Evolution in-game: character select speaks each
-  highlighted name, and match audio has the same cues as CVS2. On-screen
+  highlighted name, and in Versus and Training the stage select speaks each
+  stage ("Hong Kong"). Match audio has the same cues as CVS2. On-screen
   system text is spoken.
 - Street Fighter Alpha 3 in-game: character, ism and speed select are
-  spoken, match audio has the same cues, and the opening screens, pre-fight
-  story and on-screen system text are spoken. This works with the game's
-  **Additional Characters** setting on or off; with it on, Eagle, Maki, Yun
-  and Ingrid are named on the select screen.
+  spoken, and with Mode Select on in EX Settings, the mode ("Classical
+  mode"). Match audio has the same cues, and the opening screens, pre-fight
+  story and on-screen system text are spoken. The pre-fight story is also
+  read in the Japanese version. This works with the game's **Additional
+  Characters** setting on or off; with it on, Eagle, Maki, Yun and Ingrid are
+  named on the select screen.
 - CVS2 text: win quotes, story pages, credits and on-screen prompts are
-  spoken, and the **`` ` ``** key (the key left of 1) reads the current text
-  again, in every supported game. In the menus it repeats the last thing the
-  mod said.
+  spoken, including the Japanese version's, and the **`` ` ``** key (the key
+  left of 1) reads the current text again, in every supported game. In the
+  menus it repeats the last thing the mod said.
+- Languages: the mod's own words ("3 of 6", select screens, volume keys)
+  follow the language set in the collection's options, in all 14 of its
+  languages. Words the collection already translates are taken from its own
+  text; the rest are the mod's translations, so please report any that read
+  wrongly. Fighter, groove and stage names stay as the games name them.
 - The other four arcade games (PWS1, PWS2, MJUS, STG2): in progress, not yet
   playable with the mod. The plan for porting the CVS2 features to them is in
   `docs/collection-port-plan.md` in the repository.
@@ -99,4 +108,4 @@ Source, build script (`build.ps1`), and design docs are in the repository:
 https://github.com/ObjectInSpace/cfc2-access
 
 `.\build.ps1 -Deploy` builds and copies the mod into the game folder;
-`.\build.ps1 -Package 0.5.5` builds the release zip from a clean checkout.
+`.\build.ps1 -Package 0.6.0` builds the release zip from a clean checkout.

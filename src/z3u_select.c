@@ -3,6 +3,7 @@
  * speech belong to selection_channel. No hooks, no game-memory writes. */
 #include "z3u_select.h"
 #include "selection_channel.h"
+#include "mod_text.h"
 #include "character_name_table.h"
 #include "memsafe.h"
 #include "match_audio.h"
@@ -25,7 +26,16 @@ static const wchar_t *const g_ism[2][3] = {
 };
 /* Speed menu: the cursor indexes 0x1412DBDC8 to the game speed, 0 -> 6 and
  * 1 -> 8 in the capture, so 1 is the faster setting. */
-static const wchar_t *const g_speed[2] = { L"Normal", L"Turbo" };
+static const mt_id g_speed[2] = { MT_NORMAL, MT_TURBO };   /* the collection's own words */
+/* EX Mode Select (object state 1). Confirm (0x140E0BA23; ordinary
+ * 0x1408AABA3) sets nothing for 0, one flag each for 1 and 2, and for 3 a
+ * flag plus ism 0xFF, which skips the ism menu (live: P1 confirmed 3 and went
+ * to speed; P2 confirmed 0 and went to ism). With Mode Select off the game's
+ * own button codes set the same flags (0x140DFC1FF; ordinary 0x14089B71F):
+ * LP+LK -> 2, MP+MK -> 1 only behind two unlock flags, HP+HK -> 3. Those are
+ * Alpha 3's Saikyo, Mazi (unlocked) and Classical (no ism) codes; the names
+ * are matched from that, not read from the screen, so listening confirms. */
+static const mt_id g_mode[4] = { MT_MODE_NORMAL, MT_MODE_MAZI, MT_MODE_SAIKYO, MT_MODE_CLASSICAL };
 
 /* ---- decoding (pure, on the owned copy) --------------------------------- */
 
@@ -55,6 +65,13 @@ int z3u_select_decode(const z3u_select_sample *s, unsigned side, unsigned *kind)
         if (o[Z3U_ID] >= s->id_limit ||
             !character_name(3, z3u_name_index(o[Z3U_ID]), s->variant)) return -2;
         return o[Z3U_ID];
+    case 1: { /* 0x1408AA8B0: EX Mode Select; up/down step the cursor 0..4,
+               * skipping values the availability mask (0x1408A83A0) leaves
+               * out; 4 is always left out. Live: 0..3 on both sides. */
+        int mode = (signed char)o[Z3U_MODE];
+        *kind = Z3U_KIND_MODE;
+        return mode >= 0 && mode <= 3 ? mode : -2;
+    }
     case 2: { /* 0x1408AA650: up/down step object+0x202 within -1..1 */
         int ism = (signed char)o[Z3U_ISM];
         *kind = Z3U_KIND_ISM;
@@ -88,9 +105,11 @@ void z3u_selection_copy(const z3u_select_sample *s,
         if (kind == Z3U_KIND_ISM)
             swprintf(out[side].label, GAME_SELECTION_LABEL, L"%ls", g_ism[s->variant][value]);
         else if (kind == Z3U_KIND_SPEED)
-            swprintf(out[side].label, GAME_SELECTION_LABEL, L"%ls", g_speed[value]);
+            swprintf(out[side].label, GAME_SELECTION_LABEL, L"%ls", mt(g_speed[value]));
+        else if (kind == Z3U_KIND_MODE)
+            mt_fmt(out[side].label, GAME_SELECTION_LABEL, MT_MODE, mt(g_mode[value]), NULL, NULL);
         else if (value == 0xFF)
-            swprintf(out[side].label, GAME_SELECTION_LABEL, L"Random");
+            swprintf(out[side].label, GAME_SELECTION_LABEL, L"%ls", mt(MT_RANDOM));
         else
             swprintf(out[side].label, GAME_SELECTION_LABEL, L"%hs",
                      character_name(3, z3u_name_index((unsigned)value), s->variant));
@@ -131,7 +150,7 @@ static BOOL read_at(void *out, ULONGLONG address, SIZE_T size)
 #define SESSION_SLOT 0x141C14F98ULL   /* emulator session singleton          */
 #define SHELL_SLOT   0x141C14F90ULL   /* shell game-select object (+0x1AC game, +0x1B0 version) */
 #define POLL_MS      33u              /* faster than a 60 fps frame; see cvs2_select_tick */
-#define OBJ_READ     0x20Bu           /* object bytes up to the alternate ism +0x20A */
+#define OBJ_READ     0x243u           /* object bytes up to the alternate mode +0x242 */
 
 typedef struct { ULONGLONG address; BYTE bytes[24]; unsigned n; } code_sig;
 typedef struct { ULONGLONG slot, target; } table_entry;
@@ -157,6 +176,10 @@ static const code_sig g_sig_ord[] = {
     { 0x1408AA6EFULL, { 0x88,0x81,0x02,0x02,0x00,0x00 }, 6 },                /* ism store         */
     { 0x1408AA9D0ULL, { 0x0f,0xb6,0x41,0x05,0x4c,0x8d,0x05,0xd5,0x13,0xa3,0x00 }, 11 }, /* state 3 sub */
     { 0x1408AAB3EULL, { 0x66,0x83,0x70,0x3c,0x01 }, 5 },                     /* speed toggle      */
+    { 0x1408AA926ULL, { 0x0f,0xbe,0x93,0x37,0x02,0x00,0x00 }, 7 },          /* mode cursor read  */
+    { 0x1408AA964ULL, { 0x88,0x93,0x37,0x02,0x00,0x00 }, 6 },                /* mode cursor store */
+    { 0x1408AABA3ULL, { 0x0f,0xb6,0x81,0x37,0x02,0x00,0x00 }, 7 },          /* mode confirm      */
+    { 0x14089B71FULL, { 0xba,0x90,0x00,0x00,0x00,0x66,0x3b,0xc2,0x75,0x08,0xc6,0x81,0x01,0x02,0x00,0x00,0x01 }, 17 }, /* LP+LK code */
 };
 
 /* The alternate copy's same instructions, each aligned with the ordinary
@@ -183,6 +206,10 @@ static const code_sig g_sig_alt[] = {
     { 0x140E0B59FULL, { 0x88,0x81,0x0a,0x02,0x00,0x00 }, 6 },                /* ism store         */
     { 0x140E0B8B0ULL, { 0x0f,0xb6,0x41,0x05,0x4c,0x8d,0x05,0x95,0xcd,0xbd,0x00 }, 11 }, /* state 3 sub */
     { 0x140E0B9C1ULL, { 0x66,0x83,0x70,0x3c,0x01 }, 5 },                     /* speed toggle      */
+    { 0x140E0B807ULL, { 0x0f,0xbe,0x93,0x42,0x02,0x00,0x00 }, 7 },          /* mode cursor read  */
+    { 0x140E0B844ULL, { 0x88,0x93,0x42,0x02,0x00,0x00 }, 6 },                /* mode cursor store */
+    { 0x140E0BA23ULL, { 0x0f,0xb6,0x81,0x42,0x02,0x00,0x00 }, 7 },          /* mode confirm      */
+    { 0x140DFC1FFULL, { 0xba,0x90,0x00,0x00,0x00,0x66,0x3b,0xc2,0x75,0x08,0xc6,0x81,0x09,0x02,0x00,0x00,0x01 }, 17 }, /* LP+LK code */
 };
 
 /* Shell code both copies share: the name and style functions and the
@@ -199,9 +226,11 @@ static const table_entry g_entries_ord[] = {
     { 0x1412D7A50ULL, 0x140899E70ULL },   /* game mode 1               */
     { 0x1412DBC70ULL, 0x1408AA700ULL },   /* screen 2: select          */
     { 0x1412DBCE0ULL, 0x1408A9F80ULL },   /* object state 0: character */
+    { 0x1412DBCE8ULL, 0x1408AA7E0ULL },   /* object state 1: mode      */
     { 0x1412DBCF0ULL, 0x1408AA5E0ULL },   /* object state 2: ism       */
     { 0x1412DBCF8ULL, 0x1408AA9D0ULL },   /* object state 3: speed     */
     { 0x1412DBD10ULL, 0x1408AA120ULL },   /* state 0 sub 1             */
+    { 0x1412DBDA0ULL, 0x1408AA8B0ULL },   /* state 1 sub 1             */
     { 0x1412DBD88ULL, 0x1408AA650ULL },   /* state 2 sub 1             */
     { 0x1412DBDB8ULL, 0x1408AAAE0ULL },   /* state 3 sub 1             */
 };
@@ -209,9 +238,11 @@ static const table_entry g_entries_alt[] = {
     { 0x1419E3BC0ULL, 0x140DFAEB0ULL },   /* game mode 1               */
     { 0x1419E8508ULL, 0x140E0B5B0ULL },   /* screen 2: select          */
     { 0x1419E8580ULL, 0x140E0AE10ULL },   /* object state 0: character */
+    { 0x1419E8588ULL, 0x140E0B6B0ULL },   /* object state 1: mode      */
     { 0x1419E8590ULL, 0x140E0B440ULL },   /* object state 2: ism       */
     { 0x1419E8598ULL, 0x140E0B8B0ULL },   /* object state 3: speed     */
     { 0x1419E85B0ULL, 0x140E0AFC0ULL },   /* state 0 sub 1             */
+    { 0x1419E8640ULL, 0x140E0B780ULL },   /* state 1 sub 1             */
     { 0x1419E8628ULL, 0x140E0B500ULL },   /* state 2 sub 1             */
     { 0x1419E8658ULL, 0x140E0B960ULL },   /* state 3 sub 1             */
 };
@@ -418,6 +449,7 @@ void z3u_select_tick(void)
         f[Z3U_ID] = obj[b->o_id];
         f[Z3U_RANDOM] = obj[b->o_random];
         f[Z3U_ISM] = obj[b->o_ism];
+        f[Z3U_MODE] = obj[b->o_mode];
     }
     /* Bracket: the block and session must still be the ones we validated. */
     if (!read_at(&again, b->root_slot, 8) || again != root ||

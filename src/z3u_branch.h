@@ -22,6 +22,7 @@ typedef struct {
     /* player objects: R + obj_off + side*obj_step */
     unsigned obj_off, obj_step;
     unsigned o_hp, o_gauge, o_motion, o_side, o_id, o_random, o_ism;
+    unsigned o_mode;             /* EX Mode Select cursor, object state 1   */
     /* root fields */
     unsigned clock, camera, queue, messages;
     unsigned id_limit;           /* grid IDs are 0 .. id_limit-1            */
@@ -35,7 +36,7 @@ static const z3u_branch z3u_ordinary = {
     .frame_fn = 0x14086D160ull, .walker_fn = 0x1408797D0ull,
     .obj_off = 0x1B0u, .obj_step = 0x550u,
     .o_hp = 0x88u, .o_gauge = 0x1EEu, .o_motion = 0x52u, .o_side = 0x1D1u,
-    .o_id = 0x1D2u, .o_random = 0x59u, .o_ism = 0x202u,
+    .o_id = 0x1D2u, .o_random = 0x59u, .o_ism = 0x202u, .o_mode = 0x237u,
     .clock = 0xF1u, .camera = 0xC55Au, .queue = 0x9D70u, .messages = 0x9C68u,
     .id_limit = 38u,
 };
@@ -50,14 +51,17 @@ static const z3u_branch z3u_ordinary = {
  *   motion byte +0x52 -> +0x5A (every +0x51.. displacement moves by 8);
  *   camera R+0xE4EA (0x140DD2973); queue R+0xBC00 (print 0x140DD925A);
  *   messages R+0xBAF8 (0x140DD8170); clock R+0x129 (0x140E03ECF);
- *   grid 0x1419E83F0 holds IDs 0..41. */
+ *   grid 0x1419E83F0 holds IDs 0..41;
+ *   mode cursor +0x242 (0x140E0B807; ordinary +0x237 at 0x1408AA926).
+ *     ⚠ Not +8: fields past about +0x220 do not move uniformly (the mode
+ *     flags +0x22C and +0x230 become +0x238 and +0x23B). */
 static const z3u_branch z3u_alternate = {
     .name = "alternate", .rom_jp = 16, .rom_us = 17,
     .root_slot = 0x142C44050ull, .state_size = 0x1B528u,
     .frame_fn = 0x140DCC3F0ull, .walker_fn = 0x140DD92B0ull,
     .obj_off = 0x1F8u, .obj_step = 0x580u,
     .o_hp = 0x90u, .o_gauge = 0x1F6u, .o_motion = 0x5Au, .o_side = 0x1D9u,
-    .o_id = 0x1DAu, .o_random = 0x61u, .o_ism = 0x20Au,
+    .o_id = 0x1DAu, .o_random = 0x61u, .o_ism = 0x20Au, .o_mode = 0x242u,
     .clock = 0x129u, .camera = 0xE4EAu, .queue = 0xBC00u, .messages = 0xBAF8u,
     .id_limit = 42u,
 };

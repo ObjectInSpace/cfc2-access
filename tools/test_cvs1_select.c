@@ -58,18 +58,21 @@ static void load(void)
 /* The 2026-10-14 select-menu fixture (tools/make_cvs1_menu_fixture.py):
  * groove, speed and order moments with hand-read expectations. */
 #define MENU_RECORD (8 + 4 + CVS1_PHASE_SIZE + 2 * CVS1_ACTOR_HEAD + 4 + 8 + 32)
+#define MENU_MAX 64
 static unsigned menu_count;
-static double menu_t[32];
-static BYTE menu_kind[32][2], menu_value[32][2];
-static cvs1_select_sample menu[32];
+static double menu_t[MENU_MAX];
+static BYTE menu_kind[MENU_MAX][2], menu_value[MENU_MAX][2];
+static cvs1_select_sample menu[MENU_MAX];
 
-static void load_menus(void)
+/* Both menu fixtures share the record; the 2026-10-15 branch-B one
+ * (tools/make_cvs1_versus_fixture.py) has magic CV1V. */
+static void load_records(const char *path, const char *want)
 {
-    FILE *f = fopen("tools/fixtures/cvs1-select-menus-20261014.bin", "rb");
+    FILE *f = fopen(path, "rb");
     BYTE magic[4], raw[MENU_RECORD], *p;
     assert(f);
-    assert(fread(magic, 1, 4, f) == 4 && !memcmp(magic, "CV1M", 4));
-    assert(fread(&menu_count, 4, 1, f) == 1 && menu_count > 0 && menu_count <= 32);
+    assert(fread(magic, 1, 4, f) == 4 && !memcmp(magic, want, 4));
+    assert(fread(&menu_count, 4, 1, f) == 1 && menu_count > 0 && menu_count <= MENU_MAX);
     for (unsigned i = 0; i < menu_count; i++) {
         cvs1_select_sample *s = &menu[i];
         assert(fread(raw, 1, MENU_RECORD, f) == MENU_RECORD);
@@ -89,6 +92,38 @@ static void load_menus(void)
     }
     assert(fgetc(f) == EOF);
     fclose(f);
+}
+
+static void load_menus(void)
+{ load_records("tools/fixtures/cvs1-select-menus-20261014.bin", "CV1M"); }
+
+/* Check every moment of the loaded fixture against its expectation. 0xFE
+ * marks a total-ratio value the trace cannot hold: it must equal the
+ * injected global instead. */
+static void check_moments(void)
+{
+    for (unsigned i = 0; i < menu_count; i++) {
+        game_selection_choice c[GAME_SELECTION_OWNERS];
+        cvs1_selection_copy(&menu[i], c);
+        for (unsigned side = 0; side < 2; side++) {
+            unsigned want = menu_value[i][side];
+            if (want == 0xFE) want = (unsigned)menu[i].total_cursor[side];
+            if (menu_kind[i][side] == 0xFF) {
+                if (c[side].status != GAME_SELECTION_INACTIVE)
+                    fprintf(stderr, "moment %.2f side %u: expected inactive, got kind %u '%ls'\n",
+                           menu_t[i], side, c[side].kind, c[side].label);
+                assert(c[side].status == GAME_SELECTION_INACTIVE);
+            } else {
+                if (c[side].status != GAME_SELECTION_VALID || c[side].kind != menu_kind[i][side] ||
+                    c[side].value != want)
+                    fprintf(stderr, "moment %.2f side %u: expected kind %u value %u, got status %d kind %u value %u\n",
+                           menu_t[i], side, menu_kind[i][side], want,
+                           (int)c[side].status, c[side].kind, c[side].value);
+                assert(c[side].status == GAME_SELECTION_VALID);
+                assert(c[side].kind == menu_kind[i][side] && c[side].value == want);
+            }
+        }
+    }
 }
 
 /* The record whose expectation for side 0 is (kind, value), first match. */
@@ -202,26 +237,7 @@ int main(void)
     /* 5. Live select menus (2026-10-14): every moment decodes to the
      *    hand-read expectation on both sides, and to nothing else. */
     load_menus();
-    for (unsigned i = 0; i < menu_count; i++) {
-        game_selection_choice c[GAME_SELECTION_OWNERS];
-        cvs1_selection_copy(&menu[i], c);
-        for (unsigned side = 0; side < 2; side++) {
-            if (menu_kind[i][side] == 0xFF) {
-                if (c[side].status != GAME_SELECTION_INACTIVE)
-                    fprintf(stderr, "moment %.2f side %u: expected inactive, got kind %u '%ls'\n",
-                           menu_t[i], side, c[side].kind, c[side].label);
-                assert(c[side].status == GAME_SELECTION_INACTIVE);
-            } else {
-                if (c[side].status != GAME_SELECTION_VALID || c[side].kind != menu_kind[i][side] ||
-                    c[side].value != menu_value[i][side])
-                    fprintf(stderr, "moment %.2f side %u: expected kind %u value %u, got status %d kind %u value %u\n",
-                           menu_t[i], side, menu_kind[i][side], menu_value[i][side],
-                           (int)c[side].status, c[side].kind, c[side].value);
-                assert(c[side].status == GAME_SELECTION_VALID);
-                assert(c[side].kind == menu_kind[i][side] && c[side].value == menu_value[i][side]);
-            }
-        }
-    }
+    check_moments();
 
     /* 6. The words: grooves by the shell's names, speeds, and order as the
      *    fighter's name plus the fight it is being placed for. */
@@ -302,8 +318,193 @@ int main(void)
         assert(n == sizeof want / sizeof want[0] && calls == before + (int)n);
     }
 
+    unsigned arcade_menus = menu_count;
+
+    /* 9. Branch B, live Versus and Training (2026-10-15): every moment decodes
+     *    to its hand-read expectation on both sides and to nothing else. The
+     *    ratio globals are injected: total-ratio cursors 1 and 3 (code-traced
+     *    only), 4 points left on each side. */
+    load_records("tools/fixtures/cvs1-select-versus-20261015.bin", "CV1V");
+    for (unsigned i = 0; i < menu_count; i++) {
+        menu[i].total_cursor[0] = 1; menu[i].total_cursor[1] = 3;
+        menu[i].ratio_left[0] = 4;   menu[i].ratio_left[1] = 4;
+        /* The stage menu has its own fixture (case 13); its globals are not
+         * in these records, so mark it chosen here. */
+        menu[i].stage_chosen = 1;
+    }
+    check_moments();
+
+    /* 10. The words. */
+    {
+        game_selection_choice c[GAME_SELECTION_OWNERS];
+        cvs1_selection_copy(&menu[moment(CVS1_KIND_TOTAL_RATIO, 0xFE)], c);
+        assert(!wcscmp(c[0].label, L"Team ratio 2 of 4") && !wcscmp(c[1].label, L"Team ratio 4 of 4"));
+        cvs1_selection_copy(&menu[moment(CVS1_KIND_RATIO, 1)], c);
+        assert(!wcscmp(c[0].label, L"Ratio 2 of 4") && c[0].visit == 0);
+        cvs1_selection_copy(&menu[moment(CVS1_KIND_RATIO, 0)], c);
+        assert(!wcscmp(c[0].label, L"Ratio 1 of 4"));
+        cvs1_selection_copy(&menu[moment(CVS1_KIND_GROOVE, 1)], c);
+        assert(!wcscmp(c[0].label, L"SNK Groove"));
+        cvs1_selection_copy(&menu[moment(CVS1_KIND_CHARACTER, 0x00)], c);
+        assert(!wcscmp(c[0].label, L"Ryu"));
+    }
+
+    /* 11. Each branch-B gate refuses on its own, from live records. */
+    {
+        cvs1_select_sample r = menu[moment(CVS1_KIND_RATIO, 1)], g = menu[moment(CVS1_KIND_GROOVE, 1)];
+        cvs1_select_sample k = menu[moment(CVS1_KIND_CHARACTER, 0x0C)], t = menu[2], h;
+        assert(cvs1_ratio_decode(&r, 0) == 1 && cvs1_total_ratio_decode(&t, 0) == 1);
+        h = r; h.phase[0x48] = 0;     assert(cvs1_ratio_decode(&h, 0) == -1);   /* branch A  */
+        h = r; h.phase[0x48] = 2;     assert(cvs1_ratio_decode(&h, 0) == -1);   /* branch A  */
+        h = r; h.phase[0x48] = 7;     assert(cvs1_ratio_decode(&h, 0) == 1);    /* branch B  */
+        h = r; h.phase[3] = 3;        assert(cvs1_ratio_decode(&h, 0) == -1);   /* phase     */
+        h = r; h.phase[0x65] = 2;     assert(cvs1_ratio_decode(&h, 0) == -1);   /* not human */
+        h = r; h.actor[0][5] = 6;     assert(cvs1_ratio_decode(&h, 0) == -1);   /* countdown */
+        h = r; h.owner[0] = 1;        assert(cvs1_ratio_decode(&h, 0) == -1);   /* owner     */
+        h = r; h.phase[0xDE] = 1;     assert(cvs1_ratio_decode(&h, 0) == -1);   /* auto pick */
+        h = r; h.phase[0x4B] = 1;     assert(cvs1_ratio_decode(&h, 0) == -1);
+        h = r; h.ratio_left[0] = 0;   assert(cvs1_ratio_decode(&h, 0) == -2);   /* no points */
+        h = r; h.ratio_left[0] = 1;   assert(cvs1_ratio_decode(&h, 0) == -2);   /* past left */
+        h = r; h.phase[0xA0] = 4;     assert(cvs1_ratio_decode(&h, 0) == -2);   /* slot      */
+        assert(cvs1_ratio_decode(&r, 1) == -1);                                 /* P2 state 4 */
+        h = t; h.phase[0x48] = 4;     assert(cvs1_total_ratio_decode(&h, 0) == -1); /* Training */
+        h = t; h.phase[0x4B] = 1;     assert(cvs1_total_ratio_decode(&h, 0) == -1);
+        h = t; h.total_cursor[0] = 4; assert(cvs1_total_ratio_decode(&h, 0) == -2);
+        h = t; h.actor[0][5] = 2;     assert(cvs1_total_ratio_decode(&h, 0) == -1); /* countdown */
+        /* Branch A's groove screen shares the 02 01 01 02 prefix: mode 0 with
+         * this record's step 0 is neither. */
+        h = g; h.phase[0x48] = 0;     assert(cvs1_groove_decode(&h, 0) == -1);
+        h = g; h.actor[0][5] = 4;     assert(cvs1_groove_decode(&h, 0) == -1);
+        h = k; h.actor[0][4] = 4; h.actor[0][5] = 4;
+        assert(cvs1_select_decode(&h, 0) == -1);                                /* state 4 is not the grid here */
+        h = k; h.phase[0x79] = 0x23;  assert(cvs1_select_decode(&h, 0) == 0x0C); /* other slot ignored */
+    }
+
+    /* 12. Spoken in the live order through the shared channel. */
+    {
+        /* Names are the shell table's for the IDs read off the trace. Both
+         * sides' totals open together and are grouped; P2's total is not
+         * repeated while P1 moves on; one ratio menu per chosen character. */
+        static const wchar_t *const want[] = {
+            L"Team ratio 2 of 4. Team ratio 4 of 4",
+            L"Capcom Groove", L"SNK Groove", L"Capcom Groove",
+            L"Ryu", L"Cammy", L"Kyo", L"Nakoruru",
+            L"Ratio 2 of 4", L"Ratio 1 of 4", L"Ratio 2 of 4", L"Ratio 1 of 4",
+            L"Guile", L"King", L"Vice",
+            L"Capcom Groove", L"SNK Groove", L"Capcom Groove",
+            L"Kyo", L"Yuri", L"Ken", L"Dhalsim",
+            L"Ratio 1 of 4", L"Ratio 3 of 4", L"Ratio 1 of 4", L"Ratio 2 of 4", L"Ratio 3 of 4",
+            /* Training */
+            L"Capcom Groove", L"SNK Groove", L"Capcom Groove",
+            L"Ryu", L"Sakura", L"Kyo", L"Ryu",
+            L"Capcom Groove", L"SNK Groove",
+            L"Kyo", L"Yuri", L"Vice", L"Yuri" };
+        unsigned n = 0;
+        cvs1_select_observe(NULL, 0, 0);
+        int before = calls;
+        for (unsigned i = 0; i < menu_count; i++) {
+            int was = calls;
+            settle(&menu[i], 0x17741000ULL);
+            if (calls != was) {
+                assert(n < sizeof want / sizeof want[0]);
+                if (wcscmp(last, want[n]))
+                    fprintf(stderr, "versus spoken %u at %.2f: '%ls', want '%ls'\n", n, menu_t[i], last, want[n]);
+                assert(!wcscmp(last, want[n]));
+                n++;
+            }
+        }
+        assert(n == sizeof want / sizeof want[0] && calls == before + (int)n);
+    }
+
+    /* 13. The branch-B stage menu (tools/make_cvs1_stage_fixture.py): its
+     *     cursor recovered from the traced stage byte through the game's own
+     *     permutation table. Shared owner, numbered words, the chosen skip. */
+    unsigned stage_count;
+    {
+        FILE *f = fopen("tools/fixtures/cvs1-stage-select-20261015.bin", "rb");
+        BYTE magic[4], raw[8 + 2 + CVS1_PHASE_SIZE + 2 * CVS1_ACTOR_HEAD + 2];
+        static cvs1_select_sample st[32];
+        static BYTE want[32];
+        static double t[32];
+        assert(f);
+        assert(fread(magic, 1, 4, f) == 4 && !memcmp(magic, "CV1T", 4));
+        assert(fread(&stage_count, 4, 1, f) == 1 && stage_count > 0 && stage_count <= 32);
+        for (unsigned i = 0; i < stage_count; i++) {
+            BYTE *p = raw + 10;
+            assert(fread(raw, 1, sizeof raw, f) == sizeof raw);
+            memset(&st[i], 0, sizeof st[i]);
+            memcpy(&t[i], raw, 8);
+            want[i] = raw[8];
+            st[i].stage_cursor = (signed char)raw[9];
+            memcpy(st[i].phase, p, CVS1_PHASE_SIZE);      p += CVS1_PHASE_SIZE;
+            memcpy(st[i].actor[0], p, CVS1_ACTOR_HEAD);   p += CVS1_ACTOR_HEAD;
+            memcpy(st[i].actor[1], p, CVS1_ACTOR_HEAD);   p += CVS1_ACTOR_HEAD;
+            st[i].owner[0] = p[0]; st[i].owner[1] = p[1];
+            st[i].ratio_left[0] = st[i].ratio_left[1] = 4;
+            st[i].variant = 1;
+        }
+        assert(fgetc(f) == EOF);
+        fclose(f);
+
+        for (unsigned i = 0; i < stage_count; i++) {
+            game_selection_choice c[GAME_SELECTION_OWNERS];
+            int v = cvs1_stage_decode(&st[i]);
+            if (v != (want[i] == 0xFF ? -1 : (int)want[i]))
+                fprintf(stderr, "stage moment %.2f: got %d, want %u\n", t[i], v, want[i]);
+            assert(v == (want[i] == 0xFF ? -1 : (int)want[i]));
+            cvs1_selection_copy(&st[i], c);
+            if (want[i] != 0xFF) {
+                assert(c[CVS1_STAGE_OWNER].status == GAME_SELECTION_VALID &&
+                       c[CVS1_STAGE_OWNER].kind == CVS1_KIND_STAGE && c[CVS1_STAGE_OWNER].value == want[i]);
+                assert(c[0].status == GAME_SELECTION_INACTIVE && c[1].status == GAME_SELECTION_INACTIVE);
+            } else {
+                assert(c[CVS1_STAGE_OWNER].status == GAME_SELECTION_INACTIVE);
+            }
+        }
+        {
+            game_selection_choice c[GAME_SELECTION_OWNERS];
+            cvs1_select_sample s = st[0];
+            cvs1_selection_copy(&s, c);
+            assert(!wcscmp(c[CVS1_STAGE_OWNER].label, L"Random stage"));
+            s = st[3];
+            cvs1_selection_copy(&s, c);
+            assert(!wcscmp(c[CVS1_STAGE_OWNER].label, L"Ayuthaya Ruins"));
+            s = st[0]; s.stage_chosen = 1;   assert(cvs1_stage_decode(&s) == -1); /* chosen     */
+            s = st[0]; s.phase[0x48] = 0;    assert(cvs1_stage_decode(&s) == -1); /* branch A   */
+            s = st[0]; s.actor[0][5] = s.actor[1][5] = 1;
+            assert(cvs1_stage_decode(&s) == -1);                                  /* countdown  */
+            s = st[0]; s.actor[1][4] = 0;    assert(cvs1_stage_decode(&s) == 0);  /* either side */
+            s = st[0]; s.stage_cursor = 16;  assert(cvs1_stage_decode(&s) == -2);
+            s = st[0]; s.stage_cursor = -1;  assert(cvs1_stage_decode(&s) == -2);
+        }
+        {
+            static const wchar_t *const spoken[] = {
+                L"Random stage", L"Suzaku Castle", L"Random stage", L"Ayuthaya Ruins", L"Random stage",
+                L"Suzaku Castle", L"Ayuthaya City", L"Metro City",
+                L"Team ratio 1 of 4. Team ratio 1 of 4",       /* the next menu */
+                L"Random stage", L"Ayuthaya Ruins", L"Random stage" };
+            unsigned n = 0;
+            cvs1_select_observe(NULL, 0, 0);
+            int before = calls;
+            for (unsigned i = 0; i < stage_count; i++) {
+                int was = calls;
+                settle(&st[i], 0x17741000ULL);
+                if (calls != was) {
+                    assert(n < sizeof spoken / sizeof spoken[0]);
+                    if (wcscmp(last, spoken[n]))
+                        fprintf(stderr, "stage spoken %u at %.2f: '%ls', want '%ls'\n", n, t[i], last, spoken[n]);
+                    assert(!wcscmp(last, spoken[n]));
+                    n++;
+                }
+            }
+            assert(n == sizeof spoken / sizeof spoken[0] && calls == before + (int)n);
+        }
+    }
+
     printf("PASS: %u live CVS1 highlights decoded, names by game version, shared-channel "
            "speech/retry/visit/depart, every gate; %u live menu moments: groove, speed, "
-           "order, their gates and spoken sequence\n", count, menu_count);
+           "order, their gates and spoken sequence; %u live Versus/Training moments: "
+           "total ratio, groove, grid, ratio and their gates; %u stage-menu moments\n",
+           count, arcade_menus, menu_count, stage_count);
     return 0;
 }

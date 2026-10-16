@@ -1,6 +1,7 @@
 /* The shared speech and read-current-text layer. Rationale in the header. */
 #include "text_channel.h"
 #include "speech.h"
+#include "mod_text.h"
 #include "log.h"
 #include <string.h>
 #include <wchar.h>
@@ -51,15 +52,21 @@ BOOL tc_has_letters(const wchar_t *s)
 
 BOOL tc_say(const wchar_t *text, BOOL interrupt, const char *what)
 {
+    /* The log is UTF-8. "%ls" converts through the C locale and printed
+     * NOTHING for a Japanese line (2026-10-15: "cvs2-quote: spoke: " with the
+     * quote missing), so the text is converted here. */
+    char utf8[1024];
     if (!text || !text[0]) return FALSE;
+    if (!WideCharToMultiByte(CP_UTF8, 0, text, -1, utf8, (int)sizeof utf8, NULL, NULL))
+        lstrcpynA(utf8, "(text too long to log)", sizeof utf8);
     if (speech_say(text, interrupt)) {
-        log_line("%s: spoke: %ls", what ? what : "text", text);
+        log_line("%s: spoke: %s", what ? what : "text", utf8);
         return TRUE;
     }
     /* ⚠ Not a warning-and-carry-on. The caller must NOT advance its cursor on
      * this, which is the whole reason this function returns a value. */
-    log_line("%s: ⛔ NOT SPOKEN (backend refused): %ls", what ? what : "text",
-             text);
+    log_line("%s: ⛔ NOT SPOKEN (backend refused): %s", what ? what : "text",
+             utf8);
     return FALSE;
 }
 
@@ -309,7 +316,7 @@ void tc_read_current(void)
 {
     int i, inactive = 0, empty = 0, stale = 0, refused = 0;
     if (!g_source_count) {
-        speech_say(L"No text reader is available.", TRUE);
+        speech_say(mt(MT_TEXT_NO_READER), TRUE);
         return;
     }
     for (i = 0; i < g_source_count; ++i) {
@@ -328,11 +335,11 @@ void tc_read_current(void)
     if (refused)
         log_line("text-channel: a source assembled text the backend refused");
     else if (empty)
-        speech_say(L"No readable text on screen.", TRUE);
+        speech_say(mt(MT_TEXT_NOTHING), TRUE);
     else if (stale)
-        speech_say(L"No fresh text frame is available.", TRUE);
+        speech_say(mt(MT_TEXT_STALE), TRUE);
     else if (inactive == g_source_count)
-        speech_say(L"No text reader is active here.", TRUE);
+        speech_say(mt(MT_TEXT_INACTIVE), TRUE);
 }
 
 void tc_test_reset(void)

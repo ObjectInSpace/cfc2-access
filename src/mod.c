@@ -43,6 +43,8 @@
 #include "menu_cursor.h"
 #include "menu_speak.h"   /* menu_speak_set_discovery() */
 #include "emu_ram.h"      /* the emulated machine's state (world 2)         */
+#include "mod_text.h"     /* the mod's own words, in the game's language    */
+#include "gmd_find.h"     /* gmd_text_language()                            */
 
 #include <stdio.h>
 
@@ -1429,12 +1431,18 @@ static void volume_hotkeys_tick(void)
         /* "beacons 50 percent" / "health muted" -- the word MUTED rather than
          * "0 percent", because 0 is the state the user most needs to
          * recognise instantly and a number is easy to mishear. */
+        /* Spoken in the game's language; audio_cue_name() stays English for
+         * the log line below. Order is audio_cue's. */
+        static const mt_id cue_word[AUDIO_CUE_COUNT] = {
+            MT_CUE_HEALTH, MT_CUE_SUPER, MT_CUE_BEACONS, MT_CUE_TICK };
         if (pct == 0)
-            _snwprintf(say, 96, L"%ls muted", audio_cue_name((audio_cue)c));
-        else
-            _snwprintf(say, 96, L"%ls %d percent",
-                       audio_cue_name((audio_cue)c), pct);
-        say[95] = 0;
+            mt_fmt(say, 96, MT_MUTED, mt(cue_word[c]), NULL, NULL);
+        else {
+            wchar_t n[16];
+            _snwprintf(n, 16, L"%d", pct);
+            n[15] = 0;
+            mt_fmt(say, 96, MT_PERCENT, mt(cue_word[c]), n, NULL);
+        }
         speech_say(say, TRUE);
 
         /* Persist so the balance survives a restart. ⚠ A profile write is a
@@ -1930,17 +1938,10 @@ static DWORD WINAPI worker(LPVOID param)
          * retired. What a user needs to hear today is simply whether the mod
          * can name menu items -- speech backend, and whether the message table
          * resolved. */
-        if (unpacked) {
-            _snwprintf(msg, 255,
-                       L"Access mod ready. Backend %ls.",
-                       backend ? backend : L"none");
-        }
-        else
-            _snwprintf(msg, 255,
-                       L"Access mod loaded, backend %ls, but the image never "
-                       L"unpacked. Menu reading will not work.",
-                       backend ? backend : L"none");
-        msg[255] = L'\0';
+        /* The game's language is not known yet this early (the message
+         * table resolves later), and an unknown language speaks English. */
+        mt_fmt(msg, 256, unpacked ? MT_READY : MT_NOT_UNPACKED,
+               backend ? backend : mt(MT_NONE), NULL, NULL);
         speech_say(msg, TRUE);
     }
 
@@ -2037,6 +2038,17 @@ static DWORD WINAPI worker(LPVOID param)
                 if (foreground_pid == GetCurrentProcessId()) tc_request_read();
             }
 
+            /* Follow the game's language for the mod's own words (mod_text.h).
+             * Once a second: a language change is rare, and the read is a
+             * guarded copy of one string. */
+            {
+                static ULONGLONG last_lang;
+                ULONGLONG now_lang = GetTickCount64();
+                if (!last_lang || now_lang - last_lang >= 1000) {
+                    last_lang = now_lang;
+                    mt_update_language(gmd_text_language());
+                }
+            }
             /* Read actual CVS2 selection on the speech worker, never a hook. */
             cvs2_select_tick();
             /* CVS1, CFJ and Alpha 3 highlights through the same shared channel;

@@ -98,6 +98,33 @@ Tests:
     sites in CVS1 and 4 in Alpha 3 (two of them the story table), so this
     addressing is rare. It is not how CVS1's quotes are reached.
 
+## Japanese versions and the mod's own words (2026-10-15)
+
+Checked with a play session of each game's Japanese version; nobody needs
+to read Japanese for these checks, the log records what was refused.
+
+- **CVS2** stores real Shift-JIS (its quote table at blob 0x1A2440). The
+  story reader already decoded CP932; the win-quote and positioned-record
+  readers refused bytes from 0x80 and now decode CP932, taking a lead
+  byte's trail byte whole (a trail byte can equal `^`).
+- **CVS1 and CFE**: their text readers saw only the same ASCII system text
+  in the Japanese version. Their win quotes and stories are drawn outside
+  the queues in both versions (the gap below).
+- **Alpha 3's Japanese pre-fight story** is glyph numbers, not text. Each
+  story file (game_30.arc AFS 0x7E..0xA1) holds the entries, the English
+  table and a 256x256 PVR sheet of the glyphs it uses; drawer 0x1408849FD,
+  glyph g = cell g & 0xFF. The 34 distinct sheets were transcribed by eye
+  (`tools/z3u_story_sheets.py`), checked by row length, by each sheet
+  covering exactly its story's glyphs, and by reading every decoded line
+  against its English pair. `tools/make_z3u_story_jp.py` generates
+  `src/z3u_story_jp.h`; the reader matches an entry's raw bytes and its
+  English pair (ordinary copy), or the fighters on screen (alternate copy,
+  whose buffer has no pair beside it). Confirmed in play on both copies.
+- **The mod's own words** come from `src/mod_text.c` in the collection's 14
+  languages; the ones the collection translates itself are generated from
+  msg.arc by `tools/make_mod_text_gmd.py`. The log is UTF-8 (`tc_say` no
+  longer prints Japanese as nothing).
+
 ## Not covered yet
 
 - Text drawn outside these queues, possibly including win quotes, story and ending text, and VS-screen names. Both games draw much of their HUD as sprites, and other glyph paths exist: CVS1 calls the shared glyph draw `0x140F36A70` from seven functions. Find which screens show text that is not spoken, then trace that screen's draw path.

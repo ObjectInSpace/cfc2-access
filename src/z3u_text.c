@@ -106,6 +106,50 @@ static __attribute__((noinline)) BOOL guarded_bytes(unsigned char *dst, ULONGLON
     return !faulted;
 }
 
+/* The Japanese version's story lines are glyph numbers into a per-story
+ * picture sheet, not text (make_z3u_story_jp.py has the trace). The entry's
+ * raw bytes plus its paired English line pick the decoded line from the
+ * generated table; numbering restarts per story, so the English pair is
+ * what tells Chun-Li's first line from Bison's. */
+#include "z3u_story_jp.h"
+
+int z3u_story_jp_find(const unsigned char *entry,
+                      BOOL (*english)(unsigned line, unsigned char out[16], void *ctx),
+                      void *ctx, const int fighters[2])
+{
+    int first = -1, pick = -1;
+    BOOL same = TRUE, picked_same = TRUE;
+    for (int i = 0; i < Z3U_STORY_JP_COUNT; i++) {
+        unsigned char us[Z3U_STORY_JP_US];
+        if (memcmp(entry, z3u_story_jp[i].key, sizeof z3u_story_jp[i].key)) continue;
+        /* The ordinary copy: the paired English line decides. */
+        if (english && english(z3u_story_jp[i].line, us, ctx) &&
+            !memcmp(us, z3u_story_jp[i].us, sizeof us))
+            return i;
+        if (first < 0) first = i;
+        else if (wcscmp(z3u_story_jp[first].text, z3u_story_jp[i].text)) same = FALSE;
+        for (int s = 0; fighters && s < 2; s++) {
+            if (fighters[s] < 0 || fighters[s] >= 64 ||
+                !(z3u_story_jp[i].fighters >> fighters[s] & 1))
+                continue;
+            if (pick < 0) pick = i;
+            else if (wcscmp(z3u_story_jp[pick].text, z3u_story_jp[i].text)) picked_same = FALSE;
+        }
+    }
+    /* The alternate copy has no English pair beside its buffer: the bytes
+     * alone when every match says the same thing, else the story of a
+     * fighter on screen, else nothing -- never a guess between two. */
+    if (first >= 0 && same) return first;
+    if (pick >= 0 && picked_same) return pick;
+    return -1;
+}
+
+static BOOL english_at(unsigned line, unsigned char out[16], void *ctx)
+{
+    ULONGLONG p = *(const ULONGLONG *)ctx;
+    return guarded_bytes(out, p + 0x802 - 5u * line, 16);
+}
+
 static void collect_messages(const z3u_branch *b, ULONGLONG root)
 {
     for (unsigned m = 0; m < MESSAGE_MAX; ++m) {
@@ -113,11 +157,32 @@ static void collect_messages(const z3u_branch *b, ULONGLONG root)
         unsigned char entry[0x90];
         char text[TC_RAW_CAP];
         ULONGLONG p;
+        int jp;
         if (!o[0]) continue;
         memcpy(&p, o + 0x38, 8);
         if (!p || p >= 0x00007FFF00000000ull) continue;
-        if (!guarded_bytes(entry, p, sizeof entry) ||
-            !z3u_message_join(entry, sizeof entry, text, ENTRY_CAP))
+        if (!guarded_bytes(entry, p, sizeof entry)) continue;
+        /* Japanese first: an English entry is ASCII text and can never
+         * equal a glyph-number key. */
+        int fighters[2];
+        for (int s = 0; s < 2; s++)
+            fighters[s] = *(const unsigned char *)(ULONG_PTR)(root + b->obj_off + s * b->obj_step + b->o_id);
+        if ((jp = z3u_story_jp_find(entry, english_at, &p, fighters)) >= 0) {
+            snprintf(text, sizeof text, "#%d", jp);
+            tc_frame_add(&collecting, 0.0f, (float)m, Z3U_STYLE_MESSAGE_JP, 1, text, sizeof text);
+            continue;
+        }
+        /* Glyph words, not text, and not a known line: record the bytes for
+         * the log instead of joining them into a row of spaces. An English
+         * entry is a count byte, an indent byte, then letters, so bytes 5
+         * and 7 are letters; in 16-bit words under 256 they are 0. */
+        if (!entry[1] && !entry[3] && !entry[5] && !entry[7]) {
+            for (int i = 0; i < 36; i++)
+                snprintf(text + 2 * i, sizeof text - 2 * i, "%02x", entry[i]);
+            tc_frame_add(&collecting, 0.0f, (float)m, Z3U_STYLE_MESSAGE_RAW, 1, text, sizeof text);
+            continue;
+        }
+        if (!z3u_message_join(entry, sizeof entry, text, ENTRY_CAP))
             continue;
         tc_frame_add(&collecting, 0.0f, (float)m, Z3U_STYLE_MESSAGE, 1, text, sizeof text);
     }
@@ -145,6 +210,15 @@ BOOL z3u_text_decode(int font, const char *raw, wchar_t *out, SIZE_T cap)
 {
     SIZE_T i = 0, n = 0;
     out[0] = 0;
+    if (font == Z3U_STYLE_MESSAGE_JP) {
+        /* "#n": a row of the generated Japanese story table. */
+        int idx;
+        if (raw[0] != '#' || sscanf(raw + 1, "%d", &idx) != 1 ||
+            idx < 0 || idx >= Z3U_STORY_JP_COUNT || cap < 2)
+            return FALSE;
+        lstrcpynW(out, z3u_story_jp[idx].text, (int)cap);
+        return out[0] != 0;
+    }
     if ((font < 0 || font > 3) && font != Z3U_STYLE_MESSAGE) return FALSE;
     if (cap < 2) return FALSE;
     while (i < TC_RAW_CAP && raw[i]) {

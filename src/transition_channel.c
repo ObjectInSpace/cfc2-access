@@ -2,6 +2,7 @@
 
 #include "transition_channel.h"
 #include "text_channel.h"
+#include "mod_text.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -23,9 +24,14 @@ void transition_side_label(const transition_side *s, wchar_t *out, size_t cap)
 {
     if (!out || !cap) return;
     switch (s->ownership) {
-    case TRANSITION_OWNER_LOCAL:    swprintf(out, cap, L"You"); break;
-    case TRANSITION_OWNER_OPPONENT: swprintf(out, cap, L"Opponent"); break;
-    default:                        swprintf(out, cap, L"Player %u", s->player); break;
+    case TRANSITION_OWNER_LOCAL:    swprintf(out, cap, L"%ls", mt(MT_YOU)); break;
+    case TRANSITION_OWNER_OPPONENT: swprintf(out, cap, L"%ls", mt(MT_OPPONENT)); break;
+    default: {
+        wchar_t n[12];
+        swprintf(n, 12, L"%u", s->player);
+        mt_fmt(out, cap, MT_PLAYER_N, n, NULL, NULL);
+        break;
+    }
     }
 }
 
@@ -50,8 +56,14 @@ void transition_channel_depart(transition_channel *c)
 static void member_text(wchar_t *buf, size_t cap, const transition_member *m,
                         const wchar_t *ratio_sep)
 {
-    if (m->ratio) add(buf, cap, L"%ls%lsratio %u", m->name, ratio_sep, m->ratio);
-    else          add(buf, cap, L"%ls", m->name);
+    if (m->ratio) {
+        wchar_t r[12], part[TRANSITION_TEXT];
+        swprintf(r, 12, L"%u", m->ratio);
+        /* ", " is the current fighter's form, " " the team list's. */
+        mt_fmt(part, TRANSITION_TEXT, ratio_sep[0] == L',' ? MT_MEMBER_RATIO : MT_MEMBER_RATIO_LIST,
+               m->name, r, NULL);
+        add(buf, cap, L"%ls", part);
+    } else add(buf, cap, L"%ls", m->name);
 }
 
 /* The grouped introduction, e.g. "You: C Groove, Ryu ratio 1, Ken ratio 1.

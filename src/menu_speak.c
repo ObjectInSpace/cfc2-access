@@ -12,6 +12,7 @@
 #include "log.h"
 #include "gui_text.h"     /* the live caption channel */
 #include "text_channel.h" /* shared speech + read-current-text */
+#include "mod_text.h"     /* the mod's own words, in the game's language */
 #include "gui_markup.h"   /* markup -> speech */
 
 /* Discovery-sweep string classification -- see the sweep in
@@ -32,6 +33,16 @@
 #include <stdio.h>
 #include <stdlib.h>       /* malloc/free: menu_speak_line sizes to its line */
 #include <string.h>
+
+/* "3 of 6" in the game's language (mod_text.h), as UTF-8. */
+static void pos_text(char *out, size_t cap, int pos, int total)
+{
+    char a[16], b[16];
+    _snprintf(a, sizeof a, "%d", pos);   a[sizeof a - 1] = 0;
+    _snprintf(b, sizeof b, "%d", total); b[sizeof b - 1] = 0;
+    mt_fmt8(out, cap, MT_POS, a, b, NULL);
+}
+
 
 /* --- The screen table ----------------------------------------------------
  *
@@ -2938,9 +2949,10 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
                     if (head_spoken[0] && !gm_has_residue(head_spoken) &&
                         strcmp(head_spoken, spoken) != 0) {
                         char line[GT_CAPTION_MAX + GM_OUT_MAX + 32];
-                        _snprintf(line, sizeof(line) - 1, "%s. %s, %d of %d",
-                                  head_spoken, spoken, out->position,
-                                  out->total);
+                        char where[64];
+                        pos_text(where, sizeof where, out->position, out->total);
+                        _snprintf(line, sizeof(line) - 1, "%s. %s, %s",
+                                  head_spoken, spoken, where);
                         line[sizeof(line) - 1] = '\0';
                         log_line("mcspeak: tab changed (row cursor +0x%03x) -- "
                                  "announcing the page \"%s\".",
@@ -4142,8 +4154,11 @@ void menu_speak_check_modal(void)
             /* ⛔ No readable selection: LIST both rather than name one. A wrong
              * option stated confidently on a prompt that quits the game is the
              * failure this function exists to prevent. */
-            _snprintf(flat + used, sizeof(flat) - used - 1, "%s%s or %s", sep,
-                      m.opt[0], m.opt[1]);
+        {
+            char either[256];
+            mt_fmt8(either, sizeof either, MT_OR, m.opt[0], m.opt[1], NULL);
+            _snprintf(flat + used, sizeof(flat) - used - 1, "%s%s", sep, either);
+        }
         flat[sizeof(flat) - 1] = '\0';
     }
 
@@ -4287,17 +4302,18 @@ void menu_speak(const mc_move *m)
 
     /* ⚠ The item NAME leads, then the position. A screen reader user wants the
      * word first; the position is context, not the headline. */
-    char line[256];
+    char line[256], where[64];
+    pos_text(where, sizeof where, sp.position, sp.total);
     /* ⭐ A named VALUE reads as "row name, value name" -- "Game Version,
      * English Version". The row name is the context a blind user needs in
      * order to know what the value is a value OF, and it leads for the same
      * reason the item name leads elsewhere. */
     if (sp.named && sp.axis == MC_AXIS_VALUE && sp.row_name[0])
-        _snprintf(line, sizeof(line), "%s, %s, %d of %d",
-                  sp.row_name, sp.item, sp.position, sp.total);
+        _snprintf(line, sizeof(line), "%s, %s, %s",
+                  sp.row_name, sp.item, where);
     else if (sp.named)
-        _snprintf(line, sizeof(line), "%s, %d of %d",
-                  sp.item, sp.position, sp.total);
+        _snprintf(line, sizeof(line), "%s, %s",
+                  sp.item, where);
     /* ⭐⭐ Settings screens: say which AXIS moved. Without this, moving Right
      * on the settings screen said "3 of 8" -- indistinguishable from having
      * moved to the third of eight menu items, when in fact the user changed
@@ -4308,7 +4324,7 @@ void menu_speak(const mc_move *m)
          * which asserts the screen is a settings screen -- and that claim was
          * WRONG on the first screen it met (Select Game, reached from Offline
          * Play). A bare position is true whatever the screen turns out to be. */
-        _snprintf(line, sizeof(line), "%d of %d", sp.position, sp.total);
+        _snprintf(line, sizeof(line), "%s", where);
     else if (sp.axis == MC_AXIS_VALUE && sp.row_name[0] && sp.is_level)
         /* ⭐⭐ A LEVEL ROW: the position IS the value.
          *
@@ -4325,20 +4341,27 @@ void menu_speak(const mc_move *m)
          * ⚠ Only for rows whose values are a numeric RANGE (see is_level).
          * Saying "Display, 2 of 3" as a level would be wrong -- that row's
          * values are names, and the position is genuinely just a position. */
-        _snprintf(line, sizeof(line), "%s, %d, of %d",
-                  sp.row_name, sp.position, sp.total);
+    {
+        char a[16], b[16], level[64];
+        _snprintf(a, sizeof a, "%d", sp.position); a[sizeof a - 1] = 0;
+        _snprintf(b, sizeof b, "%d", sp.total);    b[sizeof b - 1] = 0;
+        mt_fmt8(level, sizeof level, MT_LEVEL, a, b, NULL);
+        _snprintf(line, sizeof(line), "%s, %s", sp.row_name, level);
+    }
     else if (sp.axis == MC_AXIS_VALUE && sp.row_name[0])
         /* ⭐ The useful form: "Game Version, 2 of 2" -- the row NAMED, the
          * value's position given. The value text itself is not claimed. */
-        _snprintf(line, sizeof(line), "%s, %d of %d",
-                  sp.row_name, sp.position, sp.total);
+        _snprintf(line, sizeof(line), "%s, %s",
+                  sp.row_name, where);
     else if (sp.axis == MC_AXIS_VALUE && sp.have_row)
-        _snprintf(line, sizeof(line), "row %d, %d of %d",
-                  sp.row + 1, sp.position, sp.total);
-    else if (sp.axis == MC_AXIS_VALUE)
-        _snprintf(line, sizeof(line), "%d of %d", sp.position, sp.total);
+    {
+        char r[16], row[64];
+        _snprintf(r, sizeof r, "%d", sp.row + 1); r[sizeof r - 1] = 0;
+        mt_fmt8(row, sizeof row, MT_ROW_N, r, NULL, NULL);
+        _snprintf(line, sizeof(line), "%s, %s", row, where);
+    }
     else
-        _snprintf(line, sizeof(line), "%d of %d", sp.position, sp.total);
+        _snprintf(line, sizeof(line), "%s", where);
     line[sizeof(line) - 1] = '\0';
 
     /* ⭐⭐ THE ROW'S OWN DESCRIPTION, appended when the game supplied one.

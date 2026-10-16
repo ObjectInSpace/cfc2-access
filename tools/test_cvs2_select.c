@@ -613,8 +613,25 @@ int main(void)
             wq[0x20f58]++;
             wq[0x20f5c+34]='X'; assert(!cvs2_quote_decode(wq,sizeof wq,text,161));
             wq[0x20f5c+34]=0;
-            wq[0x20f5c]=0x81; assert(!cvs2_quote_decode(wq,sizeof wq,text,161));
-            wq[0x20f5c]='Y';
+            /* A dangling Shift-JIS lead byte refuses the quote. */
+            wq[0x20f5c+33]=0x81; assert(!cvs2_quote_decode(wq,sizeof wq,text,161));
+            wq[0x20f5c+33]='!';
+            /* The Japanese ROM's quotes are CP932 (its table holds
+             * "負けを認めるのか？" as these bytes): spoken as Japanese. */
+            {
+                static const BYTE jp[] = { 0x95,0x89,0x82,0xaf,0x82,0xf0,0x94,0x46,0x82,0xdf,
+                                           0x82,0xe9,0x82,0xcc,0x82,0xa9,0x81,0x48 };
+                BYTE keep[0xd0];
+                memcpy(keep, wq+0x20f30, sizeof keep);
+                memset(wq+0x20f5c, 0, 0x50);
+                memcpy(wq+0x20f5c, jp, sizeof jp);
+                wq[0x20f54]=wq[0x20f58]=(BYTE)sizeof jp;
+                wq[0x20f55]=wq[0x20f59]=0;
+                assert(cvs2_quote_decode(wq,sizeof wq,text,161));
+                assert(wcsncmp(text, L"\x8ca0\x3051\x3092\x8a8d\x3081\x308b\x306e\x304b\xff1f", 9) == 0);
+                memcpy(wq+0x20f30, keep, sizeof keep);
+                assert(cvs2_quote_decode(wq,sizeof wq,text,161));
+            }
             assert(!cvs2_quote_decode(wq,sizeof wq-1,text,161));
             assert(!cvs2_quote_decode(wq,sizeof wq,text,160));
             /* Synthetic completion of a REAL partial Sagat capture. The

@@ -4,7 +4,7 @@ $gcc = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.
 New-Item -ItemType Directory -Force -Path "$root\build\test" | Out-Null
 # CVS1 text-record decoding against the producers' own literals.
 & $gcc -O2 -Wall -Wextra -Werror -o "$root\build\test\test_cvs1_text.exe" `
-    "$root\tools\test_cvs1_text.c" "$root\src\cvs1_text.c" "$root\src\game_text.c" "$root\src\text_channel.c" `
+    "$root\tools\test_cvs1_text.c" "$root\src\cvs1_text.c" "$root\src\game_text.c" "$root\src\text_channel.c" "$root\src\mod_text.c" `
     "$root\src\text_capture.c" "$root\src\memsafe.c"
 if ($LASTEXITCODE -ne 0) { throw 'CVS1 text test build failed' }
 Push-Location $root

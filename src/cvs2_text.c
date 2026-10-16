@@ -91,7 +91,25 @@ static BOOL decode_row(const tc_row *r, wchar_t *out)
             if (c == 'Y') c = '^';
             else if (c == 'Z') c = '\\';
             else continue;
-        } else if (!embedded && (c < 32 || c >= 0x80)) {
+        } else if (!embedded && c >= 0x80) {
+            /* The Japanese ROM's font runs are the same CP932: a lead byte
+             * takes its trail byte whole, before any escape test, because a
+             * trail byte can equal '^'. Anything else outside CP932 (and the
+             * decode below) still refuses the row. */
+            BOOL lead = (c >= 0x81 && c <= 0x9F) || (c >= 0xE0 && c <= 0xFC);
+            if (lead) {
+                unsigned t;
+                if (i >= sizeof r->raw) return FALSE;
+                t = (BYTE)r->raw[i];
+                if (!(t >= 0x40 && t <= 0xFC && t != 0x7F)) return FALSE;
+                if (n + 2 >= sizeof bytes) return FALSE;
+                bytes[n++] = (char)c;
+                bytes[n++] = (char)t;
+                i++;
+                continue;
+            }
+            if (!(c >= 0xA1 && c <= 0xDF)) return FALSE;   /* half-width kana only */
+        } else if (!embedded && c < 32) {
             return FALSE; /* Icon-only/mixed command text needs its own map. */
         }
         if (n + 1 >= sizeof bytes) return FALSE;

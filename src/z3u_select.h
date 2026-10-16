@@ -10,7 +10,7 @@
  * docs/port-tasks/character-names.md. Read-only, worker thread only. */
 
 /* Per-side fields copied from the player object. */
-enum { Z3U_STATE, Z3U_SUB, Z3U_SIDE, Z3U_ID, Z3U_RANDOM, Z3U_ISM, Z3U_FIELDS };
+enum { Z3U_STATE, Z3U_SUB, Z3U_SIDE, Z3U_ID, Z3U_RANDOM, Z3U_ISM, Z3U_MODE, Z3U_FIELDS };
 
 /* The owned copy the decoder works on: only what selection needs. */
 typedef struct {
@@ -24,7 +24,7 @@ typedef struct {
 } z3u_select_sample;
 
 /* Selection kinds spoken through the shared channel. */
-enum { Z3U_KIND_CHARACTER, Z3U_KIND_ISM, Z3U_KIND_SPEED };
+enum { Z3U_KIND_CHARACTER, Z3U_KIND_ISM, Z3U_KIND_SPEED, Z3U_KIND_MODE };
 
 /* For `side`: the kind being chosen and its value, or -1 not choosing /
  * -2 choosing but unreadable. Character value 0xFF is the random cell. */

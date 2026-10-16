@@ -167,7 +167,94 @@ int main(void)
         assert(cfj_select_decode(NULL, 0) == -1 && cfj_select_decode(&s, 2) == -1);
     }
 
+    /* The arcade capture never opens the stage menu (sub-state 2 -> 3). */
+    for (unsigned i = 0; i < count; i++) assert(cfj_stage_decode(&rec[i]) == -1);
+
+    /* Stage select, live Versus and Training (2026-10-15,
+     * tools/make_cfj_stage_fixture.py): every moment decodes to its hand-read
+     * entry, the sides are not choosing on it, and it speaks in order. */
+    unsigned stage_count;
+    {
+        FILE *f = fopen("tools/fixtures/cfj-stage-select-20261015.bin", "rb");
+        BYTE magic[4], raw[8 + 1 + 3 + CFJ_SIDES_SIZE];
+        static cfj_select_sample st[32];
+        static BYTE want[32];
+        static double t[32];
+        assert(f);
+        assert(fread(magic, 1, 4, f) == 4 && !memcmp(magic, "CFJT", 4));
+        assert(fread(&stage_count, 4, 1, f) == 1 && stage_count > 0 && stage_count <= 32);
+        for (unsigned i = 0; i < stage_count; i++) {
+            assert(fread(raw, 1, sizeof raw, f) == sizeof raw);
+            memset(&st[i], 0, sizeof st[i]);
+            memcpy(&t[i], raw, 8);
+            want[i] = raw[8];
+            memcpy(st[i].phase, raw + 9, 2);
+            st[i].humans = raw[11];
+            memcpy(st[i].sides, raw + 12, CFJ_SIDES_SIZE);
+            st[i].variant = 1;
+        }
+        assert(fgetc(f) == EOF);
+        fclose(f);
+
+        for (unsigned i = 0; i < stage_count; i++) {
+            game_selection_choice c[GAME_SELECTION_OWNERS];
+            int v = cfj_stage_decode(&st[i]);
+            if (v != (want[i] == 0xFF ? -1 : (int)want[i]))
+                fprintf(stderr, "stage moment %.2f: got %d, want %u\n", t[i], v, want[i]);
+            assert(v == (want[i] == 0xFF ? -1 : (int)want[i]));
+            cfj_selection_copy(&st[i], c);
+            if (want[i] != 0xFF) {
+                assert(c[CFJ_STAGE_OWNER].status == GAME_SELECTION_VALID);
+                assert(c[CFJ_STAGE_OWNER].kind == CFJ_KIND_STAGE && c[CFJ_STAGE_OWNER].value == want[i]);
+                assert(c[0].status == GAME_SELECTION_INACTIVE && c[1].status == GAME_SELECTION_INACTIVE);
+            } else {
+                assert(c[CFJ_STAGE_OWNER].status == GAME_SELECTION_INACTIVE);
+            }
+        }
+        /* Words and gates. */
+        {
+            game_selection_choice c[GAME_SELECTION_OWNERS];
+            cfj_select_sample s = st[3];                          /* Random */
+            cfj_selection_copy(&s, c);
+            assert(!wcscmp(c[CFJ_STAGE_OWNER].label, L"Random stage"));
+            s = st[13];                                           /* 10 */
+            cfj_selection_copy(&s, c);
+            assert(!wcscmp(c[CFJ_STAGE_OWNER].label, L"Training Zone"));
+            s = st[3]; s.phase[1] = 3;  assert(cfj_stage_decode(&s) == -1);  /* sub-state */
+            s = st[3]; s.phase[0] = 4;  assert(cfj_stage_decode(&s) == -1);  /* phase     */
+            s = st[3]; s.sides[0] = 11; assert(cfj_stage_decode(&s) == -2);  /* range     */
+            s = st[3]; s.sides[1] = 0xFF; assert(cfj_stage_decode(&s) == -2); /* negative  */
+            cfj_selection_copy(&s, c);
+            assert(c[CFJ_STAGE_OWNER].status == GAME_SELECTION_UNAVAILABLE);
+            assert(cfj_stage_decode(NULL) == -1);
+        }
+        /* Spoken in the live order. */
+        {
+            static const wchar_t *const spoken[] = {
+                L"Ryu. Demitri",          /* versus picking, both sides */
+                L"Random stage", L"Myanmar", L"Random stage", L"Myanmar", L"Random stage",
+                L"Ryu",                   /* training picking: P1 on select number 0 */
+                L"Training Zone", L"Random stage", L"Training Zone", L"Random stage", L"Training Zone" };
+            unsigned n = 0;
+            cfj_select_observe(NULL, 0, 0);
+            int before = calls;
+            for (unsigned i = 0; i < stage_count; i++) {
+                int was = calls;
+                settle(&st[i]);
+                if (calls != was) {
+                    assert(n < sizeof spoken / sizeof spoken[0]);
+                    if (wcscmp(last, spoken[n]))
+                        fprintf(stderr, "stage spoken %u at %.2f: '%ls', want '%ls'\n", n, t[i], last, spoken[n]);
+                    assert(!wcscmp(last, spoken[n]));
+                    n++;
+                }
+            }
+            assert(n == sizeof spoken / sizeof spoken[0] && calls == before + (int)n);
+        }
+    }
+
     printf("PASS: %u live CFJ samples, highlight path and committed picks, names by game "
-           "version, shared-channel speech/retry/visit/depart, every gate\n", count);
+           "version, shared-channel speech/retry/visit/depart, every gate; %u live stage-select "
+           "moments, words, gates and spoken order\n", count, stage_count);
     return 0;
 }

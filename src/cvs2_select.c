@@ -7,6 +7,7 @@
 #include "cvs2_story.h"
 #include "cvs2_text.h"
 #include "text_channel.h"
+#include "mod_text.h"
 #include "memsafe.h"
 #include "speech.h"
 #include "log.h"
@@ -196,12 +197,15 @@ void cvs2_selection_copy(const BYTE *s, SIZE_T size,
         if (id >= 72) {
             /* The user identifies this as handicap. The native storage is
              * shared with ratios, but the visible heading is not verified. */
-            swprintf(part,256,L"Level %d",id-72+1);
+            mt_fmt_n(part,256,MT_LEVEL_N,id-72+1,0);
         } else if (id >= 60) {
-            swprintf(part,256,L"Stage: %ls",stage_names[id-60]);
+            /* "Stage: " is the collection's own word; Random is too. The
+             * other stage names are places, spoken as the game names them. */
+            swprintf(part,256,L"%ls%ls",mt(MT_STAGE_PREFIX),
+                     id-60 == 11 ? mt(MT_RANDOM) : stage_names[id-60]);
         } else if (id >= 54) {
             unsigned b=0x1eba8+p*0x678, i, n=s[b+0x5d1];
-            swprintf(part,256,L"Ratios: ");
+            swprintf(part,256,L"%ls",mt(MT_RATIOS));
             for (i=0; i<n; i++) {
                 wchar_t entry[80];
                 swprintf(entry,80,L"%ls%ls %u",i ? L", " : L"",
@@ -728,6 +732,11 @@ static unsigned quote_word(const BYTE *s, unsigned off)
     return s[off] | ((unsigned)s[off+1] << 8);
 }
 
+/* Each line is the game's own text: ASCII on the US ROM and Shift-JIS on
+ * the Japanese one, whose quote table (cvs2 data around 0x1A2440, e.g.
+ * "ここからが本当の勝負だ！") is plain NUL-terminated CP932. So a line is
+ * decoded as CP932, which leaves ASCII unchanged; control bytes or an
+ * invalid sequence still refuse the whole quote rather than misread it. */
 BOOL cvs2_quote_decode(const BYTE *s, SIZE_T size, wchar_t *out, SIZE_T capacity)
 {
     unsigned mode, lines, line, used=0;
@@ -745,11 +754,23 @@ BOOL cvs2_quote_decode(const BYTE *s, SIZE_T size, wchar_t *out, SIZE_T capacity
         const BYTE *text=s+0x20f5c+line*0x50;
         if (!n || n >= 0x50 || quote_word(s,0x20f58+line*2) != n ||
             text[n]) { out[0]=0; return FALSE; }
-        for (i=0; i<n; i++)
-            if (text[i] < 32 || text[i] > 126) { out[0]=0; return FALSE; }
-        if (line && used && out[used-1] != L' ' && text[0] != ' ')
-            out[used++]=L' ';
-        for (i=0; i<n; i++) out[used++]=(wchar_t)text[i];
+        {
+            char raw[0x50];
+            wchar_t wide[0x50];
+            SIZE_T w;
+            for (i=0; i<n; i++) {
+                if (text[i] < 32 || text[i] == 127) { out[0]=0; return FALSE; }
+                raw[i]=(char)text[i];
+            }
+            raw[n]=0;
+            if (!tc_decode_cp(932, raw, wide, 0x50)) { out[0]=0; return FALSE; }
+            w=wcslen(wide);
+            if (used + w + 2 > capacity) { out[0]=0; return FALSE; }
+            if (line && used && out[used-1] != L' ' && wide[0] != L' ' && wide[0] < 0x80)
+                out[used++]=L' ';
+            memcpy(out+used, wide, w*sizeof(wchar_t));
+            used+=(unsigned)w;
+        }
     }
     out[used]=0;
     return used != 0;
