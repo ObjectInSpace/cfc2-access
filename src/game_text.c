@@ -41,9 +41,12 @@ static BOOL coin_status(const wchar_t *t)
     if (wcsncmp(t, L"CREDIT", 6)) return FALSE;
     t += 6;
     if (*t == L'S') ++t;
+    else if (!wcsncmp(t, L"(S)", 3)) t += 3;     /* Project Justice: "CREDIT(S) 3" */
     while (*t == L' ' || *t == L':') ++t;
     if (!*t) return FALSE;
-    while (*t >= L'0' && *t <= L'9') ++t;
+    /* A count, and Project Justice's coin fraction "1/2" after it. */
+    if (*t < L'0' || *t > L'9') return FALSE;
+    while ((*t >= L'0' && *t <= L'9') || *t == L'/' || *t == L' ') ++t;
     return !*t;
 }
 

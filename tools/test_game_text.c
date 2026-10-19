@@ -73,6 +73,9 @@ int main(void)
     game_text_observe(&src, 0x1000);
     frame("CREDIT 1", 1, NULL, 0);
     game_text_observe(&src, 0x1000);
+    /* Project Justice's forms: "CREDIT(S) n" and the coin fraction. */
+    frame("CREDIT(S) 3", 1, "CREDIT(S) 0 1/2", 1);
+    game_text_observe(&src, 0x1000);
     assert(calls == 1);
     frame("FREE PLAY MODE", 1, NULL, 0);
     game_text_observe(&src, 0x1000);

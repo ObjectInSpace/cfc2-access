@@ -86,6 +86,16 @@ static const wchar_t *const g_text[MT_COUNT][MT_NLANG] = {
                     L"네 번째", L"czwarty", L"quarto", L"четвёртый", L"第四", L"第四", L"الرابع" },
     [MT_YOU] = { L"あなた", L"You", L"Vous", L"Tu", L"Du", L"Tú", L"Tú", L"나", L"Ty", L"Você",
                  L"Вы", L"你", L"你", L"أنت" },
+    /* Project Justice's first menu. "Story mode" as the collection words it
+     * (ACHIEVEMENT_32_DESC in each language); "Free mode" as SOUND_MJUS_40. */
+    [MT_STORY_MODE] = { L"ストーリーモード", L"Story mode", L"Mode histoire", L"Modalità Storia",
+                        L"Story-Modus", L"Modo historia", L"Modo historia", L"스토리 모드",
+                        L"Tryb historii", L"Modo história", L"Режим истории", L"故事模式",
+                        L"故事模式", L"وضع القصة" },
+    [MT_FREE_MODE] = { L"フリーモード", L"Free mode", L"Mode libre", L"Modalità libera",
+                       L"Freier Modus", L"Modo libre", L"Modo libre", L"프리 모드",
+                       L"Tryb dowolny", L"Modo livre", L"Свободный режим", L"自由模式",
+                       L"自由模式", L"الوضع الحر" },
 
     [MT_CUE_HEALTH] = { L"体力", L"health", L"santé", L"salute", L"Lebensenergie", L"salud", L"salud",
                         L"체력", L"zdrowie", L"vida", L"здоровье", L"體力", L"体力", L"الصحة" },

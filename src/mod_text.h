@@ -47,6 +47,7 @@ typedef enum {
     MT_ORDER,          /* "{0} {1}": fighter, place */
     MT_FIRST, MT_SECOND, MT_THIRD, MT_FOURTH,
     MT_YOU,
+    MT_STORY_MODE, MT_FREE_MODE,   /* Project Justice's first menu */
     /* Audio cue volume keys. */
     MT_CUE_HEALTH, MT_CUE_SUPER, MT_CUE_BEACONS, MT_CUE_TICK,
     MT_MUTED,          /* "{0} muted"             */
