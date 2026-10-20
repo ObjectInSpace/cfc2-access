@@ -1,0 +1,8 @@
+Versus character select: initial highlights; press F9
+Versus character select: move player 1 right once; press F9
+Versus character select: move player 2 right once if available; press F9
+First screen after confirming both characters; press F9
+Stage select if offered, otherwise the first fight; press F9
+Versus fight with both fighters standing; press F9
+Versus fight after the fighters exchange sides; press F9
+Versus result screen; press F9

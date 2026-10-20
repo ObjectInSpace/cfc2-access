@@ -5,6 +5,7 @@
 #include "audio.h"
 #include "mjus_text.h"
 #include "mjus_story.h"
+#include "render_project.h"
 #include "log.h"
 
 #include "../libs/minhook/include/MinHook.h"
@@ -57,18 +58,7 @@ static uint32_t u32(const unsigned char *s, unsigned off) { uint32_t v; memcpy(&
  * not look like a perspective camera or the point is behind it. */
 BOOL mjus_project_x(const float cam[32], const float pt[3], float *ndc_x)
 {
-    const float *v = cam, *pr = cam + 16;
-    float e[4], c0, c3;
-    /* Perspective: w comes from -z ([2][3] = -1), nothing else feeds w. */
-    if (pr[11] != -1.0f || pr[3] != 0.0f || pr[7] != 0.0f || pr[15] != 0.0f || !(pr[0] > 0.0f))
-        return FALSE;
-    for (int c = 0; c < 4; c++)
-        e[c] = pt[0] * v[c] + pt[1] * v[4 + c] + pt[2] * v[8 + c] + v[12 + c];
-    c0 = e[0] * pr[0] + e[1] * pr[4] + e[2] * pr[8] + e[3] * pr[12];
-    c3 = e[0] * pr[3] + e[1] * pr[7] + e[2] * pr[11] + e[3] * pr[15];
-    if (!isfinite(c0) || !isfinite(c3) || c3 <= 1e-3f) return FALSE;
-    *ndc_x = c0 / c3;
-    return isfinite(*ndc_x);
+    return render_project_x(cam, pt, ndc_x) ? TRUE : FALSE;
 }
 
 void mjus_frame_decode(const unsigned char *s, const float cam[32], match_audio_sample *m)

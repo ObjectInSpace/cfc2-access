@@ -48,7 +48,8 @@ separation. The user asked for the game's own values, so it now projects.
   a constant perspective ([2][3] = -1); the viewport at 0x141C00210 maps
   -1..+1 to 0..640.
 - Each fighter's world position, fighter+0xD0 (three floats), projected
-  through them: the pan is clip.x / clip.w.
+  through them: the pan is clip.x / clip.w. The projection now lives in
+  `src/render_project.h`, shared with Plasma Sword (stg2-match-fields.md).
 - Check against the facing flag, which the game uses to swap the controls:
   both fighters land on screen in 914 of 918 samples, and their order
   agrees with the flag in 892 of 907. The disagreements cluster in the

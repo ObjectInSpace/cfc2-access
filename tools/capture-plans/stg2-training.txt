@@ -1,0 +1,11 @@
+Training character select: initial highlight; press F9
+Training character select: move right once; press F9
+Training opponent select: initial highlight; press F9
+Training opponent select: move right once; press F9
+Training stage select if offered, otherwise the first training screen; press F9
+Training: stand still for two seconds, then press F9
+Training: jump several times, then press F9
+Training: side step several times, then press F9
+Training: attack several times, then press F9
+Training options or pause menu; press F9
+Training resumed; press F9

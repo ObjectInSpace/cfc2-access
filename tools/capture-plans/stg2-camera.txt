@@ -1,0 +1,5 @@
+Round start, before moving; press F9
+Walk toward the opponent, then press F9
+Side step several times, then press F9
+Jump over the opponent if you can, then press F9
+Back yourself into a corner, then press F9

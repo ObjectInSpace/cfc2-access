@@ -1,0 +1,11 @@
+Arcade character select: initial highlight; press F9 before moving
+Arcade character select: move right once, wait one second, then press F9
+Arcade character select: move down once, wait one second, then press F9
+First screen after confirming a character; press F9
+First fight: wait for the round announcement, then press F9
+Fight: attack several times, then press F9
+Fight: jump several times, then press F9
+Fight: side step several times, then press F9
+Pause menu during the fight; press F9
+Fight resumed after closing pause; press F9
+Result or continue screen after the fight; press F9

@@ -22,3 +22,6 @@ riprefs.pkl
 .claude/
 !tools/fixtures/cvs2-quote-complete.bin
 !tools/fixtures/cvs2-credits-stream.bin
+# Raw capture traces (~37 MB each) stay local; the compact fixtures made
+# from them by tools/make_stg2_fixtures.py are committed.
+tools/fixtures/stg2-*/trace.bin.gz

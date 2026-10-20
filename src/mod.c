@@ -22,6 +22,7 @@
 #include "cfj_select.h"
 #include "z3u_select.h"
 #include "mjus_select.h"
+#include "stg2_select.h"
 #include "cvs2_hit.h"
 #include "audio.h"
 #include "cvs2_frame.h"
@@ -32,6 +33,7 @@
 #include "cfj_frame.h"
 #include "z3u_frame.h"
 #include "mjus_frame.h"
+#include "stg2_frame.h"
 #include "mjus_text.h"
 #include "mjus_story.h"
 #include "cvs2_story.h"
@@ -1779,6 +1781,7 @@ static DWORD WINAPI worker(LPVOID param)
             cfj_frame_install();
             z3u_frame_install();
             mjus_frame_install();
+            stg2_frame_install();
         }
     }
 
@@ -2065,6 +2068,7 @@ static DWORD WINAPI worker(LPVOID param)
             cfj_select_tick();
             z3u_select_tick();
             mjus_select_tick();
+            stg2_select_tick();
             mjus_story_tick();
             collection_probe_tick();
 
@@ -2079,6 +2083,7 @@ static DWORD WINAPI worker(LPVOID param)
             cfj_frame_log_stats();
             z3u_frame_log_stats();
             mjus_frame_log_stats();
+            stg2_frame_log_stats();
             cvs2_hit_poll_and_log();
 
             /* ⭐⭐⭐ THE MODAL CHECK RUNS AT 100 ms, NOT ON THE 2 s BEAT.

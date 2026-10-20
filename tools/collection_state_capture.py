@@ -63,6 +63,7 @@ OWN_HOOKS = {
     0x140DD92B0: bytes.fromhex('488bc44889'),   # z3u_frame.c (alternate attract text)
     0x140B93500: bytes.fromhex('48895c2408'),   # mjus_frame.c
     0x140B96130: bytes.fromhex('4c8bdc4989'),   # mjus_text.c (immediate text draw)
+    0x140CCCB60: bytes.fromhex('40534883ec'),   # stg2_frame.c
 }
 
 
