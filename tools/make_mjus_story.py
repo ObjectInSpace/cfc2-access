@@ -1,0 +1,167 @@
+"""Generate src/mjus_story_text.h from data/mjus_story/.
+
+Project Justice draws its story dialogue as pictures: one 128x128 cell per
+message in AFS entry 34 (Japanese) and 35 (English) of game_60.arc. The
+pictures were transcribed by hand into data/mjus_story/{en,ja}.tsv, one line
+per cell, keyed "SS.CC" (scene ID, message index):
+
+    SS.CC<TAB>text            text, with {} where the game overlays a word
+    SS.CC<TAB>#WORDS<TAB>a|b  the scene's words cell (never shown alone)
+    SS.CC<TAB>#GLYPH<TAB>x    a lone icon cell (never shown alone)
+
+fills.tsv supplies each {} in order ("lang<TAB>SS.CC<TAB>w1|w2"). The fills
+were read off the word pieces the game itself overlays (per-scene struct
++0x20, see docs/port-tasks/mjus-text.md), not guessed.
+
+Run:  python tools/make_mjus_story.py   (also --check: fail if stale)
+"""
+import os
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA = os.path.join(ROOT, 'data', 'mjus_story')
+OUT = os.path.join(ROOT, 'src', 'mjus_story_text.h')
+
+
+def load(lang):
+    rows = {}
+    with open(os.path.join(DATA, lang + '.tsv'), encoding='utf-8') as f:
+        for n, line in enumerate(f, 1):
+            line = line.rstrip('\n')
+            if not line:
+                continue
+            key, text = line.split('\t', 1)
+            sc, msg = key.split('.')
+            k = (int(sc), int(msg))
+            if not (0 <= k[0] < 100 and 0 <= k[1] < 256) or len(key) != 5:
+                raise SystemExit('%s.tsv:%d bad key %r' % (lang, n, key))
+            if k in rows:
+                raise SystemExit('%s.tsv:%d duplicate %s' % (lang, n, key))
+            rows[k] = text
+    return rows
+
+
+def load_fills():
+    fills = {}
+    with open(os.path.join(DATA, 'fills.tsv'), encoding='utf-8') as f:
+        for line in f:
+            line = line.rstrip('\n')
+            if line:
+                lang, key, words = line.split('\t')
+                sc, msg = key.split('.')
+                fills[(lang, int(sc), int(msg))] = words.split('|')
+    return fills
+
+
+def resolve(lang, rows, fills):
+    out = {}
+    used = set()
+    for k, text in sorted(rows.items()):
+        if text.startswith('#'):
+            continue                      # words cell / icon: never spoken alone
+        holes = text.count('{}')
+        words = fills.get((lang,) + k)
+        if holes or words:
+            if not words or len(words) != holes:
+                raise SystemExit('%s %02d.%02d: %d blanks, fills %r' % (lang, k[0], k[1], holes, words))
+            for w in words:
+                text = text.replace('{}', w, 1)
+            used.add(k)
+        if '{' in text or '}' in text or '\t' in text:
+            raise SystemExit('%s %02d.%02d: stray markup in %r' % (lang, k[0], k[1], text))
+        out[k] = text
+    stale = [k for (L, *k) in fills if L == lang and tuple(k) not in used]
+    if stale:
+        raise SystemExit('%s: fills for messages without blanks: %r' % (lang, stale))
+    return out
+
+
+def c_wide(s):
+    """L"..." pieces; non-ASCII as \\x escapes, each closed so a following hex
+    digit cannot extend it."""
+    parts, run = [], ''
+    for ch in s:
+        o = ord(ch)
+        if 0x20 <= o < 0x7f and ch not in '"\\?':
+            run += ch
+        else:
+            if run:
+                parts.append('L"%s"' % run)
+                run = ''
+            parts.append('L"\\x%x"' % o)
+    if run:
+        parts.append('L"%s"' % run)
+    return ' '.join(parts) if parts else 'L""'
+
+
+def table(name, lines):
+    body = ['static const mjus_story_line %s[] = {' % name]
+    for (sc, msg), text in sorted(lines.items()):
+        body.append('    { 0x%02x%02x, %s },' % (sc, msg, c_wide(text)))
+    body.append('};')
+    return '\n'.join(body)
+
+
+def load_narration(lang):
+    """nar_<lang>.tsv: P00..P14, one narration screen per line (AFS entry 27
+    English / 26 Japanese; a screen is two 256x256 pictures side by side)."""
+    pages = {}
+    with open(os.path.join(DATA, 'nar_%s.tsv' % lang), encoding='utf-8') as f:
+        for line in f:
+            line = line.rstrip('\n')
+            if line:
+                key, text = line.split('\t', 1)
+                pages[int(key[1:])] = text
+    if sorted(pages) != list(range(15)):
+        raise SystemExit('nar_%s.tsv: want pages P00..P14, have %r' % (lang, sorted(pages)))
+    return [pages[i] for i in range(15)]
+
+
+def check_lengths(name, texts):
+    for t in texts:
+        if len(t) >= 511:                 # TC_LINE_CAP 512 wchars incl. NUL
+            raise SystemExit('%s: a line of %d characters exceeds TC_LINE_CAP' % (name, len(t)))
+
+
+def generate():
+    fills = load_fills()
+    en = resolve('en', load('en'), fills)
+    ja = resolve('ja', load('ja'), fills)
+    nar_en, nar_ja = load_narration('en'), load_narration('ja')
+    for name, texts in (('en', en.values()), ('ja', ja.values()), ('nar_en', nar_en), ('nar_ja', nar_ja)):
+        check_lengths(name, texts)
+    return '\n'.join([
+        '/* Generated by tools/make_mjus_story.py from data/mjus_story/ -- do not',
+        ' * edit. Project Justice story dialogue, transcribed from the pictures the',
+        ' * game draws, keyed (scene ID << 8) | message index, sorted by key. */',
+        '#ifndef CFC2_MJUS_STORY_TEXT_H',
+        '#define CFC2_MJUS_STORY_TEXT_H',
+        '#include <wchar.h>',
+        'typedef struct { unsigned short key; const wchar_t *text; } mjus_story_line;',
+        '#define MJUS_STORY_EN_COUNT %d' % len(en),
+        '#define MJUS_STORY_JA_COUNT %d' % len(ja),
+        table('mjus_story_en', en),
+        table('mjus_story_ja', ja),
+        '/* Story-intro narration screens P00..P14 (see mjus_story.h). */',
+        '#define MJUS_NARRATION_PAGES 15',
+        'static const wchar_t *const mjus_narration_en[MJUS_NARRATION_PAGES] = {',
+        ] + ['    %s,' % c_wide(t) for t in nar_en] + [
+        '};',
+        'static const wchar_t *const mjus_narration_ja[MJUS_NARRATION_PAGES] = {',
+        ] + ['    %s,' % c_wide(t) for t in nar_ja] + [
+        '};',
+        '#endif',
+        ''])
+
+
+if __name__ == '__main__':
+    text = generate()
+    if '--check' in sys.argv:
+        cur = open(OUT, encoding='utf-8').read() if os.path.exists(OUT) else ''
+        if cur != text:
+            raise SystemExit('src/mjus_story_text.h is stale: run tools/make_mjus_story.py')
+        print('mjus_story_text.h is current')
+    else:
+        with open(OUT, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(text)
+        print('wrote', OUT)

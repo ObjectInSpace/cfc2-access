@@ -33,6 +33,21 @@ CASES = [
     ('src/mjus_frame.c', 'if (y > 0.0f) {', 'if (y > 1e9f) {', 'run_mjus_frame_test.ps1', 'jump pitch removed'),
     ('src/mjus_text.c', "if (c == '\\\\') continue;", ';', 'run_mjus_text_test.ps1', 'copyright glyph spoken'),
     ('src/game_text.c', 'else if (!wcsncmp(t, L"(S)", 3)) t += 3;', ';', 'run_game_text_test.ps1', 'CREDIT(S) narrated'),
+    ('src/mjus_story.c', 'v->japanese = root[MJUS_STORY_LANG_OFF] == 0;', 'v->japanese = root[MJUS_STORY_LANG_OFF] != 0;', 'run_mjus_story_test.ps1', 'story language inverted'),
+    ('src/mjus_story.c', 'state == 1 && sane ?', 'sane ?', 'run_mjus_story_test.ps1', 'story shown gate removed'),
+    ('src/mjus_story.c', 'if (v->shown[side] == MJUS_STORY_NONE && !v->closing[side])', 'if (v->shown[side] == MJUS_STORY_NONE)', 'run_mjus_story_test.ps1', 'closing record forgotten'),
+    ('src/mjus_story.c', '            e->last[side] = MJUS_STORY_NONE;', '            ;', 'run_mjus_story_test.ps1', 'story never re-arms'),
+    ('src/mjus_story.c', 'if (t[mid].key < key) lo = mid + 1;', 'if (t[mid].key > key) lo = mid + 1;', 'run_mjus_story_test.ps1', 'story lookup search inverted'),
+    ('src/mjus_story.c', 'pages[n++] = 2 * school + 1;', 'pages[n++] = 2 * school;', 'run_mjus_story_test.ps1', 'narration pages shifted'),
+    ('src/mjus_story.c', 'if (school < 6) pages[n++] = 0;', 'pages[n++] = 0;', 'run_mjus_story_test.ps1', 'Darkside given the shared opening'),
+    ('src/mjus_story.c', 'if (t[7] == MJUS_STORY_PART_INTRO && t[8] >= 1)', 'if (t[8] >= 1)', 'run_mjus_story_test.ps1', 'intro part gate removed'),
+    ('src/mjus_story.c', 'if (t[7] == MJUS_STORY_PART_INTRO && t[8] >= 1)', 'if (t[7] == MJUS_STORY_PART_INTRO)', 'run_mjus_story_test.ps1', 'intro step gate removed'),
+    ('src/mjus_story.c', 'return japanese ? mjus_narration_ja[page] : mjus_narration_en[page];', 'return japanese ? mjus_narration_en[page] : mjus_narration_ja[page];', 'run_mjus_story_test.ps1', 'narration language swapped'),
+    ('src/mjus_story.c', 'if (!(t[0] | t[1]) || t[5] != MJUS_STORY_ROUTINE) continue;', 'if (t[5] != MJUS_STORY_ROUTINE) continue;', 'run_mjus_story_test.ps1', 'dead task read as the intro'),
+    ('src/mjus_story.h', '#define MJUS_STORY_MESSAGE    0x2C', '#define MJUS_STORY_MESSAGE    0x28', 'run_mjus_story_test.ps1', 'message read from the position argument'),
+    ('src/mjus_story.h', '#define MJUS_STORY_SCENE_OFF  0x2259', '#define MJUS_STORY_SCENE_OFF  0x2258', 'run_mjus_story_test.ps1', 'wrong scene offset'),
+    ('src/mjus_story.h', '#define MJUS_STORY_REC_STRIDE 0x5C', '#define MJUS_STORY_REC_STRIDE 0x60', 'run_mjus_story_test.ps1', 'wrong side stride'),
+    ('data/mjus_story/fills.tsv', 'ja	08.07	アンコクセイトカイ', 'ja	08.07	暗黒生徒会', 'run_mjus_story_test.ps1', 'fill edited without regenerating'),
 ]
 
 

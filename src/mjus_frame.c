@@ -4,6 +4,7 @@
 #include "mjus_frame.h"
 #include "audio.h"
 #include "mjus_text.h"
+#include "mjus_story.h"
 #include "log.h"
 
 #include "../libs/minhook/include/MinHook.h"
@@ -146,6 +147,10 @@ static void frame_detour(void)
     g_real_frame();
     /* The update has drawn this frame's text: publish it now. */
     mjus_text_capture();
+    /* And run its scene script: queue a story line that just appeared. Not
+     * gated on the audio epoch -- story scenes are not matches -- only on the
+     * root, which this hook (MJUS's own update) runs inside. */
+    mjus_story_frame(*(volatile ULONGLONG *)(ULONG_PTR)ROOT_PTR);
 }
 
 static BOOL beside_exe(const char *leaf)

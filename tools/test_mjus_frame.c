@@ -17,6 +17,7 @@ MH_STATUS WINAPI MH_DisableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
 void mjus_text_capture(void) {}
 BOOL mjus_text_install(void) { return FALSE; }
 void mjus_text_remove(void) {}
+void mjus_story_frame(ULONGLONG root) { (void)root; }
 
 #define F(p) (0x3B48u + (p) * 0x608u)
 #define PER_FIGHTER (12 + 2 + 1 + 2)

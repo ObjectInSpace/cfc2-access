@@ -1,0 +1,4 @@
+06.02	first word read as 血相; could be 愚問 (12-pixel glyphs)
+79.08/79.10: Mugen spelled 夢幻; second glyph 幻 is clear, first glyph (夢 or 無) is blurred.
+90.03: read as 主な素体たち; first two glyphs blurred (主な or また).
+Blank fills verified against the word pieces the game overlays (table at struct+0x20, source rect in half-pixels of the words cell). 93.04 en: the piece repeats "the" after a drawn "by the"; spoken once.

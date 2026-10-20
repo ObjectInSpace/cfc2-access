@@ -33,6 +33,7 @@
 #include "z3u_frame.h"
 #include "mjus_frame.h"
 #include "mjus_text.h"
+#include "mjus_story.h"
 #include "cvs2_story.h"
 #include "cvs2_text.h"
 #include "text_channel.h"
@@ -1729,6 +1730,8 @@ static DWORD WINAPI worker(LPVOID param)
     if (unpacked && hook_enabled) cvs1_text_register();
     if (unpacked && hook_enabled) cfj_text_register();
     if (unpacked && hook_enabled) z3u_text_register();
+    /* The story source first: during dialogue it is the line on screen; outside it is inactive. */
+    if (unpacked && hook_enabled) mjus_story_register();
     if (unpacked && hook_enabled) mjus_text_register();
     if (unpacked && hook_enabled) {
         if (opt_in_file_present("cfc2_lifetime_probe.on")) collection_probe_install_lifetime();
@@ -2062,6 +2065,7 @@ static DWORD WINAPI worker(LPVOID param)
             cfj_select_tick();
             z3u_select_tick();
             mjus_select_tick();
+            mjus_story_tick();
             collection_probe_tick();
 
             /* ⚠ AFTER cvs2_select_tick(), not beside the keypress. That tick is
