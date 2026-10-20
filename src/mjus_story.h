@@ -39,6 +39,12 @@
 #define MJUS_STORY_REC_STRIDE 0x5C
 #define MJUS_STORY_STATE      0x24
 #define MJUS_STORY_MESSAGE    0x2C
+/* Speaker: in each message record, +0x04 is a byte per portrait slot (0x10
+ * = in front, 0xFF = empty) and +0x0C the slots front to back (opcodes 1, 3,
+ * 7, 10 at 0x140C36885.. keep both). The front slot is the speaker; its
+ * character comes from the scene's cast (data/mjus_story/cast.tsv). */
+#define MJUS_STORY_SLOTS      0x04
+#define MJUS_STORY_ORDER      0x0C
 #define MJUS_STORY_SCHOOL_OFF 0x2238
 #define MJUS_STORY_TASKS      0x93F30
 #define MJUS_STORY_TASK_COUNT 16
@@ -56,6 +62,7 @@
 typedef struct {
     int shown[2];
     int closing[2];     /* the record says "closing": keep, do not repeat */
+    int speaker[2];     /* character ID in front on that side, or MJUS_STORY_NONE */
     BOOL japanese;
     int intro_school;
 } mjus_story_view;
@@ -65,6 +72,13 @@ void mjus_story_read(const unsigned char *root, mjus_story_view *v);
 /* The transcribed line for a key, or NULL (an untranscribed key, or a key
  * whose picture holds no words). */
 const wchar_t *mjus_story_lookup(int key, BOOL japanese);
+
+/* A character's name in the pictures' language, or NULL. */
+const wchar_t *mjus_speaker_name(int id, BOOL japanese);
+/* "Speaker: line" (Japanese "話者：台詞"), or the line alone when the speaker
+ * is unknown. FALSE when there is nothing to say (no transcription, or a
+ * wordless picture). */
+BOOL mjus_story_compose(int key, int speaker, BOOL japanese, wchar_t *out, size_t cap);
 
 /* The narration screens a school's intro shows, in order; returns how many
  * (0 for an unknown school). */

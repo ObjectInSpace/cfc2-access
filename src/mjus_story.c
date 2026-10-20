@@ -22,8 +22,13 @@ void mjus_story_read(const unsigned char *root, mjus_story_view *v)
         int state = rd32(rec + MJUS_STORY_STATE);
         int msg = rd32(rec + MJUS_STORY_MESSAGE);
         BOOL sane = msg >= 0 && msg < 256;
+        int front = rec[MJUS_STORY_ORDER];
         v->shown[side] = state == 1 && sane ? scene << 8 | msg : MJUS_STORY_NONE;
         v->closing[side] = state == 2;
+        v->speaker[side] = MJUS_STORY_NONE;
+        if (scene < 100 && front < 8 && (rec[MJUS_STORY_SLOTS + front] & 0x10) &&
+            rec[MJUS_STORY_SLOTS + front] != 0xFF && mjus_cast[scene][side][front] != 0xFF)
+            v->speaker[side] = mjus_cast[scene][side][front];
     }
     v->intro_school = MJUS_STORY_NONE;
     for (int i = 0; i < MJUS_STORY_TASK_COUNT; i++) {
@@ -34,6 +39,34 @@ void mjus_story_read(const unsigned char *root, mjus_story_view *v)
             v->intro_school = root[MJUS_STORY_SCHOOL_OFF];
         break;
     }
+}
+
+const wchar_t *mjus_speaker_name(int id, BOOL japanese)
+{
+    if (id < 0 || id >= MJUS_SPEAKER_IDS) return NULL;
+    return japanese ? mjus_speaker_ja[id] : mjus_speaker_en[id];
+}
+
+BOOL mjus_story_compose(int key, int speaker, BOOL japanese, wchar_t *out, size_t cap)
+{
+    const wchar_t *text = mjus_story_lookup(key, japanese);
+    const wchar_t *name = mjus_speaker_name(speaker, japanese);
+    size_t n = 0, tlen, nlen;
+    if (!out || cap == 0) return FALSE;
+    out[0] = 0;
+    /* A wordless picture ("......") is a pause, not a line. */
+    if (!text || !tc_has_letters(text)) return FALSE;
+    tlen = wcslen(text);
+    nlen = name ? wcslen(name) : 0;
+    if (nlen && nlen + 2 + tlen < cap) {
+        memcpy(out, name, nlen * sizeof *out);
+        n = nlen;
+        if (japanese) out[n++] = 0xFF1A;          /* fullwidth colon */
+        else { out[n++] = L':'; out[n++] = L' '; }
+    }
+    if (n + tlen >= cap) return FALSE;
+    memcpy(out + n, text, (tlen + 1) * sizeof *out);
+    return TRUE;
 }
 
 int mjus_narration_pages(int school, int pages[3])
@@ -106,6 +139,7 @@ static mjus_story_edges g_edges = { { MJUS_STORY_NONE, MJUS_STORY_NONE } };
 static ULONGLONG g_root;
 /* For the ` key: what the last frame showed, and when. */
 static volatile LONG g_shown[2] = { MJUS_STORY_NONE, MJUS_STORY_NONE };
+static volatile LONG g_speaker[2] = { MJUS_STORY_NONE, MJUS_STORY_NONE };
 static volatile LONG g_japanese;
 static volatile LONG g_intro = MJUS_STORY_NONE;
 static volatile LONG64 g_seen_at;
@@ -134,11 +168,11 @@ void mjus_story_frame(ULONGLONG root)
     }
     n = mjus_story_new(&g_edges, &v, keys, sides);
     for (int i = 0; i < n; i++) {
-        const wchar_t *text = mjus_story_lookup(keys[i], v.japanese);
-        if (!text) {
+        wchar_t line[TC_LINE_CAP];
+        if (!mjus_story_lookup(keys[i], v.japanese)) {
             InterlockedIncrement(&g_missing);       /* counted; logged by the worker */
-        } else if (tc_has_letters(text)) {
-            if (!tc_queue_push(&g_queue, text)) {   /* busy or full: retry next frame */
+        } else if (mjus_story_compose(keys[i], v.speaker[sides[i]], v.japanese, line, TC_LINE_CAP)) {
+            if (!tc_queue_push(&g_queue, line)) {   /* busy or full: retry next frame */
                 InterlockedIncrement(&g_full);
                 continue;
             }
@@ -150,6 +184,8 @@ void mjus_story_frame(ULONGLONG root)
     mjus_story_settle(&g_edges, &v);
     InterlockedExchange(&g_shown[0], v.shown[0]);
     InterlockedExchange(&g_shown[1], v.shown[1]);
+    InterlockedExchange(&g_speaker[0], v.speaker[0]);
+    InterlockedExchange(&g_speaker[1], v.speaker[1]);
     InterlockedExchange(&g_japanese, v.japanese);
     InterlockedExchange(&g_intro, v.intro_school);
     InterlockedExchange64(&g_seen_at, (LONG64)GetTickCount64());
@@ -215,9 +251,11 @@ static tc_read_result read_current(void)
         }
     }
     for (int side = 0; side < 2; side++) {
-        const wchar_t *t = mjus_story_lookup(InterlockedCompareExchange(&g_shown[side], 0, 0), japanese);
+        wchar_t t[TC_LINE_CAP];
         size_t n;
-        if (!t || !tc_has_letters(t)) continue;
+        if (!mjus_story_compose(InterlockedCompareExchange(&g_shown[side], 0, 0),
+                                InterlockedCompareExchange(&g_speaker[side], 0, 0),
+                                japanese, t, TC_LINE_CAP)) continue;
         n = wcslen(t);
         if (len + n + 2 >= TC_SAY_CAP) break;
         if (len) out[len++] = L' ';

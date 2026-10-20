@@ -23,6 +23,8 @@ static void set_rec(int side, int state, int msg)
     memcpy(r + 0x2C, &msg, 4);
 }
 
+static int last_speaker[2];
+
 /* Feeds one frame; commits every new line (an accepting queue). */
 static int step(mjus_story_edges *e, int out[2])
 {
@@ -30,7 +32,11 @@ static int step(mjus_story_edges *e, int out[2])
     int keys[2], sides[2], n;
     mjus_story_read(root, &v);
     n = mjus_story_new(e, &v, keys, sides);
-    for (int i = 0; i < n; i++) { out[i] = keys[i]; mjus_story_commit(e, &v, sides[i]); }
+    for (int i = 0; i < n; i++) {
+        out[i] = keys[i];
+        last_speaker[i] = v.speaker[sides[i]];
+        mjus_story_commit(e, &v, sides[i]);
+    }
     mjus_story_settle(e, &v);
     return n;
 }
@@ -39,6 +45,11 @@ static void case_replay(void)
 {
     static const int want1[] = { 0x2600, 0x2601, 0x2602, 0x2603, 0x2604 };
     static const int want3[] = { 0x4300, 0x4301, 0x4302, 0x4303, 0x4304, 0x4305, 0x4306, 0x4307 };
+    /* Who speaks each line, read off the dialogue itself: Zaki answers Yurika
+     * and Akira; Hinata, Batsu and Kyosuke meet Kurow and the roaring Daigo. */
+    static const int who1[] = { 0x16, 0x18, 0x16, 0x10, 0x16 };
+    static const int who3[] = { 0x01, 0x00, 0x02, 0x0E, 0x00, 0x0E, 0x01, 0x1B };
+    int spk[2][16];
     int got[2][16], ngot[2] = { 0, 0 }, cap = -1, lang_ok = 1, missing = 0;
     int intros[4][2], nintro = 0, intro = MJUS_STORY_NONE;
     unsigned count;
@@ -78,7 +89,10 @@ static void case_replay(void)
         n = step(&e, out);
         which = cap == 1 ? 0 : 1;
         for (int k = 0; k < n; k++) {
-            if (ngot[which] < 16) got[which][ngot[which]++] = out[k];
+            if (ngot[which] < 16) {
+                spk[which][ngot[which]] = last_speaker[k];
+                got[which][ngot[which]++] = out[k];
+            }
             if (!mjus_story_lookup(out[k], FALSE) || !mjus_story_lookup(out[k], TRUE)) missing++;
         }
         if (rec[5] == 0) lang_ok = 0;            /* both captures are English */
@@ -88,9 +102,53 @@ static void case_replay(void)
     CHECK(missing == 0, "%d shown line(s) without a transcription", missing);
     CHECK(ngot[0] == 5 && !memcmp(got[0], want1, sizeof want1), "scene 38: %d lines, first %#x", ngot[0], ngot[0] ? got[0][0] : -1);
     CHECK(ngot[1] == 8 && !memcmp(got[1], want3, sizeof want3), "scene 67: %d lines, first %#x", ngot[1], ngot[1] ? got[1][0] : -1);
+    for (int k = 0; k < 5 && k < ngot[0]; k++)
+        CHECK(spk[0][k] == who1[k], "38.%02d spoken by %#x, want %#x", k, spk[0][k], who1[k]);
+    for (int k = 0; k < 8 && k < ngot[1]; k++)
+        CHECK(spk[1][k] == who3[k], "67.%02d spoken by %#x, want %#x", k, spk[1][k], who3[k]);
     /* Each capture opens one intro: Seijyun (5) in mjus-1, Taiyo (0) in mjus-3. */
     CHECK(nintro == 2 && intros[0][0] == 1 && intros[0][1] == 5 && intros[1][0] == 3 && intros[1][1] == 0,
           "intros: %d, first cap %d school %d", nintro, nintro ? intros[0][0] : -1, nintro ? intros[0][1] : -1);
+}
+
+static void case_compose(void)
+{
+    wchar_t out[512];
+    CHECK(mjus_story_compose(0x4303, 0x0E, FALSE, out, 512) &&
+          !wcscmp(out, L"Kurow: Greetings, Batsu Ichimonji and Kyosuke Kagami."), "English speaker");
+    CHECK(mjus_story_compose(0x4303, 0x0E, TRUE, out, 512) &&
+          !wcsncmp(out, L"\x4e5d\x90ce\xff1a", 3), "Japanese speaker, fullwidth colon");
+    CHECK(mjus_story_compose(0x4307, 0x1B, FALSE, out, 512) && !wcsncmp(out, L"Daigo: ", 7), "a variant speaks as the character");
+    CHECK(mjus_story_compose(0x4303, MJUS_STORY_NONE, FALSE, out, 512) &&
+          !wcscmp(out, L"Greetings, Batsu Ichimonji and Kyosuke Kagami."), "unknown speaker: the line alone");
+    CHECK(!mjus_story_compose(0x0302, 0x08, FALSE, out, 512) && out[0] == 0, "a wordless picture says nothing");
+    CHECK(!mjus_story_compose(0x6400, 0x00, FALSE, out, 512), "no transcription");
+    CHECK(!mjus_story_compose(0x4303, 0x0E, FALSE, out, 10), "too small a buffer");
+    CHECK(!mjus_speaker_name(29, FALSE) && !mjus_speaker_name(-1, TRUE), "speaker out of range");
+    /* The front slot must carry the front flag: a record mid-reorder or an
+     * empty slot names nobody rather than the wrong character. */
+    {
+        mjus_story_view v;
+        unsigned char *r = root + 0x2600;
+        memset(root, 0, sizeof root);
+        root[0x2259] = 67;
+        set_rec(0, 1, 0);
+        memset(r + 0x04, 0xFF, 8);
+        memset(r + 0x0C, 0xFF, 8);
+        r[0x0C] = 1; r[0x0D] = 0;
+        r[0x04 + 1] = 0x10; r[0x04 + 0] = 0x01;
+        mjus_story_read(root, &v);
+        CHECK(v.speaker[0] == 0x01, "front slot 1 is Hinata: %#x", v.speaker[0]);
+        r[0x04 + 1] = 0x01;
+        mjus_story_read(root, &v);
+        CHECK(v.speaker[0] == MJUS_STORY_NONE, "no front flag, no speaker: %#x", v.speaker[0]);
+        r[0x04 + 1] = 0xFF;
+        mjus_story_read(root, &v);
+        CHECK(v.speaker[0] == MJUS_STORY_NONE, "an empty slot names nobody");
+        r[0x04 + 1] = 0x10; r[0x0C] = 5;
+        mjus_story_read(root, &v);
+        CHECK(v.speaker[0] == MJUS_STORY_NONE, "a slot outside the cast names nobody");
+    }
 }
 
 static void case_narration(void)
@@ -205,6 +263,7 @@ int main(void)
     case_replay();
     case_lookup();
     case_narration();
+    case_compose();
     case_language();
     case_edges();
     if (failures) { printf("mjus story: %d FAILED\n", failures); return 1; }

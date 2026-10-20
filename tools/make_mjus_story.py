@@ -15,6 +15,7 @@ were read off the word pieces the game itself overlays (per-scene struct
 
 Run:  python tools/make_mjus_story.py   (also --check: fail if stale)
 """
+import json
 import os
 import sys
 
@@ -117,6 +118,46 @@ def load_narration(lang):
     return [pages[i] for i in range(15)]
 
 
+# Speaker names: native cast ID (shell ID - 1) -> the collection's own
+# STATS_MJUS_NN_NAME label, in English and Japanese. Costume variants speak
+# as the character (Powered Akira, Burning Batsu, Demon Hyo, Wild Daigo).
+# Vatsu (0x1C) is Kurow's Batsu disguise; until he unmasks, a sighted player
+# sees Batsu, so it is spoken as Batsu rather than giving the twist away.
+SPEAKER = {
+    0x00: 1, 0x01: 2, 0x02: 3, 0x03: 9, 0x04: 10, 0x05: 11, 0x06: 23, 0x07: 24,
+    0x08: 22, 0x09: 15, 0x0A: 19, 0x0B: 16, 0x0C: 25, 0x0D: 26, 0x0E: 27, 0x0F: 28,
+    0x10: 19, 0x11: 4, 0x12: 14, 0x13: 6, 0x14: 5, 0x15: 13, 0x16: 20, 0x17: 12,
+    0x18: 21, 0x19: 1, 0x1A: 28, 0x1B: 14, 0x1C: 1,
+}
+
+
+def load_speakers():
+    out = {}
+    for lang, f in (('en', 'text_english.json'), ('ja', 'text_japanese.json')):
+        with open(os.path.join(ROOT, 'data', f), encoding='utf-8') as fh:
+            text = json.load(fh)
+        out[lang] = [text['STATS_MJUS_%02d_NAME' % SPEAKER[i]] for i in range(len(SPEAKER))]
+    return out
+
+
+def load_cast():
+    """cast.tsv (tools/extract_mjus_cast.py): per scene, each side's slots."""
+    cast = {}
+    with open(os.path.join(DATA, 'cast.tsv'), encoding='utf-8') as f:
+        for line in f:
+            line = line.rstrip('\n')
+            if line:
+                sc, s0, s1 = line.split('\t')
+                sides = [[int(x, 16) for x in s.split(',')] if s else [] for s in (s0, s1)]
+                for ids in sides:
+                    if len(ids) > 8 or any(i not in SPEAKER for i in ids):
+                        raise SystemExit('cast.tsv scene %s: unnamed or too many: %r' % (sc, ids))
+                cast[int(sc)] = sides
+    if sorted(cast) != list(range(100)):
+        raise SystemExit('cast.tsv: want scenes 0..99')
+    return cast
+
+
 def check_lengths(name, texts):
     for t in texts:
         if len(t) >= 511:                 # TC_LINE_CAP 512 wchars incl. NUL
@@ -128,6 +169,7 @@ def generate():
     en = resolve('en', load('en'), fills)
     ja = resolve('ja', load('ja'), fills)
     nar_en, nar_ja = load_narration('en'), load_narration('ja')
+    speakers, cast = load_speakers(), load_cast()
     for name, texts in (('en', en.values()), ('ja', ja.values()), ('nar_en', nar_en), ('nar_ja', nar_ja)):
         check_lengths(name, texts)
     return '\n'.join([
@@ -150,6 +192,20 @@ def generate():
         'static const wchar_t *const mjus_narration_ja[MJUS_NARRATION_PAGES] = {',
         ] + ['    %s,' % c_wide(t) for t in nar_ja] + [
         '};',
+        '/* Speakers: per scene and side, the character in each portrait slot',
+        ' * (0xFF none), and the name of each character ID. */',
+        '#define MJUS_SPEAKER_IDS %d' % len(SPEAKER),
+        'static const unsigned char mjus_cast[100][2][8] = {',
+        ] + ['    { %s },' % ', '.join(
+            '{ %s }' % ', '.join('0x%02x' % i for i in (side + [0xFF] * (8 - len(side))))
+            for side in cast[sc]) for sc in range(100)] + [
+        '};',
+        'static const wchar_t *const mjus_speaker_en[MJUS_SPEAKER_IDS] = {',
+        ] + ['    %s,' % c_wide(t) for t in speakers['en']] + [
+        '};',
+        'static const wchar_t *const mjus_speaker_ja[MJUS_SPEAKER_IDS] = {',
+        ] + ['    %s,' % c_wide(t) for t in speakers['ja']] + [
+        '};',
         '#endif',
         ''])
 
@@ -157,7 +213,8 @@ def generate():
 if __name__ == '__main__':
     text = generate()
     if '--check' in sys.argv:
-        cur = open(OUT, encoding='utf-8').read() if os.path.exists(OUT) else ''
+        # newline='' keeps CRLF, then normalise: git may check it out either way.
+        cur = open(OUT, encoding='utf-8', newline='').read().replace('\r\n', '\n') if os.path.exists(OUT) else ''
         if cur != text:
             raise SystemExit('src/mjus_story_text.h is stale: run tools/make_mjus_story.py')
         print('mjus_story_text.h is current')
