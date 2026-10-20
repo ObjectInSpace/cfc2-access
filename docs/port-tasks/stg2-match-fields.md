@@ -135,8 +135,12 @@ deployed; not yet heard in the game.
 
 ## Listening check
 
-Deployed 2026-10-20 with the projection build: `dinput8.dll` SHA-256
-`7bbcb0520e8d9f7ef3e4a3e6dfc963e371d275bcfbab7b8dc810ab0949e764d8`.
+✅ Confirmed by the user in the game, 2026-10-20, after v0.8.0: "I tested
+versus and training modes and they are okay." A general acceptance of
+Versus and Training, not a pass of each item below. Arcade was not named.
+
+Released as v0.8.0 (commit `a6f479f`): `dinput8.dll` SHA-256
+`aa16a06fbdc015e9864cec064dafeaf749a0293f616ca7bfc0bda8c13d2aacaf`.
 
 - The health tone falls as each side takes damage, with no sweep at a round
   start.

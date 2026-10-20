@@ -90,7 +90,11 @@ offline-tested and deployed; not yet heard in the game.
 
 ## Listening check
 
-Deployed 2026-10-20: `dinput8.dll` SHA-256 `7bbcb0520e8d9f7ef3e4a3e6dfc963e371d275bcfbab7b8dc810ab0949e764d8`.
+✅ Confirmed by the user in the game, 2026-10-20, after v0.8.0: "I tested
+versus and training modes and they are okay." A general acceptance of
+Versus and Training, not a pass of each item below. Arcade was not named.
+
+Released as v0.8.0 (commit `a6f479f`): `dinput8.dll` SHA-256 `aa16a06fbdc015e9864cec064dafeaf749a0293f616ca7bfc0bda8c13d2aacaf`.
 The build before Plasma Sword is kept as `build/deployment-backups/dinput8-5d172caf.dll`.
 
 - On Arcade character select, each cursor move speaks the highlighted name.
@@ -103,8 +107,8 @@ The build before Plasma Sword is kept as `build/deployment-backups/dinput8-5d172
 
 ## Not covered yet
 
-- A second human player (Versus). Side 1 reads its own fields by the same
-  code; no capture has shown it.
+- A second human player (Versus): accepted by ear (above), but no capture
+  has recorded it, so the replay test does not cover side 1 live.
 - The stage menu, sub-state 2: R+0x4E47C steps 0 to 7 with left and right.
   No capture and no names.
-- Training mode: not captured.
+- Training's select screen: accepted by ear (above); not captured.

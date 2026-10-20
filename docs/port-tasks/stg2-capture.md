@@ -6,11 +6,11 @@ move lists and EX Settings.
 Update 2026-10-20: the Arcade capture (`tools/fixtures/stg2-arcade-20261020`)
 and a Training capture with the renderer's context sampled beside it
 (`tools/fixtures/stg2-training-20261020`, plan `stg2-camera.txt`) are traced
-and implemented, built and deployed, awaiting a listening check:
+and implemented, released in v0.8.0 and accepted by the user in Versus and Training:
 - character select speech, [stg2-selection.md](stg2-selection.md);
 - match audio (health, plasma gauge, beacons, clock),
   [stg2-match-fields.md](stg2-match-fields.md).
-Still open: a Versus capture, Training's select screens, the stage menu,
+Still open: a Versus capture (for a side-1 replay test), the stage menu,
 crouch and side step, and all arcade text (story, quotes, endings,
 credits).
 
