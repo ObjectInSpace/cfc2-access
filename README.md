@@ -31,7 +31,7 @@ like it worked, but it ignores your configured voice, rate, punctuation level
 and braille display. The mod logs a warning when it detects this; see
 `CFC2Access.log` in the game directory if speech sounds wrong.
 
-## In-match audio (CVS2, CVS1, Capcom Fighting Evolution, Street Fighter Alpha 3)
+## In-match audio (CVS2, CVS1, Capcom Fighting Evolution, Street Fighter Alpha 3, Project Justice)
 
 Everything during a match is an audio cue; speech is used only on character
 select. Each player has a persistent beacon whose stereo position follows the
@@ -89,6 +89,17 @@ side is which.
   read in the Japanese version. This works with the game's **Additional
   Characters** setting on or off; with it on, Eagle, Maki, Yun and Ingrid are
   named on the select screen.
+- Project Justice in-game: the Story and Free menus, the school list,
+  character select and the story's teammate choice are spoken. Match audio
+  has the same health and position cues, with the guts gauge on the super
+  tone (five levels); there is no clock tick, since the game has its own
+  clock sounds. The beacons' stereo position comes from the game's own
+  camera, so it stays right as the camera moves. Story mode is read aloud in
+  English or Japanese: each school's opening narration, then every line of
+  dialogue with the speaker's name ("Kurow: Greetings, ..."). The game draws
+  this text as pictures, so all of it was transcribed from the game's own
+  data. Skipping the opening stops its narration. The coin and credit text
+  is spoken too.
 - CVS2 text: win quotes, story pages, credits and on-screen prompts are
   spoken, including the Japanese version's, and the **`` ` ``** key (the key
   left of 1) reads the current text again, in every supported game. In the
@@ -98,7 +109,7 @@ side is which.
   languages. Words the collection already translates are taken from its own
   text; the rest are the mod's translations, so please report any that read
   wrongly. Fighter, groove and stage names stay as the games name them.
-- The other four arcade games (PWS1, PWS2, MJUS, STG2): in progress, not yet
+- The other three arcade games (PWS1, PWS2, STG2): in progress, not yet
   playable with the mod. The plan for porting the CVS2 features to them is in
   `docs/collection-port-plan.md` in the repository.
 
@@ -108,4 +119,4 @@ Source, build script (`build.ps1`), and design docs are in the repository:
 https://github.com/ObjectInSpace/cfc2-access
 
 `.\build.ps1 -Deploy` builds and copies the mod into the game folder;
-`.\build.ps1 -Package 0.6.0` builds the release zip from a clean checkout.
+`.\build.ps1 -Package 0.7.0` builds the release zip from a clean checkout.
