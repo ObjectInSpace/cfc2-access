@@ -79,6 +79,11 @@ Japanese version.
   committed picks at R+0x255C..0x255E (0x1C Wild Daigo, 0x0A Edge, 0x01
   Batsu) equal the last highlight of each slot.
 - R+0x2029: bit 0 side 1 human, bit 1 side 2 (0x140C342E8, 0x140C34310).
+- Versus and Training use the same screen with +0x2A = 0xFF on both side
+  records (live, mjus-6, 2026-10-20). Both sides are human; each picks three
+  with the same slot and highlight fields, committed to R+0x255C (side 1)
+  and R+0x25DC (side 2). The first release accepted only 1, so these modes
+  were silent. Fixture `mjus-versus-20261020.bin`.
 - Names: `character_name(6, id, version)`, including the shell's remap of
   0x12 to 0 for the US version (Iincyo is "Chairperson" there).
 

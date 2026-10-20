@@ -60,7 +60,10 @@ int mjus_select_decode(const mjus_select_sample *s, unsigned side)
     /* R+0x2029 bit 0 = side 1, bit 1 = side 2 (0x140C342E8, 0x140C34310). */
     if (!s || side > 1 || !on_screen(s, 2) || !(s->humans >> side & 1)) return -1;
     r = s->sides[side];
-    if (r[0x2A] != 1) return -1;                 /* the school list, not free select */
+    /* +0x2A: 0 the story's school list, 1 Free select, 0xFF Versus and
+     * Training select (live, mjus-6: both sides, the same slot counter and
+     * highlight, committed to R+0x255C / R+0x25DC). */
+    if (r[0x2A] != 1 && r[0x2A] != 0xFF) return -1;
     /* Slot +0x17 counts picks (0x140C342EE bounds it at 3); the highlight
      * for the slot being picked is +0x18 + slot (0x140C342FC). The value is
      * the native character ID: the cursor starts on 1 Batsu, and three live

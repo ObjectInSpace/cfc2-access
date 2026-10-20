@@ -10,7 +10,8 @@ ROOT = Path(__file__).resolve().parent.parent
 CASES = [
     ('src/mjus_select.c', '!on_screen(s, 2) || !(s->humans >> side & 1)', '!on_screen(s, 2) || !(s->humans >> (side + 1) & 1)', 'run_mjus_select_test.ps1', 'human bits shifted'),
     ('src/mjus_select.c', 'id = r[0x18 + slot];', 'id = r[0x18];', 'run_mjus_select_test.ps1', 'slot ignored'),
-    ('src/mjus_select.c', "if (r[0x2A] != 1) return -1;", ';', 'run_mjus_select_test.ps1', 'free/story gate removed'),
+    ('src/mjus_select.c', "if (r[0x2A] != 1 && r[0x2A] != 0xFF) return -1;", ';', 'run_mjus_select_test.ps1', 'free/story gate removed'),
+    ('src/mjus_select.c', "if (r[0x2A] != 1 && r[0x2A] != 0xFF) return -1;", 'if (r[0x2A] != 1) return -1;', 'run_mjus_select_test.ps1', 'Versus and Training select silent'),
     ('src/mjus_select.c', 'return s->task_state == state && s->task_step == 1;', 'return s->task_state == state;', 'run_mjus_select_test.ps1', 'step gate removed'),
     ('src/mjus_select.c', 'L"Taiyo High School", L"Gorin High School"', 'L"Gorin High School", L"Taiyo High School"', 'run_mjus_select_test.ps1', 'school order swapped'),
     ('src/mjus_select.c', 'unsigned visit = s->sides[side][0x17];', 'unsigned visit = 0;', 'run_mjus_select_test.ps1', 'pick visit ignored'),

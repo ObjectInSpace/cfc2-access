@@ -90,7 +90,8 @@ side is which.
   Characters** setting on or off; with it on, Eagle, Maki, Yun and Ingrid are
   named on the select screen.
 - Project Justice in-game: the Story and Free menus, the school list,
-  character select and the story's teammate choice are spoken. Match audio
+  character select (Free, Versus and Training, both players) and the
+  story's teammate choice are spoken. Match audio
   has the same health and position cues, with the guts gauge on the super
   tone (five levels); there is no clock tick, since the game has its own
   clock sounds. The beacons' stereo position comes from the game's own

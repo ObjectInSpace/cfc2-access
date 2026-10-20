@@ -177,6 +177,57 @@ int main(void)
     assert(!strcmp(character_name(6, committed[0], 1), "Wild Daigo"));
     assert(!strcmp(character_name(6, committed[1], 1), "Edge"));
 
+    /* 2b. Versus, then Training (mjus-6). Side records +0x2A are 0xFF, both
+     *     sides are human and each picks three. Ground truth independent of
+     *     the decoder: each side's last highlight per slot is what the game
+     *     committed (R+0x255C, R+0x25DC). Both sides must be read. */
+    {
+        FILE *f = fopen("tools/fixtures/mjus-versus-20261020.bin", "rb");
+        BYTE magic[4], raw[1 + RECORD], commits[2][6];
+        unsigned n;
+        int vlast[2][2][3], vseen[2][2] = { { 0, 0 }, { 0, 0 } };
+        memset(vlast, 0xFF, sizeof vlast);
+        assert(f);
+        assert(fread(magic, 1, 4, f) == 4 && !memcmp(magic, "MJSV", 4));
+        assert(fread(&n, 4, 1, f) == 1 && n > 0 && n <= 1024);
+        for (unsigned i = 0; i < n; i++) {
+            mjus_select_sample v;
+            unsigned session;
+            assert(fread(raw, 1, sizeof raw, f) == sizeof raw);
+            session = raw[0];
+            assert(session < 2);
+            memset(&v, 0, sizeof v);
+            v.task_state = v.task_step = 0xFF;
+            for (unsigned t = 0; t < 16; t++) {
+                const BYTE *r = raw + 1 + t * TASK_BYTES;
+                if ((r[0] | r[1]) && r[2] == MJUS_SELECT_ROUTINE) { v.task_state = r[3]; v.task_step = r[4]; }
+            }
+            memcpy(v.menu, raw + 1 + 16 * TASK_BYTES, 3);
+            v.humans = raw[1 + 16 * TASK_BYTES + 3];
+            memcpy(v.sides[0], raw + 1 + 16 * TASK_BYTES + 4, 0x30);
+            memcpy(v.sides[1], raw + 1 + 16 * TASK_BYTES + 4 + 0x30, 0x30);
+            v.phase = raw[1 + BASE];
+            v.variant = 1;
+            assert(mjus_mode_decode(&v) == -1 && mjus_school_decode(&v) == -1);
+            for (unsigned side = 0; side < 2; side++) {
+                int id = mjus_select_decode(&v, side);
+                if (id < 0) continue;
+                vlast[session][side][v.sides[side][0x17]] = id;
+                vseen[session][side] |= 1 << v.sides[side][0x17];
+            }
+        }
+        assert(fread(commits, 1, sizeof commits, f) == sizeof commits);
+        assert(fgetc(f) == EOF);
+        fclose(f);
+        for (int s = 0; s < 2; s++)
+            for (int side = 0; side < 2; side++) {
+                assert(vseen[s][side] == 7);
+                for (int k = 0; k < 3; k++) assert(vlast[s][side][k] == commits[s][side * 3 + k]);
+            }
+        /* Versus: side 1 picked 0x10, 0x07, 0x0D; side 2 0x12, 0x05, 0x07. */
+        assert(commits[0][0] == 0x10 && commits[0][3] == 0x12);
+    }
+
     /* 3. Words: modes and schools follow the language; names by version. */
     {
         unsigned im = count, is = count, ic = count;

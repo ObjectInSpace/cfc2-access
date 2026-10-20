@@ -9,6 +9,8 @@ Sources (build/captures, not retained in the repository: 32 MB and 165 MB):
   continue decision.
 - mjus-1: Story mode, school 5, whose teammate choice offered Akira, Zaki and
   Yurika (Seijyun); the capture ends before a confirm.
+- mjus-6 (2026-10-20): Versus select, then Training select, both sides
+  picking three; side record +0x2A is 0xFF there (see build_versus).
 
 Outputs (tools/fixtures):
 - mjus-select-live-20261019.bin: 'MJSL', count, then one record per change
@@ -46,6 +48,7 @@ CAPS = HERE.parent / 'build' / 'captures'
 SELECT_OUT = HERE / 'fixtures' / 'mjus-select-live-20261019.bin'
 MATCH_OUT = HERE / 'fixtures' / 'mjus-match-frames-20261019.bin'
 CAMERA_OUT = HERE / 'fixtures' / 'mjus-camera-20261019.bin'
+VERSUS_OUT = HERE / 'fixtures' / 'mjus-versus-20261020.bin'
 TASKS, MENU, HUMANS, SIDE, SIDE_STRIDE = 0x93F30, 0x22F0, 0x2029, 0x2500, 0x80
 F, FSTEP = 0x3B48, 0x608
 TASK_BYTES = (0, 1, 5, 7, 8)   # state word, routine, screen state, step
@@ -91,6 +94,27 @@ def build_select():
                 last = rec
     return (b'MJSL' + struct.pack('<I', len(records)) + b''.join(records) + committed +
             teams['mjus-3'] + teams['mjus-4'])
+
+
+def build_versus():
+    """mjus-6 (2026-10-20): Versus select, then Training select, both sides
+    human, each side picking three. Records: session (u8: 0 Versus, 1
+    Training; a new root is a new session) + select_inputs. Trailer per
+    session: the game's commits, side 1 R+0x255C..E then side 2 R+0x25DC..E,
+    from the session's last sample."""
+    records, last, roots, commits = [], None, [], {}
+    for _rt, root, s in replay(CAPS / 'mjus-6'):
+        if root not in roots:
+            roots.append(root)
+        session = roots.index(root)
+        commits[session] = bytes(s[0x255C:0x255F]) + bytes(s[0x25DC:0x25DF])
+        rec = bytes((session,)) + select_inputs(s)
+        if rec != last:
+            records.append(rec)
+            last = rec
+    if len(roots) != 2:
+        sys.exit('mjus-6: expected two sessions, found %d' % len(roots))
+    return b'MJSV' + struct.pack('<I', len(records)) + b''.join(records) + commits[0] + commits[1]
 
 
 def match_inputs(s):
@@ -189,7 +213,8 @@ def main():
             print('Project Justice captures are not present; fixtures not re-derived.')
             return
         sys.exit('The source captures are not present under build/captures.')
-    outs = ((SELECT_OUT, build_select()), (MATCH_OUT, build_match()), (CAMERA_OUT, build_camera()))
+    outs = ((SELECT_OUT, build_select()), (MATCH_OUT, build_match()), (CAMERA_OUT, build_camera()),
+            (VERSUS_OUT, build_versus()))
     if args.check:
         stale = [str(p) for p, d in outs if not p.exists() or p.read_bytes() != d]
         if stale:
