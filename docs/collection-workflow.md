@@ -1,5 +1,14 @@
 # Astra investigation and Opus implementation workflow
 
+## Power Stone work started, 2026-10-22
+
+With six games supported, the user requested work on Power Stone 1 and 2.
+The first [camera acquisition increment](port-tasks/pws-camera-route.md)
+traces both games' stored views into the shared renderer and supplies an
+offline decoder and capture plans. Validate this simpler route before adding
+the older PWS2 draw diagnostic hooks. Neither Power Stone game is playable
+with the mod yet; fighter/selection acquisition and live evidence remain open.
+
 ## Current execution owner and sequence, 2026-10-13
 
 The [complete Opus execution plan](port-tasks/opus-shared-selection-execution.md) governs conflicting sequencing and
