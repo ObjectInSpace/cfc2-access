@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
+  "limitation": "Static health evidence; no runtime eligibility or universal mode coverage.",
+  "root_slot": "0x1423188c0",
+  "actor_base": "0x18428",
+  "actor_stride": "0x7890",
+  "health_offset": "0x7790",
+  "encoding": "signed little-endian int16",
+  "recovery_target_offset": "0x7792",
+  "trailing_display_offset": "0x7794",
+  "observed_refill_cap": 240,
+  "spans": [
+    {
+      "label": "damage-and-negative-floor",
+      "start": "0x1409be300",
+      "end_exclusive": "0x1409be82e",
+      "sha256": "8da46f11fe45b2e10d3330484d96a911913398eb4c56215f25c9509b09b34257"
+    },
+    {
+      "label": "item-recovery-cap",
+      "start": "0x140986317",
+      "end_exclusive": "0x14098639a",
+      "sha256": "3ff3020a416cc8f4445b28971eae88acf2b25bd7b73a2bdb10897228eb8865a4"
+    },
+    {
+      "label": "conditional-both-actor-refill",
+      "start": "0x140993775",
+      "end_exclusive": "0x1409937d0",
+      "sha256": "e1981cf392908a3c8dbae2ff916847fb6e5e6402f4120c2eedd4e06eafa466e4"
+    },
+    {
+      "label": "recoverable-and-trailing-values",
+      "start": "0x140991360",
+      "end_exclusive": "0x1409913cc",
+      "sha256": "0fddd7970ef39267f977e2d65d9bbef4272df5449b57f052d45bd60175acb563"
+    },
+    {
+      "label": "fixed-actors-recovery-callers",
+      "start": "0x140993804",
+      "end_exclusive": "0x14099384c",
+      "sha256": "eac8fd633b7600c65b1d470553816c14927c7e4f94030c41e1b0326a23eb4ef8"
+    },
+    {
+      "label": "context-option-refill-cap",
+      "start": "0x1409b2412",
+      "end_exclusive": "0x1409b2460",
+      "sha256": "214f3fe6829a417764c878f27ffd1eb62b375a36c91434679ef421c2d798a8fc"
+    },
+    {
+      "label": "gauge-layout-branch",
+      "start": "0x1409aab7d",
+      "end_exclusive": "0x1409aabb1",
+      "sha256": "1d0eb0b502e1de6a8e38420fe8fb627e5be25fcaf369b21a743016dc2bda3fd6"
+    },
+    {
+      "label": "gauge-reader-two-actor-loop",
+      "start": "0x1409aae1c",
+      "end_exclusive": "0x1409ab003",
+      "sha256": "b0c43244c7fabd2e419307f6cdc107485ae8a78492da576dbefe5686f9ef4d23"
+    },
+    {
+      "label": "collectible-increment-and-bitset",
+      "start": "0x140986150",
+      "end_exclusive": "0x140986260",
+      "sha256": "38fe23006d581c7f398bbf68af61c60cd06b2a0052052654eef3371a2c4ab0e0"
+    },
+    {
+      "label": "collectible-threshold-caller",
+      "start": "0x1409ecb50",
+      "end_exclusive": "0x1409ecbbf",
+      "sha256": "28b0c5b81b0d13cd3614210d47b6d66c5a924a194edc1dd6c01298b2e8caaf11"
+    },
+    {
+      "label": "three-collectible-action-transition",
+      "start": "0x1409ecd34",
+      "end_exclusive": "0x1409ecd50",
+      "sha256": "d9d90394ca2e8bb169e376dbc91ceea795d9c50e6ce5d811f45a70fbf7de0c2c"
+    },
+    {
+      "label": "form-enable-and-resource-fill",
+      "start": "0x140986470",
+      "end_exclusive": "0x140986497",
+      "sha256": "4c11a499f523145898bb987b6ed1761a07193b276702097df8445bea9ebe7959"
+    },
+    {
+      "label": "form-dependent-model-setup",
+      "start": "0x1409e3410",
+      "end_exclusive": "0x1409e34d0",
+      "sha256": "9e3e6daf1c2ef026b1461cd95f0fc32ac2ab2f3316a0bf383872ed7027d2d9b3"
+    },
+    {
+      "label": "resource-periodic-decrement",
+      "start": "0x1409ecd50",
+      "end_exclusive": "0x1409ecd76",
+      "sha256": "dea3ce5193cf0bbcb6f87a0b485bb8d5ee498a148664f326b8f8d8e3a0c53265"
+    }
+  ]
+}
