@@ -2,8 +2,9 @@
 
 First delivery increment for Power Stone 1 and 2: a reproducible stored-view
 trace and an offline capture decoder. Neither game has production audio or
-selection support yet. No game process was running during this investigation;
-there are no new live captures, deployment, or listening results.
+selection support yet. The initial investigation was offline; the memory-only
+PWS1 continuation below uses the October 22 capture. No deployment or listening
+acceptance is claimed.
 
 ## Result
 
@@ -14,11 +15,14 @@ not solve fighter world anchors, HUD ownership, health ranges, or arena audio.
 
 The retained [instruction evidence](../pws-camera-evidence.json) contains nine
 initial bounded spans from the hash-checked unpacked image. The selection
-continuation adds two position-consumer spans, for eleven total. Reproduce with:
+continuation adds two position-consumer spans; the memory-only investigation
+adds three model-translation spans and one data anchor, for fourteen total.
+Reproduce with:
 
 ```powershell
 python tools/pws_camera_audit.py --out docs/pws-camera-evidence.json --check
 python tools/test_pws_camera_decode.py
+python tools/test_pws_camera_audit.py
 python tools/test_pws2_actor_audit.py
 ```
 
@@ -100,7 +104,7 @@ two-player arena increment; PWS2's four-owner audio remains separate work.
 
 ## Validation
 
-Eleven spans reproduced from the reviewed image. Eight decoder tests pass,
+Fourteen spans reproduced from the reviewed image. Eight decoder tests pass,
 including every byte value of the signed PWS2 selector, both games' root-size
 rejection, alternate layouts, distinct matrices, nonfinite floats and strict
 JSON output. Seven existing PWS2 actor-audit tests pass. Runtime sources are
@@ -119,3 +123,73 @@ and raw/finite position triples. These indices are not camera indices.
   `0x140A5E0E4` reads the position in the renderer. That path can substitute
   actor+0x1E4 for Y depending on +0x1F8, and has special cases for IDs 12/13.
   Raw position is therefore a comparison candidate, not a universal render anchor.
+
+## Memory-only PWS1 camera comparison, October 22
+
+The user authorized continuing without screenshots after the visual capture
+failed. Saved CFC2 settings report BORDERLESS, so requesting borderless again
+would not resolve the observed capture problem. Visual checks remain unresolved
+and are not a prerequisite for further static or memory-only investigation.
+
+`tools/pws_camera_pair.py` brackets the thirteen retained root snapshots with
+the independently sampled renderer context, retaining both neighboring reads.
+It does not interpolate them or equate proximity with frame synchronization.
+Unreadable records remain barriers; a missing/stale bracket, context-pointer
+change, alternate layout, non-affine view or invalid perspective cannot yield
+an accepted projection. All results explicitly retain `audio_eligible=false`.
+
+Reproduce the retained diagnostic from the local raw context capture:
+
+```powershell
+python tools/pws_camera_pair.py --context build/pws1-context-20261022-b --snapshots tools/fixtures/pws1-observations-20261022 --out tools/fixtures/pws1-observations-20261022/camera-brackets.json
+python tools/test_pws_camera_pair.py
+```
+
+The tests reproduce all diagnostics using the retained brackets, without the
+local raw trace. The source hash, viewport, context bytes and timestamps are
+retained. The interrupted context stream supplied 8,700 complete records;
+unreadable records and its incomplete tail are not treated as matrices.
+
+- Every snapshot has context samples on both sides within 46.865 ms, with
+  unchanged context pointer. All thirteen use ordinary camera index zero.
+- Seven brackets have identical view/projection bytes on both sides and
+  their views exactly match the root view: snapshots 1 through 6 and 11.
+  This includes selection and transition samples, demonstrating why matrix
+  validity alone cannot admit gameplay audio.
+- The other six brackets have changing camera views. Projecting the same
+  copied positions through stored versus adjacent context views differs by
+  at most 0.024265 horizontal NDC units (about 7.77 native 640-wide pixels).
+  This bounds the observed discrepancy only; it is not a general error bound.
+- Both actor candidates project to finite front-facing points in all thirteen
+  snapshots. In snapshot 12 the first actor projects right of center and the
+  second left; snapshot 1 has the reverse order. Never assign fixed stereo
+  sides from actor index or raw world X.
+
+This supports acquiring the stored view with the actor positions and obtaining
+the appropriate projection from the draw pass. It does not certify body
+anchors, visibility, match eligibility or a player-to-controller mapping.
+The projection's depth coefficients also vary; do not hardcode one complete
+matrix from this capture. Next: trace match ownership and resource writers,
+then use the verified renderer path for a bounded runtime implementation.
+
+## PWS1 actor model origin traced independently of screenshots
+
+`0x14099102E..0x140991054` loads the root from `0x1423188C0`, supplies
+R+0x18428 and R+0x1FCB8 separately to `0x1409B4280`, matching the two fixed
+records already used in the snapshot decoder. This is one retained caller
+path, not a complete eligibility or visibility predicate.
+
+At `0x1409B4280..0x1409B430A`, the actor is preserved in RBX. The routine
+selects renderer matrix slot 1, resets it, and passes actor+0x30 to
+`0x140F33520`. It then applies the actor's angles (+0x44, +0x40, +0x3C) and
+scale (+0x60/+0x64/+0x68), copying the resulting matrix to actor+0x7C.
+The translation helper reads exactly three consecutive floats and puts them
+in the translation row of an identity template before calling the matrix
+composition helper. The template at `0x141C00250` is now pinned by the audit.
+
+Thus actor+0x30 is a model-placement input as well as a camera-follow input.
+This resolves the provenance of the candidate world position without a visual
+capture. It does not identify a body-center point, resolve every later model
+transform, or prove which actor is visible/controlled. Health/resource searches
+in these snapshots did not establish a gauge and no field was promoted from
+numeric correlation alone.
