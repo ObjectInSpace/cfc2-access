@@ -3,7 +3,7 @@ import math
 import struct
 import unittest
 
-from pws_camera_decode import LAYOUTS, decode
+from pws_camera_decode import ACTORS, LAYOUTS, decode
 
 
 class CameraDecodeTests(unittest.TestCase):
@@ -61,6 +61,29 @@ class CameraDecodeTests(unittest.TestCase):
         state = self.state('pws2')
         struct.pack_into('<f', state, 0x51D90 + 12, 1.)
         self.assertFalse(decode('pws2', state)['candidates'][0]['affine'])
+
+    def test_actor_slots_stay_distinct_from_camera_selector(self):
+        for game, actor in ACTORS.items():
+            state = self.state(game)
+            for i in range(actor['count']):
+                base = actor['base'] + i * actor['stride']
+                state[base + actor['slot']] = 3 - i
+                struct.pack_into('<3f', state, base + actor['position'], i, -i, 10 + i)
+            result = decode(game, state)
+            for i, value in enumerate(result['actor_candidates']):
+                self.assertEqual(value['fixed_index'], i)
+                self.assertEqual(value['raw_slot'], 3 - i)
+                self.assertEqual(value['position'], [i, -i, 10 + i])
+            self.assertEqual(result['ordinary_selected_index'], 0)
+
+    def test_nonfinite_actor_position_keeps_raw_evidence(self):
+        state = self.state('pws1')
+        struct.pack_into('<f', state, 0x18458, math.inf)
+        result = decode('pws1', state)
+        self.assertIsNone(result['actor_candidates'][0]['position'])
+        self.assertEqual(bytes.fromhex(result['actor_candidates'][0]['position_raw_hex']),
+                         state[0x18458:0x18464])
+        json.dumps(result, allow_nan=False)
 
 
 if __name__ == '__main__':

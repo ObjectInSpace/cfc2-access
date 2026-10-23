@@ -12,9 +12,11 @@ from collection_lifecycle_audit import CODE_SHA256, DEFAULT_DUMP, Dump
 SPANS = (
     ('pws1-camera-update', 0x140996860, 0x140996B56),
     ('pws1-single-camera-builder', 0x1409971D0, 0x140997403),
+    ('pws1-camera-fighter-position-consumer', 0x1409974F3, 0x140997561),
     ('pws1-draw-view-selection', 0x1409A8809, 0x1409A89A1),
     ('pws2-camera-builder', 0x140A5BBE0, 0x140A5BCA4),
     ('pws2-ordinary-view-selection', 0x140A5D649, 0x140A5D6D1),
+    ('pws2-fighter-position-render-consumer', 0x140A5E0C7, 0x140A5E153),
     ('renderer-slot-selection', 0x140F326E0, 0x140F32724),
     ('renderer-slot-copy-in', 0x140F32440, 0x140F32487),
     ('renderer-slot-copy-out', 0x140F31F40, 0x140F31F72),

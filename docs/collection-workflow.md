@@ -9,6 +9,13 @@ offline decoder and capture plans. Validate this simpler route before adding
 the older PWS2 draw diagnostic hooks. Neither Power Stone game is playable
 with the mod yet; fighter/selection acquisition and live evidence remain open.
 
+Continuation: both [selection decoders](port-tasks/pws-selection.md) are now
+implemented and compiled offline, with four PWS2 owners through the existing
+shared presenter. They are not wired into the DLL. Labelled PWS1 selection,
+shuffle and match-transition capture is the next gate, starting at its
+character-select screen. Camera diagnostics now retain
+traced position candidates independently of the selected camera index.
+
 ## Current execution owner and sequence, 2026-10-13
 
 The [complete Opus execution plan](port-tasks/opus-shared-selection-execution.md) governs conflicting sequencing and

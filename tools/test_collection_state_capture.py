@@ -3,6 +3,7 @@ import json
 import struct
 import tempfile
 import unittest
+from unittest.mock import patch, MagicMock
 from pathlib import Path
 
 from PIL import Image
@@ -261,6 +262,37 @@ class StateCaptureTests(unittest.TestCase):
         self.assertIsNone(h.cap.decoder)
         h.poll(3)
         self.assertEqual(h.rows('selection'), [])
+
+
+@unittest.skipUnless(hasattr(cap.C, 'WINFUNCTYPE'), 'Windows window API')
+class WindowCaptureTests(unittest.TestCase):
+    def grab(self, foreground, minimized=False):
+        user = MagicMock()
+        user.EnumWindows.side_effect = lambda visit, _: visit(123, 0)
+        user.GetWindowThreadProcessId.side_effect = lambda hwnd, out: setattr(out._obj, 'value', 5708)
+        def rect(hwnd, out):
+            out._obj.right, out._obj.bottom = 640, 480
+        user.GetClientRect.side_effect = rect
+        user.IsWindowVisible.return_value = True
+        user.IsIconic.return_value = minimized
+        user.GetForegroundWindow.side_effect = foreground
+        expected = Image.new('RGB', (640, 480), 'red')
+        with patch.object(cap.C, 'WinDLL', return_value=user), \
+             patch('PIL.ImageGrab.grab', return_value=expected) as screenshot:
+            result = cap.window_grabber(5708)()
+        return result, screenshot.call_count
+
+    def test_background_and_minimized_windows_are_not_photographed(self):
+        self.assertEqual(self.grab([456]), (None, 0))
+        self.assertEqual(self.grab([], minimized=True), (None, 0))
+
+    def test_focus_change_discards_picture(self):
+        self.assertEqual(self.grab([123, 456]), (None, 1))
+
+    def test_foreground_game_is_photographed(self):
+        picture, calls = self.grab([123, 123])
+        self.assertEqual(calls, 1)
+        self.assertEqual(picture.size, (640, 480))
 
 
 if __name__ == '__main__':

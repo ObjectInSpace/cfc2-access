@@ -356,6 +356,9 @@ class Capture:
 def window_grabber(pid):
     from PIL import ImageGrab
     user = C.WinDLL('user32', use_last_error=True)
+    user.GetForegroundWindow.restype = W.HWND
+    user.IsIconic.argtypes = [W.HWND]
+    user.GetWindowThreadProcessId.argtypes = [W.HWND, C.POINTER(W.DWORD)]
     try:
         C.WinDLL('shcore').SetProcessDpiAwareness(2)
     except OSError:
@@ -382,10 +385,15 @@ def window_grabber(pid):
         if not found:
             return None
         _, hwnd, width, height = found
+        # ImageGrab samples the desktop, not the window's own render surface.
+        # Reject covered/minimized windows and focus changes during the grab.
+        if user.IsIconic(hwnd) or user.GetForegroundWindow() != hwnd:
+            return None
         origin = W.POINT(0, 0)
         user.ClientToScreen(hwnd, C.byref(origin))
-        return ImageGrab.grab(bbox=(origin.x, origin.y, origin.x + width, origin.y + height),
-                              all_screens=True).convert('RGB')
+        result = ImageGrab.grab(bbox=(origin.x, origin.y, origin.x + width, origin.y + height),
+                                all_screens=True).convert('RGB')
+        return result if user.GetForegroundWindow() == hwnd else None
     return grab
 
 

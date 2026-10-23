@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "code_sha256": "9c340b8ce40a0c15a3eccd3c47207b02a59e38365bf99ae7605afc26bb84f95b",
+  "evidence": "static cursor path; live screen eligibility pending",
+  "data": [
+    {
+      "label": "pws1-cursor-id-map",
+      "address": "0x14109c510",
+      "bytes": "080006020403050701090a"
+    },
+    {
+      "label": "pws1-phase-two-target",
+      "address": "0x1409772e0",
+      "bytes": "f86f9700"
+    },
+    {
+      "label": "pws2-phase-one-target",
+      "address": "0x140a4cdbc",
+      "bytes": "67cda400"
+    },
+    {
+      "label": "pws2-grid-base",
+      "address": "0x141730140",
+      "bytes": "080201060b03040000080305010b070209070601060a02070a0500040409050302000b0a07040a0b050608090301090800000000000000000000000000000000"
+    },
+    {
+      "label": "pws2-grid-pride",
+      "address": "0x141730180",
+      "bytes": "08020f060b03040000080305010b070209070601060a02070a0500040409050302000b0a07040a0b05060809030109080000000000000000000000000f0f0f00"
+    },
+    {
+      "label": "pws2-grid-mel-pride",
+      "address": "0x1417301c0",
+      "bytes": "08020f060b03040e00080305010b070209070601060a02070a0500040409050302000b0a07040a0b050608090301090800000000000000000e0e010f0f0f0e00"
+    }
+  ],
+  "spans": [
+    {
+      "label": "pws1-outer-dispatch",
+      "start": "0x140976b50",
+      "end_exclusive": "0x140976bde",
+      "sha256": "360fdee1d449d010899b2519cb22f8370bce404650b3ec817c658158e2c37b42"
+    },
+    {
+      "label": "pws1-update-gates",
+      "start": "0x140976cf8",
+      "end_exclusive": "0x140976d35",
+      "sha256": "f022cc1fa27294be0d204ac8af266000988f7dffdb2bac7802ed03f8cd9df260"
+    },
+    {
+      "label": "pws1-phase-table-use",
+      "start": "0x140976efc",
+      "end_exclusive": "0x140976f22",
+      "sha256": "94c2ddff766aed5592fac0ac52b7847901653137824b17b942b8e849d5b19fd9"
+    },
+    {
+      "label": "pws1-selection-phase-call",
+      "start": "0x140976ff8",
+      "end_exclusive": "0x140977010",
+      "sha256": "94f8b20ff7000967160af33c48cdeddbab58e0ff545da2f829d096c234ed1cf0"
+    },
+    {
+      "label": "pws1-select-subphase",
+      "start": "0x1409a67e0",
+      "end_exclusive": "0x1409a6820",
+      "sha256": "b35b6d389433f7a7ebb95ba762ea8af0089cf9d1f2657e9fdc3cde94ffd94d4b"
+    },
+    {
+      "label": "pws1-select-owner-dispatch",
+      "start": "0x1409a69a1",
+      "end_exclusive": "0x1409a69f0",
+      "sha256": "c4129d0df699c2d48466c5cf41c1064f35015507c0d93a0ba92f804c0ceff2c1"
+    },
+    {
+      "label": "pws1-cursor-and-commit",
+      "start": "0x1409a0960",
+      "end_exclusive": "0x1409a1485",
+      "sha256": "52517ea66b1e7d1f6f6840faa8963d3cb35e8f9cd63b76ab4be8418ae2fb5715"
+    },
+    {
+      "label": "pws2-outer-dispatch",
+      "start": "0x140a48d3f",
+      "end_exclusive": "0x140a48da7",
+      "sha256": "6f1d1aaa331f397f26acefa97c1ec657d79983b571d0d5b08c0d39a19e45887e"
+    },
+    {
+      "label": "pws2-game-phase",
+      "start": "0x140a4ca30",
+      "end_exclusive": "0x140a4ca60",
+      "sha256": "bfc83c36d6c5de189cfdf54890539f65bcd67c1d34eb264deda429c37da42710"
+    },
+    {
+      "label": "pws2-mode-gate",
+      "start": "0x140a4caff",
+      "end_exclusive": "0x140a4cb48",
+      "sha256": "189fd8d943f710b106a677066ddcca72ec2ae4795a1feef6b6a67275a5f1f82d"
+    },
+    {
+      "label": "pws2-phase-table-use",
+      "start": "0x140a4cb48",
+      "end_exclusive": "0x140a4cb6b",
+      "sha256": "01854348776112b1a13ed7eb71f976d4e1252f0aa32b1c24e4290347f8f713fc"
+    },
+    {
+      "label": "pws2-selection-phase-call",
+      "start": "0x140a4cd67",
+      "end_exclusive": "0x140a4cd6e",
+      "sha256": "21d8f32596329fcca588e1585b7ad034d85a3aa95def9b65bc5491d36c9ea9cd"
+    },
+    {
+      "label": "pws2-selection-subphase",
+      "start": "0x140a692c0",
+      "end_exclusive": "0x140a69327",
+      "sha256": "7783673c84f758f903651ca7127834d2f00b74b087601e037db6c9fe8dbc65b0"
+    },
+    {
+      "label": "pws2-select-owner-dispatch",
+      "start": "0x140a695f0",
+      "end_exclusive": "0x140a696cd",
+      "sha256": "05c7848254f9b85318d0d156feb6537eaa16e7227b8bde7e69cfcd575868b9ce"
+    },
+    {
+      "label": "pws2-cursor-and-commit",
+      "start": "0x140a6b120",
+      "end_exclusive": "0x140a6b632",
+      "sha256": "f8ca78b4ade790b28d9fcac1eaad1ae5d5f9343f6792d132fe529e684ccaa415"
+    }
+  ]
+}

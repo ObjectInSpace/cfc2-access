@@ -13,7 +13,8 @@ resuming the older PWS2 HUD shader/draw-hook investigation. This finding does
 not solve fighter world anchors, HUD ownership, health ranges, or arena audio.
 
 The retained [instruction evidence](../pws-camera-evidence.json) contains nine
-bounded spans from the hash-checked unpacked image. Reproduce it with:
+initial bounded spans from the hash-checked unpacked image. The selection
+continuation adds two position-consumer spans, for eleven total. Reproduce with:
 
 ```powershell
 python tools/pws_camera_audit.py --out docs/pws-camera-evidence.json --check
@@ -75,7 +76,7 @@ mode/language (the following labels deliberately say unknown):
 
 ```powershell
 python tools/collection_state_capture.py 12345 --game pws1 --out build/pws1-camera-live --label "camera investigation; mode unknown" --language unknown --plan tools/capture-plans/pws1-camera.txt --screenshots --minutes 10
-python tools/pws_camera_decode.py --game pws1 build/pws1-camera-live/state-01.bin.gz
+python tools/pws_camera_decode.py --game pws1 build/pws1-camera-live/state-01.bin
 ```
 
 For PWS2 substitute `pws2` in the game, paths and plan. In a second terminal
@@ -99,8 +100,22 @@ two-player arena increment; PWS2's four-owner audio remains separate work.
 
 ## Validation
 
-Nine spans reproduced from the reviewed image. Six decoder tests pass,
+Eleven spans reproduced from the reviewed image. Eight decoder tests pass,
 including every byte value of the signed PWS2 selector, both games' root-size
 rejection, alternate layouts, distinct matrices, nonfinite floats and strict
 JSON output. Seven existing PWS2 actor-audit tests pass. Runtime sources are
 unchanged, so no DLL build or gameplay acceptance is claimed.
+
+## Position candidates from the selection continuation
+
+The decoder now retains separate fixed actor indices, their raw slot bytes
+and raw/finite position triples. These indices are not camera indices.
+
+- PWS1: R+0x18428+slot*0x7890; slot byte +3; position +0x30.
+  The camera consumer `0x1409974F3..0x140997561` reads both fighters'
+  X/Y/Z at R+0x18458/5C/60, with the other index computed as 1-index.
+  That establishes camera-follow input; visible body anchoring needs a capture.
+- PWS2: R+0x40818+slot*0x42B8; slot byte +1; position +0x3C.
+  `0x140A5E0E4` reads the position in the renderer. That path can substitute
+  actor+0x1E4 for Y depending on +0x1F8, and has special cases for IDs 12/13.
+  Raw position is therefore a comparison candidate, not a universal render anchor.

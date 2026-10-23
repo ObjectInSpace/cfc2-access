@@ -17,6 +17,10 @@ LAYOUTS = {
     'pws2': dict(size=0x8CD40, matrix=0x51D90, stride=0x308, count=4,
                  gate=0x52FDC, selector=0x52E88),
 }
+ACTORS = {
+    'pws1': dict(base=0x18428, stride=0x7890, count=2, position=0x30, slot=3),
+    'pws2': dict(base=0x40818, stride=0x42B8, count=4, position=0x3C, slot=1),
+}
 
 
 def decode(game, state):
@@ -37,10 +41,21 @@ def decode(game, state):
         candidates.append(dict(index=index, offset=hex(offset), raw_hex=raw.hex(),
                                finite=finite, affine=affine,
                                matrix=list(matrix) if finite else None))
+    actors = []
+    actor = ACTORS[game]
+    for index in range(actor['count']):
+        base = actor['base'] + index * actor['stride']
+        raw = state[base + actor['position']:base + actor['position'] + 12]
+        xyz = struct.unpack('<3f', raw)
+        actors.append(dict(fixed_index=index, raw_slot=state[base + actor['slot']],
+                           position_offset=hex(base + actor['position']),
+                           position_raw_hex=raw.hex(),
+                           position=list(xyz) if all(math.isfinite(v) for v in xyz) else None))
     return dict(game=game, audio_eligible=False, layout_gate=gate,
                 raw_selector=selector, ordinary_selected_index=selected,
-                candidates=candidates,
+                candidates=candidates, actor_candidates=actors,
                 limitations=['No match/visibility/ownership or sample-coherence proof.',
+                             'Actor positions are traced candidates, not certified body anchors.',
                              'No projection matrix is included in the root decode.',
                              'Alternate draw passes are not resolved.'])
 
