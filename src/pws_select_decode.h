@@ -3,9 +3,9 @@
 #include "game_selection.h"
 #include <stddef.h>
 
-/* Offline-tested selection candidate decoder. NOT wired into the DLL yet.
- * Caller must separately establish live execution, ROM, shell/overlay ownership
- * and code/table signatures. Root bytes alone do not establish eligibility.
+/* Selection decoder. PWS1 uses it in the DLL through pws1_select.c, which
+ * establishes live execution, ROM, shell ownership and code/table signatures;
+ * PWS2 is not wired yet. Root bytes alone do not establish eligibility.
  * Native evidence and pending live checks: docs/port-tasks/pws-selection.md. */
 typedef struct {
     unsigned game, variant;

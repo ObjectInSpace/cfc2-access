@@ -1,9 +1,9 @@
 # Power Stone selection decoder, 2026-10-22
 
 Both games now have a C decoder that converts copied native fields into the
-existing shared selection choices. It is compiled and tested offline, **not
-wired into the DLL or deployed**. The next gate is labelled live capture of
-selection and the transition to a match, starting with PWS1.
+existing shared selection choices. **Update 2026-10-23: PWS1 is wired into
+the DLL and deployed** (`src/pws1_select.c`, with match audio; see the end of
+`pws1-match-fields.md`), not yet heard in the game. PWS2 is still offline only.
 
 ## Reproduce
 
@@ -97,6 +97,42 @@ First live session, PWS1, using the prepared camera plan:
 
 PWS2 later needs all four selecting slots, optional fighters, confirmation
 and re-entry independently. The pure decoder already preserves four owners.
+
+## First live PWS1 capture, 2026-10-22
+
+Session `build/pws1-live-20261022-c`, ROM pws1u, one selecting side (owner
+byte 1), CPU opponent. The F9 labels are out of step with the game: the
+first "select" snapshot was taken in a match, and the "start a fight"
+snapshot during the transition after confirmation. Every result below is
+classified by the traced phase bytes, never by label. Screenshots in this
+session are all one identical image and carry no evidence.
+
+- **Cursor-to-ID map confirmed.** While phase R+0x27E5D == 2 and side
+  state == 2, all 152 distinct cursor/ID pairs in the trace agree with
+  `0x14109C510`, and none disagree. Cursor values 0..9 were all seen,
+  mostly during shuffle. Earlier session `-20261022` adds 3 agreeing pairs.
+  Snapshots 2, 3 and 14 decode Kraken, Ayame and Falcon.
+- **Phase sequence observed.** R+0x27E5D goes 0/1 (attract and entry), to
+  2 (select), to 3 (after confirmation, substate 2 then 3 then 4, about
+  11 s), to 4 (match). Side state goes from 2 to 5 on confirmation and stays
+  5 through the match, so side state alone does not tell a confirmed select
+  from a match.
+- **Shuffle confirmed.** Actor+0x7874 went to 1 on the first random cursor
+  jump and back to 0 when it stopped. A brief release, one cell step, and
+  about 1 s of holding again turned it back on, matching the traced 60-frame
+  rule. The decoder suppresses both snapshots taken during shuffle.
+  Confirmation came 0.15 s after the second shuffle stopped. It is not known
+  whether the user pressed confirm or the game confirmed it.
+- **Re-entry seen.** The root moved three times (`0x16F71000`, `0x16171000`,
+  `0x16D71000`), with an inactive gap at each change. Both new select screens
+  opened with cursor 1 (Falcon). The adapter must re-resolve the root and
+  announce the first highlight on entry.
+- **Pause is not visible in the root phase.** R+0x27E5D stays 4 through
+  pause and resume. Selection is not active in a match, so this does not
+  block selection speech. The shell overlay still needs its own check.
+- Not covered: Versus or Training, the second selecting side, the Japanese
+  ROM, and shell+0x578 publication (it is not in the snapshot block). The
+  match snapshots (6 to 13) are available for the camera work.
 
 ## Validation and limits
 

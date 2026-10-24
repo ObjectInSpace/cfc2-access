@@ -1,0 +1,3 @@
+Stage select, before moving the cursor; press F9
+Move to the next stage once; press F9
+Choose the stage; press F9 once the fight has started

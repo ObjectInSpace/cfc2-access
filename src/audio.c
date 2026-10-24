@@ -961,6 +961,86 @@ void audio_tick_owned(uint64_t epoch)
     tick_arm(epoch);
 }
 
+/* ---- positional pings ---------------------------------------------------
+ * A ring like the ticks, wider: an arena can hold a dozen things pinging at
+ * different rates. Every field is written before `armed` is set and read by
+ * the render thread only after it sees `armed`, so no lock is needed. A ring
+ * that wraps steals the oldest ping, which by then has nearly decayed. */
+#define PING_SLOTS 16
+typedef struct { volatile LONG armed; int family; float freq, phase, env, decay,
+                 gl, gr, vol, age; volatile LONG64 stamp; } ping_voice;
+static ping_voice g_ping[PING_SLOTS];
+static volatile LONG g_ping_next;
+
+/* Base pitch, decay time (seconds to 1/e) and level per family. */
+static const struct { float freq, tau, level; } g_ping_family[AUDIO_PING_FAMILIES] = {
+    { 1568.0f, 0.120f, 0.30f },   /* stone: G6 bell   */
+    {  660.0f, 0.090f, 0.38f },   /* food: falling    */
+    {  440.0f, 0.060f, 0.34f },   /* item: blip       */
+    {  196.0f, 0.050f, 0.20f },   /* prop: thud       */
+};
+
+void audio_ping_owned(uint64_t epoch, audio_ping_family family, int variant,
+                      float pan, float gain)
+{
+    LONG i;
+    ping_voice *p;
+    float gl, gr;
+    if ((int)family < 0 || family >= AUDIO_PING_FAMILIES || variant < 0 || variant > 24) return;
+    if (g_scene_owned || !owner_current(epoch)) return;
+    if (!(gain > 0.0f)) return;
+    if (gain > 1.0f) gain = 1.0f;
+    i = InterlockedIncrement(&g_ping_next) - 1;
+    p = &g_ping[((unsigned)i) % PING_SLOTS];
+    InterlockedExchange(&p->armed, 0);
+    pan_gains(pan, &gl, &gr);
+    p->family = (int)family;
+    p->freq   = g_ping_family[family].freq * powf(2.0f, (float)variant / 12.0f);
+    p->phase  = 0.0f;
+    p->env    = 1.0f;
+    p->decay  = expf(-1.0f / (g_ping_family[family].tau * (float)AUDIO_SR));
+    p->gl = gl; p->gr = gr;
+    p->vol    = gain * g_ping_family[family].level * cue_gain(AUDIO_CUE_BEACON);
+    p->age    = 0.0f;
+    InterlockedExchange64(&p->stamp, (LONG64)epoch);
+    InterlockedExchange(&p->armed, 1);
+}
+
+static float ping_sample(ping_voice *p)
+{
+    float f = p->freq, s;
+    /* Food falls a fifth over its first 100 ms: a "bloop", not a beep. */
+    if (p->family == AUDIO_PING_FOOD) f *= 1.0f - 0.33f * fminf(p->age / 0.100f, 1.0f);
+    p->phase += f / (float)AUDIO_SR;
+    if (p->phase >= 1.0f) p->phase -= 1.0f;
+    switch (p->family) {
+    case AUDIO_PING_STONE: {
+        float a = p->phase * 2.0f * (float)M_PI;
+        s = (sinf(a) + 0.5f * sinf(a * 2.76f) + 0.25f * sinf(a * 5.40f)) * 0.6f;
+        break;
+    }
+    case AUDIO_PING_ITEM: {
+        float a = p->phase * 2.0f * (float)M_PI;
+        s = (sinf(a) + 0.5f * sinf(a * 1.5f)) * 0.7f;
+        break;
+    }
+    case AUDIO_PING_PROP:
+        s = osc(1, p->phase, 0.0f);
+        break;
+    default:
+        s = sinf(p->phase * 2.0f * (float)M_PI);
+        break;
+    }
+    /* 2 ms attack so the onset does not click. */
+    {
+        float attack = p->age < 0.002f ? p->age / 0.002f : 1.0f;
+        s *= p->env * attack;
+    }
+    p->env *= p->decay;
+    p->age += 1.0f / (float)AUDIO_SR;
+    return s;
+}
+
 static void render(int16_t *out)
 {
     memset(out, 0, sizeof(int16_t) * AUDIO_BLOCK * 2);
@@ -1055,6 +1135,18 @@ static void render(int16_t *out)
                      * t->vol * (on ? 1.0f : 0.0f) * g_master;
             l += ts; r += ts;
             if (t->env < 0.002f) { t->env = 0.0f; InterlockedExchange(&t->armed, 0); }
+        }
+
+        /* Positional pings: panned where the thing is, retired when decayed
+         * or when their owner is no longer current. */
+        for (int pi = 0; pi < PING_SLOTS; pi++) {
+            ping_voice *p = &g_ping[pi];
+            if (!p->armed) continue;
+            if (g_scene_owned || !legacy_stamp_ok(p->stamp)) { InterlockedExchange(&p->armed, 0); continue; }
+            float ps = ping_sample(p) * p->vol * (on ? 1.0f : 0.0f) * g_master;
+            l += ps * p->gl;
+            r += ps * p->gr;
+            if (p->env < 0.002f) { p->env = 0.0f; InterlockedExchange(&p->armed, 0); }
         }
 
         if (l >  1.0f) l =  1.0f;

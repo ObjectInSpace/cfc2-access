@@ -174,6 +174,26 @@ void audio_beacons_off(void);
  * right moment, not for sounds to be exclusive. */
 void audio_tick(void);
 
+/* ---- Positional pings ---------------------------------------------------
+ * Short one-shots for things lying in an arena (Power Stone's stones, items
+ * and liftable props), scheduled by pickup_cues.c. One TIMBRE per family
+ * says what kind of thing it is; `variant` steps the pitch a semitone per
+ * type inside the family; `pan` is its screen position; `gain` 0..1 is the
+ * caller's nearness. Volume follows the beacon level (F7): these are the
+ * positional cue in the games that use them.
+ *
+ * ⚠ Lock-free and stamped with the epoch, exactly like the clock tick: called
+ * from the game's frame thread, dropped by the mixer if the owner changed. */
+typedef enum {
+    AUDIO_PING_STONE = 0,   /* bell: bright inharmonic partials, long ring  */
+    AUDIO_PING_FOOD,        /* sine that falls in pitch: a soft "bloop"     */
+    AUDIO_PING_ITEM,        /* sine plus its fifth, short: a clear blip     */
+    AUDIO_PING_PROP,        /* low triangle thud, quieter by design         */
+    AUDIO_PING_FAMILIES
+} audio_ping_family;
+void audio_ping_owned(uint64_t epoch, audio_ping_family family, int variant,
+                      float pan, float gain);
+
 /* ---- Legacy-path owner routing ------------------------------------------
  * Used by match_audio, never by an adapter directly. begin/stop run on the
  * worker. begin accepts only a strictly increasing nonzero epoch and silences
