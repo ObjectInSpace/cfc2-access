@@ -34,8 +34,17 @@ BOOL gmd_text_by_index(int index, char *out, unsigned cap)
 #include <stdint.h>
 uint64_t match_audio_begin(unsigned a) { (void)a; return 0; }
 void match_audio_depart(uint64_t e) { (void)e; }
-uint64_t match_audio_current(void) { return 0; }
+static uint64_t current;
+uint64_t match_audio_current(void) { return current; }
 LONG pws1_frame_count(void) { return 0; }
+/* Pickup events and the F9 setting: a scripted queue and setting. */
+#include "../src/pickup_speech.h"
+#include "../src/audio.h"
+static pickup_event queue[4];
+static unsigned qn, qi;
+static int option = 2;
+bool pws1_pickup_pop(pickup_event *e) { if (qi >= qn) return false; *e = queue[qi++]; return true; }
+int audio_option_get(audio_option o) { return o == AUDIO_OPT_PICKUP_SPEECH ? option : 0; }
 
 /* Same list as SELECT in tools/make_pws1_fixtures.py. */
 #define RECORD (8 + 8 + 8 + 1 + 1 + 1 + 4 + 2 + 2 + 4 + 4)
@@ -271,6 +280,34 @@ int main(void)
             gmd_ready = 1;
             pws1_select_observe(NULL, -1, 0, 0);
         }
+    }
+
+    /* 4. Pickup announcements: "who, what kind" (shell IDs: 8 Kraken, 3 Jack,
+     *    US names); players only drops the CPU's; off drops everything;
+     *    another owner's or an unadmitted game's are dropped. */
+    {
+        int before;
+        current = 41;
+        queue[0] = (pickup_event){ .epoch = 41, .fighter = 0, .id = 8, .code = PICKUP_STONE, .human = true };
+        queue[1] = (pickup_event){ .epoch = 41, .fighter = 1, .id = 3, .code = PICKUP_THROWABLE, .human = false };
+        qn = 2; qi = 0; before = calls;
+        pws1_select_speak_pickups(TRUE, 9);
+        assert(calls == before + 2 && !wcscmp(last, L"Jack, something to throw"));
+        option = 1; qn = 2; qi = 0; before = calls;
+        pws1_select_speak_pickups(TRUE, 9);
+        assert(calls == before + 1 && !wcscmp(last, L"Kraken, power stone"));
+        option = 0; qn = 2; qi = 0; before = calls;
+        pws1_select_speak_pickups(TRUE, 9);
+        assert(calls == before && qi == 2);
+        option = 2; queue[0].epoch = 40; qn = 1; qi = 0;
+        pws1_select_speak_pickups(TRUE, 9);
+        assert(calls == before && qi == 1);
+        queue[0].epoch = 41; qn = 1; qi = 0;
+        pws1_select_speak_pickups(FALSE, 9);
+        assert(calls == before && qi == 1);
+        queue[0].code = PICKUP_FOOD; qn = 1; qi = 0;
+        pws1_select_speak_pickups(TRUE, 9);
+        assert(calls == before + 1 && !wcscmp(last, L"Kraken, food"));
     }
 
     printf("PASS: %u live PWS1 select samples, highlight paths and confirmations, re-entry, "

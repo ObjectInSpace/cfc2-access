@@ -1,0 +1,4 @@
+On the screen after character select, before moving; press F11
+After moving or walking once in one direction; press F11
+After moving the other way; press F11
+After choosing, once the fight has started; press F11

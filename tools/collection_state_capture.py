@@ -7,7 +7,7 @@ with --game. While the game's published primary block is identified, it:
   trace.bin.gz (a new root starts a new keyframe and segment);
 - logs direction presses from the keyboard arrows and XInput pads;
 - with --screenshots only, pictures the game window once the cursor stops;
-- on F9, saves the whole block plus a screenshot under the next plan label,
+- on F11, saves the whole block plus a screenshot under the next plan label,
   and says through NVDA what was captured and what comes next;
 - where a game has a TRACED cursor decoder (CVS1 only, today), pictures each
   newly settled selection automatically.
@@ -28,7 +28,7 @@ import time
 
 import collection_metadata_capture as metadata
 
-SNAPSHOT_KEY = 0x78           # VK_F9: free in CFC2, the mod (F5-F8, `) and Steam (F12)
+SNAPSHOT_KEY = 0x7A           # VK_F11: free in CFC2 and Steam (F12); the mod uses F5-F9 and `
 DIRECTION_KEYS = {0x25: 'left', 0x26: 'up', 0x27: 'right', 0x28: 'down'}
 SETTLE_SECONDS = 0.35         # picture the cursor this long after the last press
 TRACE_MAGIC = b'CFC2TRC1'
@@ -65,6 +65,7 @@ OWN_HOOKS = {
     0x140B96130: bytes.fromhex('4c8bdc4989'),   # mjus_text.c (immediate text draw)
     0x140CCCB60: bytes.fromhex('40534883ec'),   # stg2_frame.c
     0x140974100: bytes.fromhex('4883ec28e8'),   # pws1_frame.c
+    0x140A47290: bytes.fromhex('4883ec28e8'),   # pws2_frame.c
 }
 
 
@@ -486,7 +487,7 @@ def main():
                        decoder=args.game if cap.decoder else None, checked_code_spans=checked,
                        manifest_sha256=hashlib.sha256(lifecycle_raw).hexdigest(),
                        tool_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()))
-        print(f'Capturing {args.game} for up to {args.minutes} minutes. F9 = snapshot. '
+        print(f'Capturing {args.game} for up to {args.minutes} minutes. F11 = snapshot. '
               f'Ctrl+C stops.', flush=True)
         say(f'Capture started. First snapshot: {plan[0]}.' if plan else 'Capture started.')
         end = time.monotonic() + args.minutes * 60

@@ -265,7 +265,7 @@ int main(void)
     /* 6. Pickups, every fought sample of the capture. */
     {
         unsigned stones_ok = 0, over = 0, run = 0, worst_run = 0, props_min = 100, props_max = 0;
-        unsigned placed = 0, present = 0, seen29 = 0, seen46 = 0, behind = 0;
+        unsigned placed = 0, present = 0, seen29 = 0, seen46 = 0, behind = 0, past_edge = 0;
         double first46 = 0, last46 = 0;
         for (unsigned i = 0; i < npick; i++) {
             pickup_sample s[PICKUP_SLOTS];
@@ -276,21 +276,25 @@ int main(void)
             for (unsigned k = 0; k < PICKUP_SLOTS; k++) {
                 if (!s[k].present) continue;
                 present++;
-                if (s[k].placed) {
+                {
                     float pt[3], pan;
+                    bool on;
                     memcpy(pt, r + k * 0x3E0 + 0x30, 12);
-                    /* Beside or behind the camera: hard to one side. This
-                     * stone was past the right edge just before (x = +112
-                     * half-widths at 343923.21) and just after (+1084 at
-                     * 343925.05), so right throughout. */
-                    if (!pws1_project(r, proj, pt, &pan)) {
-                        assert(s[k].pan == 1.0f);
-                        if (k == 2 && pwhen[i] > 343923.2 && pwhen[i] < 343925.1) behind++;
-                        else assert(0);
+                    /* Placed exactly while on screen; off screen it is
+                     * silent (user, 2026-10-27): past an edge, or the one
+                     * stone beside and behind the camera (343923.26 to
+                     * 343925.05). */
+                    on = pws1_project(r, proj, pt, &pan);
+                    assert(s[k].placed == on);
+                    if (on) {
+                        placed++;
+                        assert(s[k].pan == pan && s[k].pan >= -1.0f && s[k].pan <= 1.0f);
+                        assert(s[k].distance >= 0.0f && s[k].distance < 3000.0f);
+                    } else if (k == 2 && pwhen[i] > 343923.2 && pwhen[i] < 343925.1) {
+                        behind++;
+                    } else {
+                        past_edge++;
                     }
-                    placed++;
-                    assert(s[k].pan >= -1.0f && s[k].pan <= 1.0f);
-                    assert(s[k].distance >= 0.0f && s[k].distance < 3000.0f);
                 }
                 switch (s[k].family) {
                 case AUDIO_PING_STONE: stones++; assert(r[k * 0x3E0 + 4] == 5); break;
@@ -331,9 +335,35 @@ int main(void)
         assert(seen29 > 50 && seen46 > 100);
         assert(first46 > 343934.8 && first46 < 343935.0 && last46 > 343949.8);
         assert(props_min > 0);
-        /* Everything placed; the one stone beside and behind the camera from
-         * 343923.26 to 343925.05 pans hard to its side. */
-        assert(placed == present && behind == 34);
+        /* Off screen and silent: the stone beside and behind the camera from
+         * 343923.26 to 343925.05 (36 samples: 34 behind it, the 2 either side
+         * past the right edge, which the old clamp placed at +1), and 825
+         * other sightings past an edge. */
+        printf("pickups on screen %u, past an edge %u, behind the camera %u\n", placed, past_edge, behind);
+        fflush(stdout);
+        assert(placed + behind + past_edge == present && behind == 36 && placed > past_edge);
+        /* Off-screen sounds switched on (Shift+F9): that stone pans hard
+         * right (it lay right of the camera), as before the rule; off again,
+         * silent. */
+        {
+        int checked = 0;
+        for (unsigned i = 0; i < npick; i++) {
+            pickup_sample s[PICKUP_SLOTS];
+            float pt[3], pan;
+            if (!(pwhen[i] > 343923.3 && pwhen[i] < 343925.0)) continue;
+            memcpy(pt, pk[i] + 2 * 0x3E0 + 0x30, 12);
+            if (pws1_project(pk[i], proj, pt, &pan)) continue;
+            assert(audio_option_cycle(AUDIO_OPT_OFFSCREEN) == 1);
+            pws1_pickups_decode(pk[i], proot[i], proj, s);
+            assert(s[2].present && s[2].placed && s[2].pan == 1.0f);
+            assert(audio_option_cycle(AUDIO_OPT_OFFSCREEN) == 0);
+            pws1_pickups_decode(pk[i], proot[i], proj, s);
+            assert(s[2].present && !s[2].placed);
+            checked = 1;
+            break;
+        }
+        assert(checked);
+        }
     }
 
     /* 7. Pickup gates on one fought sample with item 46 lying out. */
@@ -464,8 +494,116 @@ int main(void)
         assert(!m.in_match);
     }
 
+    /* Pickup announcements over every fought sample: a stone event per stone
+     *  gained, for that side; a lifted event per new carried object, of its
+     *  kind; and no food, since none appeared in this round -- the game's own
+     *  slow recovery (240, 215, 208, 201, 202 ...) must not read as eating. */
+    {
+        pws1_pickup_watch w;
+        unsigned stones = 0, rises = 0, lifts = 0, lifted = 0, food = 0;
+        unsigned char prev_st[2] = { 0 };
+        unsigned long long prev_c[2] = { 0 };
+        int have = 0;
+        memset(&w, 0, sizeof w);
+        for (unsigned i = 0; i < npick; i++) {
+            unsigned who[6], kind[6], n;
+            unsigned char *r = pk[i];
+            /* The fixture keeps fought samples only; across a gap (round two's
+             * intro, 10 s, where health refills to 240) the hook sees frames
+             * that are not fought, which forget everything. */
+            if (i && pwhen[i] - pwhen[i - 1] > 1.0) { memset(&w, 0, sizeof w); have = 0; }
+            n = pws1_watch_events(r, proot[i], &w, who, kind);
+            for (unsigned p = 0; p < 2; p++) {
+                unsigned a = p ? A1 : A0;
+                unsigned char st = r[a + 0x77EC];
+                unsigned long long c;
+                unsigned want_stone, want_lift;
+                memcpy(&c, r + a + 0x7780, 8);
+                want_stone = have && st > prev_st[p];
+                want_lift = have && c && c != prev_c[p];
+                rises += want_stone;
+                lifts += want_lift;
+                for (unsigned k = 0; k < n; k++) {
+                    if (who[k] != p) continue;
+                    if (kind[k] == PICKUP_STONE) { assert(want_stone); stones++; want_stone = 0; }
+                    else if (kind[k] == PICKUP_FOOD) {
+                        short h0, h1;
+                        food++;
+                        memcpy(&h1, r + a + 0x7790, 2);
+                        memcpy(&h0, pk[i - 1] + a + 0x7790, 2);
+                        printf("  food event: side %u at %.2f (prev %.2f), health %d -> %d, sub %u step %u\n",
+                               p, pwhen[i], pwhen[i - 1], h0, h1, r[0x27FAC], r[0x27FAD]);
+                    }
+                    else {
+                        const unsigned char *o = r + (c - proot[i]);
+                        assert(want_lift);
+                        assert(kind[k] == (o[4] == 1 ? PICKUP_THROWABLE : PICKUP_ITEM));
+                        lifted++;
+                        want_lift = 0;
+                    }
+                }
+                assert(!want_stone && !want_lift);
+                prev_st[p] = st;
+                prev_c[p] = c;
+            }
+            have = 1;
+        }
+        printf("pickup events: %u stones gained (%u rises), %u lifted (%u new carried), %u food\n",
+               stones, rises, lifted, lifts, food);
+        fflush(stdout);
+        /* No object was carried in this round's fought samples, so lifting
+         * rests on the code (0x14098AB00) and the constructed case below. */
+        assert(stones == rises && rises > 3 && lifted == lifts && food == 0);
+        /* Food: a lifted food item is food; eating (health +24 at once) is
+         * food; the slow recovery is not. Constructed on a fought sample. */
+        {
+            unsigned char *r = pk[npick / 2];
+            unsigned who[6], kind[6], n;
+            short hp;
+            memset(&w, 0, sizeof w);
+            pws1_watch_events(r, proot[npick / 2], &w, who, kind);       /* seed */
+            memcpy(&hp, r + A0 + 0x7790, 2);
+            if (hp > 200) { hp = 100; memcpy(r + A0 + 0x7790, &hp, 2); pws1_watch_events(r, proot[npick / 2], &w, who, kind); }
+            hp += 1; memcpy(r + A0 + 0x7790, &hp, 2);
+            assert(pws1_watch_events(r, proot[npick / 2], &w, who, kind) == 0);
+            hp += 24; memcpy(r + A0 + 0x7790, &hp, 2);
+            n = pws1_watch_events(r, proot[npick / 2], &w, who, kind);
+            assert(n == 1 && who[0] == 0 && kind[0] == PICKUP_FOOD);
+            /* Lifted: the carried pointer naming a prop, then an item, then
+             * food (which then suppresses the eating rule for 3 s). */
+            {
+                unsigned prop = 100;
+                unsigned long long c;
+                for (unsigned k = 0; k < 100; k++)
+                    if (r[k * 0x3E0] && r[k * 0x3E0 + 4] == 1) { prop = k; break; }
+                assert(prop < 100);
+                c = proot[npick / 2] + prop * 0x3E0ull;
+                memcpy(r + A0 + 0x7780, &c, 8);
+                n = pws1_watch_events(r, proot[npick / 2], &w, who, kind);
+                assert(n == 1 && kind[0] == PICKUP_THROWABLE);
+                assert(pws1_watch_events(r, proot[npick / 2], &w, who, kind) == 0);   /* still held */
+                r[prop * 0x3E0 + 4] = 6; r[prop * 0x3E0 + 0x3C8] = 3;
+                memset(r + A0 + 0x7780, 0, 8);
+                pws1_watch_events(r, proot[npick / 2], &w, who, kind);
+                memcpy(r + A0 + 0x7780, &c, 8);
+                n = pws1_watch_events(r, proot[npick / 2], &w, who, kind);
+                assert(n == 1 && kind[0] == PICKUP_ITEM);
+                r[prop * 0x3E0 + 0x3C8] = 16;
+                memset(r + A0 + 0x7780, 0, 8);
+                pws1_watch_events(r, proot[npick / 2], &w, who, kind);
+                memcpy(r + A0 + 0x7780, &c, 8);
+                n = pws1_watch_events(r, proot[npick / 2], &w, who, kind);
+                assert(n == 1 && kind[0] == PICKUP_FOOD);
+                hp += 48; memcpy(r + A0 + 0x7790, &hp, 2);           /* eaten: not twice */
+                assert(pws1_watch_events(r, proot[npick / 2], &w, who, kind) == 0);
+                r[prop * 0x3E0 + 4] = 1;
+                memset(r + A0 + 0x7780, 0, 8);
+            }
+        }
+    }
+
     printf("PASS: %u live PWS1 frames (%u in a match), %u fought pickup samples -- gate by phase "
            "and sub-state, health through KO with recovery, stones, clock, pause, projection = "
-           "pairing tool, pickups by family and type, every gate\n", count, in, npick);
+           "pairing tool, pickups by family and type, every gate, pickup announcements\n", count, in, npick);
     return 0;
 }

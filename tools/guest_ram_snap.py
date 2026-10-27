@@ -1,12 +1,12 @@
-"""Save an emulated game's main RAM on each F9, read-only, for offline text search.
+"""Save an emulated game's main RAM on each F11, read-only, for offline text search.
 
 The recompiled NAOMI games address main RAM (guest 0x0C000000) through their
 context object: host = *(context + 8) + (guest - 0x0C000000). Seen in MJUS at
 0x140B95953..0x140B95963 (context slot 0x142C79B40), and in Alpha 3's story
 reader ([context+8] + constant). This tool reads `--bytes` from that base on
-each F9 press and writes ram-NN.bin.gz plus a JSON line with the time.
+each F11 press and writes ram-NN.bin.gz plus a JSON line with the time.
 
-Run it beside tools/collection_state_capture.py: both watch F9, so one press
+Run it beside tools/collection_state_capture.py: both watch F11, so one press
 gives a state snapshot and a RAM snapshot with matching times.
 
 No hooks, no writes, no DLL changes.
@@ -23,7 +23,7 @@ from pathlib import Path
 
 from collection_metadata_capture import ProcessReader
 
-F9 = 0x78
+F11 = 0x7A
 CHUNK = 1 << 20
 
 
@@ -45,16 +45,16 @@ def main():
     log = open(args.out / 'ram.jsonl', 'a', encoding='utf-8')
     n, down, last = 0, False, 0.0
     end = time.monotonic() + args.minutes * 60
-    print('Watching F9 for RAM snapshots.', flush=True)
+    print('Watching F11 for RAM snapshots.', flush=True)
     try:
         while time.monotonic() < end:
-            pressed = bool(user32.GetAsyncKeyState(F9) & 0x8000)
+            pressed = bool(user32.GetAsyncKeyState(F11) & 0x8000)
             timed = args.every > 0 and time.monotonic() - last >= args.every
             if (pressed and not down) or timed:
                 last = time.monotonic()
                 n += 1
                 t = time.monotonic()
-                row = dict(index=n, t=t, trigger='F9' if pressed and not down else 'timer', utc=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()))
+                row = dict(index=n, t=t, trigger='F11' if pressed and not down else 'timer', utc=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()))
                 try:
                     ctx = struct.unpack('<Q', reader.read(args.context, 8))[0]
                     base = struct.unpack('<Q', reader.read(ctx + 8, 8))[0]

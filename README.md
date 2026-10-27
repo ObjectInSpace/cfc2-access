@@ -60,6 +60,42 @@ P1 and P2 share one level per cue — they are the same cue heard from two
 sides, and turning one down would make the stereo position lie about which
 side is which.
 
+## Power Stone and Power Stone 2
+
+The arena games work differently. There are no fighter beacons (the game's
+own footsteps already place the fighters). Instead, the things lying in the
+arena ping from where they are, faster and louder the nearer they are to
+your fighter: power stones a bell, food a soft falling "bloop", items a clear
+blip, things to throw a low quieter thud, each kind of item at its own
+pitch. Health and stones are tones as in the other games, and the clock
+ticks.
+
+When anyone picks something up, it is spoken: "Falcon, food". The games have
+no item names as text, so the kind is said: power stone, food, treasure,
+something to throw, or item.
+
+In Power Stone 2 every fighter's health and stones are heard, the CPU's too.
+Each fighter has its own sound (steady, fluttering, warbling or growling) and
+its tones come from where it is on screen.
+
+Nothing off screen makes a sound, since nothing there can be picked up, hit
+or hit you.
+
+With **Stage Selection: Manual** in Power Stone 2's EX Settings, the stage
+select is a place you walk around: on landing, the five stages are spoken
+with their directions ("Stage: 1, left. Stage: 2, ahead left. ..."), each
+plays its own plain tone as you walk, faster as you near it, and the one
+chosen is spoken. The stages
+have no names in the game's text, so they are numbered 1 to 5, left to right.
+
+### Power Stone keys
+
+- **F9** cycles pickup announcements: every fighter, players only, off.
+- **Shift+F9** turns off-screen sounds on (at the screen edge they lie
+  beyond) or off.
+
+Both are spoken and saved to `cfc2_audio.ini`.
+
 ## Status
 
 - MTFramework shell (menus, options, move lists): working, including each
@@ -118,9 +154,15 @@ side is which.
   languages. Words the collection already translates are taken from its own
   text; the rest are the mod's translations, so please report any that read
   wrongly. Fighter, groove and stage names stay as the games name them.
-- The other two arcade games (PWS1, PWS2): in progress, not yet
-  playable with the mod. The plan for porting the CVS2 features to them is in
-  `docs/collection-port-plan.md` in the repository.
+- Power Stone in-game: character select and the Versus stage select are
+  spoken; health, stone and clock cues; pickups ping. Works in Arcade,
+  Versus and Training, English and Japanese. New in this release: pickup
+  announcements, and nothing off screen sounds.
+- Power Stone 2 in-game: character select is spoken; health and stone tones
+  for all four fighters, the clock, pickup pings, pickup announcements, and
+  the walk-around stage select. Arcade, Versus and Training, English and
+  Japanese, checked in play; the pickup announcements and stage select are
+  new in this release.
 
 ## Source
 
@@ -128,4 +170,4 @@ Source, build script (`build.ps1`), and design docs are in the repository:
 https://github.com/ObjectInSpace/cfc2-access
 
 `.\build.ps1 -Deploy` builds and copies the mod into the game folder;
-`.\build.ps1 -Package 0.8.0` builds the release zip from a clean checkout.
+`.\build.ps1 -Package 0.9` builds the release zip from a clean checkout.

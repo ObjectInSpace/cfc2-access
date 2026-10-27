@@ -36,6 +36,8 @@
 #include "stg2_frame.h"
 #include "pws1_frame.h"
 #include "pws1_select.h"
+#include "pws2_frame.h"
+#include "pws2_select.h"
 #include "mjus_text.h"
 #include "mjus_story.h"
 #include "cvs2_story.h"
@@ -1465,6 +1467,33 @@ static void volume_hotkeys_tick(void)
 }
 
 
+/* --- Power Stone settings key --------------------------------------------
+ * F9 cycles pickup announcements (every fighter, players only, off);
+ * Shift+F9 toggles off-screen sounds. User, 2026-10-27, "in case it is too
+ * busy". Checked: the mod uses F5-F8 (+Shift) and `; CFC2 binds no function
+ * keys; Steam takes F12; the capture tools moved their snapshot key from F9
+ * to F11; F10 is Windows' menu key. Spoken and saved like the volume keys. */
+static void power_stone_hotkeys_tick(void)
+{
+    BOOL shift;
+    wchar_t say[128];
+    if (!key_pressed(VK_F9)) return;
+    shift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+    if (shift) {
+        int on = audio_option_cycle(AUDIO_OPT_OFFSCREEN);
+        wcsncpy(say, mt(on ? MT_OFFSCREEN_ON : MT_OFFSCREEN_OFF), 127);
+        log_line("options: off-screen sounds %s", on ? "on" : "off");
+    } else {
+        static const mt_id word[3] = { MT_PICKUPS_OFF, MT_PICKUPS_PEOPLE, MT_PICKUPS_ALL };
+        int mode = audio_option_cycle(AUDIO_OPT_PICKUP_SPEECH);
+        wcsncpy(say, mt(word[mode]), 127);
+        log_line("options: pickup announcements %d", mode);
+    }
+    say[127] = 0;
+    speech_say(say, TRUE);
+}
+
+
 /* --- Probe: can we change .text page protection? -------------------------
  * This is the capability Enigma specifically takes away, and the one every
  * later stage depends on (MinHook needs it to write trampolines). Test it
@@ -1785,6 +1814,7 @@ static DWORD WINAPI worker(LPVOID param)
             mjus_frame_install();
             stg2_frame_install();
             pws1_frame_install();
+            pws2_frame_install();
         }
     }
 
@@ -2022,6 +2052,7 @@ static DWORD WINAPI worker(LPVOID param)
              * missed. Cost when nothing is pressed is four GetAsyncKeyState
              * calls -- the same order as the arrow polling already here. */
             volume_hotkeys_tick();
+            power_stone_hotkeys_tick();
             /* ⭐ ` (backtick/grave) = read the current text, and it means the
              * same thing everywhere: the shell repeats the focused row, a
              * running game reads its own screen. mod.c no longer names any
@@ -2073,6 +2104,7 @@ static DWORD WINAPI worker(LPVOID param)
             mjus_select_tick();
             stg2_select_tick();
             pws1_select_tick();
+            pws2_select_tick();
             mjus_story_tick();
             collection_probe_tick();
 
@@ -2089,6 +2121,7 @@ static DWORD WINAPI worker(LPVOID param)
             mjus_frame_log_stats();
             stg2_frame_log_stats();
             pws1_frame_log_stats();
+            pws2_frame_log_stats();
             cvs2_hit_poll_and_log();
 
             /* ⭐⭐⭐ THE MODAL CHECK RUNS AT 100 ms, NOT ON THE 2 s BEAT.

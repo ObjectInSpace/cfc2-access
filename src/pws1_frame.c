@@ -60,6 +60,7 @@ static const unsigned char FRAME_SIG[] = { 0x48,0x83,0xEC,0x28, 0xE8,0x67,0x2A,0
  *     16, 17 are food, healing 96, 48, 24 (0x140986317)
  *   1 a liftable prop; the pick-up 0x140986EF1 lifts type 1 or 6
  * A+0x7780 points at the object a fighter carries (0x14098AB00). */
+#define POOL_COUNT  100u
 #define POOL_STRIDE 0x3E0u
 #define OBJ_USED    0x0u
 #define OBJ_SHOWN   0x1u
@@ -101,37 +102,27 @@ bool pws1_fighting(const unsigned char *s)
 
 uint32_t pws1_frame_counter(const unsigned char *s) { return u32(s, OFF_FRAMES); }
 
-bool pws1_project(const unsigned char *s, const float proj[16], const float pt[3], float *pan)
+static bool project(const unsigned char *s, const float proj[16], const float pt[3], float *pan,
+                    bool offscreen_ok)
 {
     float cam[32];
+    int r;
     if (!proj) return false;
     memcpy(cam, s + OFF_VIEW, 64);
     memcpy(cam + 16, proj, 64);
     /* The stored view is a rigid camera: affine, or it is not one. */
     if (cam[3] != 0.0f || cam[7] != 0.0f || cam[11] != 0.0f || cam[15] != 1.0f) return false;
-    if (!isfinite(pt[0]) || !isfinite(pt[1]) || !isfinite(pt[2]) ||
-        !render_project_x(cam, pt, pan)) return false;
-    if (*pan < -1.0f) *pan = -1.0f;
-    if (*pan > 1.0f) *pan = 1.0f;
-    return true;
+    /* On screen only: nothing off screen is sounded (user, 2026-10-27),
+     * unless off-screen sounds are switched on (Shift+F9): then at the edge
+     * it lies beyond. */
+    r = render_project_screen(cam, pt, pan);
+    if (r == 0 && offscreen_ok) return render_project_side(cam, pt, pan);
+    return r == 1;
 }
 
-/* A pickup's pan. In front of the camera, its screen position. The camera
- * follows the fighters closely, so a pickup can lie beside or behind it (the
- * capture had a stone there for 1.7 s); it is then off the drawn screen on
- * the side the view's own right axis puts it, and pans hard to that side.
- * No camera, or not a perspective one: no pan. */
-static bool pickup_pan(const unsigned char *s, const float proj[16], const float pt[3], float *pan)
+bool pws1_project(const unsigned char *s, const float proj[16], const float pt[3], float *pan)
 {
-    float v[16], ex;
-    if (pws1_project(s, proj, pt, pan)) return true;
-    if (!proj || proj[11] != -1.0f || !(proj[0] > 0.0f)) return false;
-    memcpy(v, s + OFF_VIEW, sizeof v);
-    if (v[3] != 0.0f || v[7] != 0.0f || v[11] != 0.0f || v[15] != 1.0f) return false;
-    ex = pt[0] * v[0] + pt[1] * v[4] + pt[2] * v[8] + v[12];
-    if (!isfinite(ex)) return false;
-    *pan = ex >= 0.0f ? 1.0f : -1.0f;
-    return true;
+    return project(s, proj, pt, pan, false);
 }
 
 void pws1_pickups_decode(const unsigned char *s, uint64_t root, const float proj[16],
@@ -149,7 +140,7 @@ void pws1_pickups_decode(const unsigned char *s, uint64_t root, const float proj
         me[n][0] = f32(s, a + OFF_X); me[n][1] = f32(s, a + OFF_Y); me[n][2] = f32(s, a + OFF_Z);
         n++;
     }
-    for (unsigned i = 0; i < PICKUP_SLOTS; i++) {
+    for (unsigned i = 0; i < POOL_COUNT; i++) {
         const unsigned char *o = s + i * POOL_STRIDE;
         pickup_sample *q = &out[i];
         uint64_t addr = root + i * POOL_STRIDE;
@@ -183,7 +174,8 @@ void pws1_pickups_decode(const unsigned char *s, uint64_t root, const float proj
         }
         q->present = true;
         pt[0] = f32(o, OBJ_POS); pt[1] = f32(o, OBJ_POS + 4); pt[2] = f32(o, OBJ_POS + 8);
-        if (!n || !pickup_pan(s, proj, pt, &q->pan)) continue;
+        /* Off screen: present, silent; it pings once it comes into view. */
+        if (!n || !project(s, proj, pt, &q->pan, audio_option_get(AUDIO_OPT_OFFSCREEN) != 0)) continue;
         q->distance = 1e30f;
         for (unsigned k = 0; k < n; k++) {
             float dx = pt[0] - me[k][0], dy = pt[1] - me[k][1], dz = pt[2] - me[k][2];
@@ -231,6 +223,56 @@ void pws1_frame_decode(const unsigned char *s, match_audio_sample *m)
     }
 }
 
+/* ---- pickup announcements (pickup_speech.h) --------------------------------
+ * Who picked up what kind of thing, for both fighters (user, 2026-10-27,
+ * consistent with PWS2). Three sources, on the game thread:
+ *   - a stone: the count A+0x77EC rising (exact; the collector 0x140986150);
+ *   - a lifted thing: the carried pointer A+0x7780 naming a new pool object
+ *     (0x14098AB00), type 1 a thing to throw, type 6 an item, or food for
+ *     codes 15..17 (0x140986317);
+ *   - food eaten on touch: health rising 20 or more in one frame. Food heals
+ *     24, 48 or 96 at once (0x140986317); nothing else heals that fast in a
+ *     fight (the game's own recovery steps by one, 0x140991360). Not after a
+ *     lifted food for the same fighter within 3 s. No food appeared in the
+ *     capture, so this path is untested live. */
+static pickup_ring g_pickups;
+
+bool pws1_pickup_pop(pickup_event *e) { return pickup_ring_pop(&g_pickups, e); }
+
+unsigned pws1_watch_events(const unsigned char *s, uint64_t root, pws1_pickup_watch *w,
+                           unsigned who[6], unsigned kind[6])
+{
+    unsigned n = 0;
+    bool on = pws1_fighting(s);
+    for (unsigned p = 0; p < 2; p++) {
+        unsigned a = FIGHTER(p);
+        uint64_t c = u64(s, a + OFF_CARRIED);
+        int hp = i16(s, a + OFF_HP);
+        unsigned stones = s[a + OFF_STONES];
+        if (w->food_frames[p]) w->food_frames[p]--;
+        if (on && w->valid && s[a + OFF_SLOT] == p) {
+            if (c && c != w->carried[p] && c >= root && (c - root) % POOL_STRIDE == 0 &&
+                (c - root) / POOL_STRIDE < POOL_COUNT) {
+                const unsigned char *o = s + (c - root);
+                unsigned k = o[OBJ_TYPE] == TYPE_PROP ? PICKUP_THROWABLE :
+                             o[OBJ_TYPE] != TYPE_ITEM ? PICKUP_KINDS :
+                             o[OBJ_CODE] >= FOOD_FIRST && o[OBJ_CODE] < ITEM_CODES ? PICKUP_FOOD : PICKUP_ITEM;
+                if (k < PICKUP_KINDS) {
+                    who[n] = p; kind[n++] = k;
+                    if (k == PICKUP_FOOD) w->food_frames[p] = 180;
+                }
+            }
+            if (stones > w->stones[p] && stones <= MAX_STONES) { who[n] = p; kind[n++] = PICKUP_STONE; }
+            if (hp - w->hp[p] >= 20 && hp <= MAX_HP && !w->food_frames[p]) { who[n] = p; kind[n++] = PICKUP_FOOD; }
+        }
+        w->carried[p] = on ? c : 0;
+        w->stones[p] = (unsigned char)stones;
+        w->hp[p] = (short)hp;
+    }
+    w->valid = on;
+    return n;
+}
+
 static void frame_detour(void)
 {
     InterlockedIncrement(&g_frames);
@@ -247,6 +289,16 @@ static void frame_detour(void)
             g_last_hp[p] = v;
         }
         match_audio_feed(&g_prod, epoch, &m);
+        {
+            static pws1_pickup_watch watch;
+            unsigned who[6], kind[6], n = pws1_watch_events(s, root, &watch, who, kind);
+            for (unsigned k = 0; k < n; k++) {
+                unsigned a = FIGHTER(who[k]);
+                pickup_ring_push(&g_pickups, &(pickup_event){
+                    .epoch = epoch, .fighter = who[k], .id = s[a + 4], .code = kind[k],
+                    .human = (s[OFF_HUMANS] >> who[k] & 1u) != 0 });
+            }
+        }
         if (!pws1_fighting(s)) {
             pickup_cues_reset(&g_cues);
         } else if (pws1_frame_counter(s) != last_counter) {

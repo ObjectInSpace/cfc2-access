@@ -27,9 +27,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* The legacy mixer routes two owners (P1 HUD-left, P2 HUD-right). Four-owner
- * audio is the separate Power Stone phase; do not widen this by analogy. */
-#define MATCH_AUDIO_OWNERS 2
+/* Two owners for the HUD games (P1 left, P2 right, owners 2 and 3 absent).
+ * Four for Power Stone 2, which sets fighter_gauges (user, 2026-10-27: CPU
+ * health tracked too; told apart by sound and screen position, not HUD
+ * side). Beacons stay two-owner. */
+#define MATCH_AUDIO_OWNERS 4
 
 /* Frames with an unchanged motion signature before beacons treat the game as
  * paused. ~0.5 s at 60 fps: a false pause silences beacons mid-fight, which is
@@ -56,6 +58,10 @@ typedef struct {
     bool beacon_valid;     /* pan/stance were derived from current state     */
     float screen_pan;      /* -1 left .. +1 right, already projected         */
     float stance;          /* AUDIO_STANCE_* multiplier                      */
+    /* fighter_gauges only: where this fighter is on screen now, -1..+1, for
+     * its gauge tones; centre when gauge_pan_valid is false. */
+    bool gauge_pan_valid;
+    float gauge_pan;
 } match_audio_owner;
 
 typedef struct {
@@ -67,6 +73,10 @@ typedef struct {
     uint32_t motion_signature;   /* changes while the game simulates */
     bool clock_valid;
     int clock;                   /* the visible round clock          */
+    /* Owners are fighters (up to four): gauges through
+     * audio_gauge_set_fighter_owned, panned by gauge_pan, one articulation
+     * per owner. false: HUD gauges, owners 0 and 1 only. */
+    bool fighter_gauges;
     match_audio_owner owner[MATCH_AUDIO_OWNERS];
 } match_audio_sample;
 

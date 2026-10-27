@@ -11,6 +11,8 @@
 #include "log.h"
 #include "frame_liveness.h"
 #include "gmd_find.h"
+#include "pickup_speech.h"
+#include "character_name_table.h"
 #include <string.h>
 
 /* ---- stage select (Versus) ----------------------------------------------
@@ -89,6 +91,21 @@ void pws1_select_observe(const pws_select_sample *s, int stage, ULONGLONG root, 
     unsigned accepted = selection_channel_drain(&channel, now);
     for (unsigned p = 0; p < 2; ++p) if (accepted & (1u << p))
         log_line("pws1-select: accepted side=%u id=%u", p + 1, choices[p].value);
+}
+
+/* ---- pickup announcements (worker) --------------------------------------- */
+
+/* Speak each pending pickup ("Kraken, power stone"), the current owner's
+ * only and only while the game is admitted; pickup_say applies the F9
+ * setting. */
+void pws1_select_speak_pickups(BOOL admitted, unsigned rom)
+{
+    pickup_event e;
+    while (pws1_pickup_pop(&e)) {
+        if (!admitted || e.epoch != match_audio_current()) continue;
+        if (pickup_say(character_name(4, e.id, rom == 9 ? 1 : 0), (pickup_kind)e.code, e.human))
+            log_line("pws1-select: pickup side=%u id=%u kind=%u", e.fighter + 1, e.id, e.code);
+    }
 }
 
 /* ---- acquisition (worker thread) ---------------------------------------- */
@@ -256,6 +273,7 @@ void pws1_select_tick(void)
         }
     }
     pws1_audio_route(root, rom);
+    pws1_select_speak_pickups(TRUE, rom);
     /* Only while the update runs: a quit game's block stays frozen on its
      * last screen and passes every gate above (frame_liveness.h). */
     {
@@ -267,6 +285,7 @@ void pws1_select_tick(void)
     }
     return;
 inactive:
+    pws1_select_speak_pickups(FALSE, 0);
     pws1_audio_route(0, 0);
     pws1_select_observe(NULL, -1, 0, 0);
 }

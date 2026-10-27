@@ -52,6 +52,15 @@ typedef enum {
     MT_CUE_HEALTH, MT_CUE_SUPER, MT_CUE_BEACONS, MT_CUE_TICK,
     MT_MUTED,          /* "{0} muted"             */
     MT_PERCENT,        /* "{0} {1} percent"       */
+    /* Power Stone pickups: "{0}, {1}" fighter, kind; then the settings keys. */
+    MT_PICKUP,
+    MT_PICK_STONE, MT_PICK_FOOD, MT_PICK_ITEM, MT_PICK_TREASURE, MT_PICK_THROWABLE,
+    MT_PICKUPS_ALL, MT_PICKUPS_PEOPLE, MT_PICKUPS_OFF,
+    MT_OFFSCREEN_ON, MT_OFFSCREEN_OFF,
+    /* Power Stone 2 stage select: the screen, then each stage's direction. */
+    MT_STAGE_SELECT,
+    MT_DIR_AHEAD, MT_DIR_AHEAD_RIGHT, MT_DIR_RIGHT, MT_DIR_BEHIND_RIGHT,
+    MT_DIR_BEHIND, MT_DIR_BEHIND_LEFT, MT_DIR_LEFT, MT_DIR_AHEAD_LEFT,
     /* Startup. */
     MT_READY,          /* "Access mod ready. Backend {0}." */
     MT_NOT_UNPACKED,

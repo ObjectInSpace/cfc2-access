@@ -84,6 +84,17 @@ int  audio_cue_set_volume(audio_cue c, int percent);
  * silently no-ops at an end reads as a broken hotkey. */
 int  audio_cue_step_volume(audio_cue c, BOOL up);
 
+/* Power Stone settings, persisted beside the volumes in cfc2_audio.ini
+ * (user, 2026-10-27: "make this configurable in case it is too busy").
+ *   AUDIO_OPT_PICKUP_SPEECH  2 every fighter (default), 1 players only, 0 off
+ *   AUDIO_OPT_OFFSCREEN      0 nothing off screen sounds (default), 1 it does,
+ *                            at the screen edge it lies beyond
+ * audio_option: any thread. audio_option_cycle: worker; steps to the next
+ * value (wrapping), saves, returns it. */
+typedef enum { AUDIO_OPT_PICKUP_SPEECH = 0, AUDIO_OPT_OFFSCREEN, AUDIO_OPT_COUNT } audio_option;
+int  audio_option_get(audio_option o);
+int  audio_option_cycle(audio_option o);
+
 /* The cue's spoken name, for the announcement the hotkey makes. */
 const wchar_t *audio_cue_name(audio_cue c);
 
@@ -189,6 +200,7 @@ typedef enum {
     AUDIO_PING_FOOD,        /* sine that falls in pitch: a soft "bloop"     */
     AUDIO_PING_ITEM,        /* sine plus its fifth, short: a clear blip     */
     AUDIO_PING_PROP,        /* low triangle thud, quieter by design         */
+    AUDIO_PING_TONE,        /* a plain sine tone: places (PWS2 stage spots) */
     AUDIO_PING_FAMILIES
 } audio_ping_family;
 void audio_ping_owned(uint64_t epoch, audio_ping_family family, int variant,
@@ -206,11 +218,20 @@ void audio_ping_owned(uint64_t epoch, audio_ping_family family, int variant,
  * Gauges check under the mixer lock. Beacons and ticks stay lock-free for the
  * frame thread; they are stamped with the epoch and the mixer drops a stamp
  * that is not current, so a write that loses a race with a switch is silent.
- * Players 0 and 1 only: four-owner routing is the Power Stone phase. */
+ * Gauges and beacons: players 0 and 1 (HUD left and right), except the
+ * fighter gauges below, which take players 0..AUDIO_PARTICIPANTS-1. */
 BOOL audio_owner_begin(uint64_t epoch);
 void audio_owner_stop(uint64_t epoch);
 void audio_gauge_set_owned(uint64_t epoch, audio_gauge g, unsigned player,
                            int value, int maxv);
+/* A gauge for one of up to four fighters (Power Stone 2; user, 2026-10-27):
+ * panned to where that fighter is on screen (`pan`, -1..+1, taken at each
+ * change) instead of a fixed HUD side, and told apart by ARTICULATION, one
+ * per player: 0 steady (the plain tone every other game uses), 1 flutter
+ * (fast tremolo), 2 warble (fast vibrato), 3 growl (rough buzz). The gauge's
+ * own waveform and register still say which gauge it is. */
+void audio_gauge_set_fighter_owned(uint64_t epoch, audio_gauge g, unsigned player,
+                                   int value, int maxv, float pan);
 void audio_gauge_reset_owned(uint64_t epoch, audio_gauge g, unsigned player);
 /* live FALSE silences that one beacon and returns it to its HUD placement. */
 void audio_beacon_set_owned(uint64_t epoch, unsigned player, BOOL live,

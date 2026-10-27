@@ -219,10 +219,12 @@ The cue, as the user chose it:
   if both sides are human): every 0.2 s when touching, about 1.2 s across
   the arena; props half again as slow.
 - Pickups arriving together (a round start) are staggered over 0.35 s.
-- The camera follows the fighters closely, so a pickup can lie beside or
-  behind it: a stone did for 1.7 s in the capture. It then pans hard to the
-  side the view's own right axis puts it on (right, in that case: it was
-  past the right edge before and after).
+- Nothing off screen pings (user, 2026-10-27, for consistency with PWS2;
+  previously a pickup beside or behind the camera panned hard to its side).
+  A pickup past an edge or behind the camera is present but silent and pings
+  once it comes into view. In the capture: 1,961 sightings on screen, 825
+  past an edge, and 36 for the stone that lay beside and behind the camera
+  for 1.7 s (34 samples behind it, 2 past the right edge either side).
 - Pings only while a round is fought (sub-state 3, step 0, single view), and
   only on frames the game simulates: the frame counter R+0x27F94, which
   stopped for the whole 3.7 s pause, must have moved.
@@ -283,6 +285,24 @@ game's own.
   title; the stage's music in the fight should be the same piece.
 - Code signatures for the cursor, its bounds and the table read, and the
   table's bytes, are checked once before anything is spoken.
+
+### Pickup announcements
+
+User, 2026-10-27, consistent with PWS2: who picked up what kind of thing,
+for both fighters ("Kraken, power stone"), through the shared
+`src/pickup_speech.c` and the F9 setting (every fighter, players only, off).
+The fighter's name is the shell roster's for its ID at A+4 (live: 8 Kraken
+for the user, 3 then 6 for the CPU during the fights).
+
+- A stone: the count A+0x77EC rising. Live replay: 5 stones gained, each for
+  the right side (round two's setup stone is not fought, so not announced).
+- A lifted thing: the carried pointer A+0x7780 naming a new pool object:
+  type 1 something to throw, type 6 an item, or food for codes 15..17. No
+  object was carried in the capture; tested on constructed samples only.
+- Food eaten on touch: health rising 20 or more in one frame (food heals 24,
+  48 or 96 at once; the game's own recovery steps by one), not after a lifted
+  food within 3 s. No food appeared in the capture: the replay shows the rule
+  does not fire on recovery, but eating itself is untested live.
 
 ### Tests
 

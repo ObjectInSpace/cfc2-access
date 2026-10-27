@@ -3,7 +3,9 @@
 Both games now have a C decoder that converts copied native fields into the
 existing shared selection choices. **Update 2026-10-23: PWS1 is wired into
 the DLL and deployed** (`src/pws1_select.c`, with match audio; see the end of
-`pws1-match-fields.md`), not yet heard in the game. PWS2 is still offline only.
+`pws1-match-fields.md`), not yet heard in the game. **Update 2026-10-27: PWS2
+is wired and deployed too** (`src/pws2_select.c`); its path below held on
+every sample of the first live capture. See `pws2-match-fields.md`.
 
 ## Reproduce
 

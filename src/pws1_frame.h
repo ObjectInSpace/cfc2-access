@@ -32,6 +32,7 @@
 #include <stdbool.h>
 #include "match_audio.h"
 #include "pickup_cues.h"
+#include "pickup_speech.h"
 
 BOOL pws1_frame_install(void);
 void pws1_frame_remove(void);
@@ -46,13 +47,23 @@ void pws1_frame_decode(const unsigned char *root, match_audio_sample *m);
 bool pws1_fighting(const unsigned char *root);
 uint32_t pws1_frame_counter(const unsigned char *root);
 /* Horizontal screen position of world point `pt` through the stored view and
- * the renderer's projection `proj` (16 floats at ctx+0x1F816C); clamped to
- * the screen edge. false: no camera, not perspective, or behind it. */
+ * the renderer's projection `proj` (16 floats at ctx+0x1F816C), -1..+1.
+ * false: off screen (behind the camera or past an edge), no camera, or not
+ * perspective. Nothing off screen is sounded (user, 2026-10-27). */
 bool pws1_project(const unsigned char *root, const float proj[16], const float pt[3], float *pan);
 /* The pickups lying in the arena, by pool index, with family, type, pan and
  * distance to the nearest human fighter. `root_address` is where the block
  * lives in the game, for comparing the fighters' carried-object pointers.
  * Nothing is present unless a round is being fought. */
+/* Pickup announcements: per frame, the stones gained, things lifted and food
+ * eaten, as (side, pickup_kind) pairs; at most 6. Nothing while not fighting
+ * nor on the first fought frame. The frame hook queues them; the worker pops
+ * (event code = pickup_kind, id = the fighter's shell ID A+4). */
+typedef struct { bool valid; uint64_t carried[2]; unsigned char stones[2]; short hp[2];
+                 unsigned food_frames[2]; } pws1_pickup_watch;
+unsigned pws1_watch_events(const unsigned char *root, uint64_t root_address, pws1_pickup_watch *w,
+                           unsigned who[6], unsigned kind[6]);
+bool pws1_pickup_pop(pickup_event *e);
 void pws1_pickups_decode(const unsigned char *root, uint64_t root_address, const float proj[16],
                          pickup_sample out[PICKUP_SLOTS]);
 

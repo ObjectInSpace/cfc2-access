@@ -17,4 +17,7 @@ BOOL pws1_stage_name(int id, wchar_t *out, unsigned cap);
 /* NULL = PWS1 not admitted: depart. `stage` from pws1_stage_decode. */
 void pws1_select_observe(const pws_select_sample *s, int stage, ULONGLONG root, unsigned rom);
 void pws1_select_tick(void);
+/* Speak the pending pickups (worker; also the test seam). admitted FALSE
+ * drains them silently. */
+void pws1_select_speak_pickups(BOOL admitted, unsigned rom);
 #endif

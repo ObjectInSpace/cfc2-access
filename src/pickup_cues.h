@@ -15,7 +15,8 @@
 #include <stdint.h>
 #include "audio.h"
 
-#define PICKUP_SLOTS 100          /* stable identities: the game's pool index */
+#define PICKUP_SLOTS 200          /* stable identities: the game's pool index
+                                     (PWS1 100 records, PWS2 200)             */
 
 typedef struct {
     bool present;                 /* lying in the arena now                    */

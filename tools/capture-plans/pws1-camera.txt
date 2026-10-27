@@ -1,13 +1,13 @@
-Character select, before moving the cursor; press F9
-Move to another character; press F9
-Move back to the previous character; press F9
-Hold a direction until the character shuffle starts; press F9 while holding if practical
-Release the direction and wait for the shuffle to stop; press F9
-Start a fight, before moving; press F9
-Walk across the arena for a few seconds; press F9
-Move in the other arena direction for a few seconds; press F9
-Jump; press F9 while airborne if possible
-Collect stones or transform if practical; press F9
-Pause the game; press F9
-Resume and move again; press F9
-Round end or next arena, when reached; press F9
+Character select, before moving the cursor; press F11
+Move to another character; press F11
+Move back to the previous character; press F11
+Hold a direction until the character shuffle starts; press F11 while holding if practical
+Release the direction and wait for the shuffle to stop; press F11
+Start a fight, before moving; press F11
+Walk across the arena for a few seconds; press F11
+Move in the other arena direction for a few seconds; press F11
+Jump; press F11 while airborne if possible
+Collect stones or transform if practical; press F11
+Pause the game; press F11
+Resume and move again; press F11
+Round end or next arena, when reached; press F11

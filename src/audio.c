@@ -140,6 +140,38 @@ static const wchar_t *cue_ini_key(audio_cue c)
     }
 }
 
+/* ---- Power Stone settings (audio.h) ------------------------------------
+ * Plain interlocked reads for the frame thread; changed only by a worker
+ * keypress. Defaults are the behaviour as built: every fighter's pickups
+ * spoken, nothing off screen sounded. */
+static volatile LONG g_opt[AUDIO_OPT_COUNT] = { 2, 0 };
+static const int g_opt_values[AUDIO_OPT_COUNT] = { 3, 2 };
+static const wchar_t *const g_opt_key[AUDIO_OPT_COUNT] = { L"pickup_speech", L"offscreen_sounds" };
+
+int audio_option_get(audio_option o)
+{
+    if ((int)o < 0 || o >= AUDIO_OPT_COUNT) return 0;
+    return (int)InterlockedCompareExchange(&g_opt[o], 0, 0);
+}
+
+int audio_option_cycle(audio_option o)
+{
+    wchar_t val[8];
+    int n, v;
+    if ((int)o < 0 || o >= AUDIO_OPT_COUNT) return 0;
+    n = g_opt_values[o];
+    /* Pickup speech steps down: every fighter, players only, off, back. */
+    v = o == AUDIO_OPT_PICKUP_SPEECH ? (audio_option_get(o) + n - 1) % n : (audio_option_get(o) + 1) % n;
+    InterlockedExchange(&g_opt[o], v);
+    if (g_ini_path[0]) {
+        _snwprintf(val, 8, L"%d", v);
+        val[7] = 0;
+        if (!WritePrivateProfileStringW(L"audio", g_opt_key[o], val, g_ini_path))
+            log_line("audio: ⚠ could not save %ls to the ini (err %lu)", g_opt_key[o], GetLastError());
+    }
+    return v;
+}
+
 void audio_save_volumes(void)
 {
     if (!g_ini_path[0]) return;
@@ -181,6 +213,8 @@ typedef struct {
     float pan;          /* -1 left .. +1 right                             */
     float sm_gl, sm_gr; /* smoothed per-voice channel gains                */
     int   timbre;       /* which waveform generator                        */
+    int   kind;         /* fighter articulation, 0 = steady (see articulate) */
+    float art_phase;    /* 0..1 across one articulation cycle              */
     BOOL  active;
 } voice;
 
@@ -337,6 +371,7 @@ typedef struct {
     int   hold;
     float level;                       /* 0..1, the gauge fill fraction */
     float pan;
+    int   kind;                        /* fighter articulation; 0 = HUD gauge */
 } gauge_state;
 static gauge_state g_gauge[AUDIO_GAUGE_COUNT][AUDIO_PARTICIPANTS];
 
@@ -673,6 +708,7 @@ static void gauge_set_locked(audio_gauge g, unsigned player, int value, int maxv
 {
     gauge_state *st = &g_gauge[g][player];
     st->pan = (player == 0) ? -0.85f : 0.85f;
+    st->kind = 0;
     float lvl = (float)value / (float)maxv;
     if (lvl < 0.0f) lvl = 0.0f;
     if (lvl > 1.0f) lvl = 1.0f;
@@ -714,6 +750,24 @@ void audio_gauge_set_owned(uint64_t epoch, audio_gauge g, unsigned player,
     LeaveCriticalSection(&g_lock);
 }
 
+void audio_gauge_set_fighter_owned(uint64_t epoch, audio_gauge g, unsigned player,
+                                   int value, int maxv, float pan)
+{
+    if ((int)g < 0 || g >= AUDIO_GAUGE_COUNT || player >= AUDIO_PARTICIPANTS ||
+        maxv <= 0 || !isfinite(pan))
+        return;
+    if (pan < -1.0f) pan = -1.0f;
+    if (pan > 1.0f) pan = 1.0f;
+    lock_ensure();
+    EnterCriticalSection(&g_lock);
+    if (!g_scene_owned && owner_current(epoch)) {
+        gauge_set_locked(g, player, value, maxv);
+        g_gauge[g][player].pan = pan;
+        g_gauge[g][player].kind = (int)player;
+    }
+    LeaveCriticalSection(&g_lock);
+}
+
 static void gauge_reset_locked(audio_gauge g, unsigned player)
 {
     g_gauge[g][player].seeded = FALSE;
@@ -731,7 +785,7 @@ void audio_gauge_reset(audio_gauge g, unsigned player)
 
 void audio_gauge_reset_owned(uint64_t epoch, audio_gauge g, unsigned player)
 {
-    if ((int)g < 0 || g >= AUDIO_GAUGE_COUNT || player > 1) return;
+    if ((int)g < 0 || g >= AUDIO_GAUGE_COUNT || player >= AUDIO_PARTICIPANTS) return;
     lock_ensure();
     EnterCriticalSection(&g_lock);
     if (!g_scene_owned && owner_current(epoch)) gauge_reset_locked(g, player);
@@ -862,6 +916,7 @@ static void update_voices(void)
             const gauge_tone *t = &g_tone[g];
 
             v->timbre = t->timbre;
+            v->kind = st->kind;
             /* ⭐ Gauge pan is FIXED BY OWNER, matching the HUD: P1 bars left,
              * P2 bars right. This is deliberate and is NOT the fighter's
              * position -- the beacons carry that. Two layers, as on screen:
@@ -897,6 +952,7 @@ static void update_voices(void)
         beacon_state b = g_scene_owned ? g_scene_beacons[p] : g_beacon[p];
         if (!g_scene_owned && !legacy_stamp_ok(b.stamp)) b.live = FALSE;
         v->timbre = 3;                         /* pluck -- see osc()        */
+        v->kind   = 0;
         v->pan    = b.pan;
         /* ⚠ For the pluck, `freq` is the PULSE RATE, not a pitch: the
          * envelope and the partials are both generated from one phase ramp,
@@ -978,6 +1034,8 @@ static const struct { float freq, tau, level; } g_ping_family[AUDIO_PING_FAMILIE
     {  660.0f, 0.090f, 0.38f },   /* food: falling    */
     {  440.0f, 0.060f, 0.34f },   /* item: blip       */
     {  196.0f, 0.050f, 0.20f },   /* prop: thud       */
+    {  523.0f, 0.080f, 0.34f },   /* tone: plain sine (user, 2026-10-27: the
+                                     stage spots "just a different tone") */
 };
 
 void audio_ping_owned(uint64_t epoch, audio_ping_family family, int variant,
@@ -1084,6 +1142,20 @@ static void render(int16_t *out)
             v->sm_gr += 0.010f * (gr - v->sm_gr);
 
             float dt = v->sm_freq / (float)AUDIO_SR;   /* phase step, for polyblep */
+            /* Fighter gauges (audio_gauge_set_fighter_owned): one articulation
+             * per fighter, fast enough to show inside the ~140 ms tone --
+             * flutter 24 Hz tremolo (~3 cycles), warble 16 Hz vibrato of 7%,
+             * growl 55 Hz amplitude modulation (a rough buzz). */
+            float art = 1.0f;
+            if (v->kind > 0) {
+                static const float rate[4] = { 0.0f, 24.0f, 16.0f, 55.0f };
+                v->art_phase += rate[v->kind & 3] / (float)AUDIO_SR;
+                if (v->art_phase >= 1.0f) v->art_phase -= 1.0f;
+                float w = sinf(v->art_phase * 2.0f * (float)M_PI);
+                if (v->kind == 1) art = 0.55f + 0.45f * w;
+                else if (v->kind == 2) dt *= 1.0f + 0.07f * w;
+                else art = 0.6f + 0.4f * w;
+            }
             v->phase += dt;
             if (v->phase >= 1.0f) v->phase -= 1.0f;
 
@@ -1099,7 +1171,7 @@ static void render(int16_t *out)
                 env = expf(-7.0f * v->pulse_phase);
             }
 
-            float s = osc(v->timbre, v->phase, dt) * env * v->sm_gain * g_master;
+            float s = osc(v->timbre, v->phase, dt) * env * art * v->sm_gain * g_master;
             l += s * v->sm_gl;
             r += s * v->sm_gr;
 
@@ -1202,6 +1274,10 @@ static void read_ini(const wchar_t *game_dir)
         if (!key) continue;
         int cv = (int)GetPrivateProfileIntW(L"audio", key, 100, path);
         audio_cue_set_volume((audio_cue)c, cv);
+    }
+    for (int o = 0; o < AUDIO_OPT_COUNT; o++) {
+        int v = (int)GetPrivateProfileIntW(L"audio", g_opt_key[o], g_opt[o], path);
+        if (v >= 0 && v < g_opt_values[o]) InterlockedExchange(&g_opt[o], v);
     }
 }
 

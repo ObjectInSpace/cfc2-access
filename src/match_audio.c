@@ -58,7 +58,7 @@ static void forget_edges(match_audio_producer *p)
  * anyway, so nothing is lost. */
 static void feed_gauge(match_audio_producer *p, uint64_t epoch, audio_gauge g,
                        unsigned o, match_audio_edge *e, const match_audio_gauge *v,
-                       bool present)
+                       bool present, const match_audio_owner *fighter)
 {
     if (!present || !v->valid || v->maximum <= 0 || v->value < 0 ||
         v->value > v->maximum) {
@@ -81,16 +81,22 @@ static void feed_gauge(match_audio_producer *p, uint64_t epoch, audio_gauge g,
         audio_gauge_reset_owned(epoch, g, o);
         p->gauge_writes++;
     }
-    audio_gauge_set_owned(epoch, g, o, v->value, v->maximum);
+    /* A fighter's tone takes its screen position at the moment of change. */
+    if (fighter)
+        audio_gauge_set_fighter_owned(epoch, g, o, v->value, v->maximum,
+                                      fighter->gauge_pan_valid ? fighter->gauge_pan : 0.0f);
+    else
+        audio_gauge_set_owned(epoch, g, o, v->value, v->maximum);
     p->gauge_writes++;
     e->state = EDGE_VALID;
     e->value = v->value;
     e->maximum = v->maximum;
 }
 
+#define BEACON_OWNERS 2
 static void beacons_off(uint64_t epoch)
 {
-    for (unsigned o = 0; o < MATCH_AUDIO_OWNERS; o++)
+    for (unsigned o = 0; o < BEACON_OWNERS; o++)
         audio_beacon_set_owned(epoch, o, FALSE, 0.0f, 1.0f);
 }
 
@@ -170,12 +176,15 @@ void match_audio_feed(match_audio_producer *p, uint64_t epoch,
 
     for (unsigned o = 0; o < MATCH_AUDIO_OWNERS; o++) {
         const match_audio_owner *a = &s->owner[o];
+        /* HUD gauges exist for P1 and P2 only; audio_gauge_set_owned refuses
+         * owners 2 and 3 itself. */
+        const match_audio_owner *fighter = s->fighter_gauges ? a : NULL;
         if (p->feeds & MATCH_AUDIO_FEED_HEALTH)
             feed_gauge(p, epoch, AUDIO_GAUGE_HEALTH, o, &p->health[o],
-                       &a->health, a->present);
+                       &a->health, a->present, fighter);
         if (p->feeds & MATCH_AUDIO_FEED_RESOURCE)
             feed_gauge(p, epoch, AUDIO_GAUGE_SUPER, o, &p->resource[o],
-                       &a->resource, a->present);
+                       &a->resource, a->present, fighter);
     }
 
     if (p->feeds & MATCH_AUDIO_FEED_BEACON) {
@@ -188,7 +197,7 @@ void match_audio_feed(match_audio_producer *p, uint64_t epoch,
         } else {
             /* ⭐ Fed EVERY frame: a beacon is a continuous position channel,
              * not an edge. Lock-free in audio.c, so this costs no contention. */
-            for (unsigned o = 0; o < MATCH_AUDIO_OWNERS; o++) {
+            for (unsigned o = 0; o < BEACON_OWNERS; o++) {
                 const match_audio_owner *a = &s->owner[o];
                 BOOL live = a->present && a->beacon_valid;
                 audio_beacon_set_owned(epoch, o, live, a->screen_pan, a->stance);

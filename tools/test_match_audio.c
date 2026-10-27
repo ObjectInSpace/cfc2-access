@@ -289,8 +289,42 @@ int main(void)
     audio_tick_owned(c2);
     CHECK(loud(30) < 40, "12: a departed epoch cannot sound");
 
+    /* 13. Fighter gauges (Power Stone 2): owners 2 and 3 are HUD-less in the
+     *     ordinary mode; with fighter_gauges every owner sounds, panned by its
+     *     gauge_pan at the change, centred when it has none. */
+    {
+        match_audio_producer fp = { .feeds = MATCH_AUDIO_FEED_HEALTH };
+        uint64_t c3 = match_audio_begin(5);
+        int l, r;
+        CHECK(drained(), "13: floor before fighter gauges");
+        m = sample(); health(&m, 3, 1000, 1000);
+        match_audio_feed(&fp, c3, &m);
+        health(&m, 3, 800, 1000);
+        match_audio_feed(&fp, c3, &m);
+        CHECK(loud(20) < 40, "13: a HUD game's owner 3 never sounds");
+        match_audio_feed(&fp, c3, &(match_audio_sample){ 0 });
+        m = sample(); m.fighter_gauges = true; health(&m, 3, 1000, 1000);
+        m.owner[3].gauge_pan_valid = true; m.owner[3].gauge_pan = -1.0f;
+        match_audio_feed(&fp, c3, &m);
+        health(&m, 3, 700, 1000);
+        match_audio_feed(&fp, c3, &m);
+        window(20, &l, &r);
+        CHECK(l > 1000 && l > 4 * r, "13: fighter owner 3 sounds where it stands (left)");
+        CHECK(drained(), "13: its tone ends");
+        m.owner[3].gauge_pan = 1.0f; health(&m, 3, 600, 1000);
+        match_audio_feed(&fp, c3, &m);
+        window(20, &l, &r);
+        CHECK(r > 1000 && r > 4 * l, "13: .. and follows it (right)");
+        CHECK(drained(), "13: its tone ends again");
+        m.owner[3].gauge_pan_valid = false; health(&m, 3, 500, 1000);
+        match_audio_feed(&fp, c3, &m);
+        window(20, &l, &r);
+        CHECK(l > 1000 && r > 1000 && abs(l - r) * 4 < l + r, "13: no placement: centred");
+        match_audio_depart(c3);
+    }
+
     if (fails) { printf("%d FAILED\n", fails); return 1; }
     puts("PASS: match audio controller -- gauges, KO, resource maxima, beacons, "
-         "clock edges, pause, exit, mute, switch, late writes/stops/ticks, depart");
+         "clock edges, pause, exit, mute, switch, late writes/stops/ticks, depart, fighter gauges");
     return 0;
 }

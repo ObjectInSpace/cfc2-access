@@ -43,6 +43,9 @@ BOOL audio_owner_begin(uint64_t e) { (void)e; owner_begins++; return TRUE; }
 void audio_owner_stop(uint64_t e) { (void)e; owner_stops++; ga_resets++; }
 void audio_gauge_set_owned(uint64_t e, audio_gauge g, unsigned player, int value, int maxv)
 { (void)e; audio_gauge_set(g,player,value,maxv); }
+/* CVS2 never sets fighter_gauges; a call here would be a routing bug. */
+void audio_gauge_set_fighter_owned(uint64_t e, audio_gauge g, unsigned player, int value, int maxv, float pan)
+{ (void)e; (void)g; (void)player; (void)value; (void)maxv; (void)pan; abort(); }
 void audio_gauge_reset_owned(uint64_t e, audio_gauge g, unsigned player)
 { (void)e; audio_gauge_reset(g,player); }
 void audio_beacon_set_owned(uint64_t e, unsigned player, BOOL live, float pan, float stance)

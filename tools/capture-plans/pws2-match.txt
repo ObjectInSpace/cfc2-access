@@ -1,0 +1,8 @@
+Character select, before moving the cursor; press F11
+Move to another character; press F11
+Fight started, round clock running; press F11
+Just picked up a power stone; press F11
+Holding or just used an item; press F11
+Transformed after three stones, if practical; press F11
+Game paused; press F11
+Resumed, after a fighter is knocked out or the round ends; press F11
