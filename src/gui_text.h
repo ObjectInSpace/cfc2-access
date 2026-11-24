@@ -686,31 +686,28 @@ int gt_screen_texts(const void *screen, gt_cand_fn fn, void *ctx);
 BOOL gt_column_item(const void *screen, float x, float pair_x, int position,
                     char *out, int outlen);
 
-/* ⭐⭐ A SETTINGS SCREEN'S ROW VALUES, from the live object list.
+/* ⭐⭐⭐ THE GAME'S OWN ROW TEXT, by part ID -- no coordinates, no order.
  *
- * `labels` is the screen's row labels in row order. If the instance table holds
- * them as a TRULY CONSECUTIVE run, the values follow immediately in the same
- * order, and this returns the one for `row`.
+ * Every shell screen writes a row's text with 0x14007d290(screen, part,
+ * child, message), which finds the part by walking the screen's GUI tree and
+ * then the child text object by its index. This repeats that walk, read-only:
+ *   part node: from *(screen+0x108), id at +0x08, first child +0x68, next +0x70
+ *              (0x140307640)
+ *   child obj: from *(node+0x100), index at +0x50, first child +0x70,
+ *              next +0x78 (0x1402fc5c0)
+ * Measured: a row's label object has index 7 and its value index 8 (the
+ * 15:17 Keyboard Settings dump: every label +0x050 = 7, every value = 8).
  *
- * ⭐ It reaches three things no GMD table can: the button GLYPHS
- * (`<ICON BTN_RB>` etc. -- gui_markup already names 132 such tokens), the
- * RESOLUTION, and the display mode. Verified offline against every logged
- * instance report: 3 blocks found, 3 correct, 0 wrong.
- *
- * ⛔⛔ CONSECUTIVE IS LOAD-BEARING, not tidiness. Requiring only that the labels
- * appear IN ORDER passed on Sound Settings, where they sit at positions
- * [0,4,5,6,7,8] with a caption and a menu item in between -- and the join then
- * read from the wrong offset and produced "Music Volume -> Remix", "Announcer
- * Volume -> Options". Every value wrong, all plausible, none detectable by ear.
- *
- * ⚠ It therefore REFUSES more often than it answers: measured at 3 of 9 reports
- * where all the labels were present. A row that does not resolve keeps its
- * position-only speech, which is true.
- *
- * ⚠ Prose and hint strips are skipped between values (help text can interleave),
- * which is why this is not a fixed offset. */
-BOOL gt_row_value(const char *const *labels, int nlabels, int row,
+ * The text is the last string the game set on that exact object (the setText
+ * hook's record). FALSE when the part or child does not exist, the object is
+ * not a text object, or no text was ever set on it. Every read is guarded and
+ * the walk is capped, so a freed tree yields FALSE, never a crash. */
+BOOL gt_part_text(const void *screen, int part_id, int child,
                   char *out, int outlen);
+
+/* Log every child (index and text) of one part, once per (screen, part).
+ * Measurement for a screen whose child layout is not yet established. */
+void gt_part_dump_once(const void *screen, int part_id, const char *why);
 
 /* ⭐⭐ THE FOCUS DIFFER: which field of a cGUIObjText marks it as SELECTED?
  *

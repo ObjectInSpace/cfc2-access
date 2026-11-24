@@ -108,6 +108,46 @@ all 28 after touching this layer, not a chosen few.
 The user is blind and uses NVDA. **Never use tables** in replies or docs — use
 lists. Keep line-based output linear and screen-reader friendly.
 
+## ⭐⭐⭐ SHELL TEXT COMES FROM THE GAME'S OWN TABLES, NOT POSITIONS (2026-11-24)
+
+User: "remove guessing entirely." Converting screen by screen (user chose
+"replace one by one": each screen keeps its current reading until its
+table-driven version lands, then the guess is deleted).
+
+⭐⭐ **The mechanism.** Shell screens write row text with 0x14007d290 /
+0x14007d5b0 (screen, PART ID, child, message/string). `gt_part_text()` repeats
+the game's own lookup read-only: part node from `*(screen+0x108)` (id +0x08,
+child +0x68, next +0x70; 0x140307640), then the child object from
+`*(node+0x100)` (index +0x50, child +0x70, next +0x78; 0x1402fc5c0). **Label =
+child 7, value = child 8** (measured: every label +0x050 = 7, every value 8).
+Never follow the ROOT's sibling (the game does not).
+
+Where the row -> part mapping comes from, per screen family:
+- **Row-indexed settings screens** (System, Sound, Network, PC, ...): ONE
+  shared table `0x1411fb4f0[row]`, used by 0x14007e130 / 0x14007ede0 /
+  0x14007ea80. The MC_SETTINGS_VALUE fallback reads child 8 of that part, and
+  where the row has a verified label, child 7 must equal it or nothing is read.
+  Replaced `gt_row_value()` (consecutive-run, broke on slot reuse: System's
+  button rows went silent) and `gt_row_value_on()` (positional). Both deleted.
+- **Keyboard controls** (`MC_KEY_GRID`; 0x14009ec58 rows, 0x14009ed68
+  column switch -- NOT a Yes/No dialog, 0x14009ed20 type): row = `+0x334`
+  (⛔ the game REWRITES it after the helper: 7->8 becomes 15, 15->14 becomes
+  7, 8->7 becomes 0), part = `0x141207620[row]`, key rows drawn 1..`[+0x37c]`.
+- **Gamepad controls** (`MC_PAD_LIST`; 0x1400a031d + 0x1400a0513 / 056f /
+  05b2): refresh 0x1400a0e10. A SCROLLING list: selected item = `[+0x338] +
+  [+0x33c]`, slot s shows item 0 (s=0), `[+0x340]-1` (s=7), else `[+0x338]+s`;
+  slot part = `0x141207848[s]`; labels are messages `0x141207868[item]`.
+  Child 7 = the controller BUTTON, child 8 = the ACTION assigned to it
+  (measured 2026-11-24 15:50, every slot): "X, Light Punch, 2 of 14".
+
+Tests: `run_ms_test.ps1` cases 36-38 build a fake GUI tree (no coordinates)
+with the exe tables stood in by `menu_speak_test_set_exe_reader()`.
+
+⚠ Still guess-based, to convert next: `MC_ROW_COLUMN` / `MC_ROW_VALUE_LIVE`
+(coordinate columns), `MC_COORD_LIVE`, the caption channel's row joins, the
+move list's x=84/x=633 columns. For each, read the screen's refresh routine
+for its part table first.
+
 ## Game
 
 - Dir: `C:\Program Files (x86)\Steam\steamapps\common\CAPCOM FIGHTING COLLECTION 2`
@@ -402,8 +442,10 @@ the reason to mute is usually that the cue is in the way *right now*.
 first two proposals were both wrong):
 - **F12 is Steam's default screenshot key** — it would snap a screenshot on
   every press. Do not give it to anything used during play.
-- CFC2 itself **binds no function keys**; its 16 keyboard-settings rows
-  (`g_kbd_settings_rows`) are gameplay actions on letters and arrows.
+- CFC2's keyboard defaults use **F1-F3** (Start F1, Menu F2, Coin F3, from
+  the Keyboard Settings layout dump) and letters for the rest, so F5-F8 are
+  free. ⚠ This line used to say the game binds no function keys.
+
 - The `KB_F10` in `gui_markup.c` and `markup.py` is an **example in a comment**
   about the mechanical `KB_A -> "A"` rule, NOT a binding. ⭐ A grep hit inside
   a comment looks exactly like a real one.

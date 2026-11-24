@@ -123,9 +123,9 @@ EXPECTED = {
     # The IN-GAME pause menu (0x1400a749d). All 8 rows from their own captions,
     # 20 sightings. NOT the predicted 250-256 contiguous run: it has eight rows,
     # and INST_CARD (1070) / DISPLAY_SOUND_SETTINGS (574) are far from the rest.
-    # In-game Keyboard Settings (0x14009ec58), 16 rows. Two captions anchor it;
-    # the live object list gives the order; the corpus confirms the ten
-    # movement/attack labels are MENU_KBD_* (239-248).
+    # In-game Keyboard Settings (0x14009ec58) has NO map any more: the old one
+    # was creation order, not cursor order, and the captions contradicted it.
+    # It is read by position from the live screen (MC_KEY_GRID).
     # In-game Display & Sound Settings (0x14009c755). The two volume rows use
     # SOUND_* (592/593), not the Options MENU_OP_* pair -- they sit inside this
     # screen's own family block with HELP_SOUND_* captions.
@@ -145,12 +145,6 @@ EXPECTED = {
     "g_ingame_av_rows6": [
         "Wallpaper", "Display Filter", "Display Size",
         "Music Volume", "Sound Effects Volume", "Default",
-    ],
-    "g_kbd_settings_rows": [
-        "Key Bindings", "Default", "Menu", "Start", "Coin",
-        "Left", "Up", "Right", "Down",
-        "Light Punch", "Medium Punch", "Heavy Punch",
-        "Light Kick", "Medium Kick", "Heavy Kick", "Type A",
     ],
     "g_pause_menu_rows": [
         "Resume", "Marquee Card", "Move List", "Controller Settings",

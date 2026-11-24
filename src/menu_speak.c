@@ -656,10 +656,10 @@ static const int g_fighter_awards_rows[] = {
     3064, 3066, 3068, 3070, 3072,
 };
 
-static const int g_kbd_settings_rows[] = {
-    464, 168, 573, 238, 572, 241, 239, 242, 240,
-    243, 244, 245, 246, 247, 248, 234
-};
+/* ⛔⛔ g_kbd_settings_rows WAS HERE AND WAS WRONG (removed 2026-11-24). It was
+ * the live objects' CREATION order, and the cursor does not follow it -- see
+ * key_grid_build(). The note above is kept as history: the 0x14009ed68 "Yes/No
+ * dialog" reading in it is also wrong; the disassembly shows a column switch. */
 
 /* See MC_TEST_CALLER: a map that deliberately keeps one row UNKNOWN so the
  * sentinel path stays covered now that no shipped screen has a gap. */
@@ -1357,19 +1357,6 @@ static const mc_screen g_screens[] = {
     { 0x14009c755ULL, -1, 6, "Display & Sound Settings", MC_VERIFIED_LIVE_TEXT,
       MC_SETTINGS_ROW, 0, g_ingame_av_rows6, 6, NULL, 0, 0x18u },
 
-    /* ⭐⭐ THE KEYBOARD SETTINGS CONFIRMATION DIALOG (Yes / No), 2 items.
-     * See the long note at g_kbd_settings_rows: this was recorded for months as
-     * an unjoinable VALUE axis, and it is not a value axis -- it is a dialog.
-     * Its cursor is a stack local, which is exactly what a dialog's would be.
-     *
-     * ⭐ Read from column x=960, where the game draws both options and where the
-     * screen heading is absent while the dialog is up. No map: SYSTEM_YES/NO and
-     * SYS_WINDOW_YES/NO are textually identical and the corpus cannot separate
-     * them, so the words come from the screen itself. */
-    { .caller = 0x14009ed68ULL, .base_index = -1, .count = 2,
-      .name = "Confirm", .how = MC_VERIFIED_LIVE_TEXT,
-      .kind = MC_ROW_COLUMN, .coord_x = MC_HEADING_X },
-
     /* ⭐⭐ The in-game AV screen's VALUE axis. Same screen object as the row
      * site above -- five call sites share 0x2C498050, which is why the axes
      * must be told apart by cursor OFFSET and not by screen.
@@ -1380,33 +1367,48 @@ static const mc_screen g_screens[] = {
       (int)(sizeof(g_ingame_av_values) / sizeof(g_ingame_av_values[0])),
       0x30u },
 
-    /* ⭐⭐⭐ IN-GAME KEYBOARD SETTINGS, 16 rows. See g_kbd_settings_rows: two
-     * captions anchor it and the live object list supplies the rest, with the
-     * corpus confirming which ten labels belong. Reached from the pause menu's
-     * "Controller Settings". */
-    /* ⛔ MC_SETTINGS_ROW, not MC_LIST -- the same defect the in-game AV screen
-     * had, found by auditing every screen with a value axis for a reachable
-     * row half rather than waiting to hit it. A value movement here would have
-     * said "row 3" instead of "Menu". */
-    { 0x14009ec58ULL, -1, 16, "Keyboard Settings", MC_VERIFIED_LIVE_TEXT,
-      MC_SETTINGS_ROW, 0, g_kbd_settings_rows, 16, NULL, 0, 0 },
+    /* ⭐⭐⭐ PER-GAME KEYBOARD SETTINGS -- all three call sites of one screen
+     * (pause menu > Controller Settings, or Y on Select Game). Every movement,
+     * up/down, left/right column switch or Key Bindings type, reads the
+     * screen's own row cursor and quotes that row's label and key. See
+     * key_grid_build() for the disassembly, and for why the old row map and
+     * the "Confirm" dialog entry were removed.
+     *   0x14009ec58  rows, 0..15 (count 16)
+     *   0x14009ed68  left/right column switch, 0..1 (stack-local cursor)
+     *   0x14009ed20  Key Bindings type, 0..3 (screen+0x380) */
+    { .caller = 0x14009ec58ULL, .base_index = -1, .count = 16,
+      .name = "Keyboard Settings", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_KEY_GRID },
+    { .caller = 0x14009ed68ULL, .base_index = -1, .count = 2,
+      .name = "Keyboard Settings", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_KEY_GRID },
+    { .caller = 0x14009ed20ULL, .base_index = -1, .count = 4,
+      .name = "Keyboard Settings", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_KEY_GRID },
 
-    /* ⭐⭐ KEYBOARD SETTINGS' VALUE AXIS (0x14009ed20), 4 items, horizontal.
-     * Same screen object (0x2C498050) as the row site above -- another AXIS of
-     * a screen already named, the shape established in 0795b7f.
-     *
-     * Its cursor is screen+0x380, a real field of the screen object, so the
-     * row join is the usual arithmetic and not a timing guess.
-     *
-     * ⚠ NO VALUE SET SHIPS YET. It fires while the cursor sits on row 1
-     * ("Key Bindings"), whose caption in the 02:12 run was "Type A" -- but the
-     * corpus holds only Type A and Type B (234, 235), which is TWO, and this
-     * axis has FOUR items. Those numbers disagree, so naming its values from
-     * that pair would be exactly the plausible-but-wrong map this file has
-     * shipped before. It speaks its row name and position until a run captures
-     * all four value strings. */
-    { 0x14009ed20ULL, -1, 4, "Keyboard Settings", MC_VERIFIED_LIVE_TEXT,
-      MC_SETTINGS_VALUE, 0x380, NULL, 0, NULL, 0, 0 },
+    /* ⭐⭐ THE GAMEPAD CONTROLS SCREEN (per game, with a controller: Y on
+     * Select Game or the pause menu). First reached 2026-11-24 14:40 from
+     * Plasma Sword: 8 rows on 0x1400a031d, a 4-item axis on 0x1400a0513 and
+     * a 159-item action list on 0x1400a056f, all on one screen object; the
+     * game drew "Vertical Slash" and "Default" while it was walked.
+     * From the disassembly: the cursor helper moves a window SLOT 0..7 at
+     * screen+0x33c over a scrolling list (top +0x338, length +0x340);
+     * value cursors from +0x344 and a stack local; 0x1400a05b2 is a third
+     * axis. Read through its refresh routine 0x1400a0e10 (MC_PAD_LIST),
+     * which logs the focused part's children once so the next run
+     * establishes where an action row keeps its button. */
+    { .caller = 0x1400a031dULL, .base_index = -1, .count = 8,
+      .name = "Controller Settings", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_PAD_LIST },
+    { .caller = 0x1400a0513ULL, .base_index = -1, .count = 0,
+      .name = "Controller Settings", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_PAD_LIST },
+    { .caller = 0x1400a056fULL, .base_index = -1, .count = 0,
+      .name = "Controller Settings", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_PAD_LIST },
+    { .caller = 0x1400a05b2ULL, .base_index = -1, .count = 0,
+      .name = "Controller Settings", .how = MC_VERIFIED_LIVE_TEXT,
+      .kind = MC_PAD_LIST },
 
     /* ⭐⭐⭐ THE IN-GAME PAUSE MENU -- the first screen behind the emulated ROM
      * that this mod names; the shell's cursor hooks fire there normally, so it
@@ -2574,6 +2576,192 @@ static BOOL learn_legend_cb(const char *text, void *ctx)
     return TRUE;
 }
 
+/* ⭐⭐⭐ THE PER-GAME KEYBOARD CONTROLS GRID -- one row, named and valued.
+ *
+ * ⛔⛔ WHAT WAS WRONG, user-reported 2026-11-24: "the controls menus are not
+ * reading their values." Three faults, all on this one screen:
+ *   1. The row map was the live objects' CREATION order (Key Bindings, Default,
+ *      Menu, ... Heavy Kick, "Type A"), not the cursor's order. The 03:30 run's
+ *      own captions contradicted it: position 2 carried "Select an action to
+ *      assign." and the move that landed on Default carried "Reset to default
+ *      settings." -- while the map called them Default and Down. And "Type A"
+ *      is a VALUE, not a row.
+ *   2. The helper's index is NOT the row. The screen's code (0x14009ec58 on)
+ *      rewrites the cursor at +0x334 after the helper returns:
+ *          old 7,  new 8  -> 15   (down off the left column lands on Default)
+ *          old 15, new 14 -> 7    (up from Default returns to the left column)
+ *          old 8,  new 7  -> 0    (up off the right column goes to Key Bindings)
+ *          old == [+0x37c] (last button), moving past it -> 15
+ *      Every one of these is visible in run 15:55's raw `mc:` lines: the move
+ *      after "15 -> 14" starts from 7, the move after "7 -> 8" from 15.
+ *   3. 0x14009ed68 is the LEFT/RIGHT COLUMN SWITCH, not a Yes/No dialog. It
+ *      passes a stack-local 0/1 side (setge on row >= 8) and then writes
+ *      row +/- 7, clamped to [+0x37c]. It was named "Confirm" and read the
+ *      x=960 column, which holds one label off-dialog, so every left/right said
+ *      "2 of 2".
+ *
+ * ⭐ So every call site on this screen reads the SAME thing: the row cursor at
+ * +0x334, read on the worker AFTER the game's rewrite (the hook only records;
+ * menu_speak runs on the next poll). Index layout from the code above:
+ *     0 Key Bindings | 1..7 left column | 8..14 right column | 15 Default
+ * with right-column row r on the same line as left-column row r-7.
+ *
+ * ⭐⭐ NAMES AND VALUES COME FROM THE GAME'S OWN OBJECTS, never positions.
+ * The refresh routine (0x14009f100, and the setup loop at 0x14009e861) gives
+ * the whole mapping:
+ *   part ID of row r    = int table at 0x141207620[r]
+ *   row r's value       = written into that part's child 8 by 0x14007d290
+ *                         (row 0: message 234 + type; key rows: the bound key
+ *                          via 0x1412076f0; row 15 Default: none)
+ *   row r's label       = the part's child 7, set by the layout
+ *   key rows drawn      = 1..[+0x37c] (the game skips the rest)
+ * gt_part_text() walks the game's GUI tree to that exact object and returns
+ * the text the game set on it. A game with three buttons reads its own three,
+ * and any language reads its own words.
+ *
+ * ⚠ Refuses (position only) when the row reads outside 0..15, names a key
+ * row the game does not draw, or the object has no text: a part that cannot
+ * be found is never replaced by a nearby one. */
+/* The row -> part table shared by every row-indexed settings helper
+ * (0x14007e130, 0x14007ede0, 0x14007ea80). */
+#define SETTINGS_PART_TABLE 0x1411fb4f0ULL
+#define KG_ROW_OFF      0x334
+#define KG_LAST_KEY_OFF 0x37c
+#define KG_PART_TABLE   0x141207620ULL
+
+/* One int from the exe's own data (ASLR off, no relocations). Guarded. */
+static BOOL exe_int_real(ULONGLONG addr, int *out)
+{
+    const void *p = (const void *)(ULONG_PTR)addr;
+    *out = 0;
+    return mem_readable(p, sizeof(int)) && mem_copy(out, p, sizeof(int));
+}
+static BOOL (*g_exe_int)(ULONGLONG, int *) = exe_int_real;
+static BOOL exe_int(ULONGLONG addr, int *out) { return g_exe_int(addr, out); }
+void menu_speak_test_set_exe_reader(BOOL (*fn)(ULONGLONG, int *))
+{
+    g_exe_int = fn ? fn : exe_int_real;
+}
+
+static BOOL screen_int(const void *screen, int off, int *out)
+{
+    const void *p = (const char *)screen + off;
+    *out = 0;
+    return screen && mem_readable(p, sizeof(int)) && mem_copy(out, p, sizeof(int));
+}
+
+/* Label (child 7) and value (child 8) of one part, spoken. */
+static BOOL part_line(const void *screen, int part, BOOL want_value,
+                      const char *who, mc_speech *out)
+{
+    char label[GT_CAPTION_MAX], value[GT_CAPTION_MAX];
+    char sl[GM_OUT_MAX], sv[GM_OUT_MAX];
+
+    if (!gt_part_text(screen, part, 7, label, (int)sizeof(label))) {
+        log_line("mcspeak: %s -- part %d has no label text in the GUI tree; "
+                 "speaking position only.", who, part);
+        gt_part_dump_once(screen, part, who);
+        out->why = MC_UNNAMED_TEXT_UNREADABLE;
+        return FALSE;
+    }
+    gm_speak(label, sl, sizeof(sl));
+    if (!sl[0] || gm_has_residue(sl)) {
+        out->why = MC_UNNAMED_TEXT_UNREADABLE;
+        return FALSE;
+    }
+    sv[0] = '\0';
+    if (want_value && gt_part_text(screen, part, 8, value, (int)sizeof(value))) {
+        gm_speak(value, sv, sizeof(sv));
+        if (gm_has_residue(sv))
+            sv[0] = '\0';
+    }
+    if (sv[0])
+        _snprintf(out->item, sizeof(out->item), "%s, %s", sl, sv);
+    else
+        _snprintf(out->item, sizeof(out->item), "%s", sl);
+    out->item[sizeof(out->item) - 1] = '\0';
+    out->named = TRUE;
+    out->why   = MC_NAMED_OK;
+    return TRUE;
+}
+
+static void key_grid_build(const mc_move *m, mc_speech *out)
+{
+    int row = -1, last_key = -1, part = 0;
+
+    if (!m->screen || !screen_int(m->screen, KG_ROW_OFF, &row) ||
+        row < 0 || row > 15) {
+        log_line("mcspeak: key grid -- row cursor at +0x%x unreadable or out "
+                 "of range (%d); speaking position only.", KG_ROW_OFF, row);
+        out->why = MC_UNNAMED_ROW_UNDERIVABLE;
+        return;
+    }
+    if (row >= 1 && row <= 14 &&
+        (!screen_int(m->screen, KG_LAST_KEY_OFF, &last_key) || row > last_key)) {
+        log_line("mcspeak: key grid -- row %d is past the last drawn key row "
+                 "(%d); speaking position only.", row, last_key);
+        out->why = MC_UNNAMED_ROW_UNDERIVABLE;
+        return;
+    }
+    if (!exe_int(KG_PART_TABLE + 4ull * (ULONGLONG)row, &part)) {
+        out->why = MC_UNNAMED_ROW_UNDERIVABLE;
+        return;
+    }
+    if (part_line(m->screen, part, row != 15, "key grid", out))
+        out->bare = TRUE;
+}
+
+/* ⭐⭐ THE GAMEPAD CONTROLS SCREEN, from its refresh routine 0x1400a0e10.
+ * Eight on-screen SLOTS over a scrolling list:
+ *   selected item   = [+0x338] + [+0x33c]   (r13d)
+ *   slot s's item   = 0 for s == 0, [+0x340] - 1 for s == 7 (Default),
+ *                     [+0x338] + s otherwise
+ *   slot s's part   = int table at 0x141207848[s]
+ *   label           = child 7 (message 0x141207868[item], by 0x14007d290)
+ *   slot 0's value  = child 8 (message 234 + type)
+ * The focused slot is the one whose item equals the selected item -- the
+ * comparison the routine itself makes to choose each slot's highlight. */
+#define PAD_SCROLL_OFF  0x338
+#define PAD_CURSOR_OFF  0x33c
+#define PAD_COUNT_OFF   0x340
+#define PAD_PART_TABLE  0x141207848ULL
+
+static void pad_list_build(const mc_move *m, mc_speech *out)
+{
+    int scroll, cursor, count, sel, slot = -1, part = 0;
+
+    if (!m->screen || !screen_int(m->screen, PAD_SCROLL_OFF, &scroll) ||
+        !screen_int(m->screen, PAD_CURSOR_OFF, &cursor) ||
+        !screen_int(m->screen, PAD_COUNT_OFF, &count) || count < 2) {
+        out->why = MC_UNNAMED_ROW_UNDERIVABLE;
+        return;
+    }
+    sel = scroll + cursor;
+    for (int s = 0; s < 8; s++) {
+        int item = s == 0 ? 0 : s == 7 ? count - 1 : scroll + s;
+        if (item == sel) { slot = s; break; }
+    }
+    if (slot < 0 || !exe_int(PAD_PART_TABLE + 4ull * (ULONGLONG)slot, &part)) {
+        log_line("mcspeak: controller settings -- no slot shows item %d "
+                 "(scroll %d, cursor %d, count %d); speaking position only.",
+                 sel, scroll, cursor, count);
+        out->why = MC_UNNAMED_ROW_UNDERIVABLE;
+        return;
+    }
+    /* ⭐ Established 2026-11-24 15:50 from the part dump: on this screen
+     * child 7 is the controller BUTTON (<ICON BTN_X>) and child 8 the ACTION
+     * assigned to it ("Light Punch"), on every slot -- the reverse of the
+     * keyboard screen, and exactly what part_line() reads. */
+    if (part_line(m->screen, part, TRUE, "controller settings", out)) {
+        if (m->vertical && out->total == 8) {
+            out->position = sel + 1;
+            out->total = count;
+        } else {
+            out->bare = TRUE;
+        }
+    }
+}
+
 void menu_speak_build(const mc_move *m, mc_speech *out)
 {
     memset(out, 0, sizeof(*out));
@@ -2855,6 +3043,17 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
      * the membership test and Y is the order, so a row label is never confused
      * with its value (X=835 here) or with the screen heading (X=960). No map, no
      * screen identity, no index. */
+    if (s->kind == MC_KEY_GRID) {
+        key_grid_build(m, out);
+        return;
+    }
+
+    /* ⭐⭐ THE GAMEPAD CONTROLS SCREEN, from its own refresh routine. */
+    if (s->kind == MC_PAD_LIST) {
+        pad_list_build(m, out);
+        return;
+    }
+
     if (s->kind == MC_ROW_COLUMN) {
         char text[GT_CAPTION_MAX], spoken[GM_OUT_MAX];
         int n;
@@ -3595,43 +3794,54 @@ void menu_speak_build(const mc_move *m, mc_speech *out)
                 } else {
                     out->why = MC_UNNAMED_TEXT_UNREADABLE;
                 }
-            } else if (sib && sib->labels && sib->nlabels > 0 &&
-                       !out->is_level) {
-                /* ⭐⭐ NO TABLE FOR THIS ROW -- ask the LIVE OBJECT LIST.
+            } else if (!out->is_level) {
+                /* ⭐⭐⭐ THE ROW'S VALUE FROM THE GAME'S OWN OBJECT.
                  *
-                 * ⛔ USER-REPORTED: "it still doesn't say anything when I change
-                 * resolution." Correct, and the reason was that the join was
-                 * verified offline and never wired in. The 02:30 run shows the
-                 * data was there the whole time -- the PC Settings block reads
-                 * Resolution/Display/VSync/Default then "1280x720",
-                 * "Fullscreen", "Off".
+                 * Settings screens write a row with the row-indexed helpers
+                 * 0x14007e130 (message into row), 0x14007ede0 (string into
+                 * row) and 0x14007ea80 (row state). All three turn the row
+                 * number into a part ID through ONE table, 0x1411fb4f0, and
+                 * the value lands in that part's child 8 (0x14007d5b0). So
+                 * the value is read from exactly the object the game wrote --
+                 * the resolution, the display mode, a button glyph -- with no
+                 * coordinates and no table order.
                  *
-                 * ⭐ This reaches what no GMD table can: the resolution, the
-                 * display mode, and the button GLYPHS (<ICON BTN_RB> and
-                 * friends, which gm_speak already turns into words).
+                 * ⛔ Replaces gt_row_value() (labels as a CONSECUTIVE run in
+                 * the instance table, broken by slot reuse: Options > System's
+                 * button rows went silent, user 2026-11-24) and the positional
+                 * gt_row_value_on() added the same day. Both inferred.
                  *
-                 * ⚠ Level rows are excluded -- their position IS the value and
-                 * they are already spoken as a level. */
-                /* ⚠ The table stores GMD INDICES; gt_row_value matches on the
-                 * live strings, so resolve them here. Bounded and on the worker
-                 * thread, so the cost is a handful of table reads. */
-                char lbuf[8][64];
-                const char *lptr[8];
-                int nl = sib->nlabels <= 8 ? sib->nlabels : 8;
-                int gotall = 1;
-                for (int li = 0; li < nl; li++) {
-                    if (sib->labels[li] == MC_LABEL_UNKNOWN ||
-                        !gmd_text_by_index(sib->labels[li], lbuf[li],
-                                           sizeof(lbuf[li])) || !lbuf[li][0]) {
-                        gotall = 0;
-                        break;
+                 * ⚠ CROSS-CHECK: where this row has a verified label, the
+                 * part's child 7 must be that label, or the screen is not one
+                 * that uses this table and nothing is spoken. */
+                int part = 0;
+                char lab[GT_CAPTION_MAX], rvtext[GT_CAPTION_MAX];
+                BOOL ok_row = row >= 0 && row < 32 &&
+                              exe_int(SETTINGS_PART_TABLE + 4ull * (ULONGLONG)row,
+                                      &part);
+                if (ok_row && sib && sib->labels && row < sib->nlabels &&
+                    sib->labels[row] != MC_LABEL_UNKNOWN) {
+                    char want[GT_CAPTION_MAX];
+                    if (gmd_text_by_index(sib->labels[row], want, sizeof(want)) &&
+                        want[0] &&
+                        (!gt_part_text(m->screen, part, 7, lab, (int)sizeof(lab)) ||
+                         strcmp(lab, want) != 0)) {
+                        static const void *warned_screen;
+                        static int warned_row = -1;
+                        if (warned_screen != m->screen || warned_row != row) {
+                            warned_screen = m->screen;
+                            warned_row = row;
+                            log_line("mcspeak: %s -- row %d's part %d does not "
+                                     "carry the label \"%s\"; not reading its "
+                                     "value.", s->name ? s->name : "(unnamed)",
+                                     row, part, want);
+                            gt_part_dump_once(m->screen, part, s->name);
+                        }
+                        ok_row = FALSE;
                     }
-                    lptr[li] = lbuf[li];
                 }
-                char rvtext[128];
-                if (gotall && nl == sib->nlabels &&
-                    gt_row_value(lptr, nl, row,
-                                 rvtext, sizeof(rvtext)) && rvtext[0]) {
+                if (ok_row &&
+                    gt_part_text(m->screen, part, 8, rvtext, (int)sizeof(rvtext))) {
                     char spoken[GM_OUT_MAX];
                     gm_speak(rvtext, spoken, sizeof(spoken));
                     if (spoken[0] && !gm_has_residue(spoken)) {
@@ -4311,6 +4521,8 @@ void menu_speak(const mc_move *m)
     if (sp.named && sp.axis == MC_AXIS_VALUE && sp.row_name[0])
         _snprintf(line, sizeof(line), "%s, %s, %s",
                   sp.row_name, sp.item, where);
+    else if (sp.named && sp.bare)
+        _snprintf(line, sizeof(line), "%s", sp.item);
     else if (sp.named)
         _snprintf(line, sizeof(line), "%s, %s",
                   sp.item, where);

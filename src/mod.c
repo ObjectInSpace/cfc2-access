@@ -1413,9 +1413,10 @@ static BOOL key_pressed(int vk)
  *
  * ⚠ THE KEY CHOICE WAS CHECKED, not assumed (user asked directly):
  *  - the mod's only other hotkey was the pad dump on F7, now removed;
- *  - CFC2 binds no function keys -- its 16 keyboard-settings rows
- *    (g_kbd_settings_rows in menu_speak.c) are gameplay actions on letters
- *    and arrows;
+ *  - CFC2's keyboard defaults use F1-F3 (Start F1, Menu F2, Coin F3 -- read
+ *    from the Keyboard Settings layout dump, 2026-09-11 15:17) and letters
+ *    for the rest, so F5-F8 are free. ⚠ An earlier note here said the game
+ *    binds NO function keys; the screen itself shows otherwise;
  *  - the `KB_F10` seen in gui_markup.c and markup.py is an EXAMPLE in a
  *    comment about the mechanical KB_ naming rule, not a binding;
  *  - F12 is deliberately avoided: it is Steam's default screenshot key.

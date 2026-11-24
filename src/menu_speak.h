@@ -300,7 +300,17 @@ typedef enum {
      * ⭐ Quoting the live heading sidesteps the JP/US roster question: whatever
      * the build calls the character is what is spoken, with no table to drift
      * between regions. */
-    MC_MOVE_ROSTER
+    MC_MOVE_ROSTER,
+    /* ⭐⭐⭐ THE PER-GAME KEYBOARD CONTROLS GRID (pause menu > Controller
+     * Settings, and Select Game's Y button). Read from the screen's OWN row
+     * cursor after the game has finished moving it, then named and valued from
+     * the live objects by position on screen. See key_grid_build() for the
+     * disassembly this rests on. All three call sites of the screen use it. */
+    MC_KEY_GRID,
+    /* ⭐⭐ The gamepad controls screen (0x1400a031d): a scrolling list of 8
+     * slots, read through its refresh routine's own slot/part tables. See
+     * pad_list_build(). */
+    MC_PAD_LIST
 } mc_kind;
 
 /* ⭐ A mapped screen's row whose label is NOT established. See `labels`. */
@@ -553,6 +563,11 @@ typedef struct {
      * `levels` mask -- never inferred from the count, because a 10-value row
      * might equally be ten named options. */
     BOOL  is_level;
+    /* ⭐ Speak the item WITHOUT "N of M". Set by MC_KEY_GRID, whose cursor
+     * runs over a two-column grid the game re-routes after every move: the
+     * helper's index is not the row on screen, and a count of 16 over a grid
+     * with blank slots describes nothing the player can see. */
+    BOOL  bare;
 } mc_speech;
 
 /* Build the announcement for a movement. Always fills `position`/`total`;
@@ -561,6 +576,11 @@ void menu_speak_build(const mc_move *m, mc_speech *out);
 
 /* Build it and speak it. */
 void menu_speak(const mc_move *m);
+
+/* Test seam: replace the reader of the exe's own data tables (the part-ID
+ * tables at 0x141207620 / 0x141207848), which a test process does not map.
+ * NULL restores the real guarded read. */
+void menu_speak_test_set_exe_reader(BOOL (*fn)(ULONGLONG addr, int *out));
 
 /* ⛔⛔ THERE IS NO CAPTION DEFERRAL, AND THERE MUST NOT BE ONE.
  *

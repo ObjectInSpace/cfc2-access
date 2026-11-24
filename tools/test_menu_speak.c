@@ -71,6 +71,7 @@
  * seams (gt_test_settext_body) and the class constants. The suite already
  * LINKS gui_text.c; only the declarations were missing. */
 #include "../src/gui_text.h"
+#include "../src/gui_markup.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -123,6 +124,23 @@ static BOOL test_modal_resolve(int idx, char *out, unsigned outlen)
     _snprintf(out, outlen, "%s", s);
     out[outlen - 1] = '\0';
     return TRUE;
+}
+
+/* Stands in for the exe's part-ID tables, which a test process does not map:
+ * keyboard row r -> part 100+r, gamepad slot s -> part 200+s. */
+static BOOL test_exe_int(ULONGLONG addr, int *out)
+{
+    if (addr >= 0x141207620ULL && addr < 0x141207620ULL + 16 * 4) {
+        *out = 100 + (int)((addr - 0x141207620ULL) / 4); return TRUE;
+    }
+    if (addr >= 0x141207848ULL && addr < 0x141207848ULL + 8 * 4) {
+        *out = 200 + (int)((addr - 0x141207848ULL) / 4); return TRUE;
+    }
+    if (addr >= 0x1411fb4f0ULL && addr < 0x1411fb4f0ULL + 32 * 4) {
+        *out = 300 + (int)((addr - 0x1411fb4f0ULL) / 4); return TRUE;
+    }
+    *out = 0;
+    return FALSE;
 }
 
 static mc_move mk(ULONGLONG caller, int newi, int mini, int maxi)
@@ -2153,6 +2171,283 @@ int main(void)
               (int)s6v.is_level, (int)s6d.is_level);
     }
 
+    /* --- cases 36-37: ⭐⭐⭐ THE CONTROLS SCREENS, READ FROM THE GAME'S TREE.
+     *
+     * ⛔ User, 2026-11-24: "remove guessing entirely". Both screens are now
+     * read the way their refresh routines write them: row -> part ID from the
+     * exe's table, then the part's child 7 (label) and child 8 (value) found
+     * by walking the GUI tree. These fixtures build that tree -- screen+0x108
+     * root, part nodes (id +0x08, child +0x68, next +0x70, objects +0x100),
+     * text objects (index +0x50, child +0x70, next +0x78) -- with NO screen
+     * coordinates at all, so nothing positional can pass by accident.
+     * ⚠ A DECOY part with the same ID sits as the ROOT's sibling: the game
+     * never searches there, and neither may we. */
+    {
+        static unsigned char scr[0x2000], decoy_root[0x110];
+        static unsigned char parts[24][0x110], hold[24][0x80];
+        static unsigned char txt[48][GT_CLASS_SIZE];
+        static unsigned char root[0x110];
+        int nt = 0;
+        mc_speech cs;
+
+        gt_test_reset();
+        gt_test_focus_enable();
+        memset(scr, 0, sizeof scr);
+        memset(root, 0, sizeof root);
+        memset(decoy_root, 0, sizeof decoy_root);
+        *(int *)(root + 0x08) = -1;
+        *(void **)(scr + 0x108) = root;
+
+        /* Make part `id` with label (child 7) and optional value (child 8). */
+        #define MKPART(i_, id_, lab_, val_) do {                              \
+            unsigned char *P_ = parts[i_], *H_ = hold[i_];                   \
+            memset(P_, 0, 0x110); memset(H_, 0, 0x80);                       \
+            *(int *)(P_ + 0x08) = (id_);                                     \
+            *(int *)(H_ + 0x50) = -1;                                        \
+            *(void **)(P_ + 0x100) = H_;                                     \
+            unsigned char *L_ = txt[nt++];                                   \
+            memset(L_, 0, GT_CLASS_SIZE);                                    \
+            *(ULONGLONG *)L_ = GT_VTABLE_ADDR;                               \
+            *(int *)(L_ + 0x50) = 7;                                         \
+            *(void **)(H_ + 0x70) = L_;                                      \
+            gt_test_settext_body(L_, (lab_), NULL, 0);                       \
+            if (val_) {                                                      \
+                unsigned char *V_ = txt[nt++];                               \
+                memset(V_, 0, GT_CLASS_SIZE);                                \
+                *(ULONGLONG *)V_ = GT_VTABLE_ADDR;                           \
+                *(int *)(V_ + 0x50) = 8;                                     \
+                *(void **)(L_ + 0x78) = V_;                                  \
+                gt_test_settext_body(V_, (val_), NULL, 0);                   \
+            }                                                                \
+        } while (0)
+
+        /* Keyboard rows 0..15 -> parts 100+r. Row 14 is not drawn (6 keys). */
+        static const char *const KL[16] = {
+            "Key Bindings", "Menu", "Start", "Coin", "Left", "Up", "Right",
+            "Down", "Light Punch", "Medium Punch", "Heavy Punch", "Light Kick",
+            "Medium Kick", "Heavy Kick", NULL, "Default" };
+        static const char *const KV[16] = {
+            "Type A", "<SIZE 58><ICON KB_F2></SIZE>",
+            "<SIZE 58><ICON KB_F1></SIZE>", "<SIZE 58><ICON KB_F3></SIZE>",
+            "<SIZE 58><ICON KB_A></SIZE>", "<SIZE 58><ICON KB_W></SIZE>",
+            "<SIZE 58><ICON KB_D></SIZE>", "<SIZE 58><ICON KB_S></SIZE>",
+            "<SIZE 58><ICON KB_U></SIZE>", "<SIZE 58><ICON KB_I></SIZE>",
+            "<SIZE 58><ICON KB_O></SIZE>", "<SIZE 58><ICON KB_J></SIZE>",
+            "<SIZE 58><ICON KB_K></SIZE>", "<SIZE 58><ICON KB_L></SIZE>",
+            NULL, NULL };
+        int np = 0;
+        unsigned char *prev = NULL;
+        for (int r = 0; r < 16; r++) {
+            if (!KL[r]) continue;
+            MKPART(np, 100 + r, KL[r], KV[r]);
+            if (prev) *(void **)(prev + 0x70) = parts[np];
+            else      *(void **)(root + 0x68) = parts[np];
+            prev = parts[np++];
+        }
+        /* Decoy: the ROOT's sibling holds another part 103 saying "WRONG". */
+        *(int *)(decoy_root + 0x08) = -2;
+        *(void **)(root + 0x70) = decoy_root;
+        MKPART(np, 103, "WRONG", "WRONG");
+        *(void **)(decoy_root + 0x68) = parts[np++];
+        *(int *)(scr + 0x37c) = 13;              /* last drawn key row */
+
+        menu_speak_test_set_exe_reader(test_exe_int);
+
+        static const struct {
+            ULONGLONG caller; int helper, max, game_row;
+            const char *want; const char *why;
+        } K[] = {
+            { 0x14009ec58ULL, 1, 15, 1,  "Menu, F2", "first key row" },
+            { 0x14009ec58ULL, 8, 15, 15, "Default", "helper 8, game 15: no value" },
+            { 0x14009ec58ULL, 14, 15, 7, "Down, S", "helper 14, game 7" },
+            { 0x14009ec58ULL, 7, 15, 0,  "Key Bindings, Type A", "helper 7, game 0" },
+            { 0x14009ed68ULL, 1, 1, 9,   "Medium Punch, I", "column switch 2 -> 9" },
+            { 0x14009ed20ULL, 2, 3, 0,   "Key Bindings, Type A", "type axis" },
+            { 0x14009ec58ULL, 2, 15, 3,  "Coin, F3", "part 103 from the TREE, not the decoy" },
+        };
+        int ok = 1;
+        for (int k = 0; k < (int)(sizeof K / sizeof K[0]); k++) {
+            mc_move km = mk(K[k].caller, K[k].helper, 0, K[k].max);
+            km.vertical = (K[k].caller == 0x14009ec58ULL);
+            km.screen = scr;
+            *(int *)(scr + 0x334) = K[k].game_row;
+            menu_speak_build(&km, &cs);
+            int good = cs.named && cs.bare && strcmp(cs.item, K[k].want) == 0;
+            if (!good)
+                printf("        36: %s -> named=%d item=\"%s\" (want \"%s\")\n",
+                       K[k].why, (int)cs.named, cs.item, K[k].want);
+            ok &= good;
+        }
+        check("36. the keyboard controls read the game's own part for the "
+              "game's own row, on all three call sites", ok, "");
+
+        {
+            mc_move km = mk(0x14009ec58ULL, 3, 0, 15);
+            km.screen = scr;
+            *(int *)(scr + 0x334) = 14;          /* past the last key row */
+            menu_speak_build(&km, &cs);
+            int a1 = !cs.named;
+            *(int *)(scr + 0x334) = 16;          /* out of range */
+            menu_speak_build(&km, &cs);
+            int a2 = !cs.named && cs.why == MC_UNNAMED_ROW_UNDERIVABLE;
+            check("36b. an undrawn or out-of-range row names nothing", a1 && a2,
+                  "undrawn=%d out=%d", a1, a2);
+        }
+
+        /* --- 37: the gamepad list. Slot s -> part 200+s. scroll 3, count 12:
+         * slot 0 = item 0, slots 1..6 = items 4..9, slot 7 = item 11. */
+        gt_test_reset();
+        gt_test_focus_enable();
+        memset(scr, 0, sizeof scr);
+        memset(root, 0, sizeof root);
+        *(int *)(root + 0x08) = -1;
+        *(void **)(scr + 0x108) = root;
+        nt = 0; np = 0; prev = NULL;
+        static const char *const PL[8] = {
+            "Button Layout", "Guard", "Plasma Field", "Plasma Reflect",
+            "Taunt", "Vertical Slash x2", "Kick x2", "Default" };
+        for (int sl = 0; sl < 8; sl++) {
+            MKPART(np, 200 + sl, PL[sl], sl == 0 ? "Type A" : NULL);
+            if (prev) *(void **)(prev + 0x70) = parts[np];
+            else      *(void **)(root + 0x68) = parts[np];
+            prev = parts[np++];
+        }
+        *(int *)(scr + 0x338) = 3;
+        *(int *)(scr + 0x340) = 12;
+        static const struct {
+            ULONGLONG caller; int cursor; BOOL vert; const char *want;
+            int pos; BOOL bare;
+        } A[] = {
+            { 0x1400a031dULL, 2, TRUE,  "Plasma Field", 6, FALSE },  /* item 5 */
+            { 0x1400a031dULL, 8, TRUE,  "Default", 12, FALSE },      /* item 11 */
+            { 0x1400a056fULL, 1, FALSE, "Guard", 0, TRUE },          /* item 4 */
+        };
+        ok = 1;
+        for (int k = 0; k < (int)(sizeof A / sizeof A[0]); k++) {
+            mc_move am = mk(A[k].caller, 0, 0, A[k].vert ? 7 : 158);
+            am.vertical = A[k].vert;
+            am.screen = scr;
+            *(int *)(scr + 0x33c) = A[k].cursor;
+            menu_speak_build(&am, &cs);
+            int good = cs.named && strcmp(cs.item, A[k].want) == 0 &&
+                       cs.bare == A[k].bare &&
+                       (A[k].bare || cs.position == A[k].pos);
+            if (!good)
+                printf("        37[%d]: named=%d bare=%d pos=%d item=\"%s\" "
+                       "(want \"%s\")\n", k, (int)cs.named, (int)cs.bare,
+                       cs.position, cs.item, A[k].want);
+            ok &= good;
+        }
+        check("37. the gamepad list names the slot the game highlights", ok, "");
+        /* Slot 0 is item 0 only; with scroll 3, cursor 0 selects item 3, which
+         * no slot shows -- refuse rather than name a neighbour. */
+        {
+            mc_move am = mk(0x1400a031dULL, 0, 0, 7);
+            am.screen = scr;
+            *(int *)(scr + 0x33c) = 0;
+            menu_speak_build(&am, &cs);
+            check("37b. an item no slot shows is refused", !cs.named,
+                  "named=%d item=\"%s\"", (int)cs.named, cs.item);
+        }
+        menu_speak_test_set_exe_reader(NULL);
+        #undef MKPART
+    }
+
+    /* --- case 38: ⭐⭐⭐ A SETTINGS VALUE FROM THE PART THE GAME WROTE.
+     *
+     * Options > System, the screen the user reported silent: row r's part is
+     * 0x1411fb4f0[r] (stood in for as 300+r), value in child 8. The value
+     * axis 0x1400a3578 drives row 2 (Start Button) at values_off 0x338. No
+     * coordinates, and the objects are planted in REVERSE row order so table
+     * order cannot carry the answer. ⚠ The label cross-check needs the live
+     * message table, which this process lacks, so it is not exercised here. */
+    {
+        static unsigned char sscr[0x800], sroot[0x110];
+        static unsigned char sp_[8][0x110], sh[8][0x80];
+        static unsigned char so[16][GT_CLASS_SIZE];
+        static const char *const SL[6] = {
+            "Language", "Menu Button", "Start Button", "Coin Button",
+            "Data Collection", "Default" };
+        static const char *const SV[6] = {
+            "English [en]", "<SIZE 58><ICON BTN_SELECT></SIZE>",
+            "<SIZE 58><ICON BTN_LB></SIZE>", "<SIZE 58><ICON LSB></SIZE>",
+            "Decline", NULL };
+        int no = 0;
+        unsigned char *prevp = NULL;
+        mc_speech ss;
+
+        gt_test_reset();
+        gt_test_focus_enable();
+        memset(sscr, 0, sizeof sscr);
+        memset(sroot, 0, sizeof sroot);
+        *(int *)(sroot + 0x08) = -1;
+        *(void **)(sscr + 0x108) = sroot;
+        for (int r = 5; r >= 0; r--) {
+            unsigned char *P = sp_[r], *H = sh[r], *L, *V;
+            memset(P, 0, 0x110); memset(H, 0, 0x80);
+            *(int *)(P + 0x08) = 300 + r;
+            *(int *)(H + 0x50) = -1;
+            *(void **)(P + 0x100) = H;
+            L = so[no++]; memset(L, 0, GT_CLASS_SIZE);
+            *(ULONGLONG *)L = GT_VTABLE_ADDR;
+            *(int *)(L + 0x50) = 7;
+            *(void **)(H + 0x70) = L;
+            gt_test_settext_body(L, SL[r], NULL, 0);
+            if (SV[r]) {
+                V = so[no++]; memset(V, 0, GT_CLASS_SIZE);
+                *(ULONGLONG *)V = GT_VTABLE_ADDR;
+                *(int *)(V + 0x50) = 8;
+                *(void **)(L + 0x78) = V;
+                gt_test_settext_body(V, SV[r], NULL, 0);
+            }
+            if (prevp) *(void **)(prevp + 0x70) = P;
+            else       *(void **)(sroot + 0x68) = P;
+            prevp = P;
+        }
+        menu_speak_test_set_exe_reader(test_exe_int);
+
+        /* Start Button's value moves: cursor = values array slot 2. */
+        mc_move sm = mk(0x1400a3578ULL, 2, 0, 7);
+        sm.vertical = FALSE;
+        sm.screen = sscr;
+        sm.cursor = (int *)(sscr + 0x338 + 4 * 2);
+        menu_speak_build(&sm, &ss);
+        int good1 = ss.named && strcmp(ss.item, "LB") == 0 && ss.have_row &&
+                    ss.row == 2;
+        /* Coin Button (row 3) on its own value caller. */
+        sm = mk(0x1400a3538ULL, 3, 2, 7);
+        sm.vertical = FALSE;
+        sm.screen = sscr;
+        sm.cursor = (int *)(sscr + 0x338 + 4 * 3);
+        menu_speak_build(&sm, &ss);
+        char lsb[GM_OUT_MAX];
+        gm_speak("<SIZE 58><ICON LSB></SIZE>", lsb, sizeof lsb);
+        int good2 = ss.named && lsb[0] && strcmp(ss.item, lsb) == 0;
+        char coin[128];
+        snprintf(coin, sizeof coin, "%s", ss.item);
+        check("38. a settings value is read from the part the game wrote",
+              good1 && good2, "start ok=%d, coin=\"%s\"", good1, coin);
+
+        /* 38b: delete the value object of row 2 -> nothing is borrowed from a
+         * neighbour; the row speaks position only. */
+        {
+            /* row 2 was planted 4th (r = 5,4,3,2): its label is so[6]. */
+            unsigned char *L2 = NULL;
+            for (int i = 0; i < no; i++)
+                if (*(int *)(so[i] + 0x50) == 7 &&
+                    *(void **)(sh[2] + 0x70) == so[i])
+                    L2 = so[i];
+            if (L2) *(void **)(L2 + 0x78) = NULL;
+        }
+        sm = mk(0x1400a3578ULL, 2, 0, 7);
+        sm.vertical = FALSE;
+        sm.screen = sscr;
+        sm.cursor = (int *)(sscr + 0x338 + 4 * 2);
+        menu_speak_build(&sm, &ss);
+        check("38b. a row with no value object borrows nothing", !ss.named,
+              "named=%d item=\"%s\"", (int)ss.named, ss.item);
+        menu_speak_test_set_exe_reader(NULL);
+    }
 
     printf("\n");
     if (failures) { printf("FAILED: %d case(s)\n", failures); return 1; }

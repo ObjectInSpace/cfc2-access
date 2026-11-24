@@ -1199,64 +1199,6 @@ static BOOL text_has_number_prefix(const char *s, int n)
            strncmp(s, bare, strlen(bare)) == 0;
 }
 
-/* Is this object's text a plausible VALUE, or screen furniture to skip?
- * ⚠ Deliberately strict: help captions end in punctuation or run long, and hint
- * strips carry Confirm/Back. Everything else is a candidate. */
-static BOOL rv_usable(const char *s)
-{
-    size_t n;
-    if (!s || !s[0])
-        return FALSE;
-    n = strlen(s);
-    if (n > 40)
-        return FALSE;
-    if (s[n - 1] == '.' || s[n - 1] == '!' || s[n - 1] == '?')
-        return FALSE;
-    if (strstr(s, "Confirm") || strstr(s, "Back"))
-        return FALSE;
-    return TRUE;
-}
-
-BOOL gt_row_value(const char *const *labels, int nlabels, int row,
-                  char *out, int outlen)
-{
-    if (out && outlen > 0) out[0] = 0;
-    if ((!g_installed && !g_focus_test_mode) || !labels || nlabels <= 0 ||
-        row < 0 || row >= nlabels || !out || outlen <= 0)
-        return FALSE;
-    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
-        return FALSE;
-
-    volatile int found = 0;
-    LONG n = g_inst_count;
-    /* Find a CONSECUTIVE run of the row labels. See the header for why merely
-     * "in order" is not enough. */
-    for (LONG start = 0; start + nlabels <= n && !found; start++) {
-        int k;
-        for (k = 0; k < nlabels; k++) {
-            if (strcmp(g_inst[start + k].text, labels[k]) != 0)
-                break;
-        }
-        if (k != nlabels)
-            continue;
-        /* The values follow, skipping prose and hint strips. */
-        int want = row, i;
-        for (i = start + nlabels; i < n; i++) {
-            if (!rv_usable(g_inst[i].text))
-                continue;
-            if (want-- == 0) {
-                strncpy(out, g_inst[i].text, (size_t)outlen - 1);
-                out[outlen - 1] = 0;
-                found = 1;
-                break;
-            }
-        }
-    }
-    InterlockedExchange(&g_inst_busy, 0);
-    if (!found) out[0] = 0;
-    return found ? TRUE : FALSE;
-}
-
 BOOL gt_numbered_item(int n, char *out, int outlen)
 {
     if (out && outlen > 0) out[0] = 0;
@@ -2787,6 +2729,140 @@ BOOL gt_widget_of(const void *screen, float x, float y, char *out, int outlen)
     _snprintf(out, (size_t)outlen, "%s", w[hit].text);
     out[outlen - 1] = 0;
     return out[0] != 0;
+}
+
+/* ---- the game's GUI tree, read-only (see gt_part_text in the header) ---- */
+
+#define GT_TREE_VISITS 4096       /* hard cap: a cycle or a torn tree stops here */
+
+static BOOL tree_ptr(const void *at, void **out)
+{
+    *out = NULL;
+    if (!at || ((ULONG_PTR)at & 7u) || !mem_readable(at, sizeof(void *)))
+        return FALSE;
+    return mem_copy(out, at, sizeof(void *));
+}
+
+static BOOL tree_int(const void *at, int *out)
+{
+    *out = 0;
+    if (!at || !mem_readable(at, sizeof(int)))
+        return FALSE;
+    return mem_copy(out, at, sizeof(int));
+}
+
+/* Depth-first, as the game's own recursive search, with an explicit stack.
+ * id_off / child_off / next_off select which of the two trees is walked. */
+static void *tree_find(void *root, int want, int id_off, int child_off,
+                       int next_off)
+{
+    void *stack[256];
+    int sp = 0, visits = 0;
+
+    if (root)
+        stack[sp++] = root;
+    while (sp > 0 && visits++ < GT_TREE_VISITS) {
+        void *n = stack[--sp], *child = NULL, *next = NULL;
+        int id;
+        if (!tree_int((char *)n + id_off, &id))
+            continue;
+        if (id == want)
+            return n;
+        /* Sibling first onto the stack so the child is searched first,
+         * matching the game's order (child subtree, then the next sibling).
+         * ⚠ Never the ROOT's sibling: the game searches the node and what
+         * hangs below it only, and the root's neighbour is another part. */
+        if (n != root &&
+            tree_ptr((char *)n + next_off, &next) && next && sp < 256)
+            stack[sp++] = next;
+        if (tree_ptr((char *)n + child_off, &child) && child && sp < 256)
+            stack[sp++] = child;
+    }
+    return NULL;
+}
+
+static void *part_child_obj(const void *screen, int part_id, int child)
+{
+    void *root = NULL, *part, *objs = NULL;
+    if (!screen || !tree_ptr((const char *)screen + 0x108, &root) || !root)
+        return NULL;
+    part = tree_find(root, part_id, 0x08, 0x68, 0x70);
+    if (!part || !tree_ptr((char *)part + 0x100, &objs) || !objs)
+        return NULL;
+    return tree_find(objs, child, 0x50, 0x70, 0x78);
+}
+
+/* The text last set on `obj`, from the setText record. */
+static BOOL obj_text(const void *obj, char *out, int outlen)
+{
+    ULONGLONG vptr = 0;
+    BOOL found = FALSE;
+
+    out[0] = 0;
+    if (!obj || !mem_readable(obj, sizeof(vptr)) ||
+        !mem_copy(&vptr, obj, sizeof(vptr)) ||
+        (vptr != GT_VTABLE_ADDR && vptr != GT_VTABLE_MSG))
+        return FALSE;
+    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
+        return FALSE;
+    for (LONG i = 0; i < g_inst_count; i++) {
+        if (g_inst[i].obj == obj && g_inst[i].text[0]) {
+            _snprintf(out, (size_t)outlen, "%s", g_inst[i].text);
+            out[outlen - 1] = 0;
+            found = TRUE;
+            break;
+        }
+    }
+    InterlockedExchange(&g_inst_busy, 0);
+    return found;
+}
+
+BOOL gt_part_text(const void *screen, int part_id, int child,
+                  char *out, int outlen)
+{
+    void *obj;
+    if (out && outlen > 0) out[0] = 0;
+    if ((!g_installed && !g_focus_test_mode) || !out || outlen <= 0)
+        return FALSE;
+    obj = part_child_obj(screen, part_id, child);
+    if (!obj || !obj_text(obj, out, outlen))
+        return FALSE;
+    /* A pooled slot the game blanked is not text. */
+    for (const char *q = out; *q; q++)
+        if (*q != ' ' && *q != '\t')
+            return TRUE;
+    out[0] = 0;
+    return FALSE;
+}
+
+void gt_part_dump_once(const void *screen, int part_id, const char *why)
+{
+    static struct { const void *s; int p; } seen[32];
+    static int nseen;
+    char t[GT_TEXT_MAX];
+    int shown = 0;
+
+    if ((!g_installed && !g_focus_test_mode) || !screen)
+        return;
+    for (int i = 0; i < nseen; i++)
+        if (seen[i].s == screen && seen[i].p == part_id)
+            return;
+    if (nseen >= 32)
+        return;
+    seen[nseen].s = screen; seen[nseen].p = part_id; nseen++;
+    for (int c = 0; c < 32; c++) {
+        void *o = part_child_obj(screen, part_id, c);
+        if (!o)
+            continue;
+        if (!obj_text(o, t, (int)sizeof t))
+            strcpy(t, "(no text recorded)");
+        log_line("gt: part %d on %p (%s) child %d = \"%.80s\"", part_id,
+                 screen, why ? why : "", c, t);
+        shown++;
+    }
+    if (!shown)
+        log_line("gt: part %d on %p (%s) -- no children found in the GUI "
+                 "tree.", part_id, screen, why ? why : "");
 }
 
 int gt_screen_texts(const void *screen, gt_cand_fn fn, void *ctx)
