@@ -23,7 +23,7 @@ $mh = Get-ChildItem "$root\libs\minhook\src" -Recurse -Filter *.c | ForEach-Obje
 
 & $gcc -O2 -Wall -o "$out\t_modal.exe" `
     "$root\tools\t_modal_probe.c" `
-    "$root\src\gui_text.c" "$root\src\menu_speak.c" "$root\src\gui_markup.c" `
+    "$root\src\gui_text.c" "$root\src\menu_speak.c" "$root\src\help_line.c" "$root\src\gui_markup.c" `
     "$root\src\text_channel.c" "$root\src\mod_text.c" `
     "$root\src\move_list.c" `
     "$root\src\gmd_find.c" "$root\src\prompt_id.c" "$root\src\rom_table.c" `

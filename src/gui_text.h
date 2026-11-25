@@ -709,6 +709,18 @@ BOOL gt_part_text(const void *screen, int part_id, int child,
  * Measurement for a screen whose child layout is not yet established. */
 void gt_part_dump_once(const void *screen, int part_id, const char *why);
 
+/* ⭐⭐ The layout animation a part is PLAYING -- how the game shows or hides a
+ * row's children. 0x140309440 (play animation) compares the request with
+ * **(int **)(*(node+0x100) + 0xb8), the current one, so that is read here.
+ * FALSE when the part or the record cannot be read (unknown, not "none"). */
+BOOL gt_part_anim(const void *screen, int part_id, int *anim);
+
+/* ⭐⭐ A NESTED part child's text: part `part_id`, its child `child`, then
+ * that object's own child `sub` (searched under +0xf0) -- the path the
+ * generic heading setter 0x14007df40 takes. FALSE when any step is missing. */
+BOOL gt_part_sub_text(const void *screen, int part_id, int child, int sub,
+                      char *out, int outlen);
+
 /* ⭐⭐ THE FOCUS DIFFER: which field of a cGUIObjText marks it as SELECTED?
  *
  * The open question two screens now need (Casual Match's 8-item strip, the

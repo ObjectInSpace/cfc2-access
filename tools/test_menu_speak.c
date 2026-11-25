@@ -128,8 +128,15 @@ static BOOL test_modal_resolve(int idx, char *out, unsigned outlen)
 
 /* Stands in for the exe's part-ID tables, which a test process does not map:
  * keyboard row r -> part 100+r, gamepad slot s -> part 200+s. */
+static const char *g_test_charset;   /* case 27: the lobby charset */
+
 static BOOL test_exe_int(ULONGLONG addr, int *out)
 {
+    if (g_test_charset && (addr == 0x141206c90ULL || addr == 0x141206c94ULL)) {
+        ULONGLONG v = (ULONGLONG)(ULONG_PTR)g_test_charset;
+        *out = (int)(addr == 0x141206c90ULL ? (v & 0xffffffffu) : (v >> 32));
+        return TRUE;
+    }
     if (addr >= 0x141207620ULL && addr < 0x141207620ULL + 16 * 4) {
         *out = 100 + (int)((addr - 0x141207620ULL) / 4); return TRUE;
     }
@@ -138,6 +145,14 @@ static BOOL test_exe_int(ULONGLONG addr, int *out)
     }
     if (addr >= 0x1411fb4f0ULL && addr < 0x1411fb4f0ULL + 32 * 4) {
         *out = 300 + (int)((addr - 0x1411fb4f0ULL) / 4); return TRUE;
+    }
+    /* The real action-row states (0x1411fb640, read from the dump). */
+    if (addr >= 0x1411fb640ULL && addr < 0x1411fb640ULL + 3 * 4) {
+        static const int st[3] = { 0xf4247, 0xf4248, 0xf4249 };
+        *out = st[(addr - 0x1411fb640ULL) / 4]; return TRUE;
+    }
+    if (addr >= 0x141207ce8ULL && addr < 0x141207ce8ULL + 16 * 4) {
+        *out = 400 + (int)((addr - 0x141207ce8ULL) / 4); return TRUE;
     }
     *out = 0;
     return FALSE;
@@ -193,7 +208,9 @@ int main(void)
      * means this is not the screen the table row describes -- a game update
      * reordered the menu, or the call site was reused. Indexing the label run
      * anyway would speak confident wrong names. */
-    m = mk(MAIN_CALLER, 2, 0, 8);        /* 9 items, table says 6 */
+    /* Keyboard Settings: a fixed 16 rows (since 2026-11-24 the main menu has
+     * no fixed count -- it is read from its own data). */
+    m = mk(0x14009ec58ULL, 2, 0, 8);     /* 9 items, table says 16 */
     menu_speak_build(&m, &sp);
     /* ⭐⭐ It demands the REASON, not just "no name". Asserting only !named
      * passed with this whole check DELETED, because the text lookup fails in
@@ -235,10 +252,13 @@ int main(void)
     /* --- case 7: the shipped table is not empty and is self-consistent ---- */
     int n = menu_speak_screen_count();
     const mc_screen *s = menu_speak_lookup(MAIN_CALLER);
-    check("7. the shipped table has the main menu with base 37, count 6",
-          n >= 1 && s && s->base_index == 37 && s->count == 6,
-          "n=%d base=%d count=%d", n, s ? s->base_index : -1,
-          s ? s->count : -1);
+    /* Since 2026-11-24: read through the LIST part table, label child 8. */
+    check("7. the shipped table reads the main menu from its own rows",
+          n >= 1 && s && s->kind == MC_PART_ROWS &&
+          s->part_table == 0x141207188ULL && s->label_child == 8 &&
+          s->row_off == 0x330 && s->rows_off == 0x334,
+          "n=%d kind=%d table=%llx", n, s ? (int)s->kind : -1,
+          s ? (unsigned long long)s->part_table : 0ull);
 
     /* --- case 8: the table holds CALL SITES, not return addresses ---------
      * ⭐@@S@ REGRESSION GUARD FOR A BUG THAT SHIPPED. The hook takes
@@ -480,9 +500,9 @@ int main(void)
         int ok = three && six && three != six &&
                  strcmp(three->name, "Select Mode") == 0 &&
                  strcmp(six->name, "Online Play") == 0 &&
-                 six->labels && six->nlabels == 6 &&
-                 /* the map's first and last entries, from the run's captions */
-                 six->labels[0] == 68 && six->labels[5] == 1078;
+                 /* both read from the game's own rows, no map */
+                 three->kind == MC_PART_ROWS && six->kind == MC_PART_ROWS &&
+                 !six->labels;
         check("9b. a shared caller resolves by item count", ok,
               "3->%s  6->%s",
               three ? three->name : "(none)", six ? six->name : "(none)");
@@ -617,29 +637,8 @@ int main(void)
               accepted, "");
     }
 
-    /* --- case 16: the Select Game map is the RIGHT map --------------------
-     * ⭐⭐ THE CASE THAT WOULD HAVE CAUGHT THE SHIPPED BUG. The screen reached
-     * from Offline Play was named "Game settings" on a guess and spoke
-     * "setting 2 of 3". It is Select Game, and its three rows are GMD 51
-     * (Game), 52 (Game Version) and 56 (Player).
-     *
-     * ⭐ 51, 52, 56 is NOT contiguous, and that is the whole reason a map
-     * exists: base+index would land on 53 ("Japanese Version") for row 2 --
-     * a VALUE label where a row name belongs. This pins the exact indices, so
-     * a future edit that "tidies" them into a run fails here. */
-    {
-        const mc_screen *sg = menu_speak_lookup(0x1400b1b69ULL);
-        int ok = sg && sg->labels && sg->nlabels == 3 &&
-                 sg->labels[0] == 51 && sg->labels[1] == 52 &&
-                 sg->labels[2] == 56 &&
-                 sg->kind == MC_SETTINGS_ROW &&
-                 sg->name && strcmp(sg->name, "Select Game") == 0;
-        /* ⛔ And it must NOT carry a base index: a row with a map that also
-         * had a base could silently fall back to the wrong labels. */
-        int no_base = sg && sg->base_index == -1;
-        check("16. Select Game maps rows 0,1,2 to GMD 51,52,56 and has no base",
-              ok && no_base, "ok=%d no_base=%d", ok, no_base);
-    }
+    /* 16 tested the hand-made label/value maps, removed 2026-11-24
+     * when settings screens moved to the game's own rows. */
 
     /* --- case 17: a mapped screen NEVER uses base+index -------------------
      * ⭐⭐ The safety property, stated directly. Even if some future edit gives
@@ -664,8 +663,8 @@ int main(void)
         const mc_screen *v = menu_speak_lookup(0x1400b1bd9ULL);
         const mc_screen *sib = menu_speak_sibling_row(v);
         check("18. the value site finds its sibling row entry by screen name",
-              v && sib && sib->kind == MC_SETTINGS_ROW && sib->labels &&
-              sib->nlabels == 3,
+              v && sib && sib->kind == MC_SETTINGS_ROW && !sib->labels &&
+              sib->part_table == 0x141208408ULL,
               "v=%p sib=%p", (const void *)v, (const void *)sib);
     }
 
@@ -681,38 +680,8 @@ int main(void)
           "named=%d why=%d %d of %d", (int)sp.named, (int)sp.why,
           sp.position, sp.total);
 
-    /* --- case 20: value variants are keyed on the LIVE count -------------
-     * ⭐⭐ The live value list is a SUBSET of the labels that exist: "Either"
-     * is an online lobby filter, P3/P4 belong to the 4-player games. So a
-     * variant is selected by the count actually on screen, and a count nobody
-     * has measured selects NOTHING rather than the nearest list. */
-    {
-        const mc_screen *v = menu_speak_lookup(0x1400b1bd9ULL);
-        const mc_value_set *ver2 = menu_speak_values_for(v, 1, 2);
-        const mc_value_set *ply2 = menu_speak_values_for(v, 2, 2);
-        const mc_value_set *ply4 = menu_speak_values_for(v, 2, 4);
-        /* Row 0 is the games -- deliberately absent until the ROM index
-         * mapping is confirmed (rom_table.h). The titles DO exist. */
-        const mc_value_set *game = menu_speak_values_for(v, 0, 8);
-        /* ⭐ The ONLINE 3-value Game Version (Japanese/English/Either). It was
-         * a negative here until 2026-09-10: the row ran at a live count of 3
-         * while only the 2-value variant existed, so the mod said "Game
-         * Version, 2 of 3" and named nothing -- part of the "values missing on
-         * the online screens" the user reported. It now resolves, and the
-         * corpus check confirms 53-55 really is that run. */
-        const mc_value_set *ver3 = menu_speak_values_for(v, 1, 3);
-        /* ⚠ A count nobody has measured must STILL refuse -- this is the
-         * discriminating half of the case and must not be lost. */
-        const mc_value_set *ply7 = menu_speak_values_for(v, 2, 7);
-        check("20. value variants match on live count; unmeasured counts refuse",
-              ver2 && ver2->first == 53 && ply2 && ply2->first == 58 &&
-              ply4 && ply4->first == 58 && ply4->count == 4 &&
-              ver3 && ver3->first == 53 && ver3->count == 3 &&
-              game == NULL && ply7 == NULL,
-              "ver2=%p ply2=%p ply4=%p game=%p ver3=%p ply7=%p",
-              (const void *)ver2, (const void *)ply2, (const void *)ply4,
-              (const void *)game, (const void *)ver3, (const void *)ply7);
-    }
+    /* 20 tested the hand-made label/value maps, removed 2026-11-24
+     * when settings screens moved to the game's own rows. */
 
     /* --- case 20b: the three settings screens are wired correctly --------
      * ⭐⭐ Each is a ROW half and a VALUE half linked by an identical `name`
@@ -750,32 +719,8 @@ int main(void)
               (const void *)sdv, (const void *)ntr, (const void *)ntv);
     }
 
-    /* --- case 20c: the new value variants match on their MEASURED count ---
-     * ⛔ And an UNMEASURED count must refuse, not borrow the nearest list.
-     * The volume rows show 10-11 generated steps with no labels at all; if a
-     * lookup ever returned a variant for those, it would read a neighbouring
-     * setting's words as if they were volume levels. */
-    {
-        const mc_screen *ntv = menu_speak_lookup(0x14009f4c1ULL);
-        const mc_screen *sdv = menu_speak_lookup(0x1400a2771ULL);
-        const mc_value_set *mic  = menu_speak_values_for(ntv, 0, 2);
-        const mc_value_set *conn = menu_speak_values_for(ntv, 3, 5);
-        const mc_value_set *jing = menu_speak_values_for(sdv, 4, 2);
-        /* Measured-but-unlabelled rows must name nothing. */
-        const mc_value_set *chat = menu_speak_values_for(ntv, 1, 11);
-        const mc_value_set *dly  = menu_speak_values_for(ntv, 2, 11);
-        const mc_value_set *vol  = menu_speak_values_for(sdv, 0, 10);
-        /* Default rows have no value slot at all. */
-        const mc_value_set *dflt = menu_speak_values_for(sdv, 5, 2);
-        check("20c. new value variants match measured counts; the rest refuse",
-              mic && mic->first == 203 && conn && conn->first == 212 &&
-              jing && jing->first == 195 &&
-              chat == NULL && dly == NULL && vol == NULL && dflt == NULL,
-              "mic=%p conn=%p jing=%p chat=%p dly=%p vol=%p dflt=%p",
-              (const void *)mic, (const void *)conn, (const void *)jing,
-              (const void *)chat, (const void *)dly, (const void *)vol,
-              (const void *)dflt);
-    }
+    /* 20c tested the hand-made label/value maps, removed 2026-11-24
+     * when settings screens moved to the game's own rows. */
 
     /* --- case 20d: System's FOUR value callers all link to one row map ----
      * ⭐⭐ New shape: this screen's values are driven by four separate callers
@@ -793,9 +738,8 @@ int main(void)
             0x1400a3431ULL, 0x1400a3538ULL, 0x1400a3578ULL, 0x1400a34a8ULL
         };
         const mc_screen *rowmap = menu_speak_lookup_n(0x1400a33b8ULL, 6);
-        int ok = rowmap && rowmap->kind == MC_SETTINGS_ROW &&
-                 rowmap->nlabels == 6 && rowmap->labels &&
-                 rowmap->labels[0] == 180 && rowmap->labels[5] == 168;
+        /* since 2026-11-24 read from the game's rows: no map */
+        int ok = rowmap && rowmap->kind == MC_SETTINGS_ROW && !rowmap->labels;
         int linked = 0;
         for (size_t i = 0; i < sizeof VC / sizeof VC[0]; i++) {
             const mc_screen *v = menu_speak_lookup(VC[i]);
@@ -803,7 +747,7 @@ int main(void)
                 menu_speak_sibling_row(v) == rowmap)
                 linked++;
         }
-        check("20d. System: 4 value callers all link to the one row map",
+        check("20d. System: 4 value callers all link to the one row entry",
               ok && linked == 4, "rowmap=%p linked=%d of 4",
               (const void *)rowmap, linked);
     }
@@ -912,11 +856,11 @@ int main(void)
         const mc_screen *val    = menu_speak_lookup(0x140098986ULL);
         int ok = casual && ranked && val &&
                  casual != ranked &&
-                 casual->nlabels == 4 && ranked->nlabels == 3;
+                 casual->count == 4 && ranked->count == 3;
         check("20i. one caller resolves to TWO screens by live row count",
               ok, "casual=%p(%d) ranked=%p(%d) val=%p",
-              (const void *)casual, casual ? casual->nlabels : -1,
-              (const void *)ranked, ranked ? ranked->nlabels : -1,
+              (const void *)casual, casual ? casual->count : -1,
+              (const void *)ranked, ranked ? ranked->count : -1,
               (const void *)val);
     }
     {
@@ -1033,131 +977,14 @@ int main(void)
               game_list_sites);
     }
 
-    /* --- case 21: row 0's values are never named ------------------------
-     * ⛔ Row 0 must have NO GMD value variant. The eight game titles have no
-     * clean run in the GMD, so any base that "looks close" names something
-     * else -- the confident-wrong-name failure.
-     *
-     * ⚠ This case does NOT say the titles are unavailable. They are in the
-     * exe (src/rom_table.h) and readable; what is missing is confirmation that
-     * cursor index N corresponds to ROM index 2N. When a run confirms that,
-     * the fix is a ROM-backed name, NOT a GMD variant -- so this case stays
-     * as it is even then.
-     *
-     * ⚠ Asserted STRUCTURALLY, not through menu_speak_build(). With no live
-     * GMD table in this process the text read fails anyway, so a behavioural
-     * assertion would pass even with a games variant added -- two layers, one
-     * outcome, the trap this suite has hit before. Checking the TABLE is what
-     * isolates it: no variant may exist for row 0. Verified by sabotage --
-     * adding { 0, 8, 51 } fails this case. */
-    {
-        const mc_screen *v = menu_speak_lookup(0x1400b1bd9ULL);
-        int any_row0 = 0;
-        for (int i = 0; v && i < v->nvalues; i++)
-            if (v->values[i].row == 0)
-                any_row0 = 1;
-        check("21. row 0 (the games) has NO value variant -- they are images",
-              v && !any_row0, "any_row0=%d", any_row0);
-    }
+    /* 21 tested the removed value lists (no variant for the game row). */
 
-    /* --- case 22: the GAME-STRIP flag is set for Gallery, and ONLY there ---
-     * ⭐⭐ sp.game_strip is the gate on a rule that speaks an unverified-by-
-     * corpus caption as an ITEM NAME. Being in the ROM table is not by itself
-     * permission to speak -- the screen must be declared a game strip too.
-     *
-     * ⚠ Both directions asserted. A flag that was always TRUE would let the
-     * rule fire on the main menu, where a caption like "Play offline." is a
-     * DESCRIPTION and must never become the item's name. That failure would be
-     * invisible to a positive-only test.
-     *
-     * ⚠ Gallery's count is 0 (position 1 is the collection, not a ROM), so the
-     * movement below deliberately uses a 9-item range to mirror the real
-     * screen -- and case 3's staleness check must not reject it. */
-    {
-        mc_speech g;
-        mc_move gm_ = mk(0x14009a482ULL, 1, 0, 8);
-        menu_speak_build(&gm_, &g);
+    /* Case 22 tested a strip reader replaced on 2026-11-24 (caption game
+     * strips, the Music position table); those strips are now read from
+     * the part the game writes their title into: case 40. */
 
-        mc_speech mn;
-        mc_move mm = mk(MAIN_CALLER, 1, 0, 5);
-        menu_speak_build(&mm, &mn);
-
-        /* And a screen that IS named must not be flagged either. */
-        mc_speech lb;
-        mc_move lm = mk(0x140083e09ULL, 1, 0, 2);
-        menu_speak_build(&lm, &lb);
-
-        check("22. game_strip is set for Gallery and for nothing else",
-              g.game_strip && g.position == 2 && g.total == 9 &&
-              !mn.game_strip && !lb.game_strip,
-              "gallery=%d (pos %d of %d), main=%d, lobby=%d",
-              (int)g.game_strip, g.position, g.total,
-              (int)mn.game_strip, (int)lb.game_strip);
-    }
-
-    /* --- case 23: an UNKNOWN row in a mapped screen speaks POSITION ---------
-     * ⚠⚠ THIS FIXTURE ROTTED ONCE AND THAT IS THE LESSON. It originally used
-     * Lobby Filters' row 2 as its "unknown row". The moment that row was named
-     * from the renderer's table, the case FAILED -- a test quietly depending on
-     * a screen staying unsolved. It now uses MC_TEST_CALLER, a g_screens row
-     * that exists only to hold a gap, so the mechanism outlives the screens it
-     * was built for.
-     *
-     * ⭐⭐ Join Lobby's filters have 5 of 6 rows established. Without
-     * MC_LABEL_UNKNOWN a map must be all-or-nothing, so one unproven row would
-     * force all six to speak position -- discarding evidence that exists to
-     * avoid claiming evidence that does not.
-     *
-     * ⚠ BOTH halves asserted. The unknown row must NOT be named (the failure
-     * that matters: naming it would speak a neighbour's label or garbage), and
-     * its neighbours MUST still be named (otherwise the sentinel has silently
-     * disabled the whole map and the test would pass on a broken screen). */
-    {
-        mc_speech u, k;
-        mc_move um = mk(MC_TEST_CALLER, 1, 0, 2);   /* position 2 -- unknown */
-        menu_speak_build(&um, &u);
-        mc_move km = mk(MC_TEST_CALLER, 2, 0, 2);   /* position 3 -- known   */
-        menu_speak_build(&km, &k);
-
-        /* ⚠ The GMD is not live in this process, so a KNOWN row cannot resolve
-         * its text here -- it reports TEXT_UNREADABLE. That is a different
-         * reason from NO_LABELS, and the distinction is the whole assertion:
-         * the unknown row declines because it has no label, the known row
-         * because there is no live table to read. */
-        check("23. an unknown mapped row declines for NO_LABELS, not by "
-              "naming, while a known row reaches the text lookup",
-              !u.named && u.why == MC_UNNAMED_NO_LABELS &&
-              u.position == 2 && u.total == 3 &&
-              !k.named && k.why == MC_UNNAMED_TEXT_UNREADABLE,
-              "unknown: named=%d why=%d pos=%d; known: named=%d why=%d",
-              (int)u.named, (int)u.why, u.position, (int)k.named, (int)k.why);
-    }
-
-    /* --- case 24: the TWO 8-item game strips are kept apart ----------------
-     * ⛔⛔ Ranked Leaderboard (0x1400ac059) and Casual Match (0x140098986) are
-     * both 8-item horizontal game strips and look identical in a log. The
-     * Leaderboard CAPTIONS one title per movement; Casual Match captions NOT AT
-     * ALL (0 in 20 movements) and its titles arrive only on the transcript
-     * channel.
-     *
-     * ⚠ So exactly one of them may carry game_strip. If Casual Match ever gains
-     * it, the rule would fire on a screen with no per-movement caption and
-     * speak whatever stale title was last set -- and the one caption that does
-     * exist near that strip belongs to a DIFFERENT axis and contradicts the
-     * insertion order. This case is what stops that being added by symmetry. */
-    {
-        mc_speech lb, cm;
-        mc_move lm = mk(0x1400ac059ULL, 2, 0, 7);
-        menu_speak_build(&lm, &lb);
-        mc_move cmv = mk(0x140098986ULL, 2, 0, 7);
-        menu_speak_build(&cmv, &cm);
-
-        check("24. the Leaderboard strip is a game strip; Casual Match's is NOT",
-              lb.game_strip && lb.total == 8 &&
-              !cm.game_strip && !cm.named,
-              "leaderboard=%d (total %d), casual=%d named=%d",
-              (int)lb.game_strip, lb.total, (int)cm.game_strip, (int)cm.named);
-    }
+    /* 23 tested the hand-made label/value maps, removed 2026-11-24
+     * when settings screens moved to the game's own rows. */
 
     /* --- case 25: the ROM game-list path is keyed to a CALLER LIST ---------
      * ⭐⭐ Row 0 means "the game list" on Select Game and on Casual Match's
@@ -1221,102 +1048,74 @@ int main(void)
               (int)stale.char_picker);
     }
 
-    /* --- case 27: the picker's character must MATCH its position -----------
-     * ⛔⛔ FROM THE 21:17 RUN. The keypad wrapped to position 36 ("Z") and the
-     * mod spoke "0" -- the six-slot ID display's value, set 100 ms earlier by
-     * the OTHER axis on the SAME screen object. Across all runs: 36 movements
-     * where the nearby character is right, 2 where it is stale. Speaking the
-     * wrong character ~5% of the time is exactly the failure this file exists
-     * to prevent, and is_value_shaped() alone cannot catch it -- "0" is a
-     * perfectly value-shaped string.
+    /* --- cases 27-27c: ⭐⭐⭐ THE LOBBY ID IS READ FROM THE GAME'S DATA.
      *
-     * ⭐ So the quote is checked against the position. Two independent sources
-     * -- the cursor's index and the text the game drew -- must agree, the same
-     * standard the music list's numbering meets. */
+     * The refresh routine 0x14008ad70 writes slot i as charset[screen[0x334 +
+     * 4*i]], with the charset pointed to by 0x141206c90 and the current slot at
+     * +0x350 of [+0x354]. The 36-item picker edits the current slot's index;
+     * the slot strip moves the slot. Both speak the current slot's character.
+     * ⚠ The test charset is deliberately NOT "0..9A..Z" order, so speech that
+     * still maps a position through a written-down alphabet fails. No caption
+     * is supplied: the old caption fallback is gone. */
     {
-        int ok = 1;
-        /* The real mapping, spot-checked at both ends and the digit/letter seam */
-        ok &= menu_speak_test_char_picker("0", 1);
-        ok &= menu_speak_test_char_picker("9", 10);
-        ok &= menu_speak_test_char_picker("A", 11);
-        ok &= menu_speak_test_char_picker("Z", 36);
-        /* ⛔ THE MEASURED BUG: "0" at position 36 must be REFUSED. */
-        ok &= !menu_speak_test_char_picker("0", 36);
-        ok &= !menu_speak_test_char_picker("Z", 1);
-        /* Multi-character and degenerate input */
-        ok &= !menu_speak_test_char_picker("AB", 11);
-        ok &= !menu_speak_test_char_picker("", 1);
-        ok &= !menu_speak_test_char_picker(NULL, 1);
-        /* Out-of-range positions */
-        ok &= !menu_speak_test_char_picker("0", 0);
-        ok &= !menu_speak_test_char_picker("Z", 37);
-        check("27. the picker speaks a character ONLY if it matches the position",
-              ok, "one or more mappings misclassified");
-    }
-
-    /* --- cases 27b-27d: ⛔⛔ THE PICKER MUST SPEAK WITHOUT A CAPTION --------
-     *
-     * USER-REPORTED: "when I press up and down to choose a value I don't hear
-     * anything." Measured in run-...-1222: of 101 up/down movements, only TWO
-     * spoke a character; 99 gave a bare "19 of 36", which is useless when you
-     * are spelling out a code.
-     *
-     * THE CAUSE: the picker's speech lived in the CAPTION block, so it needed a
-     * caption to corroborate the position -- and this screen SETS NO TEXT AT
-     * ALL. Its 36 characters have no text objects (the layout probe finds only
-     * the six lobby slots at y=556), so they are sprites. The path was gated on
-     * a signal that does not exist for it.
-     *
-     * ⚠ THESE CASES ASSERT SPEECH WITH NO CAPTION SUPPLIED, which is the whole
-     * point -- menu_speak_build() must name the item from POSITION alone. A
-     * case that passed a caption in would have passed before the fix. */
-    {
-        /* 27b: every one of the 36 positions names its own character. */
+        static unsigned char lscr[0x400];
+        static char lcs[37] = "ZYXWVUTSRQPONMLKJIHGFEDCBA9876543210";
+        mc_speech ls;
         int wrong = 0;
-        char first_bad[64] = { 0 };
-        static const char *const ALPHA =
-            "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        for (int p = 1; p <= 36; p++) {
-            mc_speech sp;
-            mc_move m = mk(0x14008a8efULL, p - 1, 0, 35);
-            menu_speak_build(&m, &sp);
-            if (!sp.named || sp.item[0] != ALPHA[p - 1] || sp.item[1] != '\0') {
+        char first_bad[96] = { 0 };
+
+        g_test_charset = lcs;
+        menu_speak_test_set_exe_reader(test_exe_int);
+        memset(lscr, 0, sizeof lscr);
+        *(int *)(lscr + 0x354) = 6;                  /* six slots */
+        *(int *)(lscr + 0x350) = 2;                  /* editing slot 2 */
+        for (int idx = 0; idx < 36; idx++) {
+            mc_move km = mk(0x14008a8efULL, (idx + 7) % 36, 0, 35);
+            km.screen = lscr;
+            *(int *)(lscr + 0x334 + 4 * 2) = idx;    /* slot 2's character */
+            menu_speak_build(&km, &ls);
+            if (!ls.named || ls.item[0] != lcs[idx] || ls.item[1]) {
                 if (!wrong)
                     snprintf(first_bad, sizeof first_bad,
-                             "pos %d named=%d item=\"%.20s\" want '%c'",
-                             p, (int)sp.named, sp.item, ALPHA[p - 1]);
+                             "idx %d named=%d item=\"%s\" want '%c'", idx,
+                             (int)ls.named, ls.item, lcs[idx]);
                 wrong++;
             }
         }
-        check("27b. all 36 picker positions name their character, NO caption",
-              wrong == 0, "%d wrong; first: %s", wrong, first_bad);
-    }
-    {
-        /* 27c: ⛔ a screen with a different live count is NOT this picker and
-         * must get nothing -- the count is the membership test. */
-        mc_speech sp;
-        mc_move m = mk(0x14008a8efULL, 0, 0, 9);     /* 10 items, not 36 */
-        menu_speak_build(&m, &sp);
-        check("27c. a picker-caller screen with the wrong count names nothing",
-              !sp.named && sp.item[0] == '\0',
-              "named=%d item=\"%s\"", (int)sp.named, sp.item);
-    }
-    {
-        /* 27d: ⚠ THE TWO ALPHABETS MUST BE THE SAME ONE. build() speaks from
-         * K_PICKER_STR and char_picker_matches() guards with K_PICKER; if those
-         * ever drift, the picker says one character while its own guard checks
-         * another. Asserted by requiring the spoken character to satisfy the
-         * guard at every position. */
-        int bad = 0;
-        for (int p = 1; p <= 36; p++) {
-            mc_speech sp;
-            mc_move m = mk(0x14008a8efULL, p - 1, 0, 35);
-            menu_speak_build(&m, &sp);
-            if (!sp.named || !menu_speak_test_char_picker(sp.item, p))
-                bad++;
-        }
-        check("27d. the spoken character satisfies the picker's OWN guard",
-              bad == 0, "%d position(s) disagree between the two alphabets", bad);
+        check("27. the picker speaks the GAME's character for the slot, not "
+              "the position's", wrong == 0, "%d wrong; first: %s", wrong,
+              first_bad);
+
+        /* 27b: the slot strip speaks the character in the slot it moved to. */
+        *(int *)(lscr + 0x334 + 4 * 4) = 10;
+        *(int *)(lscr + 0x350) = 4;
+        mc_move sm = mk(0x14008a91bULL, 4, 0, 5);
+        sm.vertical = FALSE;
+        sm.screen = lscr;
+        menu_speak_build(&sm, &ls);
+        int b1 = ls.named && ls.item[0] == lcs[10] && !ls.item[1];
+        check("27b. the slot strip speaks the moved-to slot's character",
+              b1, "named=%d item=\"%s\" want '%c'", (int)ls.named, ls.item,
+              lcs[10]);
+
+        /* 27c: an index outside the charset, a slot outside the count, or a
+         * charset that is not 36 printable characters names nothing. */
+        *(int *)(lscr + 0x334 + 4 * 4) = 36;
+        menu_speak_build(&sm, &ls);
+        int c1 = !ls.named;
+        *(int *)(lscr + 0x334 + 4 * 4) = 3;
+        *(int *)(lscr + 0x350) = 6;
+        menu_speak_build(&sm, &ls);
+        int c2 = !ls.named;
+        *(int *)(lscr + 0x350) = 4;
+        lcs[20] = ' ';
+        menu_speak_build(&sm, &ls);
+        int c3 = !ls.named;
+        lcs[20] = 'F';
+        check("27c. a bad index, slot or charset names nothing", c1 && c2 && c3,
+              "index=%d slot=%d charset=%d", c1, c2, c3);
+        menu_speak_test_set_exe_reader(NULL);
+        g_test_charset = NULL;
     }
 
     /* --- case 28: the ROM probe is caller-gated, like the speaking path -----
@@ -1380,39 +1179,8 @@ int main(void)
               eight != NULL);
     }
 
-    /* --- case 30: a settings row with NO value table names no value ---------
-     * ⛔⛔ USER-REPORTED 2026-09-11: "the values in the options submenus are not
-     * correct". Measured in the logs, the mod was appending ANOTHER ROW'S
-     * value:
-     *     "Coin Button, 1 of 6, English [en]"
-     *     "Menu Button, 1 of 7, English [en]"
-     *     "Announcer Volume, 1 of 10, Remix"
-     *     "Game, 3 of 9, First to 4"
-     *
-     * The live-quote path claimed a guard of "a caption stamped with THIS
-     * movement", which is NOT the same as "belongs to this row" -- several rows
-     * write text during one movement and the channel returns whichever came
-     * last.
-     *
-     * ⚠ Asserted on the DATA, not by staging a caption (the harness has no live
-     * caption channel): System's button rows 1-3 must have NO value variant, so
-     * there is nothing for a quote to be checked against and the path must stay
-     * silent. If someone adds a variant for them later, this case fails and
-     * they must re-establish the labels first -- the buttons are controller
-     * GLYPHS with no GMD run, which is why no variant exists. */
-    {
-        const mc_screen *v = menu_speak_lookup(0x1400a3431ULL);
-        int any = 0;
-        for (int i = 0; v && i < v->nvalues; i++)
-            if (v->values[i].row >= 1 && v->values[i].row <= 3)
-                any = 1;
-        /* Row 0 (Language) and row 4 (Data Collection) DO have variants -- the
-         * positive control, so this cannot pass on an empty table. */
-        const mc_value_set *lang = menu_speak_values_for(v, 0, 14);
-        check("30. System's button rows have no value variant to mis-speak",
-              v && !any && lang && lang->count == 14,
-              "buttons=%d lang=%d", any, lang != NULL);
-    }
+    /* 30 tested the hand-made label/value maps, removed 2026-11-24
+     * when settings screens moved to the game's own rows. */
 
     /* --- case 31: LEVEL rows are marked per-row, not per-screen -------------
      * ⭐⭐ User, 2026-09-11: "they might be textless but even an internal value
@@ -1451,289 +1219,34 @@ int main(void)
               pc ? pc->levels : 0);
     }
 
-    /* --- case 32: ⛔⛔ THE TABS ARE NAMED WITHOUT IDENTIFYING THE TAB, and this
-     * case exists because the first attempt did the opposite.
-     *
-     * FOUR tabs share caller 0x1400a41ef and ONE screen object: 6 rows, then
-     * three of 5. Two 5-row tabs have identical value shapes (3,3,3,2), so
-     * neither the row count nor the value counts separate them -- and the
-     * HEADING cannot either: it is refreshed on a different schedule from the
-     * rows and leads them by one tab (2 of 6 dumps had a heading naming a
-     * different tab than its own rows; one had reverted to "Training Options").
-     * A heading_index key was built, shipped, and removed.
-     *
-     * ⭐ MC_ROW_COLUMN reads the label the game DREW, scoped to the row column,
-     * so no tab identity is needed at all. */
-    {
-        const mc_screen *five = menu_speak_lookup_n(0x1400a41efULL, 5);
-        const mc_screen *six  = menu_speak_lookup_n(0x1400a41efULL, 6);
-        int ok = five && six;
+    /* Cases 32 tested the position-based readers (the x=320/835
+     * columns, the x=362 pause column, the training value slots) that
+     * Game Settings, Training Options and the Pause Menu used until
+     * 2026-11-24. Those screens are now read from their own data:
+     * case 39. */
 
-        if (ok) {
-            ok &= five->kind == MC_ROW_COLUMN;
-            ok &= five->coord_x > 0.0f;
-            /* The 6-row tab keeps its verified label MAP -- it is unambiguous. */
-            ok &= six->kind == MC_SETTINGS_ROW && six->labels &&
-                  six->nlabels == 6;
-        }
-        check("32. the 5-row training tabs read their own column, not a map",
-              ok, "5-row kind=%d coord_x=%.0f, 6-row nlabels=%d",
-              five ? (int)five->kind : -1,
-              five ? (double)five->coord_x : 0.0,
-              six ? six->nlabels : -1);
-    }
-
-    /* --- case 33: no MC_ROW_COLUMN entry may ship without a column and count.
-     * ⚠ A zero coord_x makes the path refuse SILENTLY on a screen the table
-     * claims to name -- worse than no entry, because the log then says the
-     * screen is known. */
+    /* --- case 33: ⭐⭐ NO SCREEN IS READ BY POSITION ANY MORE.
+     * Since 2026-11-24 every screen that used a coordinate column
+     * (MC_ROW_COLUMN, MC_ROW_VALUE_LIVE) or coordinate order (MC_COORD_LIVE)
+     * is read from its own data. A new entry of those kinds would bring the
+     * guessing back, so none may ship. */
     {
-        int ok = 1, seen = 0;
+        int bad = 0;
         for (int i = 0; i < menu_speak_screen_count(); i++) {
             const mc_screen *s = menu_speak_screen_at(i);
-            if (!s || s->kind != MC_ROW_COLUMN)
-                continue;
-            seen++;
-            /* ⚠ The COLUMN is the requirement, and it is the one this case was
-             * written for: a zero coord_x makes the path refuse SILENTLY on a
-             * screen the table claims to name.
-             *
-             * ⭐ The count may legitimately be 0. Every game draws a different
-             * number of settings -- this caller reports 3,4,5,6,7,8 across the
-             * collection -- so a catch-all is the only entry that covers them,
-             * and MC_ROW_COLUMN re-checks the LIVE COLUMN against the cursor
-             * on every movement, so the table count is not what keeps it
-             * honest. A negative count is still a typo. */
-            if (!(s->coord_x > 0.0f) || s->count < 0)
-                ok = 0;
+            if (s && (s->kind == MC_ROW_COLUMN || s->kind == MC_ROW_VALUE_LIVE ||
+                      s->kind == MC_COORD_LIVE))
+                bad++;
         }
-        ok &= seen > 0;
-        check("33. every MC_ROW_COLUMN entry has a column (count may be a "
-              "catch-all)", ok, "entries=%d", seen);
+        check("33. no screen entry reads by screen position", bad == 0,
+              "%d entr%s still positional", bad, bad == 1 ? "y" : "ies");
     }
 
-    /* --- case 33c: ⭐⭐⭐ THE VALUE REACHES THE SPOKEN LINE, END TO END.
-     *
-     * ⛔⛔ THE CASE THE SABOTAGE SWEEP DEMANDED. 54i-54k prove the HELPER pairs
-     * a row with the value sharing its Y, and 33b proves the TABLE carries a
-     * pair_x -- but with `-1.0f` hardcoded where `s->pair_x` belongs in
-     * menu_speak.c, every one of those still passed. Only a case that drives
-     * menu_speak_build() on a planted Game Settings screen can see the field
-     * actually being read.
-     *
-     * ⚠ Plants the real geometry: labels x=320, values x=835, 80px pitch, and
-     * a 7th row with NO value (the "Default" action row), which is the
-     * asymmetry that makes ordinal pairing wrong. */
-    {
-        static unsigned char go[13][GT_CLASS_SIZE];
-        void *S = (void *)0x2BE7A290ULL;           /* the real screen pointer */
-        static const float GX[13] = {
-            320.f, 835.f, 320.f, 835.f, 320.f, 835.f, 320.f,
-            835.f, 320.f, 835.f, 320.f, 835.f, 320.f };
-        static const float GY[13] = {
-            286.f, 286.f, 366.f, 366.f, 446.f, 446.f, 526.f,
-            526.f, 606.f, 606.f, 686.f, 686.f, 766.f };
-        static const char *const GT_[13] = {
-            "Game Difficulty", "Free Play", "Attack Power", "Normal",
-            "Timer Speed", "Normal", "Speed Select", "Turbo 1",
-            "Battle Type", "3 on 3 Match", "Max Rounds (Single)",
-            "3 (First to 2)", "Default" };
-        gt_test_focus_enable();
-        for (int i = 0; i < 13; i++) {
-            memset(go[i], 0, sizeof go[i]);
-            *(ULONGLONG *)go[i] = GT_VTABLE_ADDR;
-            memcpy(go[i] + 0x40, &GX[i], sizeof(float));
-            memcpy(go[i] + 0x44, &GY[i], sizeof(float));
-            memcpy(go[i] + 0x88, &S, sizeof(void *));
-            gt_test_settext_body(go[i], GT_[i], NULL, 0);
-        }
-        /* Row 1 of 7 on the Game Settings caller. */
-        mc_move gm = mk(0x14009d8dfULL, 0, 0, 6);
-        gm.screen = S;
-        menu_speak_build(&gm, &sp);
-        check("33c. a settings row SPEAKS its value, not just its label",
-              sp.named && strcmp(sp.item, "Game Difficulty, Free Play") == 0,
-              "named=%d item=\"%s\"", (int)sp.named, sp.item);
-
-        /* And the action row with no value must not borrow another row's. */
-        gm = mk(0x14009d8dfULL, 6, 0, 6);
-        gm.screen = S;
-        menu_speak_build(&gm, &sp);
-        check("33d. an action row speaks its label ALONE",
-              sp.named && strcmp(sp.item, "Default") == 0,
-              "named=%d item=\"%s\"", (int)sp.named, sp.item);
-
-        /* --- cases 33e-33g: ⭐⭐ CHANGING A VALUE MUST SPEAK.
-         *
-         * ⛔ USER: "They don't read when I change them with left or right, only
-         * when I leave and come back." The value axis is a different CALLER;
-         * without its own entry it spoke bare position at the one moment the
-         * value changed. MC_ROW_VALUE_LIVE reads the ROW CURSOR to learn which
-         * row is focused, then quotes that row and its value.
-         *
-         * ⚠ The screen object here is a real allocation in this process (the
-         * planted objects' parent), so row_off can be written and read like the
-         * game's own field. */
-        {
-            static int fake_screen[512];        /* stands in for the screen */
-            void *FS = (void *)fake_screen;
-            static unsigned char vo[13][GT_CLASS_SIZE];
-            for (int i = 0; i < 13; i++) {
-                memset(vo[i], 0, sizeof vo[i]);
-                *(ULONGLONG *)vo[i] = GT_VTABLE_ADDR;
-                memcpy(vo[i] + 0x40, &GX[i], sizeof(float));
-                memcpy(vo[i] + 0x44, &GY[i], sizeof(float));
-                memcpy(vo[i] + 0x88, &FS, sizeof(void *));
-                gt_test_settext_body(vo[i], GT_[i], NULL, 0);
-            }
-            /* The row cursor says row 4 (0-based) = "Battle Type". */
-            *(int *)((char *)FS + 0x35C) = 4;
-            mc_move vm = mk(0x14009d929ULL, 1, 0, 2);
-            vm.vertical = FALSE;
-            vm.screen = FS;
-            menu_speak_build(&vm, &sp);
-            check("33e. changing a value speaks the ROW and its new value",
-                  sp.named &&
-                  strcmp(sp.item, "Battle Type, 3 on 3 Match") == 0,
-                  "named=%d item=\"%s\"", (int)sp.named, sp.item);
-
-            /* ⭐⭐ And it follows the ROW cursor, not the value cursor. Point
-             * the row cursor at a different row and the SAME movement must
-             * speak that row instead -- this is what distinguishes reading the
-             * row field from reading this axis's own index, which on a tabbed
-             * screen indexes a shared array. */
-            /* ⚠ Row 2 (Timer Speed), not row 0: row 0 is Game Difficulty,
-             * which is a LEVEL row and deliberately comes back unnamed. This
-             * case is about WHICH row is read, so it must use a row whose
-             * value is text -- otherwise it would fail for an unrelated
-             * reason and read as a regression. */
-            *(int *)((char *)FS + 0x35C) = 2;
-            menu_speak_build(&vm, &sp);
-            check("33f. the spoken row follows the ROW cursor, not the value "
-                  "axis index",
-                  sp.named && strcmp(sp.item, "Timer Speed, Normal") == 0,
-                  "named=%d item=\"%s\"", (int)sp.named, sp.item);
-
-            /* ⛔⛔ A row index the COLUMN cannot support must REFUSE, not quote
-             * a plausible-looking wrong line. 99 is past the end of a 7-row
-             * column. */
-            *(int *)((char *)FS + 0x35C) = 99;
-            menu_speak_build(&vm, &sp);
-            check("33g. an out-of-range row cursor REFUSES rather than quoting",
-                  !sp.named && sp.why == MC_UNNAMED_ROW_UNDERIVABLE,
-                  "named=%d why=%d item=\"%s\"",
-                  (int)sp.named, (int)sp.why, sp.item);
-
-            /* --- case 33h: ⭐⭐ A ROW WHOSE VALUE IS NOT TEXT.
-             *
-             * ⛔ USER-VERIFIED GAP: with values working on every other row,
-             * Game Difficulty spoke "Game Difficulty, 9 of 9" -- no value. It
-             * has NOTHING at x=835 (measured; every other row has an object
-             * there), because its 9 positions are a numeric scale drawn as
-             * graphics. The position IS the setting, so it must come back as a
-             * LEVEL: row_name set, is_level TRUE, and `named` FALSE because
-             * there is no item text to claim.
-             *
-             * ⚠ The fixture drops the value object for row 0 to reproduce
-             * exactly that shape. */
-            {
-                static int lvl_screen[512];
-                void *LS = (void *)lvl_screen;
-                static unsigned char lo[12][GT_CLASS_SIZE];
-                /* Same geometry MINUS the x=835 object at y=286. */
-                int k = 0;
-                for (int i = 0; i < 13; i++) {
-                    if (i == 1)          /* "Free Play" at y=286 */
-                        continue;
-                    memset(lo[k], 0, sizeof lo[k]);
-                    *(ULONGLONG *)lo[k] = GT_VTABLE_ADDR;
-                    memcpy(lo[k] + 0x40, &GX[i], sizeof(float));
-                    memcpy(lo[k] + 0x44, &GY[i], sizeof(float));
-                    memcpy(lo[k] + 0x88, &LS, sizeof(void *));
-                    gt_test_settext_body(lo[k], GT_[i], NULL, 0);
-                    k++;
-                }
-                *(int *)((char *)LS + 0x35C) = 0;    /* Game Difficulty */
-                mc_move lm = mk(0x14009d929ULL, 3, 0, 8);   /* 4 of 9 */
-                lm.vertical = FALSE;
-                lm.screen = LS;
-                /* The level row must carry OPT_DIFFICULTY's own text (643,
-                 * level_label): plant a table that has it, for this case
-                 * only -- every other case here runs with no table. */
-                static char *lvl_blob;
-                static SIZE_T lvl_cap;
-                const int LN = gmd_test_label_count();
-                if (!lvl_blob) {
-                    lvl_cap = (SIZE_T)LN * 24 + 64;
-                    lvl_blob = (char *)VirtualAlloc(NULL, lvl_cap, MEM_COMMIT | MEM_RESERVE,
-                                                    PAGE_READWRITE);
-                }
-                {
-                    SIZE_T pos = 0;
-                    for (int i = 0; i < LN; i++)
-                        pos += (SIZE_T)_snprintf(lvl_blob + pos, lvl_cap - pos, "%s",
-                                                 i == 643 ? "Game Difficulty" : "x") + 1;
-                }
-                gmd_test_set_blob((BYTE *)lvl_blob, LN);
-                menu_speak_build(&lm, &sp);
-                check("33h. a textless value row speaks as a LEVEL, not a "
-                      "missing value",
-                      !sp.named && sp.is_level &&
-                      strcmp(sp.row_name, "Game Difficulty") == 0 &&
-                      sp.position == 4 && sp.total == 9,
-                      "named=%d is_level=%d row_name=\"%s\" %d of %d",
-                      (int)sp.named, (int)sp.is_level, sp.row_name,
-                      sp.position, sp.total);
-
-                /* case 33h2: the SAME row number on a page where it is not
-                 * Game Difficulty (the EX page's Coin Mode). USER 2026-10-15:
-                 * Coin Mode spoke "1, of 3" instead of "Free Play". With 643
-                 * naming a different text, row 0 is not a level. */
-                {
-                    SIZE_T pos = 0;
-                    for (int i = 0; i < LN; i++)
-                        pos += (SIZE_T)_snprintf(lvl_blob + pos, lvl_cap - pos, "%s",
-                                                 i == 643 ? "Coin Mode" : "x") + 1;
-                }
-                gmd_test_set_blob((BYTE *)lvl_blob, LN);
-                menu_speak_build(&lm, &sp);
-                check("33h2. a masked row whose label is not the level row's is "
-                      "NOT a level",
-                      !sp.is_level,
-                      "is_level=%d row_name=\"%s\" item=\"%s\"",
-                      (int)sp.is_level, sp.row_name, sp.item);
-                gmd_test_set_blob(NULL, 0);
-
-                /* ⛔⛔ AND A ROW THAT IS *NOT* MARKED MUST STILL SPEAK ITS TEXT.
-                 * Marking every row a level, or letting an empty read imply
-                 * one, would turn "Attack Power, Low" into "Attack Power, 1,
-                 * of 4" -- a number where a name belongs. Row 1 has its value
-                 * object, is unmarked, and must come back named. */
-                *(int *)((char *)LS + 0x35C) = 1;    /* Attack Power */
-                menu_speak_build(&lm, &sp);
-                check("33i. an unmarked row still speaks its value TEXT",
-                      sp.named && !sp.is_level &&
-                      strcmp(sp.item, "Attack Power, Normal") == 0,
-                      "named=%d is_level=%d item=\"%s\"",
-                      (int)sp.named, (int)sp.is_level, sp.item);
-            }
-        }
-    }
-
-    /* ⛔⛔ CASES 33k-33m ARE GONE WITH THE DEFERRAL THEY TESTED.
-     *
-     * They pinned a one-poll hold that waited for a late caption. It fixed its
-     * race and was still wrong: a delay on the keypress->speech path is paid on
-     * EVERY movement to rescue the few that were racing, and the user cycles
-     * hundreds of items with the button held. Reported first as "it takes that
-     * much longer before I can hear anything", then as "now it doesn't read any
-     * labels at all... that is getting slower".
-     *
-     * ⚠ TWO of those cases had ASSERTED the broken behaviour as correct before
-     * the user felt it -- they encoded my reasoning about what was better,
-     * which is not the same thing as what the user experiences. Deleting them
-     * with the feature is right; keeping them would preserve the claim that the
-     * behaviour was desirable. */
+    /* Cases 33c-33i tested the position-based readers (the x=320/835
+     * columns, the x=362 pause column, the training value slots) that
+     * Game Settings, Training Options and the Pause Menu used until
+     * 2026-11-24. Those screens are now read from their own data:
+     * case 39. */
 
     /* --- case 33n: ⭐⭐ FIGHTER AWARDS' GRID NAMES FROM THE CORPUS, AND ONLY
      * AT 40 ITEMS.
@@ -1754,8 +1267,8 @@ int main(void)
      * at all. */
     {
         const mc_screen *grid40 = menu_speak_lookup_n(0x140079739ULL, 40);
-        int ok = grid40 && grid40->labels && grid40->nlabels == 40 &&
-                 grid40->count == 40;
+        /* since 2026-11-24 named from the game's data (MC_AWARD) */
+        int ok = grid40 && grid40->kind == MC_AWARD && grid40->count == 40;
 
         /* ⛔⛔ ASSERT WHAT THE USER WOULD HEAR, not what lookup_n returns.
          *
@@ -1775,8 +1288,10 @@ int main(void)
         ok &= (!s35.named && s35.why == MC_UNNAMED_COUNT_MISMATCH);
 
         /* And the 7-row window must carry no map of its own. */
+        /* the scrolling list moves the same selection field, so it is named
+         * from data too -- but never from a position map */
         const mc_screen *list7 = menu_speak_lookup_n(0x140079833ULL, 7);
-        ok &= !(list7 && list7->labels);
+        ok &= list7 && list7->kind == MC_AWARD && !list7->labels;
 
         check("33n. the awards grid names at 40 items, and the 35-item page "
               "REFUSES rather than borrowing its map", ok,
@@ -1822,7 +1337,7 @@ int main(void)
          * claim's size cross-check, so the count match stands. */
         *tab = 0;                      /* CVS1: 35 != 40, so no claim */
         e = menu_speak_lookup_for(0x140079739ULL, 40, screen);
-        ok &= (e && e->kind == MC_LIST && e->nlabels == 40);
+        ok &= (e && e->kind == MC_AWARD);
 
         /* ⛔⛔ A tab index outside 0..7 establishes nothing. It must NOT claim,
          * and must NOT be CLAMPED into some roster.
@@ -1911,93 +1426,24 @@ int main(void)
         const mc_screen *sb = menu_speak_lookup_n(0x1400991c1ULL, 3);
         const mc_screen *a  = menu_speak_lookup_n(0x14009885eULL, 3);
         const mc_screen *b  = menu_speak_lookup_n(0x1400988bfULL, 3);
-        int ok = sb && sb->kind == MC_ROW_COLUMN && sb->coord_x == 494.0f &&
+        int ok = sb && sb->kind == MC_PART_ROWS &&
+                 sb->part_table == 0x1411fb510ULL && sb->label_child == 7 &&
+                 sb->row_off == 0x334 && sb->rows_off == 0x338 &&
                  /* the other pair must still have NO entry at all */
-                 a == NULL && b == NULL;
-        check("33t. Standby Settings reads its own column, and the Casual "
-              "Match 3-row pair is still unclaimed", ok,
-              "standby=%d x=%.0f other=%d/%d",
-              sb ? (int)sb->kind : -1, sb ? (double)sb->coord_x : -1.0,
+                 /* since 2026-11-24: identified from the code as up/down
+                  * inside the game grid */
+                 a && a->kind == MC_GAME_GRID && b && b->kind == MC_GAME_GRID;
+        check("33t. Standby Settings reads its own rows, and the Casual "
+              "Match 3-row pair is the game grid", ok,
+              "standby=%d table=%llx grid=%d/%d",
+              sb ? (int)sb->kind : -1,
+              sb ? (unsigned long long)sb->part_table : 0ull,
               a != NULL, b != NULL);
     }
 
-    /* --- case 33q: ⭐⭐ THE SOUNDTRACK CHOOSER names from its position.
-     *
-     * Museum > Music's 9-item strip captions nothing, so this is the one place
-     * this file names from a position -- see MC_SOUNDTRACK_STRIP. Position 1
-     * is the collection's own music (user-confirmed by opening it: five
-     * SOUND_DINGO_* tracks), and 2-9 are the games in ROM-table order. */
-    {
-        mc_speech sp1, sp2, sp9;
-        mc_move m1 = mk(0x14009af21ULL, 0, 0, 8);   /* 9 items, position 1 */
-        mc_move m2 = mk(0x14009af21ULL, 1, 0, 8);
-        mc_move m9 = mk(0x14009af21ULL, 8, 0, 8);
-        m1.vertical = m2.vertical = m9.vertical = FALSE;
-        menu_speak_build(&m1, &sp1);
-        menu_speak_build(&m2, &sp2);
-        menu_speak_build(&m9, &sp9);
-        int ok = sp1.named && strstr(sp1.item, "Collection") != NULL &&
-                 sp2.named && strcmp(sp2.item, "Capcom vs. SNK") == 0 &&
-                 sp9.named && strcmp(sp9.item, "Plasma Sword") == 0;
-        check("33q. the Music strip names position 1 as the collection and "
-              "2..9 as the games in ROM order", ok,
-              "1=\"%s\" 2=\"%s\" 9=\"%s\"", sp1.item, sp2.item, sp9.item);
-    }
-
-    /* --- case 33r: ⛔ a DIFFERENT count is not this strip ------------------
-     * The map is keyed to nine items. A screen on this caller with any other
-     * count is not the soundtrack chooser and must name NOTHING rather than
-     * index into the table -- the confidently-wrong-name failure this file
-     * exists to refuse.
-     *
-     * ⚠⚠ TWO GUARDS PRODUCE THIS REFUSAL and they must be told apart. The
-     * table row carries count = 9, so menu_speak_lookup_n() rejects a 6-item
-     * screen before the kind's own check ever runs -- sabotage proved it:
-     * deleting `out->total != 9` from the build case left this GREEN.
-     *
-     * ⭐ So the assertion below is deliberately about the OBSERVABLE outcome
-     * (nothing is named), and the case does NOT claim to pin either check
-     * individually. Sabotage, in full:
-     *   remove the kind's `out->total != 9`  -> PASSES (the lookup refuses)
-     *   remove the row's count key (9 -> 0)  -> PASSES (the kind refuses)
-     *   remove BOTH                          -> ⛔ FAILS, speaking
-     *                                           "Capcom vs. SNK 2" on a
-     *                                           SIX-item screen
-     * That last line is the wrong-name failure this case exists for, and it is
-     * what the case genuinely pins. The two guards are redundant on purpose;
-     * neither is individually testable while the other stands. See the memory
-     * on a sabotage answered by another guard. */
-    {
-        mc_speech sp;
-        mc_move m = mk(0x14009af21ULL, 2, 0, 5);   /* 6 items, not 9 */
-        m.vertical = FALSE;
-        menu_speak_build(&m, &sp);
-        check("33r. a non-9-item screen on the Music caller names nothing "
-              "(the lookup's count key refuses it)",
-              !sp.named && sp.item[0] == '\0',
-              "named=%d why=%d item=\"%s\"", (int)sp.named, (int)sp.why,
-              sp.item);
-    }
-
-    /* --- case 33s: ⛔⛔ GALLERY'S 9-ITEM SIBLING MUST NOT GET THIS MAP.
-     *
-     * 0x14009a482 is Museum > Gallery's chooser: also nine items, also
-     * horizontal, and it DOES caption -- so it is an MC_GAME_STRIP and its
-     * position 1 is the collection too, but it is a DIFFERENT SCREEN reached a
-     * different way. If the soundtrack map ever matched it, Gallery would
-     * speak soundtrack names.
-     *
-     * ⚠ This is the pairing that has caught two wrong maps in this file
-     * already: two screens of identical shape on different callers. */
-    {
-        const mc_screen *music = menu_speak_lookup_n(0x14009af21ULL, 9);
-        const mc_screen *gal   = menu_speak_lookup_n(0x14009a482ULL, 9);
-        int ok = music && music->kind == MC_SOUNDTRACK_STRIP &&
-                 gal   && gal->kind   == MC_GAME_STRIP;
-        check("33s. the Music strip and Gallery's sibling stay distinct kinds",
-              ok, "music=%d gallery=%d",
-              music ? (int)music->kind : -1, gal ? (int)gal->kind : -1);
-    }
+    /* Case 33q-33s tested a strip reader replaced on 2026-11-24 (caption game
+     * strips, the Music position table); those strips are now read from
+     * the part the game writes their title into: case 40. */
 
     /* --- case 33j: ⛔⛔ THE PAUSE MENU MUST NOT CLAIM NAMES FROM A MAP.
      *
@@ -2023,16 +1469,18 @@ int main(void)
         if (ok) {
             /* Both counts must resolve to a quoting entry with a real column,
              * and NEITHER may carry a label map or a base to index. */
-            ok &= p7->kind == MC_ROW_COLUMN && p7->coord_x > 0.0f &&
-                  !p7->labels && p7->base_index < 0;
-            ok &= p8->kind == MC_ROW_COLUMN && p8->coord_x > 0.0f &&
-                  !p8->labels && p8->base_index < 0;
+            /* Since 2026-11-24: read from the game's own rows (MC_PART_ROWS),
+             * still with no map and no base. */
+            ok &= p7->kind == MC_PART_ROWS && p7->part_table &&
+                  p7->label_child == 8 && !p7->labels && p7->base_index < 0;
+            ok &= p8->kind == MC_PART_ROWS && p8->part_table &&
+                  p8->label_child == 8 && !p8->labels && p8->base_index < 0;
             /* ⭐ And both must be the SAME entry: two entries here would mean
              * the count was being used to tell the variants apart again, which
              * is the thing that was wrong. */
             ok &= (p7 == p8);
         }
-        check("33j. the pause menu QUOTES its rows (count cannot separate "
+        check("33j. the pause menu reads its own rows (count cannot separate "
               "training from arcade)", ok,
               "7-row kind=%d labels=%d / 8-row kind=%d labels=%d / same=%d",
               p7 ? (int)p7->kind : -1, p7 && p7->labels,
@@ -2040,82 +1488,11 @@ int main(void)
               p7 && p8 && p7 == p8);
     }
 
-    /* --- case 33b: ⭐⭐ THE VALUE COLUMN MUST ACTUALLY BE WIRED.
-     *
-     * ⛔⛔ THIS CASE EXISTS BECAUSE THE SABOTAGE SWEEP CAUGHT ITS ABSENCE.
-     * Cases 54i-54k in the gui_text suite prove gt_column_item() pairs a row
-     * with the value sharing its Y -- but they call that helper DIRECTLY. With
-     * the pair_x plumbing deleted from menu_speak.c's MC_ROW_COLUMN path
-     * (`-1.0f` hardcoded where `s->pair_x` belongs), all three still PASSED:
-     * the helper was never the thing at risk. A case must exercise the path
-     * that READS the field, not just the helper it hands off to.
-     *
-     * Game Settings is the screen whose values are quoted (labels x=320,
-     * values x=835, measured over 16 dumps). If its pair_x is lost, the rows
-     * still speak and nothing looks broken -- the player simply never hears
-     * what any setting is SET TO, which is the whole point of the screen. */
-    {
-        int ok = 0;
-        double px = -1.0;
-        for (int i = 0; i < menu_speak_screen_count(); i++) {
-            const mc_screen *s = menu_speak_screen_at(i);
-            if (!s || s->kind != MC_ROW_COLUMN || !s->name)
-                continue;
-            if (strcmp(s->name, "Game Settings") != 0)
-                continue;
-            px = (double)s->pair_x;
-            /* The value column sits well to the RIGHT of the label column --
-             * asserting only "non-zero" would pass a pair_x accidentally set
-             * to the label's own X, which would pair every row with itself. */
-            ok = (s->pair_x > s->coord_x + 100.0f);
-        }
-        check("33b. Game Settings ships a VALUE column right of its labels",
-              ok, "pair_x=%.0f", px);
-    }
-
-    /* --- case 34: ⭐⭐ THE TRAINING VALUE SLOTS ARE ABSOLUTE ACROSS TABS.
-     *
-     * USER: "The rows read, but not the values." The value entry existed but its
-     * sets covered only the FIRST tab, so every other tab spoke "row 11, 2 of 3".
-     *
-     * ⭐ Each tab owns a block of EIGHT slots, so slot = tab_base + row -- and
-     * this is MEASURED, not assumed: in the 17:02 run the row axis on "Guard
-     * Crush, 3 of 5" produced slot 10 and "Groove Gauge, 2 of 5" produced slot
-     * 9, i.e. slot - (row-1) == 8 on all six pairings.
-     *
-     * This asserts the slots that must exist and the ones that deliberately must
-     * NOT -- a missing entry is the correct behaviour for a row whose values
-     * cannot be expressed as a contiguous run. */
-    {
-        const mc_screen *v = menu_speak_lookup(0x1400a4241ULL);
-        int have8 = 0, have10 = 0, have11 = 0, have24 = 0, have26 = 0;
-        int have27 = 0, ok = v != NULL;
-
-        if (ok) {
-            for (int i = 0; i < v->nvalues; i++) {
-                int r = v->values[i].row;
-                if (r == 8)  have8  = 1;
-                if (r == 10) have10 = 1;
-                if (r == 11) have11 = 1;
-                if (r == 24) have24 = 1;
-                if (r == 26) have26 = 1;
-                if (r == 27) have27 = 1;
-            }
-            ok &= have10 && have11 && have24 && have26;
-            /* ⛔ Slot 8 (Health Bar) must have NO entry: VITAL_GAUGE_00..02 are
-             * 715-717 but _03 is at 4136, so a {first,count} run cannot express
-             * it and {8,4,715} would name the 4th value "Super Combo Gauge". */
-            ok &= !have8;
-            /* ⛔ Slot 27 (Network Delay) is a GENERATED level, not a label run:
-             * it must carry a levels BIT and no value set. */
-            ok &= !have27;
-            ok &= (v->levels & (1u << 27)) != 0;
-        }
-        check("34. training value slots are absolute (tab_base + row)", ok,
-              "s8=%d s10=%d s11=%d s24=%d s26=%d s27=%d levels=%#x",
-              have8, have10, have11, have24, have26, have27,
-              v ? v->levels : 0);
-    }
+    /* Cases 33b and 34 tested the position-based readers (the x=320/835
+     * columns, the x=362 pause column, the training value slots) that
+     * Game Settings, Training Options and the Pause Menu used until
+     * 2026-11-24. Those screens are now read from their own data:
+     * case 39. */
 
     /* --- case 35: ⛔⛔ TWO VARIANTS OF ONE SCREEN NEED TWO LEVEL MASKS, and
      * this case drives menu_speak_build() rather than reading the table.
@@ -2184,7 +1561,7 @@ int main(void)
      * never searches there, and neither may we. */
     {
         static unsigned char scr[0x2000], decoy_root[0x110];
-        static unsigned char parts[24][0x110], hold[24][0x80];
+        static unsigned char parts[24][0x110], hold[24][0x100];
         static unsigned char txt[48][GT_CLASS_SIZE];
         static unsigned char root[0x110];
         int nt = 0;
@@ -2201,7 +1578,7 @@ int main(void)
         /* Make part `id` with label (child 7) and optional value (child 8). */
         #define MKPART(i_, id_, lab_, val_) do {                              \
             unsigned char *P_ = parts[i_], *H_ = hold[i_];                   \
-            memset(P_, 0, 0x110); memset(H_, 0, 0x80);                       \
+            memset(P_, 0, 0x110); memset(H_, 0, 0x100);                       \
             *(int *)(P_ + 0x08) = (id_);                                     \
             *(int *)(H_ + 0x50) = -1;                                        \
             *(void **)(P_ + 0x100) = H_;                                     \
@@ -2363,7 +1740,7 @@ int main(void)
      * message table, which this process lacks, so it is not exercised here. */
     {
         static unsigned char sscr[0x800], sroot[0x110];
-        static unsigned char sp_[8][0x110], sh[8][0x80];
+        static unsigned char sp_[8][0x110], sh[8][0x100];
         static unsigned char so[16][GT_CLASS_SIZE];
         static const char *const SL[6] = {
             "Language", "Menu Button", "Start Button", "Coin Button",
@@ -2384,7 +1761,7 @@ int main(void)
         *(void **)(sscr + 0x108) = sroot;
         for (int r = 5; r >= 0; r--) {
             unsigned char *P = sp_[r], *H = sh[r], *L, *V;
-            memset(P, 0, 0x110); memset(H, 0, 0x80);
+            memset(P, 0, 0x110); memset(H, 0, 0x100);
             *(int *)(P + 0x08) = 300 + r;
             *(int *)(H + 0x50) = -1;
             *(void **)(P + 0x100) = H;
@@ -2447,6 +1824,215 @@ int main(void)
         check("38b. a row with no value object borrows nothing", !ss.named,
               "named=%d item=\"%s\"", (int)ss.named, ss.item);
         menu_speak_test_set_exe_reader(NULL);
+    }
+
+    /* --- case 39: ⭐⭐⭐ MC_PART_ROWS -- Pause Menu, Training Options, Game
+     * Settings read from their own data.
+     *
+     * Training: tab = [+0x338], row = [+0x350 + 4*tab], count = [+0x360 +
+     * 4*tab], part = 0x1411fb4f0[row] (stood in for as 300+row), label child 7,
+     * value child 8. Pause: row = [+0x338], count [+0x33c], part =
+     * 0x141207ce8[row] (stood in for as 400+row), label child 8.
+     * ⚠ The tab TITLE comes from the message table, which this process lacks,
+     * so it is not exercised here. */
+    {
+        static unsigned char tscr[0x800], troot[0x110];
+        static unsigned char tp[12][0x110], th[12][0x100];
+        static unsigned char tobj[24][GT_CLASS_SIZE];
+        int no = 0, np = 0;
+        unsigned char *prev = NULL;
+        mc_speech ts;
+
+        gt_test_reset();
+        gt_test_focus_enable();
+        memset(tscr, 0, sizeof tscr);
+        memset(troot, 0, sizeof troot);
+        *(int *)(troot + 0x08) = -1;
+        *(void **)(tscr + 0x108) = troot;
+
+        #define PLANT(id_, lc_, lab_, vc_, val_) do {                          \
+            unsigned char *P_ = tp[np], *H_ = th[np], *L_;                    \
+            memset(P_, 0, 0x110); memset(H_, 0, 0x100);                        \
+            *(int *)(P_ + 0x08) = (id_);                                      \
+            *(int *)(H_ + 0x50) = -1;                                         \
+            *(void **)(P_ + 0x100) = H_;                                      \
+            L_ = tobj[no++]; memset(L_, 0, GT_CLASS_SIZE);                    \
+            *(ULONGLONG *)L_ = GT_VTABLE_ADDR;                                \
+            *(int *)(L_ + 0x50) = (lc_);                                      \
+            *(void **)(H_ + 0x70) = L_;                                       \
+            gt_test_settext_body(L_, (lab_), NULL, 0);                        \
+            if (val_) {                                                       \
+                unsigned char *V_ = tobj[no++]; memset(V_, 0, GT_CLASS_SIZE); \
+                *(ULONGLONG *)V_ = GT_VTABLE_ADDR;                            \
+                *(int *)(V_ + 0x50) = (vc_);                                  \
+                *(void **)(L_ + 0x78) = V_;                                   \
+                gt_test_settext_body(V_, (val_), NULL, 0);                    \
+            }                                                                 \
+            if (prev) *(void **)(prev + 0x70) = P_;                           \
+            else      *(void **)(troot + 0x68) = P_;                          \
+            prev = P_; np++;                                                  \
+        } while (0)
+
+        /* Training rows on screen (whatever tab): parts 300..302. */
+        PLANT(300, 7, "Health Bar", 8, "Normal");
+        PLANT(301, 7, "Super Meter", 8, "Infinite");
+        PLANT(302, 7, "Stun Gauge", 8, "Off");
+        /* Pause rows: parts 400..402, label in child 8. */
+        PLANT(400, 8, "Resume", 0, NULL);
+        PLANT(401, 8, "Move List", 0, NULL);
+        PLANT(402, 8, "Quit", 0, NULL);
+        menu_speak_test_set_exe_reader(test_exe_int);
+
+        /* Tab 1: row cursor at +0x354 = 1, count at +0x364 = 3. Tab 0's
+         * fields hold a DIFFERENT row (2) so a builder ignoring the tab names
+         * the wrong row. */
+        *(int *)(tscr + 0x338) = 1;
+        *(int *)(tscr + 0x350) = 2;  *(int *)(tscr + 0x360) = 3;
+        *(int *)(tscr + 0x354) = 1;  *(int *)(tscr + 0x364) = 3;
+        mc_move tm = mk(0x1400a41efULL, 0, 0, 2);     /* helper index unused */
+        tm.screen = tscr;
+        menu_speak_build(&tm, &ts);
+        int r1 = ts.named && strcmp(ts.item, "Super Meter, Infinite") == 0 &&
+                 ts.position == 2 && ts.total == 3;
+        char d1[160];
+        snprintf(d1, sizeof d1, "item=\"%s\" pos=%d/%d", ts.item, ts.position,
+                 ts.total);
+        /* Value axis on the same tab: the row is named, the value is the item. */
+        tm = mk(0x1400a4241ULL, 1, 0, 3);
+        tm.vertical = FALSE;
+        tm.screen = tscr;
+        menu_speak_build(&tm, &ts);
+        int r2 = ts.named && ts.axis == MC_AXIS_VALUE &&
+                 strcmp(ts.row_name, "Super Meter") == 0 &&
+                 strcmp(ts.item, "Infinite") == 0;
+        char d2[160];
+        snprintf(d2, sizeof d2, "row=\"%s\" item=\"%s\"", ts.row_name, ts.item);
+        check("39. Training Options reads the current TAB's row from its own "
+              "part, on both axes", r1 && r2, "%s | %s", d1, d2);
+
+        /* Pause menu: row [+0x338] = 1, count [+0x33c] = 3, label child 8. */
+        *(int *)(tscr + 0x338) = 1;
+        *(int *)(tscr + 0x33c) = 3;
+        tm = mk(0x1400a749dULL, 0, 0, 2);
+        tm.screen = tscr;
+        menu_speak_build(&tm, &ts);
+        check("39b. the pause menu reads its label from child 8",
+              ts.named && strcmp(ts.item, "Move List") == 0 && ts.position == 2,
+              "item=\"%s\" pos=%d", ts.item, ts.position);
+
+        /* A row at or past the count is not drawn: refused. */
+        *(int *)(tscr + 0x338) = 3;
+        menu_speak_build(&tm, &ts);
+        check("39c. a row past the game's count is refused", !ts.named,
+              "named=%d item=\"%s\"", (int)ts.named, ts.item);
+        /* 39d: ⛔ the EX page's Default row spoke page 1's "3 (First to 2)"
+         * (user run 16:18). Its value object keeps stale text; the game hides
+         * it by playing an ACTION-row state. Same row, same stale text: with
+         * the action state it must speak the label alone, with a value-row
+         * state it must still speak the value. */
+        {
+            static int anim_rec;
+            *(void **)(th[1] + 0xb8) = &anim_rec;     /* part 301 */
+            *(int *)(tscr + 0x338) = 1;
+            *(int *)(tscr + 0x354) = 1;  *(int *)(tscr + 0x364) = 3;
+            mc_move dm = mk(0x1400a41efULL, 0, 0, 2);
+            dm.screen = tscr;
+            anim_rec = 0xf4248;                       /* action row, selected */
+            menu_speak_build(&dm, &ts);
+            int hid = ts.named && strcmp(ts.item, "Super Meter") == 0;
+            char dh[96]; snprintf(dh, sizeof dh, "%s", ts.item);
+            anim_rec = 5;                             /* value row, selected */
+            menu_speak_build(&dm, &ts);
+            int shown = ts.named && strcmp(ts.item, "Super Meter, Infinite") == 0;
+            check("39d. an action row's hidden value is not spoken; a value "
+                  "row's is", hid && shown, "action=\"%s\" value-row=\"%s\"",
+                  dh, ts.item);
+            *(void **)(th[1] + 0xb8) = NULL;
+        }
+        menu_speak_test_set_exe_reader(NULL);
+        #undef PLANT
+    }
+
+    /* --- case 40: ⭐⭐ STRIPS SPEAK THE TITLE THEIR REFRESH WRITES.
+     * Gallery and Music write the current title into part 0xd child 7, the
+     * Ranked Leaderboard into part 0x1e child 15. The position the helper
+     * reports is deliberately unrelated to the planted title, so a strip that
+     * still named by position fails. */
+    {
+        static unsigned char gscr[0x400], groot[0x110];
+        static unsigned char gp[2][0x110], gh[2][0x100];
+        static unsigned char go_[2][GT_CLASS_SIZE];
+        mc_speech gs;
+
+        gt_test_reset();
+        gt_test_focus_enable();
+        memset(gscr, 0, sizeof gscr); memset(groot, 0, sizeof groot);
+        *(int *)(groot + 0x08) = -1;
+        *(void **)(gscr + 0x108) = groot;
+        static const struct { int part, child; const char *t; } G[2] = {
+            { 0xd, 7, "Capcom vs. SNK 2: Mark of the Millennium 2001" },
+            { 0x1e, 15, "Power Stone 2" },
+        };
+        for (int i = 0; i < 2; i++) {
+            memset(gp[i], 0, 0x110); memset(gh[i], 0, 0x100);
+            memset(go_[i], 0, GT_CLASS_SIZE);
+            *(int *)(gp[i] + 0x08) = G[i].part;
+            *(int *)(gh[i] + 0x50) = -1;
+            *(void **)(gp[i] + 0x100) = gh[i];
+            *(ULONGLONG *)go_[i] = GT_VTABLE_ADDR;
+            *(int *)(go_[i] + 0x50) = G[i].child;
+            *(void **)(gh[i] + 0x70) = go_[i];
+            gt_test_settext_body(go_[i], G[i].t, NULL, 0);
+            if (i == 0) *(void **)(groot + 0x68) = gp[i];
+            else        *(void **)(gp[0] + 0x70) = gp[i];
+        }
+        mc_move gm = mk(0x14009a482ULL, 6, 0, 8);    /* Gallery, position 7 */
+        gm.vertical = FALSE; gm.screen = gscr;
+        menu_speak_build(&gm, &gs);
+        int g1 = gs.named && strcmp(gs.item, G[0].t) == 0;
+        gm = mk(0x14009af21ULL, 0, 0, 8);            /* Music strip */
+        gm.vertical = FALSE; gm.screen = gscr;
+        menu_speak_build(&gm, &gs);
+        int g2 = gs.named && strcmp(gs.item, G[0].t) == 0;
+        gm = mk(0x1400ac059ULL, 3, 0, 7);            /* Leaderboard */
+        gm.vertical = FALSE; gm.screen = gscr;
+        menu_speak_build(&gm, &gs);
+        int g3 = gs.named && strcmp(gs.item, G[1].t) == 0;
+        check("40. Gallery, Music and the Leaderboard speak the title their "
+              "refresh wrote", g1 && g2 && g3, "gallery=%d music=%d board=%d",
+              g1, g2, g3);
+    }
+
+    /* --- case 41: ⭐⭐ THE MODE STRIP AND THE CONSENT DIALOG ARE NAMED BY
+     * THE GAME'S OWN MESSAGE TABLES (once thought to be layout-only text).
+     * The message text needs the live table, so this pins the wiring -- the
+     * tables the screens' own code uses -- and the refusals. */
+    {
+        const mc_screen *ms = menu_speak_lookup_n(0x1400b2729ULL, 3);
+        const mc_screen *cs = menu_speak_lookup_n(0x140087cdaULL, 3);
+        int ok = ms && ms->kind == MC_MSG_LIST &&
+                 ms->msg_table == 0x1412084d8ULL && ms->id_off == 0x340 &&
+                 ms->row_off == 0x338 && ms->id_max == 4 && !ms->labels &&
+                 cs && cs->kind == MC_MSG_LIST &&
+                 cs->msg_table == 0x141206b98ULL && cs->row_off == 0x340 &&
+                 cs->id_max == 3 && !cs->labels;
+        /* an item past the count, and a mode id past the table, name nothing */
+        static unsigned char ms_scr[0x400];
+        mc_speech r;
+        memset(ms_scr, 0, sizeof ms_scr);
+        *(int *)(ms_scr + 0x33c) = 3;
+        *(int *)(ms_scr + 0x338) = 3;               /* item 3 of 3: refused */
+        mc_move mm = mk(0x1400b2729ULL, 2, 0, 2);
+        mm.vertical = FALSE; mm.screen = ms_scr;
+        menu_speak_build(&mm, &r);
+        int a = !r.named;
+        *(int *)(ms_scr + 0x338) = 1;
+        *(int *)(ms_scr + 0x340 + 4) = 4;           /* mode id 4: refused */
+        menu_speak_build(&mm, &r);
+        int b = !r.named;
+        check("41. the mode strip and consent dialog read their own message "
+              "tables, and refuse out-of-range items", ok && a && b,
+              "wiring=%d past-count=%d bad-id=%d", ok, a, b);
     }
 
     printf("\n");

@@ -50,6 +50,7 @@
 #include "kbd_state.h"
 #include "emu_cursor.h"
 #include "gui_text.h"
+#include "help_line.h"
 #include "menu_cursor.h"
 #include "menu_speak.h"   /* menu_speak_set_discovery() */
 #include "emu_ram.h"      /* the emulated machine's state (world 2)         */
@@ -1832,6 +1833,12 @@ static DWORD WINAPI worker(LPVOID param)
     } else if (unpacked) {
         log_line("gt: DISABLED by cfc2_hook.off next to the exe.");
     }
+
+    /* The help line, as the message the game sets (help_line.h): each menu
+     * row's description, exactly. Always on; respects cfc2_hook.off. If it
+     * cannot install, descriptions fall back to the caption channel. */
+    if (unpacked && hook_enabled)
+        help_line_install();
 
     /* ⭐⭐ TWO THINGS RODE ON ONE FLAG, AND THEY HAVE OPPOSITE AUDIENCES.
      *

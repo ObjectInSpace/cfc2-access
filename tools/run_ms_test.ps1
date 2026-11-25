@@ -17,7 +17,7 @@ $minhookSrc = @(
     "$root\libs\minhook\src\hde\hde64.c"
 )
 & $gcc -O2 -Wall -Wextra -o "$out\test_menu_speak.exe" `
-    "$root\tools\test_menu_speak.c" "$root\src\menu_speak.c" `
+    "$root\tools\test_menu_speak.c" "$root\src\menu_speak.c" "$root\src\help_line.c" `
     "$root\src\gmd_find.c" "$root\src\speech.c" "$root\src\log.c" `
     "$root\src\rom_table.c" "$root\src\move_list.c" `
     "$root\src\gui_text.c" "$root\src\gui_markup.c" "$root\src\prompt_id.c" `

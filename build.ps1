@@ -32,7 +32,7 @@ New-Item -ItemType Directory -Force -Path "$root\build" | Out-Null
     "$root\src\dinput8_proxy.c" "$root\src\mod.c" "$root\src\speech.c" `
     "$root\src\log.c" "$root\src\image.c" "$root\src\gmd_find.c" `
     "$root\src\pad_watch.c" "$root\src\memsafe.c" "$root\src\kbd_state.c" `
-    "$root\src\menu_cursor.c" "$root\src\menu_speak.c" `
+    "$root\src\menu_cursor.c" "$root\src\menu_speak.c" "$root\src\help_line.c" "$root\src\help_line_hook.c" `
     "$root\src\rom_table.c" "$root\src\gui_text.c" `
     "$root\src\gui_markup.c" "$root\src\prompt_id.c" `
     "$root\src\move_list.c" "$root\src\emu_ram.c" "$root\src\emu_cursor.c" `

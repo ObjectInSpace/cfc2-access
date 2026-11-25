@@ -140,13 +140,106 @@ Where the row -> part mapping comes from, per screen family:
   Child 7 = the controller BUTTON, child 8 = the ACTION assigned to it
   (measured 2026-11-24 15:50, every slot): "X, Light Punch, 2 of 14".
 
-Tests: `run_ms_test.ps1` cases 36-38 build a fake GUI tree (no coordinates)
-with the exe tables stood in by `menu_speak_test_set_exe_reader()`.
+- **`MC_PART_ROWS`** (generic: row from `row_off` [+4*tab], count from
+  `rows_off`, part from `part_table[row]`, label/value children per entry):
+  Pause Menu (`0x141207ce8`, row +0x338, count +0x33c, label child **8**),
+  Game Settings (shared table, row +0x35c, count +0x360), Training Options
+  (shared table, tab +0x338, row +0x350+4*tab, count +0x360+4*tab; tab title
+  = message `0x141207a68[[+0x340+4*tab]]`, the index the tab's builder
+  0x14007bc90 receives), Standby Settings (LIST-row table `0x1411fb510` via
+  0x14007ed70, row +0x334, count +0x338; ⚠ label child 8 not yet seen in a
+  dump -- a wrong index logs the part's children and says the position).
+- **Lobby ID** (picker 0x14008a8ef + slots 0x14008a91b): character =
+  `charset[screen[0x334 + 4*[+0x350]]]`, charset = `*(char**)0x141206c90`
+  ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"). The slot child table
+  `0x141206cb0` = 0a 0c 0b 0d 0e 0f, i.e. the "slots 2 and 3 inverted" order
+  measured on screen in September. The fixed picker alphabet and its caption
+  fallback are deleted.
 
-⚠ Still guess-based, to convert next: `MC_ROW_COLUMN` / `MC_ROW_VALUE_LIVE`
-(coordinate columns), `MC_COORD_LIVE`, the caption channel's row joins, the
-move list's x=84/x=633 columns. For each, read the screen's refresh routine
-for its part table first.
+⭐ **Child indexes differ by row kind** (layout dumps, `+0x050`): settings
+rows label 7 / value 8; single-text list rows (main menu, pause) label **8**;
+headings **9**. Each entry states its own; never assume 7/8.
+
+Tests: `run_ms_test.ps1` cases 27, 33, 33t, 36-39 build fake GUI trees (no
+coordinates) with the exe tables stood in by
+`menu_speak_test_set_exe_reader()`. Case 33 fails if any entry is
+positional again.
+
+- **Settings rows now also speak their VALUE** (MC_SETTINGS_ROW: label from
+  the map, value from part `0x1411fb4f0[row]` child 8 only when child 7 equals
+  the mapped label), and on the value axis the part is read BEFORE the
+  hand-made value lists (`settings_part_value()`).
+- ⛔ **Hidden values:** an action row (Default) keeps STALE child-8 text --
+  the EX page's Default spoke page 1's "3 (First to 2)". The game hides it by
+  playing an action-row animation. `gt_part_anim()` reads the part's current
+  one (`**(int**)(*(node+0x100)+0xb8)`); states 0x1411fb640[0..2]
+  (0xf4247-9) mean no value (`settings_value_hidden()`, case 39d). Value-row
+  states are 0x1411fb620 (1, 5, 0xf4240).
+
+- **List screens** (main menu, Options, Select Mode / Online Play, Museum):
+  row `[+0x330]`, count `[+0x334]`, LIST part table `0x141207188`, label
+  child 8. **Lobby**: list-row table `0x1411fb510`, row +0x330.
+- **Casual / Ranked Match**: rows through `0x141207230` (label 7, value 8);
+  the "unnamed 3-row pair" 0x14009885e / 0x1400988bf is up/down INSIDE the
+  game grid (`MC_GAME_GRID`: game `[+0x344]` of `[+0x33c]`, ROM title, version
+  `[+0x348]`). Ticked games are bits of `[+0x340]` -- NOT yet spoken (needs a
+  translated mod word).
+- **Select Game**: rows through `0x141208408` (labels = messages
+  `0x141208498[r]`, values = the strings the refresh writes into child 8).
+- **Strips** (`MC_PART_TEXT`): Ranked Leaderboard part 0x1e child 15;
+  Gallery and Music part 0xd child 7 -- the title the refresh just wrote.
+- **Fighter Awards** (`MC_AWARD`, grid AND the 7-row list): title = message
+  `0xbb2 + 2*[+0x354]` -- the game's own constant.
+- **Music tracks**: window slot `[+0x340]`, part `0x141208500[slot]`, title
+  child 8 (no count field: the slot is not the track number).
+- **Move list**: row parts `0x141204908[0..9]`, name child 8, input child 7
+  (x=1565 glyph is child 30); heading via `heading_text()`: part `[+0x2e4]`,
+  child `0x1411fb368[[+0x2e0]]`, then under `+0xf0` child 9.
+- **Row descriptions**: `help_line_hook.c` hooks the help-line setter
+  0x140051b30 (prologue `40 57 48 83 EC 20 80 79 30 00`); the description is
+  the MESSAGE the game sets (465 "Change key bindings." etc.), spoken when it
+  changes on a screen. The caption channel is only the fallback if the hook
+  cannot install.
+
+Retired 2026-11-24 (no entry may use them; case 33): `MC_ROW_COLUMN`,
+`MC_ROW_VALUE_LIVE`, `MC_COORD_LIVE`, `MC_NUMBERED_LIVE`, `MC_GAME_STRIP`,
+`MC_SOUNDTRACK_STRIP`, the picker alphabet, `gt_row_value*`.
+
+⭐⭐ **NOT ACTUALLY BLOCKED: "layout-only" labels are messages set in SETUP
+code.** The mode strip and the consent dialog looked layout-only because their
+cursor/refresh functions write no text; their setup code does (found by
+scanning the whole code region around each screen, not just the cursor
+function). The layout files carry no message names or hashes at all.
+- **Consent dialog** (`MC_MSG_LIST`): button i = message `0x141206b98[i]`
+  (part `0x141206b78[i]`, child 7), cursor `+0x340` of `+0x344`. Cursor order
+  is **Privacy Policy, Agree, Decline** (31, 29, 30). ⛔ The order shipped and
+  reverted earlier ("Agree / Decline / Privacy Policy", `g_consent_rows`) was
+  WRONG and is deleted.
+- **Mode strip** (`MC_MSG_LIST`): item `[+0x338]` of `[+0x33c]`, mode id
+  `[+0x340 + 4*item]`, message `0x1412084d8[id]`: Arcade / Versus / Training /
+  Training Mode (Boss).
+
+Also measured 2026-11-24 17:06: the LIST-row table `0x1411fb510` (Lobby,
+Standby) keeps its label in **child 7**, not 8 (Lobby's part dump). Lobby
+Settings SCROLLS (8 slots, slot s = item `[+0x330]` + s): settings entries take
+`scroll_off` so the part is `table[item - top]`. The shared settings table has
+only 8 real entries (3,13,14,15,16,21,22,25); index 8+ runs into the list
+table.
+
+Casual Match's ticked games are spoken ("selected" / "not selected",
+`MT_SELECTED` / `MT_NOT_SELECTED`, 14 languages, only English native-checked):
+on the grid, on the Game row, and when a toggle changes the mask
+(`menu_speak_poll_ticks()`, vtable-checked watch on the last checklist screen).
+
+⭐⭐ **No hand-made label or value maps remain (2026-11-24).** Settings rows
+(MC_SETTINGS_ROW / _VALUE) read the label from child 7 and the value from
+child 8 of the row's own part (shared table, the entry's `part_table`, and
+`scroll_off` for scrolling screens) -- `settings_row_part()`,
+`settings_label()`, `settings_value()`. All 31 map arrays, the count-keyed
+value lists (`mc_value_set`), the Sentinel Test entry and
+`tools/test_screen_maps.py` are deleted; older notes below that cite them are
+history. Kept because they are exe data: the ROM title table for game-list
+rows (and "Any" = message 14), and the per-row `levels` masks.
 
 ## Game
 

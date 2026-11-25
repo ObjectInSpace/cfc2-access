@@ -67,6 +67,9 @@ typedef enum {
     MT_NONE,
     /* The read-current-text key. */
     MT_TEXT_NO_READER, MT_TEXT_NOTHING, MT_TEXT_STALE, MT_TEXT_INACTIVE,
+    /* A ticked / unticked entry in a multiple-choice list (Casual Match's
+     * game list). Added 2026-11-24; not native-checked except English. */
+    MT_SELECTED, MT_NOT_SELECTED,
     MT_COUNT
 } mt_id;
 

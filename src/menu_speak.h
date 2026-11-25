@@ -310,7 +310,32 @@ typedef enum {
     /* ⭐⭐ The gamepad controls screen (0x1400a031d): a scrolling list of 8
      * slots, read through its refresh routine's own slot/part tables. See
      * pad_list_build(). */
-    MC_PAD_LIST
+    MC_PAD_LIST,
+    /* ⭐⭐⭐ A row list read from the screen's own data: row from `row_off`
+     * (per tab when `tab_off` is set), part from `part_table[row]`, label and
+     * value from that part's `label_child` / `value_child`. See
+     * part_rows_build(). */
+    MC_PART_ROWS,
+    /* ⭐⭐ The lobby-ID slot strip (0x14008a91b): the character in the slot
+     * the cursor moved to, read from the game's own data. See lobby_char(). */
+    MC_LOBBY_SLOT,
+    /* ⭐⭐ One fixed part's text: `part_id`, child `label_child`. For strips
+     * whose refresh writes the CURRENT item's title into one place (Ranked
+     * Leaderboard part 0x1e child 15; Gallery and Music part 0xd child 7). */
+    MC_PART_TEXT,
+    /* ⭐⭐ Up/down inside Casual Match's game grid (0x14009885e/0x1400988bf):
+     * the highlighted game [+0x344] of [+0x33c], named from the exe's ROM
+     * title table and following the Game Version row ([+0x348]). */
+    MC_GAME_GRID,
+    /* ⭐⭐ Fighter Awards (grid 0x140079739 and 7-row list 0x140079833): the
+     * selected achievement is [+0x354], and the refresh 0x140079cb0 writes its
+     * title as message 0xbb2 + 2*[+0x354]. */
+    MC_AWARD,
+    /* ⭐⭐ An item named by MESSAGE, read from the screen's setup code:
+     * item = [row_off] of [rows_off]; id = item, or [id_off + 4*item] when
+     * id_off is set; name = message msg_table[id], id < id_max. The mode
+     * strip after choosing a game and the data-collection consent dialog. */
+    MC_MSG_LIST
 } mc_kind;
 
 /* ⭐ A mapped screen's row whose label is NOT established. See `labels`. */
@@ -354,13 +379,6 @@ typedef struct {
      * one unknown row from silencing its five proven neighbours. */
     const int *labels;
     int        nlabels;    /* entries in `labels`; must equal `count` */
-    /* ⭐⭐ VALUE labels, for MC_SETTINGS_VALUE: one variant per row, chosen by
-     * the row's LIVE count. See mc_value_set. NULL when the values cannot be
-     * named (Select Game's row 0). ⚠ Not because the titles do not exist --
-     * they are in the exe, see rom_table.h -- but because the mapping from
-     * cursor index to ROM index is not yet confirmed against a real screen. */
-    const struct mc_value_set *values;
-    int        nvalues;    /* entries in `values` */
     /* ⭐⭐ Bitmask of rows whose values are a numeric RANGE -- bit N set means
      * row N is a LEVEL (volume, input delay) and its cursor position is the
      * setting itself, not a position in a list of names.
@@ -462,6 +480,35 @@ typedef struct {
      * ⚠ LAST in the struct: entries initialised by position must never
      * shift into it. */
     int        level_label;
+    /* ⭐⭐⭐ For MC_PART_ROWS -- every value read from the screen's refresh
+     * routine, never measured on screen:
+     *   part_table   exe address of the int row -> part ID table
+     *   rows_off     screen offset of the live row COUNT (per tab, like row_off)
+     *   tab_off      screen offset of the current tab index, 0 = no tabs; the
+     *                row and count fields are then `off + 4*tab`
+     *   label_child  the part child holding the row's label (+0x050 index)
+     *   value_child  the child holding its value, 0 = the row has none
+     *   title_table / title_idx_off  the tab title: message
+     *                title_table[ [title_idx_off + 4*tab] ], 0 = none */
+    ULONGLONG  part_table;
+    int        rows_off;
+    int        tab_off;
+    int        label_child;
+    int        value_child;
+    ULONGLONG  title_table;
+    int        title_idx_off;
+    /* For MC_PART_TEXT: the fixed part ID whose child `label_child` holds
+     * the current item's text. */
+    int        part_id;
+    /* For a SCROLLING settings screen: the screen offset of the first
+     * visible item. The row helpers are given the on-screen SLOT, so the
+     * part is table[item - [scroll_off]]. 0 = the screen does not scroll.
+     * Lobby Settings (refresh 0x140083040): slot s shows item [+0x330] + s. */
+    int        scroll_off;
+    /* For MC_MSG_LIST: see the kind. */
+    ULONGLONG  msg_table;
+    int        id_off;
+    int        id_max;
 } mc_screen;
 
 /* ⭐ The heading column. The shell draws a screen's own title at X=960 -- the
@@ -497,28 +544,6 @@ typedef enum {
     MC_UNNAMED_NO_LABELS
 } mc_named_why;
 
-/* ⭐⭐ One row's value labels, keyed by how many values are LIVE.
- *
- * The Select Game screen's value lists are shorter than the label sets that
- * exist for them, because some labels are online-only or game-dependent:
- *   - Game Version has THREE labels (Japanese / English / Either) but "Either"
- *     is a lobby-search filter; offline the list is J/E, and the live count
- *     was measured at 2.
- *   - Player has FOUR (P1..P4) but only the 4-player games (Power Stone 2,
- *     Project Justice) offer P3/P4; the live count was measured at 2.
- *
- * ⛔ So the labels CANNOT be indexed directly -- the live list is a subset, and
- * which subset depends on the game and on online/offline. Keying each variant
- * on its `count` makes the match checkable: a count with no matching variant
- * names nothing rather than indexing a list that does not apply.
- *
- * ⚠ `count` is the LIVE number of values, and `first` the GMD index the list
- * starts at. Variants are only ever added from a MEASURED count. */
-typedef struct mc_value_set {
-    int row;      /* which row of the screen these values belong to */
-    int count;    /* the live value count this variant applies to */
-    int first;    /* GMD index of value 0 */
-} mc_value_set;
 
 /* Which axis a movement was on -- so the readout can say what the user
  * actually did. ⭐ On a settings screen "3 of 8" is ambiguous between "the
@@ -568,6 +593,9 @@ typedef struct {
      * helper's index is not the row on screen, and a count of 16 over a grid
      * with blank slots describes nothing the player can see. */
     BOOL  bare;
+    /* A page/tab title to speak BEFORE the line, set only when the tab has
+     * just changed (MC_PART_ROWS). Read from the tab's own message. */
+    char  title[64];
 } mc_speech;
 
 /* Build the announcement for a movement. Always fills `position`/`total`;
@@ -576,6 +604,10 @@ void menu_speak_build(const mc_move *m, mc_speech *out);
 
 /* Build it and speak it. */
 void menu_speak(const mc_move *m);
+
+/* Worker: speak a Casual Match game being ticked or unticked (no cursor
+ * moves when that happens). Cheap: one guarded read per call. */
+void menu_speak_poll_ticks(void);
 
 /* Test seam: replace the reader of the exe's own data tables (the part-ID
  * tables at 0x141207620 / 0x141207848), which a test process does not map.
@@ -674,9 +706,6 @@ void menu_speak_log_unknown(const mc_move *m);
 BOOL menu_speak_derive_row(const void *screen, const void *cursor,
                            int values_off, int max_row, int *row);
 
-/* The value-label variant for `row` matching the LIVE value count, or NULL. */
-const mc_value_set *menu_speak_values_for(const mc_screen *s, int row,
-                                          int live_count);
 
 /* The MC_SETTINGS_ROW entry of the same screen as a value entry, or NULL --
  * so a value can name the row it belongs to. */
@@ -769,16 +798,9 @@ BOOL menu_speak_discovery_enabled(void);
  * the only thing keeping prose or a button strip out of that path. */
 BOOL menu_speak_test_value_shaped(const char *s);
 
-/* ⭐ The character picker's self-verification: does the caption match the
- * character this POSITION holds? Measured bug it prevents -- the keypad wrapped
- * to position 36 ("Z") and spoke "0", a stale value from the six-slot ID
- * display on the same screen. */
-BOOL menu_speak_test_char_picker(const char *s, int position);
 
-/* ⭐ Logs what a character-picker movement carried, so one run can settle
- * whether the caption lags the cursor or names the position being LEFT. Logged
- * only, never spoken -- see the long note at char_picker_matches(). */
-void menu_speak_probe_picker(const mc_move *m, const char *cap);
+
+
 
 /* Test seam: would this caption be suppressed as the SCREEN's rather than the
  * row's? A caption that does not change as the cursor moves describes the

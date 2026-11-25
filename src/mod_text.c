@@ -230,6 +230,17 @@ static const wchar_t *const g_text[MT_COUNT][MT_NLANG] = {
     [MT_NONE] = { L"なし", L"none", L"aucun", L"nessuno", L"keins", L"ninguno", L"ninguno", L"없음",
                   L"brak", L"nenhum", L"нет", L"無", L"无", L"لا شيء" },
 
+    /* Order: jpn eng fre ita ger spa oth kor pol por rus chT chS ara. */
+    [MT_SELECTED] = { L"選択中", L"selected", L"sélectionné", L"selezionato",
+                      L"ausgewählt", L"seleccionado", L"seleccionado", L"선택됨",
+                      L"zaznaczono", L"selecionado", L"выбрано", L"已選擇",
+                      L"已选择", L"محدد" },
+    [MT_NOT_SELECTED] = { L"未選択", L"not selected", L"non sélectionné",
+                          L"non selezionato", L"nicht ausgewählt",
+                          L"no seleccionado", L"no seleccionado", L"선택 안 됨",
+                          L"nie zaznaczono", L"não selecionado", L"не выбрано",
+                          L"未選擇", L"未选择", L"غير محدد" },
+
     [MT_TEXT_NO_READER] = { L"テキストの読み取り機能がありません。", L"No text reader is available.",
                             L"Aucun lecteur de texte disponible.", L"Nessun lettore di testo disponibile.",
                             L"Kein Textleser verfügbar.", L"No hay lector de texto disponible.",

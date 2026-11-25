@@ -579,6 +579,9 @@ void mc_poll_and_log(void)
             menu_speak_log_unknown(&rest);
     }
 
+    /* A game ticked/unticked on Casual Match moves no cursor. */
+    menu_speak_poll_ticks();
+
     /* ⚠ `if`, not `while`: only the most recent movement is kept, so a loop
      * would suggest a queue that does not exist. */
     mc_move m;

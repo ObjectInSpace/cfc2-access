@@ -2817,6 +2817,41 @@ static BOOL obj_text(const void *obj, char *out, int outlen)
     return found;
 }
 
+BOOL gt_part_sub_text(const void *screen, int part_id, int child, int sub,
+                      char *out, int outlen)
+{
+    void *obj, *subroot = NULL, *o2;
+    if (out && outlen > 0) out[0] = 0;
+    if ((!g_installed && !g_focus_test_mode) || !out || outlen <= 0)
+        return FALSE;
+    obj = part_child_obj(screen, part_id, child);
+    if (!obj || !tree_ptr((char *)obj + 0xf0, &subroot) || !subroot)
+        return FALSE;
+    o2 = tree_find(subroot, sub, 0x50, 0x70, 0x78);
+    if (!o2 || !obj_text(o2, out, outlen))
+        return FALSE;
+    for (const char *q = out; *q; q++)
+        if (*q != ' ' && *q != '\t')
+            return TRUE;
+    out[0] = 0;
+    return FALSE;
+}
+
+BOOL gt_part_anim(const void *screen, int part_id, int *anim)
+{
+    void *root = NULL, *part, *objs = NULL, *rec = NULL;
+    if (anim) *anim = 0;
+    if ((!g_installed && !g_focus_test_mode) || !screen || !anim)
+        return FALSE;
+    if (!tree_ptr((const char *)screen + 0x108, &root) || !root)
+        return FALSE;
+    part = tree_find(root, part_id, 0x08, 0x68, 0x70);
+    if (!part || !tree_ptr((char *)part + 0x100, &objs) || !objs ||
+        !tree_ptr((char *)objs + 0xb8, &rec) || !rec)
+        return FALSE;
+    return tree_int(rec, anim);
+}
+
 BOOL gt_part_text(const void *screen, int part_id, int child,
                   char *out, int outlen)
 {

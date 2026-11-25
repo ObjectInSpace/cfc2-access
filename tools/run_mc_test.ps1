@@ -26,7 +26,7 @@ $minhookSrc = @(
 & $gcc -O2 -Wall -Wextra -Wclobbered -o "$out\test_menu_cursor.exe" `
     "$root\tools\test_menu_cursor.c" "$root\src\menu_cursor.c" `
     "$root\src\log.c" "$root\src\memsafe.c" `
-    "$root\src\menu_speak.c" "$root\src\gmd_find.c" "$root\src\speech.c" `
+    "$root\src\menu_speak.c" "$root\src\help_line.c" "$root\src\gmd_find.c" "$root\src\speech.c" `
     "$root\src\text_channel.c" "$root\src\mod_text.c" `
     "$root\src\move_list.c" `
     "$root\src\rom_table.c" `
