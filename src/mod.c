@@ -1837,8 +1837,10 @@ static DWORD WINAPI worker(LPVOID param)
     /* The help line, as the message the game sets (help_line.h): each menu
      * row's description, exactly. Always on; respects cfc2_hook.off. If it
      * cannot install, descriptions fall back to the caption channel. */
-    if (unpacked && hook_enabled)
+    if (unpacked && hook_enabled) {
         help_line_install();
+        dialog_install();
+    }
 
     /* ⭐⭐ TWO THINGS RODE ON ONE FLAG, AND THEY HAVE OPPOSITE AUDIENCES.
      *

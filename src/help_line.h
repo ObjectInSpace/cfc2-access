@@ -24,6 +24,25 @@ BOOL help_line_installed(void);
  * FALSE before the first set. */
 BOOL help_line_latest(int *msg, LONG *seq);
 
+/* ⭐⭐⭐ EVERY SHELL DIALOG, as the game opens it.
+ *
+ * 0x14007fc20(dialog, type, message, selection, ...) is the one routine all 25
+ * shell dialog call sites use (quit, back-to-title, reset scores, keep these
+ * settings, privacy policy, age check, lobby, network errors, quick save...).
+ * It stores the prompt message at dialog+0x370 and the highlighted button at
+ * +0x38c, and its type switch sets the button messages (+0x33c, +0x340) and
+ * their count (+0x364). The hook records the dialog object and a sequence
+ * number; the worker reads those fields. No prompt list, no text matching. */
+#define DIALOG_OPEN_ADDR 0x14007fc20ULL
+
+BOOL dialog_install(void);
+BOOL dialog_installed(void);
+/* The most recently opened dialog object and the number of openings so far.
+ * FALSE before the first opening. */
+BOOL dialog_latest(void **dlg, LONG *seq);
+void dialog_test_open(void *dlg);
+void dialog_test_reset(void);
+
 /* Test seam: record a set as the hook would. */
 void help_line_test_set(int msg);
 void help_line_test_reset(void);

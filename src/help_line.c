@@ -33,3 +33,37 @@ void help_line_test_reset(void)
     InterlockedExchange(&g_help_msg, -1);
     InterlockedExchange(&g_help_seq, 0);
 }
+
+/* ---- dialogs (see help_line.h) ---- */
+void * volatile g_dlg_obj;
+volatile LONG   g_dlg_seq;
+BOOL            g_dlg_installed;
+static BOOL     g_dlg_test;
+
+BOOL dialog_installed(void) { return g_dlg_installed || g_dlg_test; }
+
+BOOL dialog_latest(void **dlg, LONG *seq)
+{
+    LONG s1 = InterlockedCompareExchange(&g_dlg_seq, 0, 0);
+    void *o = InterlockedCompareExchangePointer((void * volatile *)&g_dlg_obj,
+                                                NULL, NULL);
+    if (s1 == 0 || !o)
+        return FALSE;
+    if (dlg) *dlg = o;
+    if (seq) *seq = s1;
+    return TRUE;
+}
+
+void dialog_test_open(void *dlg)
+{
+    g_dlg_test = TRUE;
+    InterlockedExchangePointer((void * volatile *)&g_dlg_obj, dlg);
+    InterlockedIncrement(&g_dlg_seq);
+}
+
+void dialog_test_reset(void)
+{
+    g_dlg_test = FALSE;
+    InterlockedExchangePointer((void * volatile *)&g_dlg_obj, NULL);
+    InterlockedExchange(&g_dlg_seq, 0);
+}

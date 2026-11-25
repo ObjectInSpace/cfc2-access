@@ -9,6 +9,9 @@
 extern volatile LONG g_help_msg;
 extern volatile LONG g_help_seq;
 extern BOOL          g_help_installed;
+extern void * volatile g_dlg_obj;
+extern volatile LONG   g_dlg_seq;
+extern BOOL            g_dlg_installed;
 
 typedef void (*help_set_fn)(void *mgr, int msg);
 
@@ -75,3 +78,57 @@ BOOL help_line_install(void)
     return TRUE;
 }
 
+
+/* ---- the dialog opener (help_line.h) ------------------------------------ */
+typedef ULONG_PTR (*dlg_open_fn)(void *dlg, int type, int msg, int sel,
+                                 ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7);
+static dlg_open_fn g_real_open;
+
+/* Records the dialog object only; every field is read later, guarded, on the
+ * worker. Published AFTER the original returns, so the fields are set. */
+static ULONG_PTR hook_open(void *dlg, int type, int msg, int sel,
+                           ULONG_PTR a5, ULONG_PTR a6, ULONG_PTR a7)
+{
+    ULONG_PTR r = g_real_open(dlg, type, msg, sel, a5, a6, a7);
+    InterlockedExchangePointer((void * volatile *)&g_dlg_obj, dlg);
+    InterlockedIncrement(&g_dlg_seq);
+    return r;
+}
+
+BOOL dialog_install(void)
+{
+    static const unsigned char expect[7] = {
+        0x8b, 0x44, 0x24, 0x38,             /* mov eax, [rsp+0x38] */
+        0x4c, 0x8b, 0xd1                    /* mov r10, rcx        */
+    };
+    void *target = (void *)(ULONG_PTR)DIALOG_OPEN_ADDR;
+    unsigned char got[7];
+    MEMORY_BASIC_INFORMATION mbi;
+    MH_STATUS st;
+
+    if (g_dlg_installed)
+        return TRUE;
+    if (VirtualQuery(target, &mbi, sizeof(mbi)) != sizeof(mbi) ||
+        mbi.State != MEM_COMMIT ||
+        !(mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ |
+                         PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) ||
+        !mem_copy(got, target, sizeof(got)) || memcmp(got, expect, sizeof(got))) {
+        log_line("dialog: 0x%llx is not the expected dialog opener -- not "
+                 "hooking; prompts fall back to the text-matched list.",
+                 DIALOG_OPEN_ADDR);
+        return FALSE;
+    }
+    st = MH_Initialize();
+    if (st != MH_OK && st != MH_ERROR_ALREADY_INITIALIZED)
+        return FALSE;
+    if (MH_CreateHook(target, (void *)&hook_open, (void **)&g_real_open) != MH_OK)
+        return FALSE;
+    if (MH_EnableHook(target) != MH_OK) {
+        MH_RemoveHook(target);
+        return FALSE;
+    }
+    g_dlg_installed = TRUE;
+    log_line("dialog: hooked the dialog opener at 0x%llx -- every shell prompt "
+             "is read from the dialog's own fields.", DIALOG_OPEN_ADDR);
+    return TRUE;
+}

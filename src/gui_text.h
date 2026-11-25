@@ -446,32 +446,6 @@ void gt_note_focus_move(void);
  * previous row's caption". Hint strips (which carry markup) are skipped: they
  * describe the SCREEN and do not change per row, so speaking one on every
  * movement would be noise. */
-/* ⭐⭐⭐ THE MODAL SLOT -- the latest yes/no dialog, not a history search.
- *
- * ⛔ USER (2026-10-04): "we shouldn't be relying on a buffer that can fill up
- * to determine what's currently being spoken." The quit prompts used to be
- * found by searching the focus record; it filled, and they went silent.
- *
- * The worker PUBLISHES the prompt texts in the game's current language
- * (gt_set_modal_prompts). The hook compares each CHANGED string against them;
- * a match is an opening of that dialog, so it fills this slot and bumps
- * `serial` once. The next two short prose strings are its options, top first
- * (measured order: prompt, Yes, No). `pending` is TRUE until both arrive or
- * something else interrupts -- then the options are incomplete.
- *
- * ⚠ This says a dialog was OPENED, not that it is still open. Whether it is
- * still on screen comes from gt_modal_selection(), which reads the dialog's own
- * state. Returns FALSE if no prompt has ever arrived. */
-#define GT_MODAL_PROMPTS_MAX 24
-typedef struct {
-    char prompt[GT_CAPTION_MAX];
-    char opt[2][GT_CAPTION_MAX];
-    int  nopts;
-    BOOL pending;
-    LONG serial;
-} gt_modal_info;
-void gt_set_modal_prompts(const char *const *texts, int n);
-BOOL gt_modal_latest(gt_modal_info *out);
 
 /* ⭐⭐ The newest prose, and ONLY IF IT HAS ARRIVED SINCE THE LAST CALL.
  *
@@ -511,16 +485,6 @@ void gt_focus_report(void);
  * pressing a direction. Reports OFFSETS AND VALUES only -- never a conclusion.
  *
  * Switch: cfc2_modal.on. Absent = off. */
-/* ⭐⭐⭐ The MODAL dialog's selected option index: 0 = the TOP option, 1 = the
- * next. Read from parent+0x38c, where parent is either option widget's +0x088.
- *
- * ⭐ Two independent sources: "Yes" sits above "No" in every run (so 0=Yes),
- * and on both confirms in run-...-1450 the index read 1 and the game kept
- * running, i.e. No was taken.
- *
- * ⚠ Every press TOGGLES it -- a two-item list wraps, so there is no direction
- * rule. FALSE when no such dialog is on screen, or the value is not 0/1. */
-BOOL gt_modal_selection(int *out_index);
 
 void gt_modal_probe(void);
 

@@ -112,19 +112,6 @@ static void check(const char *name, int cond, const char *fmt, ...)
 #define MODAL_RESET_GAME "Restart the game?"
 #define MODAL_LOAD_CHECK "Load quick save data?"
 
-static BOOL test_modal_resolve(int idx, char *out, unsigned outlen)
-{
-    const char *s = (idx == 384)  ? MODAL_EXIT_APP :
-                    (idx == 383)  ? MODAL_BACK_TITLE :
-                    (idx == 279)  ? MODAL_QUIT_TR :
-                    (idx == 385)  ? MODAL_SCORE_RST :
-                    (idx == 4117) ? MODAL_RESET_GAME :
-                    (idx == 269)  ? MODAL_LOAD_CHECK : NULL;
-    if (!s || !out || outlen == 0) return FALSE;
-    _snprintf(out, outlen, "%s", s);
-    out[outlen - 1] = '\0';
-    return TRUE;
-}
 
 /* Stands in for the exe's part-ID tables, which a test process does not map:
  * keyboard row r -> part 100+r, gamepad slot s -> part 200+s. */
@@ -786,51 +773,8 @@ int main(void)
         check("20l. a modal prompt's line breaks collapse to single spaces",
               ok, "got \"%s\" / \"%s\"", out, lead);
     }
-    {
-        /* 20m: the matcher accepts ONLY the known prompts. ⚠ Asserted in both
-         * directions: a matcher that accepts everything would pass a
-         * one-sided test and announce ordinary menu prose as a quit warning. */
-        int ok = menu_speak_is_modal_prompt(MODAL_EXIT_APP, test_modal_resolve) &&
-                 menu_speak_is_modal_prompt(MODAL_BACK_TITLE, test_modal_resolve) &&
-                 /* ⭐ The prompts added after the user reported that most
-                  * confirmations were silent. Without these the list could be
-                  * reverted to its original two and this case would not
-                  * notice. */
-                 menu_speak_is_modal_prompt(MODAL_QUIT_TR, test_modal_resolve) &&
-                 menu_speak_is_modal_prompt(MODAL_SCORE_RST,
-                                            test_modal_resolve) &&
-                 menu_speak_is_modal_prompt(MODAL_RESET_GAME,
-                                            test_modal_resolve) &&
-                 menu_speak_is_modal_prompt(MODAL_LOAD_CHECK,
-                                            test_modal_resolve) &&
-                 !menu_speak_is_modal_prompt("Play offline.", test_modal_resolve) &&
-                 !menu_speak_is_modal_prompt("Exit the application.",
-                                             test_modal_resolve) &&
-                 /* ⛔⛔ THE SONG TITLES. Two corpus strings end in a question
-                  * mark -- SOUND_CFJ_06 "06. At Ease!?" and SOUND_MJUS_46
-                  * "46. Who's the Number one?" -- so a matcher that keyed on
-                  * punctuation instead of on the known indices would announce a
-                  * music track as a confirmation dialog the moment the player
-                  * opened the sound test. That is why the list is chosen by
-                  * STEM FAMILY and this case asserts the trap directly. */
-                 !menu_speak_is_modal_prompt("06. At Ease!?",
-                                             test_modal_resolve) &&
-                 !menu_speak_is_modal_prompt("46. Who's the Number one?",
-                                             test_modal_resolve) &&
-                 !menu_speak_is_modal_prompt("", test_modal_resolve) &&
-                 !menu_speak_is_modal_prompt(NULL, test_modal_resolve);
-        check("20m. only the known modal prompts match, in both directions",
-              ok, "one or more classifications wrong");
-    }
-    {
-        /* 20n: ⛔ with no resolver it must match NOTHING. In the game a missing
-         * GMD table is a real state (it is built during startup), and silence
-         * is correct there -- announcing an unresolved string would speak
-         * whatever prose happened to be on screen. */
-        int ok = !menu_speak_is_modal_prompt(MODAL_EXIT_APP, NULL);
-        check("20n. no resolver means no match, not a fallback",
-              ok, "matched with a NULL resolver");
-    }
+    /* 20m-20n tested the hand-picked list of 20 text-matched prompts, removed
+     * 2026-11-24: every dialog is read from its own fields (run_modal_test). */
 
     /* --- cases 20i-20k: ⛔⛔ ONE CALLER, TWO SCREENS, ONE SHARED VALUE AXIS
      *
@@ -2033,6 +1977,30 @@ int main(void)
         check("41. the mode strip and consent dialog read their own message "
               "tables, and refuse out-of-range items", ok && a && b,
               "wiring=%d past-count=%d bad-id=%d", ok, a, b);
+    }
+
+    /* --- case 42: a dialog's filled-in text fits its template.
+     * The resolution confirm (PC_SETTING_ASK, "%d seconds") and the quick-save
+     * overwrite (POP_SAVE_CHECK2, "%s") were silent: no exact match could ever
+     * fire. The dialog reader speaks the live text that fits the template. */
+    {
+        const char *T1 = "Do you want to keep the current settings? (Reverting "
+                         "to previous settings in %d seconds.)";
+        const char *T2 = "<CNTR>Quick save data already exists for <CNTR>\"%s\". "
+                         "<CNTR>Overwrite?";
+        int ok = 1;
+        ok &= menu_speak_test_template_fits(T1, "Do you want to keep the current "
+                 "settings? (Reverting to previous settings in 14 seconds.)");
+        ok &= menu_speak_test_template_fits(T2, "<CNTR>Quick save data already "
+                 "exists for <CNTR>\"Capcom vs. SNK 2\". <CNTR>Overwrite?");
+        ok &= menu_speak_test_template_fits("Begin match?", "Begin match?");
+        /* refusals: different wording, a missing tail, extra text */
+        ok &= !menu_speak_test_template_fits(T1, "Do you want to keep the "
+                  "current settings?");
+        ok &= !menu_speak_test_template_fits("Begin match?", "Begin match? Now");
+        ok &= !menu_speak_test_template_fits(T2, "Quick save loaded.");
+        check("42. a dialog's live text is matched to its template, values and "
+              "names included", ok, "");
     }
 
     printf("\n");

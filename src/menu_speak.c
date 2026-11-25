@@ -3119,51 +3119,6 @@ BOOL menu_speak_test_caption_repeat(const char *cap, const char *screen_name)
  *
  * ⚠ Announced ONCE per appearance: the dialog re-sets its text while open, and
  * a prompt repeating every redraw would talk over the user. */
-/* ⛔ USER: "You also are not reading many of the yes/no prompts." Correct --
- * this list held exactly TWO, the quit dialogs it was built for, so every other
- * confirmation in the collection was silent. A blind player was being asked a
- * question they could not hear, and some of these END A MATCH or OVERWRITE A
- * SAVE.
- *
- * ⭐ Chosen by STEM FAMILY (POP_*, SYS_*, ASK_*), not by "the text ends in a
- * question mark". Two song titles in the corpus end in '?' -- SOUND_CFJ_06
- * "06. At Ease!?" and SOUND_MJUS_46 "46. Who's the Number one?" -- and a
- * punctuation rule would announce a music track as a dialog the moment the
- * player opened the sound test.
- *
- * ⚠ These are INDICES, resolved against the live corpus at match time, so the
- * mod follows the game's language. A hardcoded English literal would break for
- * 13 of the 14 shipped languages. */
-static const int K_MODAL_PROMPTS[] = {
-    384,    /* SYS_EXIT_APP     'If you exit the application, ...Continue?'  */
-    383,    /* SYS_BACK_TITLE   'If you return to the title screen, ...'     */
-    278,    /* POP_QUIT         'Exit the game?'                             */
-    279,    /* POP_QUIT_TR      'Exit training mode?'                        */
-    280,    /* POP_QUIT_HOST    'Exit the game and return to the lobby?'     */
-    281,    /* POP_QUIT_GUEST   'Exit the game and leave the lobby?'         */
-    4117,   /* POP_RESET_GAME   'Restart the game?'                          */
-    269,    /* POP_LOAD_CHECK   'Load quick save data?'                      */
-    270,    /* POP_SAVE_CHECK   'Overwrite game data?'                       */
-    /* ⚠ 271 POP_SAVE_CHECK2 is DELIBERATELY ABSENT. Its corpus text contains a
-     * "%s" that the game substitutes with the save name, so the live string can
-     * never equal the template and an exact match would never fire. Listing it
-     * would look like coverage while changing nothing -- worse than the gap,
-     * because it hides it. Matching it needs a prefix rule, which is a wider
-     * change than this one and would need its own evidence that no other
-     * string shares the prefix. */
-    385,    /* SYS_SCORE_RESET  'Reset high score data?'                     */
-    389,    /* SYS_NOTFIND_SAVEDATA 'Could not find save data. Create new?'  */
-    400,    /* SYS_SAVEDATA_NOCREATE 'You will not be able to create ...'    */
-    402,    /* SYS_AUTOSAVE_NOSAVING_01 'Unable to save. Return to title?'   */
-    150,    /* POP_LEAVE_LOBBY  'Leave this lobby?'                          */
-    933,    /* POP_SEARCH_NO_MATCH 'Unable to find an opponent. Search again?' */
-    935,    /* ASK_MATCH        'Begin match?'                               */
-    945,    /* ASK_REMATCH      'Rematch?'                                   */
-    946,    /* POP_ASK_MATCH    'Stop waiting for opponents and exit standby?' */
-    1062,   /* POP_DECLINED_MATCH 'You have left the match. Search again?'   */
-    1082,   /* ASK_REPLAY       'Play again?'                                */
-};
-
 /* ⭐ Collapse the corpus strings' CR/LF layout to single spaces.
  *
  * ⚠ The prompts carry "\r\n" as visual line breaks. Spoken verbatim those
@@ -3192,160 +3147,204 @@ void menu_speak_flatten_prompt(const char *in, char *out, int outlen)
     out[o] = '\0';
 }
 
-/* Test seam: is this text one of the modal prompts, given a resolver?
- * ⭐ The resolver is passed in so the suite can supply the corpus strings the
- * test process cannot load. The SHIPPING caller passes gmd_text_by_index. */
-BOOL menu_speak_is_modal_prompt(const char *text,
-                                BOOL (*resolve)(int, char *, unsigned))
-{
-    if (!text || !text[0] || !resolve)
-        return FALSE;
-    for (size_t i = 0; i < sizeof(K_MODAL_PROMPTS) / sizeof(K_MODAL_PROMPTS[0]);
-         i++) {
-        char want[GT_CAPTION_MAX];
-        if (resolve(K_MODAL_PROMPTS[i], want, sizeof(want)) &&
-            want[0] && strcmp(want, text) == 0)
-            return TRUE;
-    }
-    return FALSE;
-}
+/* The message lookup the dialog reader uses. Overridable ONLY by the test
+ * harness, which has no message table. */
+static BOOL (*g_dialog_resolver)(int, char *, unsigned);
 
-/* ⭐ The resolver menu_speak_check_modal() uses. Overridable ONLY by the test
- * harness, which has no GMD table -- so the end-to-end probe can drive the real
- * function instead of reimplementing its logic and testing its own copy. */
-static BOOL (*g_modal_resolver)(int, char *, unsigned);
-
-static BOOL modal_resolve(int idx, char *out, unsigned outlen)
+static BOOL dialog_msg(int idx, char *out, unsigned outlen)
 {
-    if (g_modal_resolver)
-        return g_modal_resolver(idx, out, outlen);
+    if (g_dialog_resolver)
+        return g_dialog_resolver(idx, out, outlen);
     return gmd_text_by_index(idx, out, outlen);
 }
 
-void menu_speak_test_set_modal_resolver(BOOL (*fn)(int, char *, unsigned))
+void menu_speak_test_set_dialog_resolver(BOOL (*fn)(int, char *, unsigned))
 {
-    g_modal_resolver = fn;
+    g_dialog_resolver = fn;
 }
 
-void menu_speak_check_modal(void)
+/* ⭐⭐⭐ EVERY SHELL DIALOG, FROM ITS OWN FIELDS (2026-11-24).
+ *
+ * USER: "We should cover all prompts." The text-matched list held 20 hand-
+ * picked prompts and could never match one carrying a number or a name
+ * ("Reverting to previous settings in %d seconds", "%s"). The game opens every
+ * shell dialog through 0x14007fc20 (help_line.h), which leaves:
+ *     +0x370 prompt message   +0x38c highlighted button
+ *     +0x33c / +0x340 button messages, +0x364 their count
+ * So the prompt is the message the game chose. When its template has a %d or
+ * %s, the words spoken are the dialog's own filled-in text -- the live text
+ * object under the dialog that fits the template -- so the countdown or the
+ * save name is said as shown. */
+#define DLG_MSG_OFF   0x370
+#define DLG_SEL_OFF   0x38c
+#define DLG_OPT0_OFF  0x33c
+#define DLG_OPT1_OFF  0x340
+#define DLG_NOPT_OFF  0x364
+
+/* Does `live` fit `tmpl`, where %d / %s / %u stand for anything? */
+static BOOL template_fits(const char *tmpl, const char *live)
 {
-    /* ⭐⭐⭐ READ THE MODAL SLOT -- do not search a history.
-     *
-     * ⛔⛔ USER (2026-10-04): "sometimes the confirm quit yes/no prompts are not
-     * reading", then: "we shouldn't be relying on a buffer that can fill up to
-     * determine what's currently being spoken." This used to scan the 48-entry
-     * focus record for a known prompt. The record filled ~48 strings into a
-     * session (only a diagnostics-only report ever emptied it), and it kept
-     * closed dialogs' prompts, so a dialog opened twice matched the first time
-     * and was silent.
-     *
-     * Now the hook recognises the prompt as it is SET and fills one slot (see
-     * gt_modal_latest): the prompt, its two options, and a serial bumped once
-     * per opening. A new serial is a new opening; nothing can fill or linger. */
-    static const void *published_for;   /* language the hook's table is for */
-    static ULONGLONG   next_lang_check;
-    static LONG        last_serial;
-    static int         last_sel = -2;
-    static LONG        pending_serial;
-    static ULONGLONG   pending_since;
-    gt_modal_info m;
-    char flat[GT_CAPTION_MAX];
-
-    /* 1. Give the hook the prompt texts in the game's CURRENT language.
-     *
-     * ⚠ The hook cannot read the GMD table itself (it runs on the game's
-     * thread), so the worker resolves the indices and publishes the strings,
-     * and republishes when the language changes. Checked once a second: a
-     * language change is a human-speed event, and the check is a guarded read. */
-    {
-        ULONGLONG now = GetTickCount64();
-        if (g_modal_resolver || now >= next_lang_check) {
-            const void *key = g_modal_resolver
-                                  ? (const void *)g_modal_resolver
-                                  : (const void *)gmd_text_language();
-            next_lang_check = now + 1000;
-            if (key && key != published_for) {
-                enum { NP = sizeof(K_MODAL_PROMPTS) / sizeof(K_MODAL_PROMPTS[0]) };
-                static char texts[NP][GT_CAPTION_MAX];
-                const char *ptrs[NP];
-                int k = 0;
-                for (int i = 0; i < NP; i++) {
-                    if (modal_resolve(K_MODAL_PROMPTS[i], texts[k],
-                                      sizeof(texts[k])) && texts[k][0]) {
-                        ptrs[k] = texts[k];
-                        k++;
-                    }
-                }
-                gt_set_modal_prompts(ptrs, k);
-                published_for = key;
-                log_line("mcspeak: yes/no prompts: %d of %d resolved and handed "
-                         "to the text hook.", k, (int)NP);
+    const char *t = tmpl, *l = live;
+    while (*t) {
+        if (t[0] == '%' && (t[1] == 'd' || t[1] == 's' || t[1] == 'u')) {
+            const char *next = t + 2;
+            char lit[64];
+            size_t n = 0;
+            const char *f;
+            /* the literal run up to the next placeholder (or the end) */
+            while (next[n] && !(next[n] == '%' && next[n + 1]) && n < sizeof lit - 1) {
+                lit[n] = next[n];
+                n++;
             }
+            lit[n] = 0;
+            if (!n)
+                return TRUE;                /* placeholder at the end */
+            f = strstr(l, lit);
+            if (!f)
+                return FALSE;
+            l = f + n;
+            t = next + n;
+            continue;
         }
+        if (*t != *l)
+            return FALSE;
+        t++; l++;
     }
+    return *l == 0;
+}
 
-    if (!gt_modal_latest(&m))
-        return;                         /* no dialog has opened yet */
+/* Test seam. */
+BOOL menu_speak_test_template_fits(const char *tmpl, const char *live)
+{
+    return template_fits(tmpl, live);
+}
 
-    BOOL is_new = (m.serial != last_serial);
+typedef struct { const char *tmpl; char out[GT_CAPTION_MAX]; } fill_ctx;
 
-    /* 2. A new opening whose options have not all arrived yet: wait a moment.
-     * The dialog sets prompt, Yes, No back to back, so this is normally one
-     * poll; ⚠ bounded, so a dialog with no options is still spoken. */
-    if (is_new && m.pending) {
+static BOOL fill_cb(const char *text, void *ctx)
+{
+    fill_ctx *c = (fill_ctx *)ctx;
+    if (!c->out[0] && template_fits(c->tmpl, text)) {
+        _snprintf(c->out, sizeof c->out, "%s", text);
+        c->out[sizeof c->out - 1] = 0;
+    }
+    return TRUE;
+}
+
+static BOOL dialog_option(const void *dlg, int i, char *out, size_t cap)
+{
+    int msg = -1;
+    char raw[GT_CAPTION_MAX];
+    out[0] = 0;
+    if (i < 0 || i > 1 ||
+        !screen_int(dlg, i ? DLG_OPT1_OFF : DLG_OPT0_OFF, &msg) || msg <= 0 ||
+        !dialog_msg(msg, raw, sizeof raw) || !raw[0])
+        return FALSE;
+    gm_speak(raw, out, cap);
+    return out[0] && !gm_has_residue(out);
+}
+
+static void menu_speak_check_dialog(void)
+{
+    static LONG      seen_seq;
+    static const void *cur;
+    static ULONGLONG cur_vt;
+    static int       last_sel = -2;
+    static LONG      pending_seq;
+    static ULONGLONG pending_since;
+    void *dlg = NULL;
+    LONG seq = 0;
+    int nopt = 0, sel = -1, msg = -1;
+    char line[512];
+
+    if (dialog_latest(&dlg, &seq) && seq != seen_seq) {
+        /* A new opening. Give its text a moment to be drawn (the fill-in
+         * text object is set by the dialog's first refresh), bounded. */
         ULONGLONG now = GetTickCount64();
-        if (pending_serial != m.serial) {
-            pending_serial = m.serial;
+        if (pending_seq != seq) {
+            pending_seq = seq;
             pending_since = now;
             return;
         }
-        if (now - pending_since < 300)
+        if (now - pending_since < 150)
             return;
-    }
-
-    /* 3. The highlighted option, from the dialog's own state (parent+0x38c,
-     * 0 = TOP). See gt_modal_selection() for the two sources behind that. */
-    int sel = -1;
-    BOOL have_sel = gt_modal_selection(&sel) && (sel == 0 || sel == 1);
-
-    if (!is_new) {
-        /* ⭐ The same opening: speak only a READABLE change of option.
-         * ⚠ An unreadable selection is most likely the dialog having closed --
-         * the slot keeps its last opening. Speaking then would describe a
-         * dialog that is no longer there. */
-        if (!have_sel || sel == last_sel)
+        seen_seq = seq;
+        cur = dlg;
+        cur_vt = 0;
+        if (!mem_readable(dlg, sizeof cur_vt) || !mem_copy(&cur_vt, dlg, sizeof cur_vt) ||
+            !screen_int(dlg, DLG_MSG_OFF, &msg) || msg <= 0) {
+            cur = NULL;
             return;
-    }
-    last_serial = m.serial;
-    last_sel = have_sel ? sel : -1;
-
-    /* 4. Say it. The prompt only on a new opening; afterwards just the option
-     * -- USER: "it repeats the whole dialog, it should just say yes or no". */
-    if (is_new)
-        menu_speak_flatten_prompt(m.prompt, flat, (int)sizeof(flat));
-    else
-        flat[0] = '\0';
-
-    if (m.nopts == 2) {
-        size_t used = strlen(flat);
-        const char *sep = used ? " " : "";
-        if (have_sel)
-            _snprintf(flat + used, sizeof(flat) - used - 1, "%s%s", sep,
-                      m.opt[sel]);
-        else
-            /* ⛔ No readable selection: LIST both rather than name one. A wrong
-             * option stated confidently on a prompt that quits the game is the
-             * failure this function exists to prevent. */
-        {
-            char either[256];
-            mt_fmt8(either, sizeof either, MT_OR, m.opt[0], m.opt[1], NULL);
-            _snprintf(flat + used, sizeof(flat) - used - 1, "%s%s", sep, either);
         }
-        flat[sizeof(flat) - 1] = '\0';
+        {
+            char tmpl[GT_CAPTION_MAX], text[GT_CAPTION_MAX], spoken[GM_OUT_MAX];
+            if (!dialog_msg(msg, tmpl, sizeof tmpl) || !tmpl[0]) {
+                log_line("dialog: message %d has no text; not spoken.", msg);
+                return;
+            }
+            _snprintf(text, sizeof text, "%s", tmpl);
+            if (strchr(tmpl, '%')) {
+                fill_ctx fc;
+                fc.tmpl = tmpl;
+                fc.out[0] = 0;
+                gt_screen_texts(dlg, fill_cb, &fc);
+                if (fc.out[0])
+                    _snprintf(text, sizeof text, "%s", fc.out);
+                else
+                    log_line("dialog: message %d's filled-in text was not found "
+                             "on the dialog; speaking its template.", msg);
+            }
+            text[sizeof text - 1] = 0;
+            gm_speak(text, spoken, sizeof spoken);
+            menu_speak_flatten_prompt(spoken, line, (int)sizeof line);
+        }
+        screen_int(dlg, DLG_NOPT_OFF, &nopt);
+        if (screen_int(dlg, DLG_SEL_OFF, &sel) && nopt >= 2 && sel >= 0 &&
+            sel < 2) {
+            char opt[GM_OUT_MAX];
+            if (dialog_option(dlg, sel, opt, sizeof opt)) {
+                size_t u = strlen(line);
+                _snprintf(line + u, sizeof line - u - 1, "%s%s", u ? " " : "", opt);
+                line[sizeof line - 1] = 0;
+            }
+        }
+        last_sel = sel;
+        log_line("dialog: opened -- message %d, %d button(s), button %d "
+                 "highlighted.", msg, nopt, sel);
+        if (line[0])
+            menu_speak_line(line);
+        return;
     }
 
-    if (flat[0])
-        menu_speak_line(flat);
+    /* The same dialog: speak a change of highlighted button. The object's
+     * identity is re-checked first, so a closed and reused dialog is not read. */
+    if (cur) {
+        ULONGLONG vt = 0;
+        if (!mem_readable(cur, sizeof vt) || !mem_copy(&vt, cur, sizeof vt) ||
+            vt != cur_vt) {
+            cur = NULL;
+            return;
+        }
+        if (!screen_int(cur, DLG_SEL_OFF, &sel) || sel == last_sel)
+            return;
+        screen_int(cur, DLG_NOPT_OFF, &nopt);
+        last_sel = sel;
+        if (nopt >= 2 && sel >= 0 && sel < 2) {
+            char opt[GM_OUT_MAX];
+            if (dialog_option(cur, sel, opt, sizeof opt))
+                menu_speak_line(opt);
+        }
+    }
+}
+
+/* Every shell dialog, from its own fields (see above). Called from the
+ * worker's poll: dialogs move no menu cursor, so the movement path never sees
+ * them. Without the opener hook there is nothing to read, and nothing is said
+ * -- no text-matched fallback list remains. */
+void menu_speak_check_modal(void)
+{
+    if (dialog_installed())
+        menu_speak_check_dialog();
 }
 
 /* ⭐⭐⭐ THE HINTS VIEW (Fighter Awards -> DECIDE).

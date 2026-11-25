@@ -231,6 +231,19 @@ Casual Match's ticked games are spoken ("selected" / "not selected",
 on the grid, on the Game row, and when a toggle changes the mask
 (`menu_speak_poll_ticks()`, vtable-checked watch on the last checklist screen).
 
+⭐⭐⭐ **EVERY SHELL DIALOG, FROM ITS OWN FIELDS (2026-11-25).** All 25 shell
+dialog call sites go through one opener, 0x14007fc20(dialog, type, message,
+selection, ...); `help_line_hook.c` hooks it (prologue `8B 44 24 38 4C 8B
+D1`). The worker reads the dialog object: prompt message `+0x370`, buttons
+`+0x33c` / `+0x340`, button count `+0x364`, highlighted `+0x38c`. A prompt
+whose message has `%d` / `%s` (PC_SETTING_ASK's countdown, POP_SAVE_CHECK2's
+save name) is spoken from the dialog's own filled-in text object, found by
+fitting the template (`template_fits`). The hand-picked list of 20
+text-matched prompts, the hook-side prompt slot (`gt_modal_latest`,
+`gt_set_modal_prompts`) and `gt_modal_selection` are DELETED -- with the hook
+not installed, dialogs say nothing (logged). Tests: `run_modal_test.ps1`
+(rewritten, 8 cases) and menu case 42.
+
 ⭐⭐ **No hand-made label or value maps remain (2026-11-24).** Settings rows
 (MC_SETTINGS_ROW / _VALUE) read the label from child 7 and the value from
 child 8 of the row's own part (shared table, the entry's `part_table`, and

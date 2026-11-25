@@ -192,10 +192,6 @@ static volatile LONG g_focus_dropped;
  *             "distinct consecutive" rule.)
  *   PROSE     the newest arrival without markup, its move stamp and a serial.
  *             gt_take_caption() and gt_newest_prose_if_new() read it.
- *   MODAL     the newest arrival matching a published prompt text, plus the
- *             next two short prose arrivals (its options -- measured order
- *             prompt, Yes, No; 4 of 4 runs) and a serial bumped once per
- *             opening.
  *
  * ⭐ CONCURRENCY. Writers (the hook) take a TRY-lock and never wait. Readers do
  * not take it: they read a sequence counter either side of their copy and retry
@@ -212,22 +208,6 @@ static char  g_prose_text[GT_TEXT_MAX];
 static LONG  g_prose_move_seq;
 static LONG  g_prose_serial;
 
-#define GT_MODAL_OPT_MAXLEN 24          /* an option is a short button label   */
-static char  g_modal_prompt[GT_TEXT_MAX];
-static char  g_modal_opt[2][GT_TEXT_MAX];
-static int   g_modal_nopts;
-static BOOL  g_modal_pending;           /* options still being collected       */
-static LONG  g_modal_serial;
-
-/* The prompt texts the hook matches, in the game's CURRENT language. Built on
- * the worker (it needs the GMD table) and published by swapping a pointer
- * between two buffers, so the hook never sees a half-written table. */
-typedef struct {
-    int  n;
-    char s[GT_MODAL_PROMPTS_MAX][GT_TEXT_MAX];
-} gt_prompt_table;
-static gt_prompt_table  g_ptab[2];
-static gt_prompt_table *volatile g_ptab_live;
 static volatile LONG g_focus_busy;
 /* Stamped by gt_note_focus_move() from the cursor hook. Never read as a
  * timestamp -- only compared for equality/order. */
@@ -399,18 +379,6 @@ static pfn_settext g_real_settext_n[GT_SETTEXT_COUNT];   /* the four reals */
  * previous run could not answer that, because only one of four was hooked. */
 static volatile LONG g_settext_each[GT_SETTEXT_COUNT];
 
-/* Is `t` one of the published prompt texts? */
-static BOOL slots_is_prompt(const char *t)
-{
-    const gt_prompt_table *tab = g_ptab_live;
-    if (!tab)
-        return FALSE;
-    for (int i = 0; i < tab->n; i++) {
-        if (tab->s[i][0] == t[0] && strcmp(tab->s[i], t) == 0)
-            return TRUE;
-    }
-    return FALSE;
-}
 
 /* Called by the hook for every string set on one of our objects. ⚠ Runs on the
  * game's thread: no allocation, no I/O, no waiting. A busy writer lock (another
@@ -427,28 +395,6 @@ static void slots_note_text(const char *buf)
 
         InterlockedIncrement(&g_slot_seq);          /* odd: write in progress */
         memcpy(g_prev_text, buf, GT_TEXT_MAX);
-
-        if (prose && slots_is_prompt(buf)) {
-            /* A prompt arriving IS an opening -- the dialog sets it once per
-             * appearance -- so it gets a new serial even if the text is the
-             * same as last time. Options are collected from what follows. */
-            memcpy(g_modal_prompt, buf, GT_TEXT_MAX);
-            g_modal_opt[0][0] = g_modal_opt[1][0] = '\0';
-            g_modal_nopts = 0;
-            g_modal_pending = TRUE;
-            g_modal_serial++;
-        } else if (g_modal_pending) {
-            /* The next two short prose arrivals are the buttons, top first.
-             * Anything else ends the collection: the options are then
-             * incomplete and the prompt is spoken alone. */
-            if (prose && strlen(buf) <= GT_MODAL_OPT_MAXLEN && buf[0]) {
-                memcpy(g_modal_opt[g_modal_nopts], buf, GT_TEXT_MAX);
-                if (++g_modal_nopts == 2)
-                    g_modal_pending = FALSE;
-            } else {
-                g_modal_pending = FALSE;
-            }
-        }
 
         if (prose) {
             memcpy(g_prose_text, buf, GT_TEXT_MAX);
@@ -475,46 +421,6 @@ static void slots_note_text(const char *buf)
         }                                                                   \
     } while (0)
 
-void gt_set_modal_prompts(const char *const *texts, int n)
-{
-    gt_prompt_table *next = (g_ptab_live == &g_ptab[0]) ? &g_ptab[1]
-                                                        : &g_ptab[0];
-    int k = 0;
-    for (int i = 0; i < n && k < GT_MODAL_PROMPTS_MAX; i++) {
-        if (!texts[i] || !texts[i][0])
-            continue;
-        strncpy(next->s[k], texts[i], GT_TEXT_MAX - 1);
-        next->s[k][GT_TEXT_MAX - 1] = '\0';
-        k++;
-    }
-    next->n = k;
-    InterlockedExchangePointer((PVOID volatile *)&g_ptab_live, next);
-}
-
-BOOL gt_modal_latest(gt_modal_info *out)
-{
-    BOOL slot_ok_ = FALSE;
-    if (!out)
-        return FALSE;
-    memset(out, 0, sizeof(*out));
-    if (!g_installed && !g_focus_test_mode)
-        return FALSE;
-    SLOT_READ({
-        memcpy(out->prompt, g_modal_prompt, GT_TEXT_MAX);
-        memcpy(out->opt[0], g_modal_opt[0], GT_TEXT_MAX);
-        memcpy(out->opt[1], g_modal_opt[1], GT_TEXT_MAX);
-        out->nopts   = g_modal_nopts;
-        out->pending = g_modal_pending;
-        out->serial  = g_modal_serial;
-    });
-    if (!slot_ok_ || out->serial == 0) {
-        memset(out, 0, sizeof(*out));
-        return FALSE;
-    }
-    out->prompt[GT_TEXT_MAX - 1] = '\0';
-    out->opt[0][GT_TEXT_MAX - 1] = out->opt[1][GT_TEXT_MAX - 1] = '\0';
-    return TRUE;
-}
 
 static void *settext_body(int which, pfn_settext real, void *self,
                           const char *s, int a, int b, int c, int d)
@@ -1641,83 +1547,6 @@ static BOOL modal_enabled(void)
     return cached != 0;
 }
 
-/* ⭐⭐⭐ THE MODAL SELECTION -- shipping, not a probe.
- *
- * Reads the selected index out of the parent both option widgets share.
- *
- *     parent = <either option object> + 0x088
- *     index  = *(int *)(parent + 0x38c)      0 = the TOP option, 1 = the next
- *
- * ⭐ ESTABLISHED BY TWO INDEPENDENT SOURCES, which is the standard every other
- * row in this project meets:
- *   1. LAYOUT -- "Yes" sits above "No" at y=540/600 in every run, so a
- *      top-to-bottom index makes 0=Yes and 1=No.
- *   2. OUTCOME -- on both confirms in run-...-1450 the index read 1 and the
- *      game KEPT RUNNING, i.e. the choice taken was No. 1=No from the game's
- *      own behaviour, agreeing with the layout.
- *
- * ⚠ AND THE MODEL IS A TOGGLE, NOT A DIRECTION. My first reading was
- * "UP gives 0, DOWN gives 1" from two samples, and the next run reversed it.
- * On a two-item list either direction wraps, so every press flips the value --
- * 6 of 6 samples across both runs fit that and none fit the direction model.
- * ⛔ Do not reintroduce a direction rule here.
- *
- * ⚠ Returns FALSE when no such dialog is on screen, which is every other
- * screen: the lookup is keyed on a live object whose text is "Yes".
- */
-BOOL gt_modal_selection(int *out_index)
-{
-    void *parent = NULL;
-    LONG n;
-    BOOL got = FALSE;
-
-    if (out_index)
-        *out_index = -1;
-    if (!out_index || (!g_installed && !g_focus_test_mode))
-        return FALSE;
-    if (InterlockedCompareExchange(&g_inst_busy, 1, 0) != 0)
-        return FALSE;
-
-    n = g_inst_count;
-    for (LONG i = 0; i < n && !parent; i++) {
-        void *o = g_inst[i].obj;
-        ULONGLONG vptr = 0;
-        BOOL faulted = FALSE;
-        unsigned char buf[MODAL_PARENT_OFF + sizeof(void *)];
-
-        if (!o || strcmp(g_inst[i].text, "Yes") != 0)
-            continue;
-        if (mem_readable_run(o, sizeof(vptr)) < sizeof(vptr))
-            continue;
-        MEM_GUARDED(faulted, vptr = *(volatile ULONGLONG *)o);
-        if (faulted || (vptr != GT_VTABLE_ADDR && vptr != GT_VTABLE_MSG))
-            continue;
-        if (mem_readable_run(o, sizeof(buf)) < sizeof(buf))
-            continue;
-        if (!mem_copy(buf, o, sizeof(buf)))
-            continue;
-        memcpy(&parent, buf + MODAL_PARENT_OFF, sizeof(parent));
-    }
-
-    if (parent && !((ULONG_PTR)parent & 7u)) {
-        unsigned char sel[4];
-        const unsigned char *at = (const unsigned char *)parent + MODAL_SEL_OFF;
-        /* ⛔⛔ mem_readable_run FIRST, then the guarded copy. */
-        if (mem_readable_run(at, sizeof(sel)) >= sizeof(sel) &&
-            mem_copy(sel, at, sizeof(sel))) {
-            unsigned v = *(unsigned *)sel;
-            /* ⚠ A two-option dialog. Anything else means this is not the
-             * control we think it is, and a bare refusal beats a wrong word. */
-            if (v <= 1) {
-                *out_index = (int)v;
-                got = TRUE;
-            }
-        }
-    }
-
-    InterlockedExchange(&g_inst_busy, 0);
-    return got;
-}
 
 void gt_modal_probe(void)
 {
@@ -3991,11 +3820,6 @@ void gt_test_reset(void)
     g_prose_move_seq = 0;
     g_prose_serial = 0;
     g_prose_taken_serial = 0;
-    g_modal_prompt[0] = 0;
-    g_modal_opt[0][0] = g_modal_opt[1][0] = 0;
-    g_modal_nopts = 0;
-    g_modal_pending = FALSE;
-    g_modal_serial = 0;
     g_move_seq = 0; g_move_notifications = 0;
     for (int i = 0; i < GT_FOCUS_MAX; i++) {
         g_focus[i].text[0] = 0;

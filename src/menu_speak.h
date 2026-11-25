@@ -609,6 +609,14 @@ void menu_speak(const mc_move *m);
  * moves when that happens). Cheap: one guarded read per call. */
 void menu_speak_poll_ticks(void);
 
+/* Test seam: does a dialog's live text fit its message template (%d / %s / %u
+ * standing for the value the game filled in)? */
+BOOL menu_speak_test_template_fits(const char *tmpl, const char *live);
+
+/* Test seam: the message lookup the dialog reader uses (NULL = the live
+ * message table). */
+void menu_speak_test_set_dialog_resolver(BOOL (*fn)(int, char *, unsigned));
+
 /* Test seam: replace the reader of the exe's own data tables (the part-ID
  * tables at 0x141207620 / 0x141207848), which a test process does not map.
  * NULL restores the real guarded read. */
@@ -664,14 +672,8 @@ void menu_speak_check_hint(void);
 
 /* Test seams for the modal path -- the only parts that can run offline, since
  * gmd_text_by_index() has no table in the test process. */
-/* ⚠ TEST ONLY: substitute the GMD resolver menu_speak_check_modal() uses, so
- * the end-to-end probe can drive the REAL function (there is no GMD table in a
- * test process). Passing NULL restores the shipping resolver. */
-void menu_speak_test_set_modal_resolver(BOOL (*fn)(int, char *, unsigned));
 
 void menu_speak_flatten_prompt(const char *in, char *out, int outlen);
-BOOL menu_speak_is_modal_prompt(const char *text,
-                                BOOL (*resolve)(int, char *, unsigned));
 
 /* Report what the ROM table would name the game the cursor is RESTING on.
  * Logged, never spoken -- the index mapping is not yet confirmed. */
