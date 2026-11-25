@@ -59,6 +59,14 @@ MH_STATUS WINAPI MH_DisableHook(LPVOID t) { (void)t; return MH_UNKNOWN; }
 BOOL mem_guard_install(void) { return FALSE; }
 BOOL mem_copy(void *d,const void *s,SIZE_T n)
 { (void)d; (void)s; (void)n; return FALSE; }
+/* The super meter is fed from the frame hook with everything else now, so
+ * gauges are replayed exactly as frame_detour feeds them. */
+static match_audio_producer tp = {
+    .feeds = MATCH_AUDIO_FEED_HEALTH | MATCH_AUDIO_FEED_RESOURCE |
+             MATCH_AUDIO_FEED_BEACON | MATCH_AUDIO_FEED_CLOCK
+};
+static void frame_feed(const BYTE *s)
+{ match_audio_sample m; cvs2_frame_decode(s,&m); match_audio_feed(&tp, match_audio_current_for(1), &m); }
 static BYTE ryu[CVS2_STATE_SIZE], sagat[CVS2_STATE_SIZE], yun[CVS2_STATE_SIZE];
 static BYTE inactive[CVS2_STATE_SIZE], altered[CVS2_STATE_SIZE];
 static BYTE groove[CVS2_STATE_SIZE];
@@ -70,7 +78,7 @@ static void load(const char *name, BYTE *out)
     assert(fread(out,1,CVS2_STATE_SIZE,f)==CVS2_STATE_SIZE);
     assert(fgetc(f)==EOF); fclose(f);
 }
-static void observe(const BYTE *s) { cvs2_select_observe(s,CVS2_STATE_SIZE,1,3); }
+static void observe(const BYTE *s) { cvs2_select_observe(s,CVS2_STATE_SIZE,1,1,3); }
 static bool shared_emit(void *context, const wchar_t *text)
 { (void)context; return tc_say(text, TRUE, "shared-selection-replay"); }
 static unsigned shared_sample(game_session *session, game_selection *presenter,
@@ -80,7 +88,7 @@ static unsigned shared_sample(game_session *session, game_selection *presenter,
     assert(game_session_capture(session, &o.token));
     o.captured_ms = 1000;
     o.complete = true;
-    cvs2_selection_copy(state, CVS2_STATE_SIZE, o.owner);
+    cvs2_selection_copy(state, CVS2_STATE_SIZE, 1, o.owner);
     assert(game_session_publish(session, &o.token));
     assert(game_selection_offer(presenter, session, &o, 1000));
     return game_selection_drain(presenter, session, 1000, shared_emit, NULL);
@@ -94,7 +102,7 @@ static void shared_replay(void)
     game_selection_choice choices[GAME_SELECTION_OWNERS];
     assert(game_session_begin(&session, 1, 3));
     assert(game_session_resume(&session, session.issued.generation, session.issued.revision));
-    cvs2_selection_copy(ryu, sizeof ryu, choices);
+    cvs2_selection_copy(ryu, sizeof ryu, 1, choices);
     assert(choices[0].status == GAME_SELECTION_VALID && choices[0].value == 0);
     assert(!wcscmp(choices[0].label, L"Ryu"));
     assert(choices[2].status == GAME_SELECTION_INACTIVE);
@@ -123,9 +131,9 @@ static void shared_replay(void)
     assert(!shared_sample(&session, &presenter, yun));
     assert(shared_sample(&session, &presenter, yun) == 1);
     assert(!wcscmp(last, L"Yun"));
-    cvs2_selection_copy(NULL, 0, choices);
+    cvs2_selection_copy(NULL, 0, 1, choices);
     assert(choices[0].status == GAME_SELECTION_INACTIVE);
-    cvs2_selection_copy(ryu, sizeof ryu - 1, choices);
+    cvs2_selection_copy(ryu, sizeof ryu - 1, 1, choices);
     assert(choices[0].status == GAME_SELECTION_INACTIVE);
     puts("PASS: copied CVS2 selections through shared session/presenter and tc_say");
 }
@@ -170,8 +178,8 @@ int main(void)
     speech_accepts=0; observe(yun); observe(yun); assert(calls==4);
     speech_accepts=1; observe(yun); assert(calls==5 && !wcscmp(last,L"Yun"));
     observe(yun); assert(calls==5);
-    cvs2_select_observe(yun,sizeof yun,2,3); assert(calls==5);
-    cvs2_select_observe(yun,sizeof yun,2,3); assert(calls==6);
+    cvs2_select_observe(yun,sizeof yun,1,2,3); assert(calls==5);
+    cvs2_select_observe(yun,sizeof yun,1,2,3); assert(calls==6);
     cvs2_select_tick(); /* failed guarded read clears selection */
     observe(ryu); observe(ryu); assert(calls==7);
     /* P2 alone, all three slots, including unchanged ID at the next slot. */
@@ -188,7 +196,7 @@ int main(void)
         observe(altered); assert(calls==before+1);
     }
     /* Both players change: deliver one utterance containing both names. */
-    cvs2_select_observe(NULL,0,0,3);
+    cvs2_select_observe(NULL,0,0,0,3);
     altered[0x17c]=altered[0x1ffec]=3;
     observe(altered); observe(altered);
     assert(!wcscmp(last,L"Ryu. Sagat"));
@@ -206,7 +214,7 @@ int main(void)
     assert(cvs2_groove_decode(groove,sizeof groove,0)==0);
     assert(cvs2_groove_decode(groove,sizeof groove,1)==-1);
     assert(cvs2_groove_decode(ryu,sizeof ryu,0)==-1);
-    cvs2_select_observe(NULL,0,0,3);
+    cvs2_select_observe(NULL,0,0,0,3);
     observe(groove); observe(groove); assert(!wcscmp(last,L"C Groove"));
     {
         int before=calls;
@@ -230,7 +238,7 @@ int main(void)
     load("ratio-12",altered);
     assert(cvs2_ratio_decode(altered,sizeof altered,0)==3);
     assert(cvs2_ratio_decode(altered,sizeof altered,1)==-1);
-    cvs2_select_observe(NULL,0,0,3);
+    cvs2_select_observe(NULL,0,0,0,3);
     observe(altered); observe(altered);
     assert(!wcscmp(last,L"Ratios: Ryu 2, Ken 1, Yun 1"));
     altered[0x1ffe6]=2;
@@ -259,7 +267,7 @@ int main(void)
         altered[0x64c]=(BYTE)stage;
         assert(cvs2_stage_decode(altered,sizeof altered)==(int)stage);
     }
-    cvs2_select_observe(NULL,0,0,3);
+    cvs2_select_observe(NULL,0,0,0,3);
     {
         int before=calls;
         observe(altered); observe(altered);
@@ -285,7 +293,7 @@ int main(void)
         altered[0x1ffd4+p]=1; altered[b+0x5d0]=4;
         assert(cvs2_groove_decode(altered,sizeof altered,p)==4);
         assert(cvs2_select_decode(altered,sizeof altered,p)==-1);
-        cvs2_select_observe(NULL,0,0,3); observe(altered); observe(altered);
+        cvs2_select_observe(NULL,0,0,0,3); observe(altered); observe(altered);
         assert(!wcscmp(last,L"N Groove"));
         altered[b+4]=2;
         assert(cvs2_groove_decode(altered,sizeof altered,p)==-1);
@@ -316,7 +324,7 @@ int main(void)
         altered[0x1ffec]=(BYTE)(1u<<p); altered[0x1ffd4+p]=3;
         altered[b+4]=1; altered[b+0x5ec]=(BYTE)p; altered[0x1ffe4+p]=0;
         altered[0x1ffda]=altered[0x1ffdb]=0;
-        cvs2_select_observe(NULL,0,0,3);
+        cvs2_select_observe(NULL,0,0,0,3);
         for (unsigned c=0; c<4; c++) {
             wchar_t expected[32];
             int before=calls;
@@ -341,7 +349,7 @@ int main(void)
         altered[b+0x5d1]=3;
         altered[b+0x5c0]=0; altered[b+0x5c1]=1; altered[b+0x5c2]=44;
         assert(cvs2_ratio_decode(altered,sizeof altered,p)==4);
-        cvs2_select_observe(NULL,0,0,3); observe(altered); observe(altered);
+        cvs2_select_observe(NULL,0,0,0,3); observe(altered); observe(altered);
         assert(!wcscmp(last,L"Ratios: Ryu 1, Ken 2, Yun 1"));
         altered[0x1a3]=1;
         assert(cvs2_ratio_decode(altered,sizeof altered,p)==-1);
@@ -353,7 +361,7 @@ int main(void)
     load("handicap-confirmed-02",altered);
     assert(cvs2_ratio_decode(altered,sizeof altered,0)==7);
     assert(cvs2_ratio_decode(altered,sizeof altered,1)==-1);
-    cvs2_select_observe(NULL,0,0,3); observe(altered); observe(altered);
+    cvs2_select_observe(NULL,0,0,0,3); observe(altered); observe(altered);
     assert(!wcscmp(last,L"Level 2"));
     load("handicap-right-03",altered);
     assert(cvs2_ratio_decode(altered,sizeof altered,0)==8);
@@ -381,20 +389,19 @@ int main(void)
         g[b1+0x16c]=(BYTE)(8216&0xff);  g[b1+0x16d]=(BYTE)(8216>>8);
         g[b1+0x170]=(BYTE)(11200&0xff); g[b1+0x171]=(BYTE)(11200>>8);
 
-        /* ⛔ HEALTH IS NO LONGER FED FROM THE POLL. cvs2_frame.c feeds it on
-         * the game's own frame; feeding it here too would overwrite that with
-         * a stale value and re-introduce the lag the hook removes. The poll
-         * still READS health for its counters and the KO-sentinel guard, so
-         * assert that it does not reach the mixer. */
+        /* One frame sample feeds health AND the meter, the way every
+         * other game's frame hook does. */
         memset(ga_seen,0,sizeof ga_seen);
-        cvs2_gauges_observe(g,sizeof g,0x15ba1000ULL);
-        assert(!ga_seen[1][0] && !ga_seen[1][1]);    /* health not fed here */
-        assert(ga_seen[0][0] && ga_seen[0][1]);      /* meter still is      */
+        frame_feed(g);
+        assert(ga_seen[1][0] && ga_seen[1][1]);      /* health              */
+        assert(ga_val[1][0]==4260 && ga_max[1][0]==11520);
+        assert(ga_val[1][1]==8216 && ga_max[1][1]==11200);
+        assert(ga_seen[0][0] && ga_seen[0][1]);      /* meter               */
 
         /* An unchanged sample touches nothing: the change rule is what keeps
          * the mixer lock off the hot path. */
         ga_sets=0;
-        cvs2_gauges_observe(g,sizeof g,0x15ba1000ULL);
+        frame_feed(g);
         assert(ga_sets==0);
 
         /* 0xFFFF is the KO/round-end sentinel: the shipping FRAME decode must
@@ -418,13 +425,16 @@ int main(void)
         memset(ga_seen,0,sizeof ga_seen);
         assert(match_audio_begin(1) != 0);
         assert(ga_resets>before);
-        cvs2_gauges_observe(g,sizeof g,0x16000000ULL);
+        frame_feed(g);
         assert(ga_seen[0][0] && ga_seen[0][1]);
 
-        /* Leaving CVS2 resets and feeds nothing. */
+        /* Leaving CVS2 departs the epoch: the frame hook then feeds nothing. */
+        match_audio_depart(match_audio_current());
+        assert(match_audio_current_for(1)==0);
         ga_sets=0;
-        cvs2_gauges_observe(NULL,0,0);
+        frame_feed(g);
         assert(ga_sets==0);
+        assert(match_audio_begin(1) != 0);
 
         /* ⛔⛔ THE REGRESSION THAT MATTERS: an UNMODIFIED real capture must be
          * ACCEPTED. The first version read the cap from B+0x5BC, which is 0 in
@@ -443,13 +453,13 @@ int main(void)
             load("meter-empty2", me);    /* P1 empty, P2 full  */
 
             memset(ga_seen,0,sizeof ga_seen);
-            cvs2_gauges_observe(mf,sizeof mf,0x15541000ULL);
+            frame_feed(mf);
             assert(ga_seen[0][0] && ga_seen[0][1]);
             assert(ga_val[0][0]==168 && ga_max[0][0]==168);   /* P1 full  */
             assert(ga_val[0][1]==168 && ga_max[0][1]==168);   /* P2 full  */
 
             memset(ga_seen,0,sizeof ga_seen);
-            cvs2_gauges_observe(me,sizeof me,0x15541000ULL);
+            frame_feed(me);
             assert(ga_val[0][0]==4   && ga_max[0][0]==168);   /* P1 spent */
             assert(ga_val[0][1]==168 && ga_max[0][1]==168);   /* P2 held  */
 
@@ -464,13 +474,13 @@ int main(void)
                     g2[0x1eba8+0x22d]=(BYTE)gi;
                     g2[0x1eba8+0x226]=1; g2[0x1eba8+0x227]=0;
                     memset(ga_seen,0,sizeof ga_seen);
-                    cvs2_gauges_observe(g2,sizeof g2,0x15541000ULL);
+                    frame_feed(g2);
                     assert(ga_max[0][0]==(int)caps[gi]);
                 }
                 /* An unknown groove has no known ceiling: stay silent. */
                 g2[0x1eba8+0x22d]=9;
                 memset(ga_seen,0,sizeof ga_seen);
-                cvs2_gauges_observe(g2,sizeof g2,0x15541000ULL);
+                frame_feed(g2);
                 assert(!ga_seen[0][0]);
             }
         }
@@ -479,7 +489,7 @@ int main(void)
             static BYTE match[CVS2_STATE_SIZE];
             load("hp-hurt", match);      /* a real IN-MATCH capture */
             memset(ga_seen,0,sizeof ga_seen); ga_resets=0;
-            cvs2_gauges_observe(match,sizeof match,0x15ba1000ULL);
+            frame_feed(match);
             /* An unmodified real capture must still be ACCEPTED -- the guard
              * that caught the B+0x5BC cap bug. Health goes to the mixer via
              * the frame hook now, so assert the meter path here. */
@@ -516,7 +526,7 @@ int main(void)
             assert(memcmp(wq + 0x78, "\x02\x01\x02\x02", 4) != 0);
 
             memset(ga_seen,0,sizeof ga_seen); ga_resets=0;
-            cvs2_gauges_observe(wq,sizeof wq,0x145f1000ULL);
+            frame_feed(wq);
             assert(!ga_seen[0][0] && !ga_seen[0][1]);
             assert(!ga_seen[1][0] && !ga_seen[1][1]);
             /* The meter was live just before: the observed exit silences it
@@ -533,7 +543,7 @@ int main(void)
             /* No match/round speech over a quote either. */
             {
                 int b = calls;
-                cvs2_announce_observe(wq,sizeof wq,0x145f1000ULL);
+                cvs2_announce_observe(wq,sizeof wq,1,0x145f1000ULL);
                 assert(calls == b);
             }
 
@@ -724,9 +734,9 @@ int main(void)
         load("hp-full", m1);          /* P1 Ryu, team 0/1/9, C groove */
         load("hp-ken",  m2);          /* same match, P1 now Ken       */
 
-        cvs2_announce_observe(NULL,0,0);
+        cvs2_announce_observe(NULL,0,0,0);
         before=calls;
-        cvs2_announce_observe(m1,sizeof m1,0x15ba1000ULL);
+        cvs2_announce_observe(m1,sizeof m1,1,0x15ba1000ULL);
         assert(calls==before+1);                       /* match announced */
         assert(wcsstr(last,L"You")!=NULL);
         assert(wcsstr(last,L"C Groove")!=NULL);
@@ -737,21 +747,21 @@ int main(void)
         assert(wcsstr(last,L"K Groove")!=NULL);        /* P2 groove */
 
         /* Repeating the same state must not repeat the announcement. */
-        cvs2_announce_observe(m1,sizeof m1,0x15ba1000ULL);
+        cvs2_announce_observe(m1,sizeof m1,1,0x15ba1000ULL);
         assert(calls==before+1);
 
         /* A new round with a different fighter speaks just that fighter. */
         before=calls;
-        cvs2_announce_observe(m2,sizeof m2,0x15ba1000ULL);
+        cvs2_announce_observe(m2,sizeof m2,1,0x15ba1000ULL);
         assert(calls==before+1);
         assert(wcsstr(last,L"Ken")!=NULL);
         assert(wcsstr(last,L"Groove")==NULL);          /* not the whole team */
-        cvs2_announce_observe(m2,sizeof m2,0x15ba1000ULL);
+        cvs2_announce_observe(m2,sizeof m2,1,0x15ba1000ULL);
         assert(calls==before+1);                       /* no repeat */
 
         /* A relocated block is a new session: announce the match again. */
         before=calls;
-        cvs2_announce_observe(m2,sizeof m2,0x16000000ULL);
+        cvs2_announce_observe(m2,sizeof m2,1,0x16000000ULL);
         assert(calls==before+1);
         assert(wcsstr(last,L"Groove")!=NULL);
 
@@ -766,17 +776,17 @@ int main(void)
 
             /* Real Ratio Match 3-member team: 1+1+2 = 4 -> ratios spoken. */
             memcpy(t3,m1,sizeof t3);
-            cvs2_announce_observe(NULL,0,0);
-            cvs2_announce_observe(t3,sizeof t3,0x21000000ULL);
+            cvs2_announce_observe(NULL,0,0,0);
+            cvs2_announce_observe(t3,sizeof t3,1,0x21000000ULL);
             assert(wcsstr(last,L"ratio")!=NULL);
 
             /* Plain 3-on-3: every fighter equal, so the field is not a real
              * allocation (1+1+1 = 3, not 4) -> say NOTHING about ratios. */
             t3[b0+0x5cc]=0; t3[b0+0x5cd]=0; t3[b0+0x5ce]=0;
             t3[0x1f220+0x5cc]=0; t3[0x1f220+0x5cd]=0; t3[0x1f220+0x5ce]=0;
-            cvs2_announce_observe(NULL,0,0);
+            cvs2_announce_observe(NULL,0,0,0);
             before2=calls;
-            cvs2_announce_observe(t3,sizeof t3,0x22000000ULL);
+            cvs2_announce_observe(t3,sizeof t3,1,0x22000000ULL);
             assert(calls==before2+1);
             assert(wcsstr(last,L"ratio")==NULL);       /* no ratio claimed */
             assert(wcsstr(last,L"Ryu")!=NULL);         /* team still named */
@@ -785,67 +795,115 @@ int main(void)
 
         /* Selection-screen phases must NOT trigger match speech. */
         before=calls;
-        cvs2_announce_observe(ryu,sizeof ryu,0x17000000ULL);
+        cvs2_announce_observe(ryu,sizeof ryu,1,0x17000000ULL);
         assert(calls==before);
 
         /* ⭐ CORRECTION: a REFUSED fighter change is retried, not lost. The
          * old path latched the fighter before speech was accepted. */
-        cvs2_announce_observe(NULL,0,0);
-        cvs2_announce_observe(m1,sizeof m1,0x30000000ULL);   /* intro */
+        cvs2_announce_observe(NULL,0,0,0);
+        cvs2_announce_observe(m1,sizeof m1,1,0x30000000ULL);   /* intro */
         speech_accepts=0; before=calls;
-        cvs2_announce_observe(m2,sizeof m2,0x30000000ULL);   /* refused */
+        cvs2_announce_observe(m2,sizeof m2,1,0x30000000ULL);   /* refused */
         assert(calls==before+1);
         speech_accepts=1;
-        cvs2_announce_observe(m2,sizeof m2,0x30000000ULL);   /* retried */
+        cvs2_announce_observe(m2,sizeof m2,1,0x30000000ULL);   /* retried */
         assert(calls==before+2 && wcsstr(last,L"Ken")!=NULL);
         assert(wcsstr(last,L"Groove")==NULL);
-        cvs2_announce_observe(m2,sizeof m2,0x30000000ULL);
+        cvs2_announce_observe(m2,sizeof m2,1,0x30000000ULL);
         assert(calls==before+2);                             /* then done */
 
         /* A refused INTRODUCTION is retried too, and stays the intro. */
-        cvs2_announce_observe(NULL,0,0);
+        cvs2_announce_observe(NULL,0,0,0);
         speech_accepts=0; before=calls;
-        cvs2_announce_observe(m1,sizeof m1,0x31000000ULL);
+        cvs2_announce_observe(m1,sizeof m1,1,0x31000000ULL);
         speech_accepts=1;
-        cvs2_announce_observe(m1,sizeof m1,0x31000000ULL);
+        cvs2_announce_observe(m1,sizeof m1,1,0x31000000ULL);
         assert(calls==before+2 && wcsstr(last,L"C Groove")!=NULL);
 
         /* ⭐ OWNERSHIP: Arcade's joined mask names P1 as the player... */
         {
             transition_observation o;
             static BYTE tr[CVS2_STATE_SIZE];
-            cvs2_announce_observation(m1,&o);
+            cvs2_announce_observation(m1,1,&o);
             assert(o.side[0].ownership==TRANSITION_OWNER_LOCAL);
             assert(o.side[1].ownership==TRANSITION_OWNER_OPPONENT);
             assert(o.team_ready && o.side[0].count==3 && o.side[1].count==2);
             assert(o.side[0].member[2].ratio==2);          /* 1/1/2 budget */
             /* ...but Training's mask is 0: nobody is named "You". */
             load("crouch-01",tr);
-            cvs2_announce_observation(tr,&o);
+            cvs2_announce_observation(tr,1,&o);
             assert(o.side[0].ownership==TRANSITION_OWNER_UNKNOWN);
             assert(o.side[1].ownership==TRANSITION_OWNER_UNKNOWN);
-            cvs2_announce_observe(NULL,0,0);
-            cvs2_announce_observe(tr,sizeof tr,0x32000000ULL);
+            cvs2_announce_observe(NULL,0,0,0);
+            cvs2_announce_observe(tr,sizeof tr,1,0x32000000ULL);
             /* 1v1, so the stored 1/1/1 is not a 4-point budget: no ratios. */
             assert(!wcscmp(last,L"Player 1: C Groove, Ryu. Player 2: C Groove, Kyo"));
             /* Two joined humans also identify nobody. */
             tr[0x1ffec]=3;
-            cvs2_announce_observation(tr,&o);
+            cvs2_announce_observation(tr,1,&o);
             assert(o.side[0].ownership==TRANSITION_OWNER_UNKNOWN);
         }
     }
 
     /* ROM changes at a reused root must rearm the common presentation owner. */
-    cvs2_select_observe(NULL,0,0,0);
+    cvs2_select_observe(NULL,0,0,0,0);
     int before_rom_switch = calls;
-    cvs2_select_observe(ryu,sizeof ryu,1,3);
-    cvs2_select_observe(ryu,sizeof ryu,1,3);
+    cvs2_select_observe(ryu,sizeof ryu,1,1,3);
+    cvs2_select_observe(ryu,sizeof ryu,1,1,3);
     assert(calls == before_rom_switch + 1 && !wcscmp(last,L"Ryu"));
-    cvs2_select_observe(ryu,sizeof ryu,1,2);
+    cvs2_select_observe(ryu,sizeof ryu,1,1,2);
     assert(calls == before_rom_switch + 1);
-    cvs2_select_observe(ryu,sizeof ryu,1,2);
+    cvs2_select_observe(ryu,sizeof ryu,1,1,2);
     assert(calls == before_rom_switch + 2 && !wcscmp(last,L"Ryu"));
     shared_replay();
-    puts("PASS: Arcade and alternate character/groove, team/P2, ratio/stage, transitions, speech without prefixes, gauge feed + KO sentinel, super meter per-groove caps, match/round speech");
+    /* ---- the shared adapter shape ------------------------------------- */
+    {
+        game_selection_choice c[GAME_SELECTION_OWNERS];
+        /* Names are the shell's, by its game-version setting: native 8 is
+         * the claw fighter, Balrog in Japan and Vega in the US. */
+        memcpy(altered,ryu,sizeof altered);
+        altered[0x1eba9]=8; altered[0x1fff0+4*16+2]=8;   /* the highlighted cell */
+        altered[0x1ffde]=2; altered[0x1ffdf]=4;
+        assert(cvs2_select_decode(altered,sizeof altered,0)==8);
+        cvs2_selection_copy(altered,sizeof altered,1,c);
+        assert(c[0].kind==CVS2_KIND_CHARACTER && c[0].value==8 && !wcscmp(c[0].label,L"Vega"));
+        cvs2_selection_copy(altered,sizeof altered,0,c);
+        assert(!wcscmp(c[0].label,L"Balrog"));
+        /* Grooves carry their own index as the value. */
+        load("c-groove-09",groove);
+        cvs2_selection_copy(groove,sizeof groove,1,c);
+        assert(c[0].kind==CVS2_KIND_GROOVE && c[0].value==0 && !wcscmp(c[0].label,L"C Groove"));
+        /* Team ratio layout and the level menu each have a kind. */
+        load("ratio-12",altered);
+        cvs2_selection_copy(altered,sizeof altered,1,c);
+        assert(c[0].kind==CVS2_KIND_RATIO && c[0].value==3);
+        load("handicap-confirmed-02",altered);
+        cvs2_selection_copy(altered,sizeof altered,1,c);
+        assert(c[0].kind==CVS2_KIND_LEVEL && c[0].value==1 && !wcscmp(c[0].label,L"Level 2"));
+        /* The stage is the shared owner's, and the sides say nothing. */
+        memcpy(altered,ryu,sizeof altered);
+        altered[0x1a0]=1; altered[0x1ffd0]=2; altered[0x1ffef]=1;
+        altered[0x1ffda]=1; altered[0x1ffec]=3;
+        altered[0x1ffd4]=altered[0x1ffd5]=0;
+        altered[0x1ebac]=altered[0x1f224]=3;
+        altered[0x1ffe4]=altered[0x1ffe5]=0; altered[0x64c]=6;
+        cvs2_selection_copy(altered,sizeof altered,1,c);
+        assert(c[CVS2_STAGE_OWNER].status==GAME_SELECTION_VALID &&
+               c[CVS2_STAGE_OWNER].kind==CVS2_KIND_STAGE && c[CVS2_STAGE_OWNER].value==6);
+        assert(!wcscmp(c[CVS2_STAGE_OWNER].label,L"Stage: New York"));
+        assert(c[0].status==GAME_SELECTION_INACTIVE && c[1].status==GAME_SELECTION_INACTIVE);
+        /* Announcements use the same names. */
+        {
+            static BYTE m[CVS2_STATE_SIZE];
+            transition_observation o;
+            load("hp-full",m);
+            m[0x1eba8+1]=10;
+            cvs2_announce_observation(m,1,&o);
+            assert(!wcscmp(o.side[0].current.name,L"M.Bison"));
+            cvs2_announce_observation(m,0,&o);
+            assert(!wcscmp(o.side[0].current.name,L"Vega"));
+        }
+    }
+    puts("PASS: Arcade and alternate character/groove, team/P2, ratio/stage, transitions, speech without prefixes, shell names by version, per-kind values and a shared stage owner, frame gauge feed + KO sentinel, super meter per-groove caps, match/round speech");
     return 0;
 }

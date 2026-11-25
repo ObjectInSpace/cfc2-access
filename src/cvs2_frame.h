@@ -16,7 +16,7 @@
  *
  * ⛔⛔ THE DETOUR RUNS ON THE GAME'S FRAME THREAD. It does the minimum: read
  * the root pointer, read four u16s, store them in a lock-free slot, return.
- *   - NO VirtualQuery. `cvs2_hit.c` called mem_readable() twice per invocation,
+ *   - NO VirtualQuery. The old hit-handler probe (cvs2_hit.c, deleted) called mem_readable() twice per invocation,
  *     i.e. two syscalls per hit on the render thread. That is the wall this
  *     project has hit FOUR times (gmd_find, heapdiff, span scan, arena sweep).
  *   - NO locks, NO allocation, NO logging, NO speech.
@@ -26,26 +26,29 @@
  * frame-thread calls into audio.c are lock-free except on a gauge CHANGE.
  * Speech never runs here.
  *
- * Installed whenever the audio device opens; `cfc2_hook.off` disables it
+ * Installed with the other games' frame hooks; `cfc2_hook.off` disables it
  * like every other hook.
  */
-#ifndef CFC2_FRAME_H
-#define CFC2_FRAME_H
+#ifndef CFC2_CVS2_FRAME_H
+#define CFC2_CVS2_FRAME_H
 
 #include <windows.h>
 #include "match_audio.h"
 
 BOOL cvs2_frame_install(void);
 void cvs2_frame_remove(void);
+/* Detour entries so far; the worker uses it to notice a stalled frame
+ * (frame_liveness.h) and to silence beacons when the update stops. */
+LONG cvs2_frame_count(void);
 
 /* Frames seen, and frames on which a health value actually changed. Liveness
  * before findings: "no tones" means nothing unless we know the detour ran. */
 void cvs2_frame_log_stats(void);
 
 /* Decode CVS2 state `s` (CVS2_STATE_SIZE bytes) into an owned audio sample:
- * health/max, projected beacon pan, stance ladder, round clock and the pause
- * motion signature. Outside the in-match phase it returns in_match = false.
+ * health/max, super meter against its per-groove cap, projected beacon pan,
+ * stance ladder, round clock and the pause motion signature. Outside the in-match phase it returns in_match = false.
  * Pure arithmetic; no reads beyond `s`, no audio calls. */
 void cvs2_frame_decode(const unsigned char *s, match_audio_sample *m);
 
-#endif /* CFC2_FRAME_H */
+#endif /* CFC2_CVS2_FRAME_H */

@@ -72,7 +72,10 @@ static tc_read_result assemble(game_text_source *s, BOOL manual, wchar_t *say, S
         BOOL suppress = FALSE;
         int slot = -1;
         SIZE_T length;
-        if (!s->decode(frame.rows[i].style, frame.rows[i].raw, decoded[i], TC_LINE_CAP)) {
+        BOOL ok = s->decode_row
+            ? s->decode_row(&frame.rows[i], decoded[i], TC_LINE_CAP)
+            : s->decode(frame.rows[i].style, frame.rows[i].raw, decoded[i], TC_LINE_CAP);
+        if (!ok) {
             if (frame.rows[i].raw[0] && !(s->quiet && s->quiet(&frame.rows[i])))
                 note_refused(s, &frame.rows[i]);
             continue;
@@ -81,6 +84,7 @@ static tc_read_result assemble(game_text_source *s, BOOL manual, wchar_t *say, S
         for (j = 0; j < i; ++j) if (!wcscmp(decoded[j], decoded[i])) break;
         if (j < i) continue;
         if (!manual) {
+            if (s->key_only && s->key_only(&frame.rows[i])) continue;
             if (!tc_has_letters(decoded[i]) || coin_status(decoded[i])) continue;
             slot = tc_textdedup_note(&st->dedup, decoded[i], now, REARM_MS, &suppress);
             if (suppress) continue;

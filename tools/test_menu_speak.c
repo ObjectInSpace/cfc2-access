@@ -383,41 +383,6 @@ int main(void)
     check("9. every row is verified, sane, and distinguishable "
           "(caller+count unique)", sane, "rows=%d", nrows);
 
-    /* --- case 9a: the DISCOVERY sweep is OFF by default -------------------
-     * ⛔⛔ This is a user-facing safety property, not a preference. That sweep
-     * runs on the poll thread and stalled a live session TWICE -- 37 s, then
-     * 11.9 s -- during which the mod stopped speaking and the user navigated
-     * blind. It has named ZERO shipped screens (every g_screens row cites live
-     * text, the disassembly, or the caption channel).
-     *
-     * ⚠ Asserted by TIMING the call, because that is the property that matters:
-     * "returns quickly" is what the user experiences. With the gate removed
-     * this takes hundreds of ms against a real GMD; here there is no live
-     * table, so the assertion is simply that nothing expensive is attempted.
-     *
-     * ⭐ The default must be OFF at process start with no opt-in file, which is
-     * the state an ordinary session is in. */
-    /* ⛔ Asserted on the GATE'S STATE, not by timing the call.
-     *
-     * The first version of this case timed menu_speak_log_unknown() and PASSED
-     * with the gate deleted -- the offline harness has no live GMD, so the
-     * sweep exits early on `gmd_text_count() > 0` regardless. A second guard
-     * was producing the effect the test attributed to the first. */
-    {
-        BOOL def = menu_speak_discovery_enabled();
-        check("9a. the DISCOVERY sweep is OFF by default", !def,
-              def ? "enabled with no opt-in file -- an ordinary session would "
-                    "pay for it" : "off");
-
-        /* And the switch must actually move, or the default above is just a
-         * variable nobody reads. */
-        menu_speak_set_discovery(TRUE);
-        BOOL on = menu_speak_discovery_enabled();
-        menu_speak_set_discovery(FALSE);
-        check("9a2. the discovery switch responds to being set",
-              on && !menu_speak_discovery_enabled(), "");
-    }
-
     /* --- case 9d: is_value_shaped -- the ONLY guard on unverified speech ---
      * ⭐⭐ On a value axis the mod speaks the captured string WITHOUT matching
      * it to the corpus, because identification is impossible there ("Off"

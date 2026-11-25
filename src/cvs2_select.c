@@ -1,33 +1,39 @@
+/* See cvs2_select.h. The CVS2 adapter for the shared channels: native reads,
+ * gates and decoding here; settling, grouping, retries, transition policy,
+ * cue policy and speech belong to the shared layers. No hooks, no
+ * game-memory writes, no keyboard history, no guest-address assumption.
+ * CVS2 native-state evidence: docs/cvs2-state-access-trace.md. */
+#include "cvs2_select.h"
 #include "selection_channel.h"
 #include "match_audio.h"
 #include "transition_channel.h"
-/* CVS2 native-state evidence: docs/cvs2-state-access-trace.md.
- * No keyboard history, guest-address assumption, or game-memory writes. */
-#include "cvs2_select.h"
+#include "character_name_table.h"
+#include "frame_liveness.h"
+#include "cvs2_frame.h"
 #include "cvs2_story.h"
 #include "cvs2_text.h"
 #include "text_channel.h"
 #include "mod_text.h"
 #include "memsafe.h"
-#include "speech.h"
+#include "audio.h"
 #include "log.h"
 #include <string.h>
 #include <stdio.h>
 
-/* Zero-based game IDs, from the reviewed Flycast Dojo cvs2.lua CHARACTER
- * list (build/prior-art/SamuelioX-cvs2.lua). Ryu, Sagat and Yun additionally
- * checked live. Claw/Boxer/Dictator retain unambiguous regional labels. */
-static const wchar_t *names[54] = {
-    L"Ryu", L"Ken", L"Chun-Li", L"Guile", L"Zangief", L"Dhalsim",
-    L"E. Honda", L"Blanka", L"Claw", L"Sagat", L"Dictator", L"Sakura",
-    L"Cammy", L"Akuma", L"Morrigan", L"Evil Ryu", L"Kyo", L"Iori",
-    L"Terry", L"Ryo", L"Mai", L"Kim", L"Geese", L"Yamazaki",
-    L"Raiden", L"Rugal", L"Vice", L"Benimaru", L"Yuri", L"King",
-    L"Nakoruru", L"Orochi Iori", L"Boxer", L"Dan", L"Joe", L"Eagle",
-    L"Maki", L"Kyosuke", L"Athena", L"Chang", L"Todoh", L"Rock",
-    L"Hibiki", L"Haohmaru", L"Yun", L"Shin Akuma", L"Ultimate Rugal",
-    L"Rolento", L"C Groove", L"A Groove", L"P Groove", L"S Groove",
-    L"N Groove", L"K Groove"
+/* Character names are the shell's own (0x14004B2F0, CVS2 = game 1, limit
+ * 0x30), in the regional spelling the shell's game-version setting selects,
+ * as every other adapter does (docs/port-tasks/character-names.md). They
+ * replaced a Flycast-derived list whose region-neutral Claw / Dictator /
+ * Boxer the game itself never shows. */
+static void name_of(wchar_t *out, size_t cap, unsigned id, unsigned variant)
+{
+    const char *n = character_name(1, id, variant);
+    swprintf(out, cap, L"%hs", n ? n : "");
+}
+/* Groove index 0..5 (B+0x5D0), the order of the per-groove meter cap table
+ * 0x1406C4138 and the reviewed Flycast list. */
+static const wchar_t *const g_groove[6] = {
+    L"C Groove", L"A Groove", L"P Groove", L"S Groove", L"N Groove", L"K Groove"
 };
 /* Reviewed Flycast stage IDs; native stage 11 is explicitly randomized by
  * 0x1406F35B7. Names are not yet checked on a live stage-select screen. */
@@ -154,69 +160,77 @@ int cvs2_select_decode(const BYTE *s, SIZE_T size, unsigned p)
     return (int)id;
 }
 
-void cvs2_selection_copy(const BYTE *s, SIZE_T size,
+void cvs2_selection_copy(const BYTE *s, SIZE_T size, unsigned variant,
                          game_selection_choice out[GAME_SELECTION_OWNERS])
 {
-    int ids[2], p;
+    unsigned p;
+    int stage;
     if (!out) return;
     memset(out, 0, sizeof(*out) * GAME_SELECTION_OWNERS);
     for (unsigned i = 0; i < GAME_SELECTION_OWNERS; ++i)
         out[i].status = GAME_SELECTION_INACTIVE;
-    for (p=0; p<2; p++) {
-        int groove;
-        ids[p] = cvs2_select_decode(s,size,(unsigned)p);
-        if (ids[p] == -1) {
-            groove = cvs2_groove_decode(s,size,(unsigned)p);
-            ids[p] = groove >= 0 ? 48+groove : groove;
-            if (ids[p] == -1) {
-                int ratio = cvs2_ratio_decode(s,size,(unsigned)p);
-                ids[p] = ratio >= 6 ? 72+ratio-6 : ratio >= 0 ? 54+ratio : ratio;
-            }
-        }
+    if (!s || size != CVS2_STATE_SIZE) return;
+    /* The stage menu is shared: spoken once on its own owner. While it is
+     * open the sides say nothing, as before. */
+    stage = cvs2_stage_decode(s, size);
+    if (stage == -2) out[CVS2_STAGE_OWNER].status = GAME_SELECTION_UNAVAILABLE;
+    if (stage >= 0) {
+        game_selection_choice *o = &out[CVS2_STAGE_OWNER];
+        o->status = GAME_SELECTION_VALID;
+        o->kind = CVS2_KIND_STAGE;
+        o->value = (unsigned)stage;
+        /* "Stage: " is the collection's own word; Random is too. The other
+         * stage names are places, spoken as the game names them. */
+        swprintf(o->label, GAME_SELECTION_LABEL, L"%ls%ls", mt(MT_STAGE_PREFIX),
+                 stage == 11 ? mt(MT_RANDOM) : stage_names[stage]);
+        return;
     }
-    {
-        int stage=cvs2_stage_decode(s,size);
-        /* Stage is shared, so announce it once even with two active cursors. */
-        if (stage >= 0) { ids[0]=60+stage; ids[1]=-1; }
-    }
-    for (p=0; p<2; p++) {
-        int id = ids[p];
-        if (id < 0) {
-            out[p].status = id == -1 ? GAME_SELECTION_INACTIVE : GAME_SELECTION_UNAVAILABLE;
-            continue;
-        }
+    for (p = 0; p < 2; p++) {
+        game_selection_choice *o = &out[p];
+        unsigned b = 0x1eba8 + p * 0x678;
+        int v;
         /* A new team slot is a new selection even if the intervening
          * confirmation animation was missed or its highlight is unchanged. */
-        out[p].status = GAME_SELECTION_VALID;
-        out[p].value = (unsigned)id;
-        out[p].kind = id < 48 ? 0 : id < 54 ? 1 : id < 60 ? 2 : id < 72 ? 3 : 4;
-        out[p].visit=s[0x1ffd4+p];
-        if (s[0x1a0] && id < 48)
-            out[p].visit += 256*s[0x1eba8+p*0x678+0x5d1];
-        wchar_t *part = out[p].label;
-        if (id >= 72) {
-            /* The user identifies this as handicap. The native storage is
-             * shared with ratios, but the visible heading is not verified. */
-            mt_fmt_n(part,256,MT_LEVEL_N,id-72+1,0);
-        } else if (id >= 60) {
-            /* "Stage: " is the collection's own word; Random is too. The
-             * other stage names are places, spoken as the game names them. */
-            swprintf(part,256,L"%ls%ls",mt(MT_STAGE_PREFIX),
-                     id-60 == 11 ? mt(MT_RANDOM) : stage_names[id-60]);
-        } else if (id >= 54) {
-            unsigned b=0x1eba8+p*0x678, i, n=s[b+0x5d1];
-            swprintf(part,256,L"%ls",mt(MT_RATIOS));
-            for (i=0; i<n; i++) {
-                wchar_t entry[80];
-                swprintf(entry,80,L"%ls%ls %u",i ? L", " : L"",
-                         names[s[b+0x5c0+i]],ratios[id-54][i]);
-                wcscat(part,entry);
+        o->visit = s[0x1ffd4 + p];
+        if ((v = cvs2_select_decode(s, size, p)) != -1) {
+            if (v < 0) { o->status = GAME_SELECTION_UNAVAILABLE; continue; }
+            o->kind = CVS2_KIND_CHARACTER;
+            if (s[0x1a0]) o->visit += 256u * s[b + 0x5d1];
+            name_of(o->label, GAME_SELECTION_LABEL, (unsigned)v, variant);
+        } else if ((v = cvs2_groove_decode(s, size, p)) != -1) {
+            if (v < 0) { o->status = GAME_SELECTION_UNAVAILABLE; continue; }
+            o->kind = CVS2_KIND_GROOVE;
+            swprintf(o->label, GAME_SELECTION_LABEL, L"%ls", g_groove[v]);
+        } else if ((v = cvs2_ratio_decode(s, size, p)) != -1) {
+            if (v < 0) { o->status = GAME_SELECTION_UNAVAILABLE; continue; }
+            if (v >= 6) {
+                /* The user identifies this as handicap. The native storage is
+                 * shared with ratios, but the visible heading is not verified. */
+                o->kind = CVS2_KIND_LEVEL;
+                v -= 6;
+                mt_fmt_n(o->label, GAME_SELECTION_LABEL, MT_LEVEL_N, v + 1, 0);
+            } else {
+                unsigned i, n = s[b + 0x5d1];
+                o->kind = CVS2_KIND_RATIO;
+                swprintf(o->label, GAME_SELECTION_LABEL, L"%ls", mt(MT_RATIOS));
+                for (i = 0; i < n; i++) {
+                    wchar_t name[64], entry[80];
+                    name_of(name, 64, s[b + 0x5c0 + i], variant);
+                    swprintf(entry, 80, L"%ls%ls %u", i ? L", " : L"", name, ratios[v][i]);
+                    wcscat(o->label, entry);
+                }
             }
-        } else swprintf(part,256,L"%ls",names[id]);
+        } else {
+            o->visit = 0;
+            continue;
+        }
+        o->status = GAME_SELECTION_VALID;
+        o->value = (unsigned)v;
     }
 }
 
-void cvs2_select_observe(const BYTE *s, SIZE_T size, ULONGLONG root, unsigned rom)
+void cvs2_select_observe(const BYTE *s, SIZE_T size, unsigned variant,
+                         ULONGLONG root, unsigned rom)
 {
     static selection_channel channel;
     static ULONGLONG previous_root;
@@ -234,18 +248,13 @@ void cvs2_select_observe(const BYTE *s, SIZE_T size, ULONGLONG root, unsigned ro
         previous_root = root;
         previous_rom = rom;
     }
-    cvs2_selection_copy(s, size, choices);
+    cvs2_selection_copy(s, size, variant, choices);
     ULONGLONG now = GetTickCount64();
     selection_channel_offer(&channel, choices, true, now, now);
     unsigned accepted = selection_channel_drain(&channel, now);
-    for (unsigned p = 0; p < 2; ++p) if (accepted & (1u << p)) {
-        unsigned id = choices[p].value;
-        log_line("cvs2-select: accepted player=%u kind=%s id=%u", p+1,
-                 id < 48 ? "character" : id < 54 ? "groove" :
-                 id < 60 ? "ratio" : id < 72 ? "stage" : "individual-ratio",
-                 id < 48 ? id : id < 54 ? id-48 : id < 60 ? id-54 :
-                 id < 72 ? id-60 : id-72);
-    }
+    for (unsigned p = 0; p < GAME_SELECTION_OWNERS; ++p) if (accepted & (1u << p))
+        log_line("cvs2-select: accepted owner=%u kind=%u value=%u", p + 1,
+                 choices[p].kind, choices[p].value);
 }
 
 static BOOL read_at(void *out, ULONGLONG address, SIZE_T size)
@@ -290,10 +299,9 @@ static BOOL read_at(void *out, ULONGLONG address, SIZE_T size)
  *    hundreds of milliseconds at minimum. The failure mode above needed a
  *    2000 ms gap, sixty times larger.
  *
- *    ⚠ And health does NOT come through here -- cvs2_frame.c feeds it on the
- *    game's own frame hook precisely so this poll's rate cannot make it
- *    stale. The super meter is the only gauge on this path, and a meter moves
- *    over seconds.
+ *    ⚠ And no gauge comes through here -- cvs2_frame.c feeds health, the
+ *    super meter, beacons and the clock on the game's own frame hook
+ *    precisely so this poll's rate cannot make them stale.
  *
  * ⛔ What was NOT done: dropping mem_readable() before the memcpy. That was
  * tried in this project and the test written to prove it safe CRASHED -- a
@@ -303,16 +311,32 @@ static BOOL read_at(void *out, ULONGLONG address, SIZE_T size)
  * calls mem_copy(). */
 #define SELECT_POLL_MS 33u
 
-/* Match-audio ownership, worker only. A new epoch per presentation owner --
- * the same compatibility identity the selection channel uses (root + ROM), so
- * leaving CVS2, a relocated block or a ROM change silences every cue the old
- * owner fed, including frame-thread writes racing the switch (audio.c drops
- * any write stamped with a replaced epoch). Not a native lifetime claim. */
+#define SESSION_SLOT 0x141c14f98ULL   /* emulator session singleton          */
+#define SHELL_SLOT   0x141c14f90ULL   /* shell game-select object (+0x1AC game, +0x1B0 version) */
+#define ROOT_SLOT    0x1422debd0ULL   /* CVS2 published root                 */
+#define PHASE_SLOT   0x1422dec30ULL   /* == root + 0x78                      */
+/* A frame counter unchanged this long means the update is not running:
+ * paused, or a quit game's frozen block (frame_liveness.h). */
+#define STALL_MS 250u
+
+/* Match-audio ownership, worker only, as every adapter does it: a new epoch
+ * per presentation owner -- the same compatibility identity the selection
+ * channel uses (root + ROM), so leaving CVS2, a relocated block or a ROM
+ * change silences every cue the old owner fed, including frame-thread writes
+ * racing the switch (audio.c drops any write stamped with a replaced epoch).
+ * Not a native lifetime claim. The frame hook feeds only an epoch naming
+ * game 1; when its update stops running the beacons are turned off after
+ * STALL_MS, since a stopped hook can no longer report a pause itself. */
 static void cvs2_audio_route(ULONGLONG root, unsigned rom)
 {
     static uint64_t epoch;
     static ULONGLONG owner_root;
     static unsigned owner_rom;
+    static LONG last_frames;
+    static ULONGLONG last_change;
+    static BOOL silenced;
+    ULONGLONG now = GetTickCount64();
+    LONG frames;
     if (!root) {
         if (epoch) match_audio_depart(epoch);
         epoch = 0;
@@ -323,6 +347,18 @@ static void cvs2_audio_route(ULONGLONG root, unsigned rom)
         epoch = match_audio_begin(1);
         owner_root = root;
         owner_rom = rom;
+        last_change = now;
+        silenced = FALSE;
+    }
+    frames = cvs2_frame_count();
+    if (frames != last_frames) {
+        last_frames = frames;
+        last_change = now;
+        silenced = FALSE;
+    } else if (epoch && !silenced && now - last_change >= STALL_MS) {
+        for (unsigned p = 0; p < 2; p++)
+            audio_beacon_set_owned(epoch, p, FALSE, 0.0f, 1.0f);
+        silenced = TRUE;
     }
 }
 
@@ -334,8 +370,8 @@ void cvs2_select_tick(void)
     static int sig_ok;
     static DWORD last_poll;
     BYTE header[0x60];
-    ULONGLONG session, arena, context, pointers[4], root, phase, again;
-    unsigned game, rom;
+    ULONGLONG session, arena, context, pointers[4], root, phase, again, shell;
+    unsigned game, rom, shell_game, variant;
     DWORD now;
 
     if (!guard_ready) {
@@ -368,7 +404,7 @@ void cvs2_select_tick(void)
      * project keeps guarding against. Throttling the INACTIVE path would
      * reintroduce it. Throttling the ACTIVE path costs nothing, because an
      * active match is precisely when there is nothing new to decide. */
-    if (!read_at(&session,0x141c14f98ULL,8) || !session)
+    if (!read_at(&session,SESSION_SLOT,8) || !session)
         goto inactive;
 
     /* Active. Everything below -- eight more guarded reads and a 134 KB copy
@@ -387,7 +423,7 @@ void cvs2_select_tick(void)
     if (game != 1 || (rom != 2 && rom != 3) ||
         !read_at(&context,0x142c79b40ULL,8) ||
         !read_at(pointers,context,sizeof pointers) ||
-        !read_at(&root,0x1422debd0ULL,8) || !read_at(&phase,0x1422dec30ULL,8))
+        !read_at(&root,ROOT_SLOT,8) || !read_at(&phase,PHASE_SLOT,8))
         goto inactive;
     if (arena > 0x00007fff00000000ULL || context != arena+0x8000000 ||
         pointers[0] != arena || pointers[1] != arena+0x8400000 ||
@@ -395,14 +431,41 @@ void cvs2_select_tick(void)
         root < arena+0xc000000 || root > arena+0x10000000-CVS2_STATE_SIZE)
         goto inactive;
 
-    if (!read_at(state,root,sizeof state) ||
-        !read_at(&again,0x1422debd0ULL,8) || again != root ||
-        !read_at(&again,0x141c14f98ULL,8) || again != session)
+    /* The shell's game-select object, as every adapter reads it: the game
+     * it names, and the game-version setting the shell's name function
+     * picks regional names by. */
+    if (!read_at(&shell,SHELL_SLOT,8) || !shell ||
+        !read_at(&shell_game,shell+0x1AC,4) || shell_game != 1 ||
+        !read_at(&variant,shell+0x1B0,4) || variant > 1)
         goto inactive;
+
+    if (!read_at(state,root,sizeof state) ||
+        !read_at(&again,ROOT_SLOT,8) || again != root ||
+        !read_at(&again,SESSION_SLOT,8) || again != session)
+        goto inactive;
+    {
+        /* Evidence for listening: the ROM loaded beside the version the
+         * names follow, once per pair. */
+        static unsigned logged = ~0u;
+        unsigned pair = rom * 2 + variant;
+        if (pair != logged) {
+            logged = pair;
+            log_line("cvs2-select: admitted ROM %u (%s), shell game version %u",
+                     rom, rom == 3 ? "cvs2u" : "cvs2", variant);
+        }
+    }
     cvs2_audio_route(root,rom);
-    cvs2_select_observe(state,sizeof state,root,rom);
-    cvs2_gauges_observe(state,sizeof state,root);
-    cvs2_announce_observe(state,sizeof state,root);
+    /* Only while the update runs: a quit game's block stays frozen on its
+     * last screen and passes every gate above (frame_liveness.h). A stall
+     * departs, so a resumed or restarted select speaks its highlight. */
+    {
+        static frame_liveness live;
+        if (frame_liveness_live(&live, cvs2_frame_count(), GetTickCount64(), STALL_MS))
+            cvs2_select_observe(state,sizeof state,variant,root,rom);
+        else
+            cvs2_select_observe(NULL,0,0,0,0);
+    }
+    cvs2_announce_observe(state,sizeof state,variant,root);
     cvs2_quote_observe(state,sizeof state,root);
     cvs2_story_observe(state,sizeof state,root);
     cvs2_text_observe(root);
@@ -410,184 +473,11 @@ void cvs2_select_tick(void)
 inactive:
     last_poll = 0;
     cvs2_audio_route(0,0);
-    cvs2_select_observe(NULL,0,0,0);
-    cvs2_gauges_observe(NULL,0,0);
-    cvs2_announce_observe(NULL,0,0);
+    cvs2_select_observe(NULL,0,0,0,0);
+    cvs2_announce_observe(NULL,0,0,0);
     cvs2_quote_observe(NULL,0,0);
     cvs2_story_observe(NULL,0,0);
     cvs2_text_observe(0);
-}
-
-/* ---- In-match gauges ---------------------------------------------------- */
-
-#include "audio.h"
-
-/* ⛔⛔⛔ B+0x16C IS HEALTH, NOT THE SUPER METER. I shipped it as the meter and
- * the user disproved it in training mode, where the variables are controlled:
- *
- *   - spending a super  -> NOTHING moved
- *   - the meter refilling -> NOTHING moved
- *   - hitting the opponent -> THEIR value dropped
- *
- * The third observation alone settles it. Nothing about a super meter makes it
- * fall when the other player is hit.
- *
- * ⭐⭐ WHY MY "CONFIRMATION" WAS WORTHLESS. I claimed the P1-moves-while-
- * P2-holds pattern proved it across 7 captures. That pattern fits health just
- * as well -- one player taking damage while the other is untouched. The test
- * discriminated "real per-player field" from "shared timer", NOT "meter" from
- * "health", and I read it as proving far more than it did.
- *
- * The instruction evidence was equally ambiguous and I treated it as decisive:
- * `imul edx,eax,0x64` (0x1406C26A0) adds in units of 100 and 0x1406C4241
- * subtracts -- I read gain/spend, but damage/recovery has exactly that shape.
- * And B+0x170 being a steady PER-CHARACTER ceiling (11520 vs 11200) is more
- * consistent with max health than a meter cap, since CVS2 vitality differs per
- * fighter. I noted that it looked like vitality early and reasoned past it.
- *
- * ⚠ A behavioural test that CANNOT tell two hypotheses apart is not evidence
- * for either. Ask what the observation would look like if the OTHER answer
- * were true -- here, identical.
- *
- * The super meter is therefore NOT located. Do not guess at it; find the
- * field that moves when a super is spent and refills over time. */
-#define GA_B(p)      (0x1eba8u + (p) * 0x678u)
-#define GA_HEALTH    0x16cu
-/* MAX health. B+0x170, not B+0x5BC: I took 0x5BC straight from the clamp at
- * 0x1406C26E9 without checking it against the captures already in hand -- it
- * reads 0 in ALL SIX, so the "value > cap" guard rejected everything and the
- * mod was silent in-game with no log line to say why.
- *
- * Reading the branch properly: 0x1406C26BC tests a mode byte, and only when it
- * is 2 or 7 does the code reach the 0x5BC path. The NORMAL path is
- * 0x1406C26CA, `movzx eax, word ptr [rbx+0x170]`. Live: 0x170 holds steady at
- * 11520 (P1) / 11200 (P2) across every capture while health varies beneath it,
- * and equals it exactly at full -- per-character vitality, as CVS2 has.
- *
- * ⭐ An offset read off a single instruction is a HYPOTHESIS. Check it against
- * a capture before shipping -- the data was in build/cvs2-state the whole
- * time, and the same shortcut produced BOTH bugs in this file. */
-#define GA_MAXHP     0x170u
-
-/* ---- Super meter -------------------------------------------------------
- * B+0x226 (u16), found by a FOUR-WAY capture constraint: identical across
- * three full-meter captures and different in a genuinely empty one. In the
- * whole 0x678 player struct exactly ONE byte survived that filter, with P2
- * holding at 168 while P1 collapsed to 4.
- *
- * Code confirms it independently: 0x1406C40EA `add word [rbx+0x226],di` with
- * a jns and a store of 0 (drain, floors at zero), and 0x1406C40B0
- * add/cmp/clamp (gain, ceilings). Accumulate-to-cap and drain-to-zero.
- *
- * ⭐⭐ THE CAP IS PER-GROOVE, and this is why a single constant was wrong:
- * 0x1406C3E53 does `movsx rax,byte [rbx+0x22D]` / `cmp eax,5` / jump table at
- * 0x1406C4138, six cases, each loading its own ceiling:
- *
- *   0 C=0xA8(168)  1 A=0x90(144)  2 P=0xC0(192)
- *   3 S=0x64(100)  4 N=0xD8(216)  5 K=0x48(72)
- *
- * ⚠ 0x48 appears as an immediate in several places and is K-Groove's cap
- * ONLY. Hardcoding it -- or the observed 168 -- would misreport every other
- * groove. The table is indexed by B+0x22D, which agrees with B+0x5D0 (the
- * groove field the selection reader already validates) in every capture.
- *
- * ⭐ The check that makes this shippable: the table predicts 100% for all
- * three full captures and 2% for the empty one, matching the user's own
- * description. A cap that could not reproduce the measured 168 would have
- * been rejected. */
-#define GA_METER     0x226u
-#define GA_GROOVE    0x22du
-static const unsigned meter_cap[6] = { 168, 144, 192, 100, 216, 72 };
-
-/* ⭐ Liveness: without these the log cannot tell "never ran" from "ran and
- * everything was rejected", which is exactly the ambiguity that hid the bug
- * above. Reported by cvs2_gauges_log_stats(). */
-static unsigned g_ga_fed, g_ga_rejected;
-
-/* ⛔⛔ THIS WROTE A LOG LINE EVERY TICK -- 2741 of them in one 5-minute
- * session, one every ~25 ms, a THIRD of the whole log. Each is a file write
- * from the worker thread, and the user heard it as speech lagging keypresses.
- *
- * ⭐ THE BUG IS THE GUARD ITSELF, and it is the SAME one already fixed in
- * cvs2_frame_log_stats(): `fed` and `rejected` are incremented twice per tick
- * while a match is running, so "have the counters changed?" is TRUE on every
- * single call. A counter that changes continuously cannot also be the thing
- * that gates "has anything changed?".
- *
- * ⚠ Knowing a trap is not the same as encoding it -- that fix was written,
- * commented at length, and the identical guard was left standing here.
- *
- * Rate-limit by TIME, like the frame version, and report the RATE rather than
- * a running total: "fed 120/s" is a number a human can act on, where an
- * ever-climbing total is not. */
-void cvs2_gauges_log_stats(void)
-{
-    static ULONGLONG last_tick;
-    static unsigned last_fed, last_rej;
-    ULONGLONG now = GetTickCount64();
-    unsigned fed = g_ga_fed, rej = g_ga_rejected;
-
-    if (last_tick == 0) { last_tick = now; last_fed = fed; last_rej = rej; return; }
-    if (now - last_tick < 10000) return;          /* at most once per 10 s */
-
-    /* Say nothing at all while nothing is happening: outside CVS2 both
-     * counters are frozen, and a heartbeat every 10 s saying "0 and 0" is the
-     * log noise this function is being fixed for. */
-    if (fed != last_fed || rej != last_rej)
-        log_line("gauge: fed=%u (%.0f/s) rejected=%u (%.0f/s)",
-                 fed, (double)(fed - last_fed) * 1000.0 / (double)(now - last_tick),
-                 rej, (double)(rej - last_rej) * 1000.0 / (double)(now - last_tick));
-
-    last_tick = now; last_fed = fed; last_rej = rej;
-}
-
-/* The worker-side producer: the super meter only. Health, beacons and the
- * clock are fed by the frame hook (cvs2_frame.c) on the frame they change;
- * feeding health here too would overwrite that with a value up to a frame
- * stale. Edge, exit and reset POLICY is shared -- src/match_audio.c. */
-static match_audio_producer g_ga_prod = { .feeds = MATCH_AUDIO_FEED_RESOURCE };
-
-void cvs2_gauges_observe(const BYTE *state, SIZE_T size, ULONGLONG root)
-{
-    match_audio_sample m;
-    uint64_t epoch = match_audio_current_for(1);   /* CVS2 is game 1 */
-    unsigned p;
-
-    /* Owner changes (leaving CVS2, a relocated block, another ROM) are new
-     * epochs from cvs2_select_tick(); audio.c already silenced the old one. */
-    (void)root;
-    if (!state || size != CVS2_STATE_SIZE || !epoch) return;
-
-    memset(&m, 0, sizeof m);
-    /* ⭐ Guard on the STATE, as the frame hook does: the meter field holds
-     * whatever it last held on selection and quote screens, and the gauges
-     * belong to the match. An observed non-match phase silences once. */
-    m.in_match = memcmp(state + 0x78, "\x02\x01\x02\x02", 4) == 0;
-    if (m.in_match) for (p = 0; p < 2; p++) {
-        unsigned b = GA_B(p);
-        unsigned hp, maxhp, meter, groove;
-        memcpy(&hp,    state + b + GA_HEALTH, 2); hp    &= 0xffff;
-        memcpy(&maxhp, state + b + GA_MAXHP,  2); maxhp &= 0xffff;
-
-        /* Health is READ, not fed: the counters and the KO-sentinel guard
-         * stay honest, so the log can tell "never ran" from "all rejected". */
-        if (hp == 0xffffu || maxhp == 0 || maxhp == 0xffffu || hp > maxhp)
-            g_ga_rejected++;
-        else
-            g_ga_fed++;
-
-        /* Super meter, scaled by this player's groove cap. An unknown groove
-         * has no known ceiling, so scaling would be a guess: stay silent
-         * rather than report a wrong fill. */
-        memcpy(&meter, state + b + GA_METER, 2); meter &= 0xffff;
-        groove = state[b + GA_GROOVE];
-        m.owner[p].present = true;
-        m.owner[p].resource.valid = groove < 6 && meter != 0xffffu &&
-                                    meter <= meter_cap[groove];
-        m.owner[p].resource.value = (int)meter;
-        m.owner[p].resource.maximum = groove < 6 ? (int)meter_cap[groove] : 0;
-    }
-    match_audio_feed(&g_ga_prod, epoch, &m);
 }
 
 /* ---- In-match announcements --------------------------------------------
@@ -655,7 +545,7 @@ static transition_ownership an_ownership(const BYTE *s, unsigned p)
     return (mask & (1u << p)) ? TRANSITION_OWNER_LOCAL : TRANSITION_OWNER_OPPONENT;
 }
 
-void cvs2_announce_observation(const BYTE *s, transition_observation *o)
+void cvs2_announce_observation(const BYTE *s, unsigned variant, transition_observation *o)
 {
     unsigned p, i;
     memset(o, 0, sizeof *o);
@@ -672,7 +562,7 @@ void cvs2_announce_observation(const BYTE *s, transition_observation *o)
         if (n < 1 || n > 3 || s[b + 0x5d0] >= 6) {
             o->team_ready = false;
         } else {
-            swprintf(side->style, TRANSITION_LABEL, L"%ls", names[48 + s[b + 0x5d0]]);
+            swprintf(side->style, TRANSITION_LABEL, L"%ls", g_groove[s[b + 0x5d0]]);
             side->count = n;
             for (i = 0; i < n; i++) {
                 unsigned m = s[b + 0x5c0 + i];
@@ -680,7 +570,7 @@ void cvs2_announce_observation(const BYTE *s, transition_observation *o)
                 side->member[i].valid = true;
                 side->member[i].id = m;
                 side->member[i].ratio = an_ratio(s, b, i);
-                swprintf(side->member[i].name, TRANSITION_LABEL, L"%ls", names[m]);
+                name_of(side->member[i].name, TRANSITION_LABEL, m, variant);
             }
         }
         if (id >= 0 && id < 48) {
@@ -691,12 +581,12 @@ void cvs2_announce_observation(const BYTE *s, transition_observation *o)
             side->current.valid = true;
             side->current.id = (unsigned)id;
             side->current.ratio = slot < 3 ? an_ratio(s, b, slot) : 0;
-            swprintf(side->current.name, TRANSITION_LABEL, L"%ls", names[id]);
+            name_of(side->current.name, TRANSITION_LABEL, (unsigned)id, variant);
         }
     }
 }
 
-void cvs2_announce_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
+void cvs2_announce_observe(const BYTE *s, SIZE_T size, unsigned variant, ULONGLONG root)
 {
     static ULONGLONG owner_root;
     transition_observation o;
@@ -716,7 +606,7 @@ void cvs2_announce_observe(const BYTE *s, SIZE_T size, ULONGLONG root)
      * quotes use other phases. Latches survive between matches, so the same
      * teams are not re-introduced but a new opponent's team is. */
     if (memcmp(s + 0x78, "\x02\x01\x02\x02", 4)) return;
-    cvs2_announce_observation(s, &o);
+    cvs2_announce_observation(s, variant, &o);
     transition_channel_offer(&g_an, &o);
 }
 

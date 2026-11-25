@@ -675,13 +675,8 @@ void menu_speak_check_hint(void);
 
 void menu_speak_flatten_prompt(const char *in, char *out, int outlen);
 
-/* Report what the ROM table would name the game the cursor is RESTING on.
- * Logged, never spoken -- the index mapping is not yet confirmed. */
-void menu_speak_probe_rest(const mc_move *m);
-
-/* Log a movement from an UNKNOWN screen in the exact form needed to add it to
- * the table -- caller address, count, axis. ⭐ This is the discovery mode: the
- * next run's log becomes the table, instead of another guessing round. */
+/* Log, once per caller, a movement on a screen with no entry: caller
+ * address, count, axis. The only trace of a screen the mod does not read. */
 void menu_speak_log_unknown(const mc_move *m);
 
 /* ⭐⭐ Derive which setting ROW is focused, from the hook's own arguments.
@@ -769,27 +764,7 @@ const mc_screen *menu_speak_lookup_for(ULONGLONG caller, int item_count,
                                        const void *screen);
 
 
-/* Enable the DISCOVERY candidate sweep. OFF by default.
- *
- * ⛔ It is a development aid, not a user feature, and it stalled a live session
- * twice (37 s, then 11.9 s) while having named exactly ZERO shipped screens --
- * every g_screens row cites live text, the disassembly, or the caption
- * channel. Unknown screens are still LOGGED when it is off; only the expensive
- * candidate hunt is gated.
- *
- * ⭐ For naming screens, prefer the caption channel: tools/name_screens.py
- * reproduces three independently verified bases from an ordinary run's log. */
-void menu_speak_set_discovery(BOOL on);
 
-/* Is the sweep currently enabled? Exists so the suite can assert the DEFAULT
- * directly.
- *
- * ⚠ Asserting it by TIMING menu_speak_log_unknown() looked reasonable and was
- * vacuous: the offline harness has no live GMD, so the sweep exits early on
- * `gmd_text_count() > 0` whatever the gate says, and the case passed with the
- * gate deleted. Test the state, not a side effect that another guard also
- * produces. (memory: harness-supplies-the-mechanism) */
-BOOL menu_speak_discovery_enabled(void);
 
 /* Test seam: does a captured string look like a SETTING VALUE?
  *

@@ -4,9 +4,10 @@ Screen reader accessibility mod for **Capcom Fighting Collection 2** (Steam
 appid 2400430). Speaks menu and gameplay state to NVDA, with braille and SAPI
 fallback via UniversalSpeech.
 
-This is an active research project — the mod works for the MTFramework shell
-(menus, move lists, training) and in-game support is under active development.
-Full technical detail and current status are in the source repository:
+Version 1.0 supports the collection's menus and all eight games: Capcom vs.
+SNK, Capcom vs. SNK 2, Capcom Fighting Evolution, Street Fighter Alpha 3,
+Project Justice, Plasma Sword, Power Stone and Power Stone 2. Full technical
+detail is in the source repository:
 https://github.com/ObjectInSpace/cfc2-access
 
 ## Install
@@ -100,8 +101,11 @@ Both are spoken and saved to `cfc2_audio.ini`.
 
 - MTFramework shell (menus, options, move lists): working, including each
   game's EX Settings page.
-- CVS2 in-game: working — character select speech, health and super gauges,
-  position beacons, and the round clock. Match start and new fighters are
+- CVS2 in-game: working — character, groove, ratio and stage select speech,
+  health and super gauges, position beacons, and the round clock. Character
+  names are the collection's own and follow its game-version setting, so
+  Balrog, Vega and M.Bison are named as the Japanese or US version names
+  them. Match start and new fighters are
   announced; in Training these say "Player 1" and "Player 2", since the game
   gives no sign of which side you control.
 - CVS1 in-game: character select speaks each highlighted character by name.
@@ -156,13 +160,12 @@ Both are spoken and saved to `cfc2_audio.ini`.
   wrongly. Fighter, groove and stage names stay as the games name them.
 - Power Stone in-game: character select and the Versus stage select are
   spoken; health, stone and clock cues; pickups ping. Works in Arcade,
-  Versus and Training, English and Japanese. New in this release: pickup
-  announcements, and nothing off screen sounds.
+  Versus and Training, English and Japanese. Pickups are announced, and
+  nothing off screen sounds.
 - Power Stone 2 in-game: character select is spoken; health and stone tones
   for all four fighters, the clock, pickup pings, pickup announcements, and
   the walk-around stage select. Arcade, Versus and Training, English and
-  Japanese, checked in play; the pickup announcements and stage select are
-  new in this release.
+  Japanese, checked in play.
 
 ## Source
 
@@ -170,4 +173,4 @@ Source, build script (`build.ps1`), and design docs are in the repository:
 https://github.com/ObjectInSpace/cfc2-access
 
 `.\build.ps1 -Deploy` builds and copies the mod into the game folder;
-`.\build.ps1 -Package 0.9` builds the release zip from a clean checkout.
+`.\build.ps1 -Package 1.0` builds the release zip from a clean checkout.

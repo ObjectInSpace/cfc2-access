@@ -143,18 +143,7 @@ BOOL mc_take_move(mc_move *out);
  * discarded. */
 BOOL mc_take_rest(mc_move *out);
 
-/* The same resting position, but NON-CONSUMING: no de-dup, no sequence
- * advance, no static state written.
- *
- * ⛔⛔ Both mc_take_move() and mc_take_rest() CONSUME, and menu_speak is already
- * their consumer. A diagnostic that used either would steal movements from the
- * speech path, and speech silently dropping movements is a shipping bug. Any
- * number of readers can call this in any order.
- *
- * ⚠ Returns FALSE on a torn or empty read rather than reporting a half-updated
- * snapshot -- the screen pointer from one write paired with an index from
- * another would be a confident wrong answer. */
-BOOL mc_peek_rest(mc_move *out);
+
 
 /* Log any movement, plus a one-time report of the first capture. Called from
  * the worker thread. */

@@ -1,7 +1,6 @@
 /* See cvs2_frame.h for the derivation and the thread-safety rules. */
 
 #include "cvs2_frame.h"
-#include "cvs2_select.h"
 #include "audio.h"
 #include "match_audio.h"
 #include "log.h"
@@ -24,6 +23,11 @@ static const unsigned char FRAME_SIG[] = {
 
 /* Offsets, all traced and live-verified. See docs/cvs2-state-access-trace.md. */
 #define B_OF(p)    (0x1EBA8u + (p) * 0x678u)
+/* ⛔ B+0x16C is HEALTH, not the super meter: it shipped once as the meter,
+ * and the user disproved it in Training (spending or refilling a super moved
+ * nothing; hitting the opponent dropped THEIR value). B+0x16E between them
+ * is the delayed drain bar, so these are 4 bytes apart, never a u16 pair.
+ * B+0x170 is per-fighter, per-ratio maximum health: read live, never fixed. */
 #define OFF_HP     0x16Cu
 #define OFF_MAXHP  0x170u
 /* Round clock, an absolute offset in R (not per player). Confirmed live:
@@ -102,6 +106,26 @@ static const unsigned char FRAME_SIG[] = {
 #define OFF_ACTION 0x007u
 #define ACTION_DOWN   3u
 
+/* ---- super meter ---------------------------------------------------------
+ * B+0x226 (u16), found by a FOUR-WAY capture constraint: identical across
+ * three full-meter captures and different in a genuinely empty one. In the
+ * whole 0x678 player struct exactly ONE byte survived that filter.
+ * Code confirms it: 0x1406C40EA `add word [rbx+0x226],di` with a jns and a
+ * store of 0 (drain, floors at zero), and 0x1406C40B0 add/cmp/clamp (gain).
+ *
+ * ⭐⭐ THE CAP IS PER-GROOVE: 0x1406C3E53 `movsx rax,byte [rbx+0x22D]` /
+ * `cmp eax,5` / jump table 0x1406C4138, six cases, each its own ceiling:
+ *   0 C=168  1 A=144  2 P=192  3 S=100  4 N=216  5 K=72
+ * ⚠ 0x48 appears as an immediate in several places and is K-Groove's ONLY.
+ * The table predicts 100% for all three full captures and 2% for the empty
+ * one. An unknown groove has no known ceiling, so it is not sounded.
+ *
+ * Read here, on the frame, like every other game's resource gauge. It used
+ * to be a second producer on the 33 ms worker poll (cvs2_gauges_observe). */
+#define OFF_METER  0x226u
+#define OFF_GROOVE 0x22Du
+static const unsigned meter_cap[6] = { 168, 144, 192, 100, 216, 72 };
+
 typedef void (*pfn_frame)(void);
 static pfn_frame g_real_frame;
 
@@ -119,8 +143,8 @@ static int g_last_hp[2] = { -1, -1 };
  * and hands it over under the current owner epoch, which the worker sets in
  * cvs2_select_tick(). Frame-thread only, so it needs no synchronisation. */
 static match_audio_producer g_prod = {
-    .feeds = MATCH_AUDIO_FEED_HEALTH | MATCH_AUDIO_FEED_BEACON |
-             MATCH_AUDIO_FEED_CLOCK
+    .feeds = MATCH_AUDIO_FEED_HEALTH | MATCH_AUDIO_FEED_RESOURCE |
+             MATCH_AUDIO_FEED_BEACON | MATCH_AUDIO_FEED_CLOCK
 };
 
 /* CVS2's composite of everything that should be moving while the game
@@ -202,6 +226,14 @@ void cvs2_frame_decode(const unsigned char *s, match_audio_sample *m)
         o->health.valid = mx > 0 && mx != 0xFFFF && v != 0xFFFF && v <= mx;
         o->health.value = v;
         o->health.maximum = mx;
+        {
+            unsigned short meter;
+            unsigned groove = s[B_OF(p) + OFF_GROOVE];
+            memcpy(&meter, s + B_OF(p) + OFF_METER, 2);
+            o->resource.valid = groove < 6 && meter != 0xFFFF && meter <= meter_cap[groove];
+            o->resource.value = meter;
+            o->resource.maximum = groove < 6 ? (int)meter_cap[groove] : 0;
+        }
         memcpy(&xr[p], s + B_OF(p) + OFF_POSX, 4);
         x[p] = (float)xr[p] / 65536.0f;      /* 16.16 -> units */
     }
@@ -294,6 +326,8 @@ BOOL cvs2_frame_install(void)
              "read ON the frame it changes, not on the worker poll.", FRAME_FN);
     return TRUE;
 }
+
+LONG cvs2_frame_count(void) { return InterlockedCompareExchange(&g_frames, 0, 0); }
 
 void cvs2_frame_remove(void)
 {

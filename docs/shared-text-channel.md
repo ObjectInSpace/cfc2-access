@@ -53,7 +53,7 @@ the priority order, kept explicit rather than sorted by anything clever.
 
 Sources today:
 
-- `CVS2` — reads the completed text frame, registered by `cvs2_text_install()`
+- `CVS2` — reads the completed text frame, registered by `cvs2_text_register()` (2026-11-25: its worker half is now the shared `game_text.c`, like CVS1, CFJ and Alpha 3)
 - `the menus` — repeats the focused row, registered by
   `menu_speak_register_reader()`, last, so a running game answers first
 

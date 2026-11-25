@@ -45,13 +45,5 @@ int image_scan(image_section *out, int max);
  * measurement on one machine, not a contract. Returns TRUE if unpacked. */
 BOOL image_wait_for_unpack(DWORD timeout_ms);
 
-/* Write the unpacked executable sections to <gamedir>\cfc2_dump\.
- * One file per section plus a manifest describing where each came from, so the
- * offline analysis can map a file offset back to a live address. Returns the
- * number of sections written. */
-int image_dump(void);
-
-/* Live base address of the main module. */
-BYTE *image_base(void);
 
 #endif /* CFC2_IMAGE_H */

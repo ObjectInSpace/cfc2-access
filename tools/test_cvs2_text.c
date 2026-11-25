@@ -1,6 +1,7 @@
 /* Renderer replay, not a live-screen capture. */
 #include "../src/text_channel.c"
 #include "../src/text_capture.c"
+#include "../src/game_text.c"
 #include "../src/cvs2_text.c"
 #include <assert.h>
 #include <stdio.h>
@@ -28,7 +29,7 @@ static void record(short x,short y,int style,const char *s)
 static void poll(void) { cvs2_text_observe(1); }
 static void frame(void) { end_detour(); poll(); }
 /* The ` key now goes through the shared registry, exactly as mod.c drives it. */
-static void press_f9(void) { cvs2_text_request_read();
+static void press_f9(void) { tc_request_read();
                              if (tc_read_requested()) tc_read_current(); }
 int main(void)
 {
@@ -60,6 +61,8 @@ int main(void)
     accepts=1; record(20,20,9,"CONTINUE 8"); frame(); assert(calls==4);
     record(20,20,9,"CONTINUE 8"); frame(); assert(calls==4);
     record(20,20,9,"GAME OVER"); frame(); assert(calls==5 && !wcscmp(last,L"GAME OVER"));
+    /* The board's credit display is status, not screen content (shared rule). */
+    record(30,30,9,"FREE PLAY"); record(30,40,9,"CREDITS 2"); frame(); assert(calls==5);
     /* Names, pure digits, story/quote font runs stay out of auto narration. */
     record(10,20,16,"RYU"); record(20,20,16,"KEN"); record(10,30,9,"12345");
     string_detour(10,10,1,"Stand up and face me again."); frame(); assert(calls==5);
@@ -68,7 +71,7 @@ int main(void)
     /* An empty frame invalidates everything, rather than reading history. */
     frame(); press_f9();
     assert(calls==7 && wcsstr(last,L"No readable text"));
-    publisher.published_at=GetTickCount64()-1000;
+    state.publisher.published_at=GetTickCount64()-1000;
     press_f9(); assert(calls==8 && wcsstr(last,L"No fresh"));
     /* An unreadable input is contained without killing the process. */
     before=(int)collecting.count;

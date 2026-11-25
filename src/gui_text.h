@@ -400,19 +400,6 @@ typedef struct {
 
 void gt_get_stats(gt_stats *out);
 
-/* Inspect one captured instance and log what its 528 bytes contain: the two
- * candidate pointer fields, every other pointer-shaped field that resolves to
- * readable text, and any inline string. Runs on the WORKER thread.
- *
- * ⭐ Returns FALSE when there is nothing new to report, so a quiet log means
- * "no new instance", never "inspected and found nothing" -- those two are
- * different findings and must not share a representation.
- *
- * ⚠ This is the DISCOVERY step, not the product. It exists to find which
- * offset holds the string; once that is known this becomes a targeted read and
- * the dump goes away. */
-BOOL gt_poll_and_log(void);
-
 /* ---- The focus channel: item 4's measurement, and the caption source. ----
  *
  * ⭐⭐ THE OPEN QUESTION THIS ANSWERS. Does the shell push a per-ROW caption
@@ -459,11 +446,6 @@ BOOL gt_newest_prose_if_new(char *out, int outlen);
 
 BOOL gt_take_caption(char *out, int outlen);
 
-/* Log the whole ordered record, with a positive count of what was examined and
- * an explicit reading guide. Refuses to conclude if the cursor side never
- * notified us. */
-void gt_focus_report(void);
-
 /* ⭐⭐ Dump each live text object's raw fields, looking for one that orders
  * objects by SCREEN POSITION. Two screens need it -- the Lobby ID field and
  * the Music chooser's game strip -- because on both the text is readable and
@@ -485,27 +467,6 @@ void gt_focus_report(void);
  * pressing a direction. Reports OFFSETS AND VALUES only -- never a conclusion.
  *
  * Switch: cfc2_modal.on. Absent = off. */
-
-void gt_modal_probe(void);
-
-void gt_layout_report(void);
-
-/* ⭐⭐ Log the LIVE INSTANCE SET: every cGUIObjText the hook has seen, keyed by
- * OBJECT, with its latest text and whether the pointer is still a valid object.
- *
- * Step 1 of docs/gui-instance-route.md. The question: does the live set contain
- * one text per menu row, and can the focused one be told apart? If so, item
- * names can come from the instance tree for ANY screen -- including Gallery,
- * the music list and the consent dialog, which neither the GMD nor the caption
- * channel can reach.
- *
- * ⛔ NOT route 3 again. That anchored on the name POOL (file data, static by
- * design, closed on a clean negative). This anchors on a pointer the game hands
- * us in setText -- an object it CONSTRUCTED. Route 3's closing note says the
- * root must come from "the GUI system's own instance list"; this is that list.
- *
- * ⚠ LOGGED, NEVER SPOKEN. A live object set is not yet a row->text mapping. */
-void gt_instance_report(void);
 
 /* ⭐⭐ THE NUMBERED-LIST LOOKUP: find a live object whose text begins with the
  * decimal number `n` followed by '.', and copy that text out.
@@ -623,11 +584,6 @@ int  gt_page_count(const void *screen, float x, int total);
 BOOL gt_page_item(const void *screen, float x, float pair_x, int total, int position,
                   char *out, int outlen);
 
-/* DIAGNOSTIC, once per (screen, x, count, total): log every object in the
- * column at `x` with its Y, text, write stamp and raw bytes. Called when a
- * column still disagrees with the cursor after the page selection. */
-void gt_column_dump(const void *screen, float x, int total);
-
 /* Call `fn` with the current text of every LIVE object on `screen` (membership
  * by the game's own +0x088 parent pointer, as gt_widget_of). Returns how many.
  *
@@ -685,218 +641,11 @@ BOOL gt_part_anim(const void *screen, int part_id, int *anim);
 BOOL gt_part_sub_text(const void *screen, int part_id, int child, int sub,
                       char *out, int outlen);
 
-/* ⭐⭐ THE FOCUS DIFFER: which field of a cGUIObjText marks it as SELECTED?
- *
- * The open question two screens now need (Casual Match's 8-item strip, the
- * lobby-ID keypad): the instance set holds one object per row, but nothing says
- * WHICH is focused. Music dodged this by being numbered; Gallery dodged it by
- * captioning. These do neither.
- *
- * ⛔ THIS IS NOT ROUTE 3 AGAIN, and the distinction is the whole design.
- * Route 3 closed on a SOLID negative -- 1789 objects, full ±128-byte windows,
- * one hop out, complete passes, different screens, ZERO changes. But every one
- * of those objects was reached from the name POOL, i.e. parsed `menu.arc` file
- * data: the layout TEMPLATE, static by design. Its own closing note says the
- * root must come from "the GUI system's own instance list, not the layout
- * data". These objects come from setText -- the game CONSTRUCTED them.
- *
- * ⭐ And route 3's other lesson is built in: it anchored on what it could FIND
- * rather than what CHANGES. This anchors on objects already proven to change
- * (their text is re-set as the user navigates) and asks only WHERE.
- *
- * HOW IT WORKS. On each cursor movement, snapshot GT_CLASS_SIZE bytes of every
- * live tracked object, then report the offsets that changed since the previous
- * movement, per object.
- *
- * ⚠⚠ THE SAME-SCREEN CONTROL IS MANDATORY and is route 3's direct lesson:
- * without it "everything that merely ticks looks like a signal". Animation
- * phase, timers and frame counters change on EVERY movement. So the report
- * separates:
- *   - offsets that changed on the object the cursor MOVED TO, and
- *   - offsets that changed on objects it did not touch (the control).
- * A selection marker changes on the first set and NOT the second. Anything
- * changing on both is a ticker and is named as one.
- *
- * ⚠ LOGGED, NEVER SPOKEN. A changed offset is a candidate, not a finding --
- * exactly as route 3's window dump was.
- *
- * Opt-in: `cfc2_focusdiff.on` next to the exe. It costs a 528-byte guarded read
- * per tracked object per movement, so it does not run in an ordinary session. */
-void gt_focus_diff_enable(BOOL on);
-
-/* Test seam: how many OBJECTS the last diff reported as changed, or -1 if the
- * differ did not run at all.
- *
- * ⭐⭐ -1 and 0 must not look alike. "The differ was gated off and never
- * executed" and "the differ ran and found nothing changed" are completely
- * different facts, and a case asserting only "it did not crash" passes on both
- * -- which is exactly what happened when this was first written: the shipping
- * gate required g_installed, the test never set it, and case 29 passed while
- * executing none of the code it named. */
-int gt_test_focus_diff_changed(void);
-void gt_focus_diff_note_move(void);
-
-/* ⭐⭐ Run the same diff because the screen REDREW rather than because the
- * cursor moved. Needed for modals that bypass the cursor helpers entirely --
- * the quit dialogs log zero movements, so the movement-gated entry point is
- * structurally blind to them. */
-void gt_focus_diff_note_text(void);
-void gt_focus_diff_report(void);
-
-/* --- THE MOVE LIST MEMBERSHIP PROBE -------------------------------------
- *
- * ⭐⭐ ONE QUESTION, and no log can answer it: at cursor-movement time, does
- * the number of live move-NAME objects equal the vertical cursor's reported
- * item total? If yes, the coordinate join can name the rows. If no, the shape
- * of the disagreement says what the cursor actually indexes.
- *
- * ⛔⛔ WHY THIS CANNOT BE SETTLED OFFLINE. gt_layout_report() samples every
- * ~6.6 s (measured) while the user moves every ~0.6 s, so pairing a dump
- * against a movement in the log failed 172 of 175 times -- the window is
- * seconds stale and belongs to a different character. The mod can read the
- * instance set on the poll that follows a movement; the log cannot.
- *
- * ⭐⭐⭐ THE GAME DECLARES MEMBERSHIP: +0x088 == the cursor helper's `screen`.
- * Measured in two runs on two different screen pointers -- 1626 run, screen
- * 2c3874d0: all 188 name objects and all 99 notation objects carry it; 1635
- * run, screen 2c316d70: all 20 name objects carry it. Same machinery as
- * MODAL_PARENT_OFF (0x088), whose premise is "a pointer the game itself shares
- * between the widgets of one control" -- here at screen scale.
- *
- * ⚠ The HEADING column is NOT parent-identified on its own. X=960 is shared
- * chrome: across one run its 23 sightings carry SIX different parents (the
- * pause menu, Select Game and Training Options all draw a heading there), and
- * only 2 belonged to the move list. The heading needs parent AND X.
- *
- * ⚠ The name column's X is DERIVED per sample (the modal X among members), not
- * hardcoded. That constant has been written down as 1265, then 1268, and
- * measured as 633.0 for the condition column -- three values for one number is
- * the argument for never baking it in.
- *
- * Opt-in: `cfc2_movelist.on`. Nothing is spoken; this only counts.
- *
- * ⚠ The opt-in FILE is checked by mod.c, which owns that helper, and the
- * answer handed in here -- the same shape as gt_focus_diff_enable(). */
-void gt_movelist_enable(BOOL on);
-
-/* Sample once, on the WORKER thread. Cheap enough for the 100 ms poll: a
- * try-lock, then at most GT_INST_MAX guarded 528-byte reads, no logging.
- *
- * ⚠⚠ THE CURSOR STATE IS PASSED IN. `screen` is the cursor helper's own screen
- * pointer (compared, never dereferenced), `total` its reported item count, and
- * `is_movelist` whether this is the move list's vertical axis.
- *
- * ⛔ An earlier version fetched these itself via mc_peek_rest(), which made
- * this module depend on menu_cursor -- and linking that into the gui_text
- * suite pulled in menu_speak and the GMD reader, turning a focused test binary
- * into most of the mod. mod.c owns both modules and calls them in sequence, so
- * it does the joining. */
-void gt_movelist_probe(void *screen, int total, BOOL is_movelist);
-
-/* ⭐⭐ THE VERDICT IS A RETURN VALUE, not a printed warning. `samples == 0`
- * means the probe never observed a movement on a move-list screen, and that is
- * NOT the same as "the counts disagree" -- reporting it as a tidy zero is the
- * mistake inconclusive-must-be-a-return-value exists to prevent. */
-BOOL gt_movelist_conclusive(long *samples, long *missed);
-void gt_movelist_report(void);
-
-/* --- THE SETTINGS CENSUS -------------------------------------------------
- *
- * ⭐⭐ WHAT ARE ALL THE VALUES A SETTINGS ROW CAN HOLD? No log can say.
- * gt_layout_report() is change-triggered but RATE-LIMITED TO ONE BEAT (2 s)
- * while the value cursor moves every ~0.2-0.5 s. Measured on the 2026-09-15
- * Game Settings run: 42 value movements, 16 dumps, and EXACTLY ONE distinct
- * value captured per row -- a nine-value row was indistinguishable from a
- * one-value row.
- *
- * ⭐ Sampling on the poll that FOLLOWS a movement turns one ordinary walk of a
- * settings screen into the whole vocabulary of every row. Each distinct
- * label=value pair is recorded once; the report is an aggregate, so a busy
- * screen cannot flood a log whose every line costs an _wfopen/fclose.
- *
- * ⚠ Rows pair with values by SHARING A Y (the gt_column_item() contract),
- * never by ordinal -- two columns of different lengths taken Nth-by-Nth would
- * attach a value to the wrong setting.
- *
- * ⛔ It names no screen and claims no corpus run. It records what the game drew
- * beside which label; the join to a label run stays offline where the corpus
- * can check it.
- *
- * Opt-in: `cfc2_census.on`. Nothing is spoken; this only records. */
-void gt_settings_census_enable(BOOL on);
-
 /* Sample once, on the WORKER thread, after a movement. ⚠ The cursor state is
  * PASSED IN for the same reason gt_movelist_probe() takes it: fetching it here
  * would pull menu_cursor, menu_speak and the GMD reader into a focused test
  * binary. `row_x`/`val_x` are screen properties, never constants of this
  * module. */
-/* ⚠ `val_total` is the VALUE cursor's reported item count. The report needs it
- * to say whether a row's list is COMPLETE -- and it needs to, because THE LIST
- * WRAPS: "press Right until it stops changing" never terminates, and no log
- * data can detect that, since a wrapping list produces movements forever. The
- * count is the only stopping rule. Pass 0 when no value axis is live. */
-void gt_settings_census(void *screen, float row_x, float val_x, int val_total);
-
-/* ⭐⭐ THE VERDICT IS A RETURN VALUE. `samples == 0` means no movement was
- * sampled with both columns readable -- NOT that the rows have no values. */
-BOOL gt_settings_census_conclusive(long *samples, long *missed);
-void gt_settings_census_report(void);
-
-int  gt_test_sc_entries(void);
-BOOL gt_test_sc_entry_at(int i, const char **label, const char **value,
-                         long *hits);
-long gt_test_sc_overflow(void);
-int  gt_test_sc_expect(const char *label);
-
-/* --- THE SCREEN SNAPSHOT ---------------------------------------------------
- *
- * ⭐⭐ Logs a screen's row labels (and the value beside each) ONCE, the first
- * time a cursor movement lands on a screen object not already reported.
- *
- * ⛔ USER: "These tests need to be faster for me to complete." Learning a
- * screen's rows previously needed a ~3 SECOND PAUSE, because the field dump is
- * rate-limited to one 2 s beat. With this, walking in and pressing one key is
- * enough -- which matters when the person testing cannot glance at the screen
- * to check whether the capture worked.
- *
- * ⚠ NOT the withdrawn settings census. That sampled on EVERY movement, walking
- * the instance table 15 times per sample with the lock taken and released
- * between each, and it CRASHED THE GAME. This takes the lock once per SCREEN
- * and is then silent until a different screen appears -- a human-speed event.
- *
- * Opt-in: `cfc2_snap.on`. Nothing is spoken. */
-void gt_snapshot_enable(BOOL on);
-
-/* Enable the live-text TRANSCRIPT ("gt: * TEXT SET ..."), a development aid.
- *
- * ⚠ This is NOT the hook. The hook always runs when gt_install() succeeded,
- * because menu_speak_check_modal() and the caption channel are shipping
- * speech that depends on it. Only the per-string log line is switched, and it
- * is OFF by default: the emulated game redraws score and timer numbers every
- * frame, each one "distinct", so the dedupe filter cannot suppress them and
- * the line becomes a file write ~12 times a second on the speech worker. */
-void gt_text_log_enable(BOOL on);
-void gt_snapshot(const void *screen, float row_x, float val_x, int total);
-long gt_snapshot_count(void);
-void gt_test_snapshot_reset(void);
-/* ⭐ Clears the census so a case can ask the UNSAMPLED question. Without it
- * every case runs against a populated table and a verdict stuck at TRUE is
- * indistinguishable from a working one -- proven by sabotage. */
-void gt_test_sc_reset(void);
-
-/* Test seams. ⭐ -1 means the probe never ran; 0 means it ran and recorded
- * nothing. Those are different facts and a case asserting only "no crash"
- * passes on both. */
-int  gt_test_ml_buckets(void);
-BOOL gt_test_ml_bucket_at(int i, int *total, int *names, int *members,
-                          long *hits);
-long gt_test_ml_overflow(void);
-long gt_test_ml_missed(void);
-/* Hand the probe its INPUTS (the cursor's total, and the screen pointer that
- * defines membership) and ask what it CONCLUDED. ⛔ It must not be told which
- * objects are members -- that is the mechanism under test. */
-void gt_test_ml_feed(int total, void *screen);
-void gt_test_ml_note_move(int n);
 
 /* --- test seams ----------------------------------------------------------
  * ⭐⭐ The stand-in must NOT re-derive what the shipping code derives. A
@@ -954,25 +703,9 @@ void gt_test_reset(void);
  * test it either. */
 void gt_test_focus_enable(void);
 
-/* Test-only: perform the window clear that gt_focus_report() does, so the
- * "recorder does not go blind when full" case can run offline. */
-void gt_test_focus_clear(void);
-
 /* Test seams for the instance set: how many objects, and what does one say?
  * ⚠ Asserting the LOG TEXT instead would test the formatter, not the table. */
 int gt_test_instance_count(void);
 int gt_test_instance_text(void *obj, char *out, int outlen);
-
-/* ⭐⭐ Is item 4's measurement CONCLUSIVE? Returns FALSE when the cursor side
- * never notified the recorder -- in which case every record carries sequence 0
- * and "no captions tracked the cursor" is indistinguishable from "the cursor
- * hook never ran". gt_focus_report() refuses to draw a conclusion on FALSE.
- *
- * ⚠ This is a RETURN VALUE, not a logged warning, for the reason this project
- * has re-learned repeatedly: if the code notices it cannot measure something,
- * a caller must be able to act on that, and a test must be able to assert it.
- * `*records` and `*moves` report the positive counts behind the verdict.
- * (memory: inconclusive-must-be-a-return-value) */
-BOOL gt_focus_conclusive(long *records, long *moves);
 
 #endif /* CFC2_GUI_TEXT_H */

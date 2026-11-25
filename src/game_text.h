@@ -13,7 +13,7 @@
  * (the capture, on the game thread, publishing to `publisher` below), and
  * how its bytes read (the decoder). Porting another game's text adds those
  * two things and one game_text_source; it does not copy this policy.
- * Readers: cvs1_text.c, cfj_text.c, z3u_text.c. */
+ * Readers: cvs1_text.c, cfj_text.c, z3u_text.c, cvs2_text.c. */
 
 /* Decodes one captured row into speech text; FALSE when the row cannot be
  * rendered faithfully (it is then logged as refused, unless quiet()). */
@@ -21,6 +21,9 @@ typedef BOOL (*game_text_decode_fn)(int style, const char *raw, wchar_t *out, SI
 /* Optional: TRUE for refused rows that are expected and not worth a log
  * line (CFJ's style 0, which its renderer never draws). */
 typedef BOOL (*game_text_quiet_fn)(const tc_row *row);
+/* Optional, used instead of decode: for a capture whose rows need more than
+ * the style to read (CVS2 tells font runs from records by tc_row.kind). */
+typedef BOOL (*game_text_row_decode_fn)(const tc_row *row, wchar_t *out, SIZE_T cap);
 
 /* Everything that changes at run time. The game declares one as a plain
  * `static game_text_state` and never initialises it: zero is a valid empty
@@ -44,6 +47,11 @@ typedef struct {
     const char *name;                 /* the ` key source name, "CFJ"        */
     game_text_decode_fn decode;
     game_text_quiet_fn quiet;         /* may be NULL                         */
+    game_text_row_decode_fn decode_row; /* may be NULL; replaces decode       */
+    /* May be NULL. TRUE for rows the ` key reads but automatic narration
+     * leaves alone, because another reader already speaks them (CVS2's
+     * story/quote font runs and its two HUD name records). */
+    game_text_quiet_fn key_only;
     game_text_state *state;           /* the game's zeroed static            */
 } game_text_source;
 

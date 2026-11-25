@@ -900,7 +900,8 @@ reproducing the user's own description. A cap that could not reproduce the
 measured 168 would have been rejected. This is the falsifiable-prediction test
 that the earlier health/meter mix-up lacked.
 
-Shipping: `cvs2_gauges_observe()` feeds AUDIO_GAUGE_SUPER from `B+0x226`
+Shipping (since 2026-11-25 on the frame hook, `cvs2_frame_decode()`; it was
+`cvs2_gauges_observe()` on the worker poll): AUDIO_GAUGE_SUPER from `B+0x226`
 scaled by `meter_cap[B+0x22D]`, and stays SILENT for a groove index outside
 0..5 rather than guessing a ceiling. Regression in `tools/test_cvs2_select.c`
 replays all four captures and forces each of the six groove indices; hardcoding

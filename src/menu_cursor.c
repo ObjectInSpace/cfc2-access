@@ -483,40 +483,6 @@ BOOL mc_take_rest(mc_move *out)
     return TRUE;
 }
 
-/* ⭐⭐ A NON-CONSUMING snapshot of the resting position.
- *
- * ⛔⛔ WHY THIS EXISTS RATHER THAN REUSING mc_take_rest(). Both existing
- * readers CONSUME: mc_take_move() advances g_taken_seq, and mc_take_rest()
- * keeps last_caller/last_index statics so it reports a position only once.
- * menu_speak_probe_rest() is already their consumer. A second consumer would
- * STEAL movements from the speech path -- the user's speech silently dropping
- * movements is a shipping bug, and a diagnostic must never be able to cause one.
- *
- * ⭐ Adding a READER is strictly safer than adding a consumer: this writes no
- * static state at all, so any number of callers can use it in any order.
- *
- * ⚠ Same seq-bracket as the consumers: odd means a write is in flight, and a
- * changed sequence across the copy means the snapshot is torn. A torn read is
- * DISCARDED, never reported -- a half-updated screen pointer paired with the
- * other half's index would be a confident wrong answer. */
-BOOL mc_peek_rest(mc_move *out)
-{
-    LONG before = InterlockedCompareExchange(&g_rest_seq, 0, 0);
-    if (before & 1)
-        return FALSE;
-
-    mc_move snap = g_rest;
-
-    LONG after = InterlockedCompareExchange(&g_rest_seq, 0, 0);
-    if (after != before)
-        return FALSE;
-    if (!snap.cursor)
-        return FALSE;                       /* nothing published yet */
-
-    *out = snap;
-    return TRUE;
-}
-
 BOOL mc_take_move(mc_move *out)
 {
     LONG before = InterlockedCompareExchange(&g_seq, 0, 0);
@@ -568,8 +534,7 @@ void mc_poll_and_log(void)
      * self-limits to one report per distinct position, so this is quiet. */
     mc_move rest;
     if (mc_take_rest(&rest)) {
-        menu_speak_probe_rest(&rest);
-        /* ⭐⭐ Discovery belongs on this channel too. Hanging it off movement
+        /* ⭐⭐ Unknown screens belong on this channel too. Hanging it off movement
          * meant a screen the user ENTERED but never moved on was never
          * reported -- so the menus hardest to navigate blind, the ones where
          * you cannot tell whether the cursor moved, were exactly the ones that
@@ -586,37 +551,12 @@ void mc_poll_and_log(void)
      * would suggest a queue that does not exist. */
     mc_move m;
     if (mc_take_move(&m)) {
-        /* ⭐ The screen snapshot, on the CONSUMING path.
-         *
-         * ⛔ It used to hang only off mc_peek_rest() in mod.c, which is reached
-         * only when a movement is still pending at poll time. On the Fighter
-         * Awards run that produced exactly ONE snapshot -- the main menu -- and
-         * none for the screen the user had been asked to open. Every movement
-         * passes through here, so this is where a per-screen capture belongs.
-         *
-         * ⚠ Still once per screen pointer, and it declines loudly rather than
-         * silently, so a screen it cannot read says so in the log. */
         /* ⭐ Speak first, log second: the user is waiting on the readout, and
          * the log is for us. menu_speak() falls back to position-only whenever
          * the screen is unknown or the text cannot be read -- it never guesses
          * a name. */
         menu_speak(&m);
 
-        /* ⛔⛔ THE SNAPSHOT MOVED BELOW menu_speak() -- IT USED TO RUN FIRST.
-         *
-         * USER-REPORTED: "a lot of lag between me pressing an arrow key and
-         * then hearing the change echoed back." This is a DIAGNOSTIC, and it
-         * ran on the game's own thread, ahead of the readout, walking the
-         * widget tree and writing one log line PER ROW. On the first movement
-         * of every screen the user waited for all of that before hearing
-         * anything.
-         *
-         * ⭐ The rule this encodes, which the discovery sweep already taught us
-         * once: a stall in the user's speech is a broken mod; a diagnostic that
-         * is late is an inconvenience to the developer. Nothing here needs to
-         * precede the announcement -- it captures the same screen either way. */
-        gt_snapshot(m.screen, 320.0f, 835.0f,
-                    m.max_index - m.min_index + 1);
         if (!menu_speak_lookup((ULONGLONG)(ULONG_PTR)m.caller))
             menu_speak_log_unknown(&m);
 

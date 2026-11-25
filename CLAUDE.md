@@ -39,11 +39,9 @@ The [next Astra session brief](docs/collection-astra-brief.md) records the start
 point. This workflow does not authorize assuming an untraced field or claiming
 an offline test proves live behavior.
 
-The optional [collection boundary probe](docs/collection-boundary-run-card.md)
-is implemented for the next lifecycle capture. It is off unless
-`cfc2_collection_probe.on` is present, respects `cfc2_hook.off`, and is not a
-production session router. Its new runner brings the regression set to 29.
-Do not treat synthetic probe CSVs under `build/test` as live evidence.
+The collection boundary probe (`cfc2_collection_probe.on`) was DELETED on
+2026-11-25: the session-lifetime design it served is deferred and all eight
+games shipped without it. Its run card is history.
 
 For CVS2 in-game research, read [the 2026-09-18 prior-art audit](docs/cvs2-prior-art-audit.md)
 before relying on the historical conclusions below. It corrects the NAOMI RAM
@@ -102,6 +100,50 @@ text-source audit declined a read-all over it and that still holds.
 tests them). ⚠⚠ **SEVEN runners needed `text_channel.c` on their link lines** --
 exactly the "an un-buildable runner looks like a passing one" trap below. Run
 all 28 after touching this layer, not a chosen few.
+
+## CVS2 NOW HAS THE SAME ADAPTER SHAPE AS THE OTHER GAMES (2026-11-25)
+
+The acquisition path (session, context pointers, root, phase, 134 KB copy)
+is unchanged. What changed to match CVS1 / CFJ / Alpha 3:
+- character names from the shell's table (`character_name(1, id, variant)`),
+  variant = shell +0x1B0, behind the shell gate (+0x1AC == 1). So JP/US
+  names now follow the game version (8 Balrog/Vega, 10 Vega/M.Bison,
+  32 M.Bison/Balrog, E.Honda, Todo, Gouki/Akuma by version).
+- selection kinds `CVS2_KIND_*`, value = the kind's own value, the stage on
+  `CVS2_STAGE_OWNER` (2) instead of borrowing P1's slot.
+- select speech only while the frame counter moves (`frame_liveness.h`);
+  beacons off after a 250 ms frame stall.
+- the super meter is fed by the frame hook with health; the second worker
+  producer `cvs2_gauges_observe` / `cvs2_gauges_log_stats` is deleted.
+- `cvs2_text.c`'s worker half is `game_text.c` (new optional `decode_row`
+  and `key_only` fields), so CVS2 also gets the credit-display filter and
+  refused-row logging; `cvs2_text_register()` registers the ` source.
+- every game's frame hook is installed whether or not the audio device
+  opens (select liveness and CVS1/CFJ/Alpha 3 text depend on them).
+Not yet heard in game.
+
+## ⛔ THE RESEARCH PROBES ARE DELETED (2026-11-25, user's call)
+
+Every question they existed for is answered, so they went, with their
+tests. Notes below that describe them, or their switch files, are HISTORY;
+the code is in git (parent of the deletion commit).
+- `mod.c` is now only the worker: hooks, hotkeys, the select/text ticks and
+  menu speech (2654 -> 400 lines).
+- Gone: the emulator-RAM search and in-game cursor probe (`emu_ram`,
+  `emu_cursor`, `cfc2_emu.on`, `cfc2_cursor.on`), the sPad watcher
+  (`pad_watch`, `cfc2_pad.on`), the keyboard hook (`kbd_state`,
+  `cfc2_kbd.on` -- it hooked game memory every launch for diagnostics only),
+  the caller trace and IAT probe, the collection boundary probe, the CVS2
+  hit probe, the image dumper (`cfc2_dump.on`), the discovery sweep
+  (`cfc2_discover.on`, `run_de_test`), and every `gui_text` diagnostic
+  (`cfc2_guitext_diag.on`, focus record and differ, layout/modal probes,
+  move-list probe, snapshot, census).
+- Kept: `cfc2_hook.off` (read-only kill switch) and ONE unknown-screen log
+  line (`menu_speak_log_unknown`), the only trace of a shell screen the mod
+  does not read.
+- ⭐ If the game is ever patched and needs re-tracing, dump the decrypted
+  exe with an existing tool first (PE-sieve does not attach a debugger,
+  which Enigma resists); do not rebuild the dumper unless that fails.
 
 ## Formatting rule
 

@@ -4,12 +4,14 @@
  * ⭐ This file is now ONLY the CVS2-specific part: the three hook addresses,
  * their signatures, the record header layout, and the CP932 record syntax.
  * Capture buffering, publication, de-duplication, speech and the ` key registry
- * are shared -- see src/text_channel.h. Porting another arcade title means
+ * are shared -- see src/text_channel.h -- and the worker half (narration,
+ * the ` key readout, refused-row logging, the credit-display filter) is the
+ * one every emulated game uses, src/game_text.c. Porting another arcade title means
  * writing a file this shape, not repeating that machinery.
  *
  * Capture only draw calls, publish only at the end of the text frame. */
 #include "cvs2_text.h"
-#include "text_channel.h"
+#include "game_text.h"
 #include "memsafe.h"
 #include "log.h"
 #include "../libs/minhook/include/MinHook.h"
@@ -27,15 +29,9 @@
 #define KIND_RECORD 1
 #define STYLE_HUD_NAME 16
 
-/* A blinking prompt must not repeat per blink, but must speak on a later
- * visit. Measured against "PRESS START BUTTON", which blinks about 1 Hz. */
-#define REARM_MS 2000
-/* A frame older than this is not what is on screen now. */
-#define FRESH_MS 500
-
 static __thread tc_frame collecting;
 static __thread unsigned record_depth;
-static tc_publisher publisher = { SRWLOCK_INIT, {0}, 0, 0 };
+static game_text_state state;       /* zeroed, so .bss: see game_text.h */
 static BOOL text_installed;
 static void (*real_record)(const void *, float);
 static void (*real_string)(float, float, float, const char *);
@@ -69,7 +65,7 @@ static void string_detour(float x, float y, float depth, const char *text)
 static void end_detour(void)
 {
     real_end();
-    tc_frame_publish(&publisher, &collecting);
+    tc_frame_publish(&state.publisher, &collecting);
 }
 
 /* Positioned-record syntax comes from 6B7E00. Ordinary font runs are CP932.
@@ -121,87 +117,28 @@ static BOOL decode_row(const tc_row *r, wchar_t *out)
     return tc_squeeze(out) > 0;
 }
 
-static tc_textdedup dedup;
-static ULONGLONG active_root;
-static unsigned consumed;
+/* Automatic narration leaves these to the readers that already speak them:
+ * the story and win-quote font runs (cvs2_story.c, cvs2_select.c) and the
+ * two HUD name records. The ` key still reads them. */
+static BOOL key_only(const tc_row *r)
+{ return r->kind == KIND_STRING || r->style == STYLE_HUD_NAME; }
 
-void cvs2_text_request_read(void) { tc_request_read(); } /* Worker only. */
+static BOOL decode_text_row(const tc_row *r, wchar_t *out, SIZE_T cap)
+{ return cap >= TC_LINE_CAP && decode_row(r, out); }
 
-/* Assembles the current frame's readable rows.
- *
- * `manual` selects the on-demand readout, which differs from automatic
- * narration in three ways, each for its own reason:
- *   - it includes rows the automatic path leaves to their own readers
- *     (story/quote font runs, and the two HUD name records);
- *   - it includes rows with no letters, i.e. unlabelled HUD digits;
- *   - it ignores de-duplication, because the user asked for what is there NOW.
- */
-static tc_read_result assemble(BOOL manual, wchar_t *say, SIZE_T say_cap)
-{
-    static tc_frame frame; /* Worker only; avoid a large stack frame. */
-    static wchar_t decoded[TC_ROW_CAP][TC_LINE_CAP];
-    int accepted[TC_ROW_CAP];
-    unsigned i, j, count = 0;
-    ULONGLONG now = GetTickCount64();
-    SIZE_T used = 0;
+static game_text_source source = {
+    .tag = "cvs2-text", .name = "CVS2", .decode_row = decode_text_row,
+    .key_only = key_only, .state = &state,
+};
 
-    say[0] = 0;
-    if (!tc_frame_take(&publisher, &frame, &consumed, manual, FRESH_MS))
-        return TC_READ_STALE;
-    memset(decoded, 0, sizeof decoded);
-    for (i = 0; i < frame.count; ++i) {
-        BOOL suppress = FALSE;
-        int slot = -1;
-        SIZE_T length;
-        if (!decode_row(&frame.rows[i], decoded[i])) continue;
-        for (j = 0; j < i; ++j) if (!wcscmp(decoded[j], decoded[i])) break;
-        if (j < i) continue;
-        if (!manual) {
-            /* Existing readers own stories/quotes and the two HUD name
-             * records. The ` key includes them, without duplicating that speech. */
-            if (frame.rows[i].kind == KIND_STRING ||
-                frame.rows[i].style == STYLE_HUD_NAME) continue;
-            if (!tc_has_letters(decoded[i])) continue; /* HUD digits: on demand */
-            slot = tc_textdedup_note(&dedup, decoded[i], now, REARM_MS,
-                                     &suppress);
-            if (suppress) continue;
-        }
-        length = wcslen(decoded[i]);
-        if (used + length + 3 >= say_cap) break;
-        if (used) { say[used++] = L' '; say[used++] = L'\n'; }
-        memcpy(say + used, decoded[i], (length + 1) * sizeof(wchar_t));
-        used += length;
-        accepted[count++] = slot;
-    }
-    if (!used) return TC_READ_EMPTY;
-    if (!tc_say(say, manual, manual ? "cvs2-text (read current)" : "cvs2-text"))
-        return TC_READ_REFUSED;
-    if (!manual)
-        for (i = 0; i < count; ++i) tc_textdedup_mark(&dedup, accepted[i]);
-    if (frame.overflow)
-        log_line("cvs2-text: capture limit reached; some rows were dropped");
-    return TC_READ_SPOKE;
-}
+/* The ` key source. INACTIVE unless CVS2 is the running game. */
+static tc_read_result read_current(void) { return game_text_read_current(&source); }
 
-/* The ` key source. Returns INACTIVE unless CVS2 is the running game. */
-static tc_read_result read_current(void)
-{
-    wchar_t say[TC_SAY_CAP];
-    if (!active_root || !text_installed) return TC_READ_INACTIVE;
-    return assemble(TRUE, say, TC_SAY_CAP);
-}
+/* Without the hooks nothing is captured, so CVS2 is "not active here" for
+ * the ` key rather than a stale-frame answer. */
+void cvs2_text_observe(ULONGLONG root) { game_text_observe(&source, text_installed ? root : 0); }
 
-void cvs2_text_observe(ULONGLONG root)
-{
-    wchar_t say[TC_SAY_CAP];
-    if (root != active_root) {
-        tc_textdedup_reset(&dedup);
-        active_root = root;
-        tc_frame_invalidate(&publisher);
-    }
-    if (!root || !text_installed) return;
-    assemble(FALSE, say, TC_SAY_CAP);
-}
+void cvs2_text_register(void) { tc_register("CVS2", read_current); }
 
 BOOL cvs2_text_install(void)
 {
@@ -230,7 +167,6 @@ BOOL cvs2_text_install(void)
     for (i = 0; i < 3; ++i)
         if (MH_EnableHook((void *)(ULONG_PTR)sites[i].address) != MH_OK) goto fail;
     text_installed = TRUE;
-    tc_register("CVS2", read_current);
     log_line("cvs2-text: record, string, and end-of-text-frame hooks installed");
     return TRUE;
 fail:
