@@ -6,7 +6,6 @@ build/
 # against a synthetic one; a suite whose inputs are gitignored passes only on
 # the machine that happened to produce them.
 !docs/run-*.log
-!tools/fixtures/*.log
 tools/__pycache__/
 data/text_*.json
 # Dumps of the unpacked game image: large, and game-owned code.
@@ -20,8 +19,9 @@ riprefs.pkl
 # absolute path to this checkout and to the Steam install, so a committed copy
 # would grant nothing on another machine while looking as though it did.
 .claude/
-!tools/fixtures/cvs2-quote-complete.bin
-!tools/fixtures/cvs2-credits-stream.bin
-# Raw capture traces (~37 MB each) stay local; the compact fixtures made
-# from them by tools/make_stg2_fixtures.py are committed.
-tools/fixtures/stg2-*/trace.bin.gz
+
+# Captures of the running games (memory snapshots, traces, frames) and
+# tables of the games' own text that only tests use. They stay on the
+# developer's machine as test data and are not published (2026-11-25).
+tools/fixtures/
+src/quote_table.h
