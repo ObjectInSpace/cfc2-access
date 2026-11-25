@@ -3268,20 +3268,40 @@ static void menu_speak_check_dialog(void)
         }
         if (now - pending_since < 150)
             return;
-        seen_seq = seq;
-        cur = dlg;
+        cur = NULL;
         cur_vt = 0;
         if (!mem_readable(dlg, sizeof cur_vt) || !mem_copy(&cur_vt, dlg, sizeof cur_vt) ||
             !screen_int(dlg, DLG_MSG_OFF, &msg) || msg <= 0) {
-            cur = NULL;
+            seen_seq = seq;
             return;
         }
         {
             char tmpl[GT_CAPTION_MAX], text[GT_CAPTION_MAX], spoken[GM_OUT_MAX];
             if (!dialog_msg(msg, tmpl, sizeof tmpl) || !tmpl[0]) {
+                /* ⛔ USER 2026-11-25: "It works but it didn't at first." For
+                 * the first ~35 s after launch the message table may not be
+                 * found yet (the 00:15 run: ready 36 s in). This used to mark
+                 * the dialog handled and never retry, so a dialog opened in
+                 * that window stayed silent. Now it waits -- re-tried every
+                 * poll for up to a minute -- and is spoken the moment the
+                 * text can be read. A message missing with the table READY is
+                 * a real gap: logged once and skipped. */
+                static LONG logged_seq;
+                if (!g_dialog_resolver && !gmd_text_ready() &&
+                    now - pending_since < 60000) {
+                    if (logged_seq != seq) {
+                        logged_seq = seq;
+                        log_line("dialog: message %d opened before the message "
+                                 "table was ready -- waiting to speak it.", msg);
+                    }
+                    return;
+                }
+                seen_seq = seq;
                 log_line("dialog: message %d has no text; not spoken.", msg);
                 return;
             }
+            seen_seq = seq;
+            cur = dlg;
             _snprintf(text, sizeof text, "%s", tmpl);
             if (strchr(tmpl, '%')) {
                 fill_ctx fc;
@@ -3601,11 +3621,17 @@ void menu_speak(const mc_move *m)
             h_last = -1;
         }
         if (help_line_latest(&hm, &hs) && hs != h_seen) {
-            h_seen = hs;
-            if (hm != h_last) {
-                char d[GT_CAPTION_MAX], ds[GM_OUT_MAX];
+            char d[GT_CAPTION_MAX], ds[GM_OUT_MAX];
+            /* ⚠ Only consumed once its text could be READ. For the first
+             * half-minute or so after launch the message table may not be
+             * found yet; giving up then left the row's description unsaid
+             * for good. Unread, it is retried on the next movement. */
+            BOOL readable = gmd_text_by_index(hm, d, sizeof(d)) && d[0];
+            if (readable)
+                h_seen = hs;
+            if (readable && hm != h_last) {
                 h_last = hm;
-                if (gmd_text_by_index(hm, d, sizeof(d)) && d[0]) {
+                {
                     gm_speak(d, ds, sizeof(ds));
                     if (ds[0] && !gm_has_residue(ds) && !strstr(line, ds)) {
                         size_t used = strlen(line);
